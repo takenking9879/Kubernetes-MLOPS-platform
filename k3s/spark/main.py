@@ -15,9 +15,9 @@ class SparkPreprocessing(BaseUtils):
         self.output_dir = output_dir
         self.artifacts_dir = artifacts_dir
         self.schema = schema
+        self.s3 = None
         self.spark = self._create_spark_session()
         self.scaler = None
-        self.s3 = None
 
     def _check_minio_connection(self):
         try:
