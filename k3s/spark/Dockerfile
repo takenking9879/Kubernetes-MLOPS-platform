@@ -69,6 +69,7 @@ RUN wget -P /opt/spark/jars/ https://repo1.maven.org/maven2/org/apache/hadoop/ha
     && wget -P /opt/spark/jars/ https://repo1.maven.org/maven2/software/amazon/awssdk/aws-cbor-protocol/2.41.8/aws-cbor-protocol-2.41.8.jar \
     && wget -P /opt/spark/jars/ https://repo1.maven.org/maven2/software/amazon/awssdk/smithy-rpcv2-protocol/2.41.8/smithy-rpcv2-protocol-2.41.8.jar \
     && wget -P /opt/spark/jars/ https://repo1.maven.org/maven2/software/amazon/awssdk/json-utils/2.41.8/json-utils-2.41.8.jar \
-    && wget -P /opt/spark/jars/ https://repo1.maven.org/maven2/software/amazon/awssdk/third-party-jackson-core/2.41.8/third-party-jackson-core-2.41.8.jar
+    && wget -P /opt/spark/jars/ https://repo1.maven.org/maven2/software/amazon/awssdk/third-party-jackson-core/2.41.8/third-party-jackson-core-2.41.8.jar \
+    && wget -P /opt/spark/jars/ https://repo1.maven.org/maven2/software/amazon/awssdk/arns/2.41.8/arns-2.41.8.jar
     
 USER spark

@@ -94,6 +94,7 @@ class SparkPreprocessing(BaseUtils):
         Unified preprocessing entry.
         """
         try:
+            self.logger.info(f"Starting preprocessing for {dataset} dataset")
             if dataset not in ['train', 'val', 'test']:
                 raise ValueError("dataset must be one of ['train', 'val', 'test']")
 
@@ -112,7 +113,9 @@ class SparkPreprocessing(BaseUtils):
                     self.scaler = self.load_scaler_artifact()
                 df_out, _ = module.preprocess_spark(df, model=self.scaler, train=False)
 
+            self.logger.info(f"Preprocessing completed for {dataset} dataset. Writing output.")
             self.write_data(df_out, os.path.join(self.output_dir, f'{dataset}/'))
+            self.logger.info(f"Output written in S3 for {dataset} dataset.")
         except Exception as e:
             self.logger.error('Preprocess failed to complete: %s', str(e), exc_info=True)
             raise
@@ -199,6 +202,8 @@ def main():
 
     # 3) Preprocess TEST using train-fitted transforms
     preprocessing.preprocess('test')
+
+    preprocessing.logger.info("Spark preprocessing completed successfully.")
 
 if __name__ == "__main__":
     main()
