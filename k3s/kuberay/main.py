@@ -244,7 +244,7 @@ def main():
     output_dir = "s3://k8s-mlops-platform-bucket/v1/models" #Para el modelo
 
     model = KubeRayTraining(
-        params_path="/app/repo/k3s/params.yaml",
+        params_path="/home/ray/app/repo/k3s/params.yaml",
         data_dir=data_dir,
         output_dir=output_dir
     )
