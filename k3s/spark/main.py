@@ -80,7 +80,7 @@ class SparkPreprocessing(BaseUtils):
 
             spark = self.spark
             self.logger.info(f"Loading data from {file_path}")
-            df = spark.read.schema(self.schema).parquet(file_path)
+            df = spark.read.schema(self.schema).parquet(file_path) #Aqui tambien se valida el schema
             self.logger.info(
                 f"Data loaded successfully | partitions: {df.rdd.getNumPartitions()}"
             )

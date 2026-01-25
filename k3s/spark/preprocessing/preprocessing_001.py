@@ -147,6 +147,23 @@ def preprocess_spark(
     df = apply_encoders(df, encoders)
     df = apply_scaler(df, scaler)
 
+    # ======================================================
+    # 5. SELECCIÓN FINAL (Eliminar basura y mantener target)
+    # ======================================================
+    # Solo nos quedamos con las columnas escaladas (_norm) y las codificadas (_idx)
+    # más el target original para que Ray pueda usarlo.
+    
+    final_cols = [f"{c}_idx" for c in cat_cols] + \
+                 [f"{c}_norm" for c in num_cols]
+    
+    target_col = 'attack'
+    if target_col in df.columns:
+        final_cols.append(target_col)
+    
+    # Verificación de seguridad: solo seleccionar si existen en el DF
+    existing_cols = [c for c in final_cols if c in df.columns]
+    df = df.select(*existing_cols)
+
     return df, model
 
 
