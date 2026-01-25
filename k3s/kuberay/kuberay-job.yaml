@@ -11,8 +11,8 @@ spec:
 
   runtimeEnvYAML: |
     env_vars:
-      NUM_WORKERS: "2"
-      CPUS_PER_WORKER: "2"
+      NUM_WORKERS: "3"
+      CPUS_PER_WORKER: "3"
 
   rayClusterSpec:
     rayVersion: "2.52.0"
@@ -89,9 +89,9 @@ spec:
     # WORKERS
     ########################
     workerGroupSpecs:
-      - replicas: 2
-        minReplicas: 2
-        maxReplicas: 3
+      - replicas: 3
+        minReplicas: 3
+        maxReplicas: 4
         groupName: small-group
         rayStartParams: {}
 
@@ -118,7 +118,7 @@ spec:
                     cpu: "4"
                     memory: "4Gi"
                   requests:
-                    cpu: "3"
+                    cpu: "4"
                     memory: "4Gi"
                 volumeMounts:
                   - name: job-files

@@ -57,7 +57,7 @@ class KubeRayTraining(BaseUtils):
                 return
             if framework == "xgboost":
                 # XGBoost permite obtener el modelo directamente del checkpoint
-                model = checkpoint.get_model()
+                model = checkpoint.to_directory()
                 with open(local_path, "wb") as f:
                     pickle.dump(model, f)
             elif framework == "pytorch":
