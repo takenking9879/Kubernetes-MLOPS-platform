@@ -3,3 +3,10 @@ message: 'org.apache.kafka.common.errors.InvalidReplicationFactorException: Unab
       be reached because only 1 broker(s) are registered.'
 
 Me tuve que pelear con TLS y scram-sha-512
+
+#buscar en repo1.maven los paquetes de spark y así para que haya compatibilidad, es necesario cada uno de estos para que funcione el codigo,
+chatgpt suele alucionar y no es muy bueno buscando las ultimas versiones y que requerimientos tienen
+
+
+https://strimzi.io/docs/operators/latest/deploying.html#ref-metrics-dashboards-str #doc strimzi
+

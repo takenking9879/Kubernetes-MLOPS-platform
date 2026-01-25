@@ -1,0 +1,5 @@
+Ejemplo1:
+python3 k3s/kuberay/helpers/resource_calculator.py --cluster-cpus 64 --num-workers 4 --cpus-per-worker 2 --cpus-head 1 --desired-trials 4
+
+Ejemplo2:
+python3 k3s/kuberay/helpers/resource_calculator.py --cluster-nodes 4 --cpus-per-node 4 --num-workers 4 --cpus-per-worker 2 --cpus-head 1 --desired-trials 4

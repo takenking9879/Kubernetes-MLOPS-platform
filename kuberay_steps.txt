@@ -1,0 +1,18 @@
+# add repo
+helm repo add kuberay https://ray-project.github.io/kuberay-helm/
+
+#Create namespace
+kubectl create namespace ray
+
+#install operator
+helm install kuberay-operator kuberay/kuberay-operator --version 1.5.1 -n ray
+
+#Añadir secrets
+kubectl create secret generic env-secret \
+  --from-env-file=.env \
+  -n ray
+
+#Crear pod
+kubectl apply -f k3s/kuberay/kuberay-job.yaml
+
+kubectl delete rayjob kuberay-job -n ray
