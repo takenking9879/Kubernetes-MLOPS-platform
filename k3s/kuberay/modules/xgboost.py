@@ -107,7 +107,7 @@ def train_func(config: Dict):
     cpus_per_worker = int(config.get("cpus_per_worker", os.getenv("CPUS_PER_WORKER", "1")))
     cpus_per_worker = max(cpus_per_worker, 1)
     params["nthread"] = cpus_per_worker
-    for var in (
+    """for var in (
         "OMP_NUM_THREADS",
         "MKL_NUM_THREADS",
         "OPENBLAS_NUM_THREADS",
@@ -115,7 +115,7 @@ def train_func(config: Dict):
         "VECLIB_MAXIMUM_THREADS",
     ):
         os.environ[var] = str(cpus_per_worker)
-    
+    """
     # Log actual CPU configuration for debugging
     if ray.train.get_context().get_world_rank() == 0:
         print(f"[xgboost] Worker using nthread={cpus_per_worker} | "
