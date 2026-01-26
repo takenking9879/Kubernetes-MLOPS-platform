@@ -4,6 +4,7 @@ import ray
 import os
 import importlib
 import pickle
+import subprocess
 import tempfile
 from urllib.parse import urlparse
 from typing import Dict, Any
@@ -146,6 +147,12 @@ class KubeRayTraining(BaseUtils):
     
     def train(self):
         try:
+            status = subprocess.run(
+                ["ray", "status"], capture_output=True, text=True, check=False
+            )
+            self.logger.info("Ray status:\n%s", status.stdout.strip())
+            if status.stderr:
+                self.logger.warning("Ray status stderr:\n%s", status.stderr.strip())
             self._check_minio_connection()
             module = importlib.import_module(f"{'modules.' + self.params.get('framework', 'xgboost')}")
 
