@@ -7,7 +7,7 @@ spec:
   entrypoint: python3 /home/ray/app/repo/k3s/kuberay/main.py
 
   shutdownAfterJobFinishes: true
-  ttlSecondsAfterFinished: 20
+  ttlSecondsAfterFinished: 100
 
   runtimeEnvYAML: |
     env_vars:
@@ -138,10 +138,10 @@ spec:
                     # Laptop single-node "simulate 2 nodes": run 2 worker pods on the same host.
                     # Sized so both worker pods can be scheduled together.
                     cpu: "9"
-                    memory: "4Gi"
+                    memory: "5Gi"
                   requests:
                     cpu: "9"
-                    memory: "4Gi"
+                    memory: "5Gi"
                 volumeMounts:
                   - name: job-files
                     mountPath: /home/ray/app

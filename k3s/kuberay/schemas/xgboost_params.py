@@ -12,7 +12,7 @@ from ray import tune
 
 # Default (non-tuned) params used for final distributed training.
 XGBOOST_PARAMS: Dict[str, Any] = {
-    "num_boost_round": 100,
+    "num_boost_round": 10,
     "objective": "multi:softprob",
   "eval_metric": ["mlogloss", "merror"],
     "booster": "gbtree",
