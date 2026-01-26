@@ -121,16 +121,8 @@ class KubeRayTraining(BaseUtils):
 
                 # Log metrics (NO artifacts)
                 for k, v in metrics.items():
-                    try:
-                        mlflow.log_metric(k, float(v))
-                    except Exception as e:
-                        self.logger.warning(
-                            "No se pudo loggear la métrica %s=%r en MLflow: %s",
-                            k,
-                            v,
-                            str(e),
-                            exc_info=True,
-                        )
+                    mlflow.log_metric(k, float(v))
+                    
         except Exception as e:
             self.logger.error(f"Error al loggear en MLflow: {str(e)}", exc_info=True)
 
