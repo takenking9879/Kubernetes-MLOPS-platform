@@ -172,8 +172,6 @@ def tune_model(
         tune_config=tune.TuneConfig(
             num_samples=8,
             scheduler=scheduler,
-            metric="validation-mlogloss",
-            mode="min",
             max_concurrent_trials=int(os.getenv("MAX_CONCURRENT_TRIALS", "1")),
         ),
         run_config=RunConfig(
