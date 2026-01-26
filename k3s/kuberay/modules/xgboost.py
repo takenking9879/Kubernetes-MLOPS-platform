@@ -177,6 +177,7 @@ def train(train_dataset, val_dataset, target, storage_path, name, num_classes: i
     # Métricas finales (mezcla de métricas reportadas por Ray + multiclass en val)
     final_metrics: Dict[str, float] = {}
     try:
+        logger.debug("Extrayendo métricas numéricas de result.metrics...")
         if getattr(result, "metrics", None):
             for k, v in result.metrics.items():
                 if isinstance(v, (int, float)):

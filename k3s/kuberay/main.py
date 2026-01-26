@@ -242,6 +242,7 @@ class KubeRayTraining(BaseUtils):
             # Log final en MLflow (sin artifacts)
             # Prefer métricas ya calculadas por el módulo; si no hay, usamos las del Result.
             if not final_metrics:
+                self.logger.debug("No se encontraron métricas finales calculadas; extrayendo de result.metrics...")
                 final_metrics = {}
                 try:
                     if getattr(result, "metrics", None):
@@ -264,6 +265,7 @@ class KubeRayTraining(BaseUtils):
 
             train_time_sec = final_metrics.get("train_time_sec")
             if train_time_sec is not None:
+                self.logger.debug("Train time sec from final_metrics: %s", str(train_time_sec))
                 self.logger.info(
                     "%s training time (distributed) = %.2f s",
                     framework,
