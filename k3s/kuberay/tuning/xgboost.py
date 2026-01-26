@@ -15,7 +15,6 @@ from ray.tune import RunConfig
 from ray.train.xgboost import RayTrainReportCallback, XGBoostTrainer
 from ray.air.integrations.mlflow import MLflowLoggerCallback
 from ray.tune.schedulers import ASHAScheduler, ResourceChangingScheduler
-from ray.tune.integration.xgboost import TuneReportCheckpointCallback
 
 from schemas.xgboost_params import SEARCH_SPACE_XGBOOST_PARAMS, XGBOOST_TUNE_SETTINGS
 from helpers.xgboost_utils import get_train_val_dmatrix, run_xgboost_train
@@ -41,33 +40,17 @@ def train_func(config: Dict):
     params["nthread"] = int(config.get("cpus_per_worker", os.getenv("CPUS_PER_WORKER", "1")))
     params["num_class"] = num_classes
 
-    xgb_model = None
-    checkpoint = tune.get_checkpoint()
-    if checkpoint:
-        xgb_model = TuneReportCheckpointCallback.get_model(
-            checkpoint, filename=CHECKPOINT_FILENAME
-        )
-
     run_xgboost_train(
         params=params,
         dtrain=dtrain,
         dval=dval,
         num_boost_round=num_boost_round,
-        xgb_model=xgb_model,
         callbacks=[
             RayTrainReportCallback(
                 metrics=["validation-mlogloss", "validation-merror"],
                 frequency=1,
                 checkpoint_frequency=1,
                 checkpoint_filename=CHECKPOINT_FILENAME,
-            ),
-            TuneReportCheckpointCallback(
-                metrics={
-                    "validation-mlogloss": "validation-mlogloss",
-                    "validation-merror": "validation-merror",
-                },
-                filename=CHECKPOINT_FILENAME,
-                frequency=1,
             ),
         ],
     )
@@ -98,22 +81,11 @@ def tune_model(
     )
 
     # --- Search space (cheap tuning) ---
-    train_loop_config = {
-        "target": target,
-        "num_classes": int(num_classes),
-        # Used by train_func to set xgboost nthread consistently with allocated CPUs.
-        "cpus_per_worker": cpus_per_worker,
+    # NOTE: We keep the keys aligned with main.py expectations.
+    # main.py does: best_config.get("xgboost_params")
+    param_space = {
         "xgboost_params": SEARCH_SPACE_XGBOOST_PARAMS,
-        # Keep ASHA's max_t consistent with the actual training loop.
-        "num_boost_round": int(XGBOOST_TUNE_SETTINGS["num_boost_round"]),
     }
-
-    trainer = XGBoostTrainer(
-        train_loop_per_worker=train_func,
-        train_loop_config=train_loop_config,
-        scaling_config=scaling_config,
-        datasets={"train": train_dataset, "val": val_dataset},
-    )
 
     # --- Early stopping ---
     asha = ASHAScheduler(
@@ -131,15 +103,32 @@ def tune_model(
     scheduler = ResourceChangingScheduler(base_scheduler=asha) if enable_rcs else asha
 
     # IMPORTANT:
-    # Ray Tune requires the trainable to be serializable (picklable).
-    # In recent Ray versions, Trainer instances may contain non-picklable objects
-    # (e.g., internal locks). Use `trainer.as_trainable()` to get a Tune Trainable.
-    if not hasattr(trainer, "as_trainable"):
-        raise TypeError(
-            "Ray Train Trainer is not serializable for Tune in this Ray version. "
-            "Expected `trainer.as_trainable()` to exist."
+    # Tune validates that the trainable is picklable. In Ray 2.52, `XGBoostTrainer`
+    # may not expose `as_trainable()`, and pickling a Trainer instance can fail.
+    # Workaround: build the Trainer inside a *function trainable*.
+    def _trainable(trial_config: Dict, *, train_dataset, val_dataset):
+        train_loop_config = {
+            "target": target,
+            "num_classes": int(num_classes),
+            "cpus_per_worker": cpus_per_worker,
+            "num_boost_round": int(XGBOOST_TUNE_SETTINGS["num_boost_round"]),
+            "xgboost_params": trial_config["xgboost_params"],
+        }
+
+        trainer = XGBoostTrainer(
+            train_loop_per_worker=train_func,
+            train_loop_config=train_loop_config,
+            scaling_config=scaling_config,
+            datasets={"train": train_dataset, "val": val_dataset},
         )
-    trainable = trainer.as_trainable()
+        result = trainer.fit()
+        metrics = getattr(result, "metrics", None) or {}
+        tune.report(
+            training_iteration=1,
+            **{k: v for k, v in metrics.items() if isinstance(v, (int, float))},
+        )
+
+    trainable = tune.with_parameters(_trainable, train_dataset=train_dataset, val_dataset=val_dataset)
 
     callbacks = []
     if mlflow_tracking_uri and mlflow_experiment_name:
@@ -154,6 +143,7 @@ def tune_model(
 
     tuner = tune.Tuner(
         trainable,
+        param_space=param_space,
         tune_config=tune.TuneConfig(
             num_samples=8,
             scheduler=scheduler,

@@ -46,19 +46,10 @@ def tune_model(
     )
 
     # --- Hyperparameter search space (cheap tuning) ---
-    train_loop_config = {
-        "target": target,
+    # Keep key aligned with main.py expectations (best_config.get("pytorch_params")).
+    param_space = {
         "pytorch_params": SEARCH_SPACE_PYTORCH_PARAMS,
-        "input_dim": 14,  # Ajustado a las columnas de preprocessing_001.py (3 cat + 11 num)
-        "num_classes": int(num_classes),
     }
-
-    trainer = TorchTrainer(
-        train_loop_per_worker=train_func,
-        train_loop_config=train_loop_config,
-        scaling_config=scaling_config,
-        datasets={"train": train_dataset, "val": val_dataset},
-    )
 
     # --- Early stopping scheduler ---
     asha = ASHAScheduler(
@@ -76,14 +67,29 @@ def tune_model(
     scheduler = ResourceChangingScheduler(base_scheduler=asha) if enable_rcs else asha
 
     # NOTE:
-    # Ray Tune requires the trainable to be serializable (picklable). Use
-    # `trainer.as_trainable()` to avoid pickling the Trainer instance itself.
-    if not hasattr(trainer, "as_trainable"):
-        raise TypeError(
-            "Ray Train Trainer is not serializable for Tune in this Ray version. "
-            "Expected `trainer.as_trainable()` to exist."
+    # Same workaround as xgboost: build the Trainer inside a function trainable.
+    def _trainable(trial_config: Dict, *, train_dataset, val_dataset):
+        train_loop_config = {
+            "target": target,
+            "pytorch_params": trial_config["pytorch_params"],
+            "input_dim": 14,
+            "num_classes": int(num_classes),
+        }
+
+        trainer = TorchTrainer(
+            train_loop_per_worker=train_func,
+            train_loop_config=train_loop_config,
+            scaling_config=scaling_config,
+            datasets={"train": train_dataset, "val": val_dataset},
         )
-    trainable = trainer.as_trainable()
+        result = trainer.fit()
+        metrics = getattr(result, "metrics", None) or {}
+        tune.report(
+            training_iteration=1,
+            **{k: v for k, v in metrics.items() if isinstance(v, (int, float))},
+        )
+
+    trainable = tune.with_parameters(_trainable, train_dataset=train_dataset, val_dataset=val_dataset)
 
     callbacks = []
     if mlflow_tracking_uri and mlflow_experiment_name:
@@ -98,6 +104,7 @@ def tune_model(
 
     tuner = tune.Tuner(
         trainable,
+        param_space=param_space,
         tune_config=tune.TuneConfig(
             num_samples=5,
             scheduler=scheduler,
