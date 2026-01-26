@@ -125,6 +125,9 @@ def train_func(config: Dict):
     # Keep it out of `params` to avoid XGBoost warnings (and keep logs clean).
     num_boost_round = int(params.pop("num_boost_round", 100))
     dtrain, dval = get_train_val_dmatrix(target)
+
+    #Aqui el tiempo de entrenamiento
+    start_time = time.perf_counter()
     run_xgboost_train(
         params=params,
         dtrain=dtrain,
@@ -138,6 +141,9 @@ def train_func(config: Dict):
             )
         ],
     )
+    train_time_sec = time.perf_counter() - start_time
+    print(f"[xgboost] Worker train_time_sec={train_time_sec:.2f}")
+    #Aqui termina el tiempo de entrenamiento
 
 # Main training function
 def train(train_dataset, val_dataset, target, storage_path, name, num_classes: int = 6, xgboost_params=None):
@@ -152,62 +158,34 @@ def train(train_dataset, val_dataset, target, storage_path, name, num_classes: i
         "xgboost_params": params,
         "cpus_per_worker": int(os.getenv("CPUS_PER_WORKER", 2)),
     }
-    
-    run_name = name
-    if os.getenv("RAY_UNIQUE_RUN_NAME", "0") in ("1", "true", "True"):
-        run_name = f"{name}-{int(time.time())}"
-    else:
-        suffix = os.getenv("RAY_RUN_NAME_SUFFIX")
-        if suffix:
-            run_name = f"{name}-{suffix}"
 
     trainer = XGBoostTrainer(
         train_loop_per_worker=train_func, #Función de entrenamiento
         train_loop_config=config, #Configuración del entrenamiento
         scaling_config=scaling_config, #Configuración de recursos
         datasets={"train": train_dataset, "val": val_dataset}, #Pasar datasets leidos
-        run_config=ray.train.RunConfig(storage_path=storage_path, name=run_name), #Donde guardar los resultados
+        run_config=ray.train.RunConfig(storage_path=storage_path, name=name), #Donde guardar los resultados
     )
 
-    start_time = time.perf_counter()
     result = trainer.fit()
-    train_time_sec = time.perf_counter() - start_time
-    print(f"[xgboost] distributed train_time_sec={train_time_sec:.2f}")
-
+    
     # Métricas finales (mezcla de métricas reportadas por Ray + multiclass en val)
     final_metrics: Dict[str, float] = {}
-    try:
-        logger.debug("Extrayendo métricas numéricas de result.metrics...")
-        if getattr(result, "metrics", None):
-            for k, v in result.metrics.items():
-                if isinstance(v, (int, float)):
-                    final_metrics[k] = float(v)
-    except Exception as e:
-        logger.warning(
-            "[xgboost] No se pudieron extraer métricas numéricas de result.metrics: %s",
-            str(e),
-            exc_info=True,
-        )
 
-    final_metrics["train_time_sec"] = train_time_sec
+    if getattr(result, "metrics", None):
+        for k, v in result.metrics.items():
+            if isinstance(v, (int, float)):
+                final_metrics[k] = float(v)
 
-    try:
-        if getattr(result, "checkpoint", None):
-            mc_start = time.perf_counter()
-            final_metrics.update(
-                xgb_multiclass_metrics_on_val(
-                    val_ds=val_dataset,
-                    target=target,
-                    num_classes=int(num_classes),
-                    booster_checkpoint=result.checkpoint,
-                )
-            )
-            final_metrics["multiclass_metrics_time_sec"] = time.perf_counter() - mc_start
-    except Exception as e:
-        logger.warning(
-            "[xgboost] Falló el cálculo de métricas multiclass en val: %s",
-            str(e),
-            exc_info=True,
+    mc_start = time.perf_counter()
+    final_metrics.update(
+        xgb_multiclass_metrics_on_val(
+            val_ds=val_dataset,
+            target=target,
+            num_classes=int(num_classes),
+            booster_checkpoint=result.checkpoint,
         )
+    )
+    final_metrics["multiclass_metrics_time_sec"] = time.perf_counter() - mc_start
 
     return result, final_metrics
