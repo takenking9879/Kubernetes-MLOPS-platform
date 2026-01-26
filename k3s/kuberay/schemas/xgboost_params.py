@@ -14,7 +14,7 @@ from ray import tune
 XGBOOST_PARAMS: Dict[str, Any] = {
     "num_boost_round": 10,
     "objective": "multi:softprob",
-  "eval_metric": ["mlogloss", "merror"],
+    "eval_metric": ["mlogloss", "merror"],
     "booster": "gbtree",
     "tree_method": "hist",
     "verbosity": 1,
@@ -37,7 +37,7 @@ XGBOOST_TUNE_SETTINGS: Dict[str, int] = {
 # Ray Tune search space for cheap HPT (ONLY XGBoost params).
 SEARCH_SPACE_XGBOOST_PARAMS: Dict[str, Any] = {
     "objective": "multi:softprob",
-  "eval_metric": ["mlogloss", "merror"],
+    "eval_metric": ["mlogloss", "merror"],
     "max_depth": tune.randint(3, 11),
     "min_child_weight": tune.choice([1, 2, 3]),
     "subsample": tune.uniform(0.5, 1.0),

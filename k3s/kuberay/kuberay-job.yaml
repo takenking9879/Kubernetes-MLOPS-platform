@@ -79,6 +79,8 @@ spec:
                   value: "true"
                 - name: RAY_DEFAULT_OBJECT_STORE_MEMORY_PROPORTION
                   value: "0.7"
+                - name: RAY_ACCEL_ENV_VAR_OVERRIDE_ON_ZERO
+                  value: "0"
 
           initContainers:
             - name: git-sync
@@ -159,6 +161,8 @@ spec:
                     value: "true"
                   - name: RAY_DEFAULT_OBJECT_STORE_MEMORY_PROPORTION
                     value: "0.7"
+                  - name: RAY_ACCEL_ENV_VAR_OVERRIDE_ON_ZERO
+                    value: "0"
 
             initContainers:
               - name: git-sync

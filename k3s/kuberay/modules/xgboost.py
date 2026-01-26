@@ -107,20 +107,7 @@ def train_func(config: Dict):
     cpus_per_worker = int(config.get("cpus_per_worker", os.getenv("CPUS_PER_WORKER", "1")))
     cpus_per_worker = max(cpus_per_worker, 1)
     params["nthread"] = cpus_per_worker
-    """for var in (
-        "OMP_NUM_THREADS",
-        "MKL_NUM_THREADS",
-        "OPENBLAS_NUM_THREADS",
-        "NUMEXPR_NUM_THREADS",
-        "VECLIB_MAXIMUM_THREADS",
-    ):
-        os.environ[var] = str(cpus_per_worker)
-    """
-    # Log actual CPU configuration for debugging
-    if ray.train.get_context().get_world_rank() == 0:
-        print(f"[xgboost] Worker using nthread={cpus_per_worker} | "
-              f"OMP_NUM_THREADS={os.environ.get('OMP_NUM_THREADS', 'not set')}")
-    
+
     # `num_boost_round` is a top-level argument to xgboost.train, not a param.
     # Keep it out of `params` to avoid XGBoost warnings (and keep logs clean).
     num_boost_round = int(params.pop("num_boost_round", 100))
