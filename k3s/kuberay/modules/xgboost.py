@@ -153,12 +153,20 @@ def train(train_dataset, val_dataset, target, storage_path, name, num_classes: i
         "cpus_per_worker": int(os.getenv("CPUS_PER_WORKER", 2)),
     }
     
+    run_name = name
+    if os.getenv("RAY_UNIQUE_RUN_NAME", "0") in ("1", "true", "True"):
+        run_name = f"{name}-{int(time.time())}"
+    else:
+        suffix = os.getenv("RAY_RUN_NAME_SUFFIX")
+        if suffix:
+            run_name = f"{name}-{suffix}"
+
     trainer = XGBoostTrainer(
         train_loop_per_worker=train_func, #Función de entrenamiento
         train_loop_config=config, #Configuración del entrenamiento
         scaling_config=scaling_config, #Configuración de recursos
         datasets={"train": train_dataset, "val": val_dataset}, #Pasar datasets leidos
-        run_config=ray.train.RunConfig(storage_path=storage_path, name=name), #Donde guardar los resultados
+        run_config=ray.train.RunConfig(storage_path=storage_path, name=run_name), #Donde guardar los resultados
     )
 
     start_time = time.perf_counter()

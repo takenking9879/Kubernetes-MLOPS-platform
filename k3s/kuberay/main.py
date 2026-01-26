@@ -41,7 +41,16 @@ class KubeRayTraining(BaseUtils):
     
     def _load_data(self, path: str):
         try:
-            ds = ray.data.read_parquet(path)
+            override_blocks_raw = os.getenv("RAY_READ_PARQUET_OVERRIDE_NUM_BLOCKS", "0")
+            try:
+                override_blocks = int(override_blocks_raw)
+            except Exception:
+                override_blocks = 0
+
+            if override_blocks and override_blocks > 0:
+                ds = ray.data.read_parquet(path, override_num_blocks=override_blocks)
+            else:
+                ds = ray.data.read_parquet(path)
             # Optional: materialize now so downstream consumers (Train + metrics)
             # can reuse blocks from the object store instead of triggering multiple
             # `ReadParquet` executions.
