@@ -42,6 +42,12 @@ class KubeRayTraining(BaseUtils):
     def _load_data(self, path: str):
         try:
             ds = ray.data.read_parquet(path)
+            # Optional: materialize now so downstream consumers (Train + metrics)
+            # can reuse blocks from the object store instead of triggering multiple
+            # `ReadParquet` executions.
+            # Enable with: RAY_MATERIALIZE_DATASETS=1
+            if os.getenv("RAY_MATERIALIZE_DATASETS", "0") in ("1", "true", "True"):
+                ds = ds.materialize()
             self.logger.info(f"Data loaded from {path}.")
             return ds
         except Exception as e:
@@ -259,6 +265,17 @@ class KubeRayTraining(BaseUtils):
                     "%s no reportó 'train_time_sec' en final_metrics.",
                     framework,
                 )
+
+            mc_time_sec = final_metrics.get("multiclass_metrics_time_sec")
+            if mc_time_sec is not None:
+                try:
+                    self.logger.info(
+                        "%s multiclass metrics time = %.2f s",
+                        framework,
+                        float(mc_time_sec),
+                    )
+                except Exception:
+                    self.logger.info("%s multiclass metrics time = %r", framework, mc_time_sec)
 
             # If tuning is disabled, log default params as the effective params.
             

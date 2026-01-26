@@ -74,7 +74,11 @@ def xgb_multiclass_metrics_on_val(
         booster = RayTrainReportCallback.get_model(booster_checkpoint)
         model_bytes = booster.save_raw()
 
-        def predict_batch(df: "pd.DataFrame") -> "pd.DataFrame":
+        # NOTE: The previous implementation used `groupby(...).count()` which forces
+        # a shuffle + hash aggregate (slow for small/medium datasets on Kubernetes).
+        # Instead, compute a confusion matrix per batch and reduce on the driver.
+
+        def predict_and_cm_batch(df: "pd.DataFrame") -> "pd.DataFrame":
             y_true = df[target].astype("int64").to_numpy()
             X = df.drop(columns=[target])
 
@@ -103,19 +107,22 @@ def xgb_multiclass_metrics_on_val(
             else:
                 y_pred = probs.argmax(axis=1).astype("int64")
 
-            return pd.DataFrame({"y_true": y_true, "y_pred": y_pred})
+            # Compute confusion matrix counts for this batch.
+            cm = np.zeros((num_classes, num_classes), dtype=np.int64)
+            for ti, pi in zip(y_true, y_pred, strict=False):
+                if 0 <= ti < num_classes and 0 <= pi < num_classes:
+                    cm[int(ti), int(pi)] += 1
 
-        pred_ds = val_ds.map_batches(predict_batch, batch_format="pandas")
-        counts = pred_ds.groupby(["y_true", "y_pred"]).count()
-        rows = counts.take_all()
+            # One row per batch: store flattened counts.
+            return pd.DataFrame({"cm": [cm.ravel().tolist()]})
 
+        cm_rows = val_ds.map_batches(predict_and_cm_batch, batch_format="pandas").take_all()
         conf = np.zeros((num_classes, num_classes), dtype=np.int64)
-        for r in rows:
-            ti = int(r["y_true"])
-            pi = int(r["y_pred"])
-            c = int(r["count()"])
-            if 0 <= ti < num_classes and 0 <= pi < num_classes:
-                conf[ti, pi] = c
+        for r in cm_rows:
+            flat = np.asarray(r["cm"], dtype=np.int64)
+            if flat.size != num_classes * num_classes:
+                continue
+            conf += flat.reshape((num_classes, num_classes))
 
         return metrics_from_confusion_np(conf)
 

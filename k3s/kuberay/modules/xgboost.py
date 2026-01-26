@@ -19,7 +19,7 @@ from helpers.xgboost_utils import get_train_val_dmatrix, run_xgboost_train
 logger = logging.getLogger(__name__)
 
 
-class _RayTrainPeriodicReportCheckpointCallback(xgboost.callback.TrainingCallback):
+class RayTrainPeriodicReportCheckpointCallback(xgboost.callback.TrainingCallback):
     """Periodic metric reporting + checkpointing for Ray Train.
 
     Ray's built-in `RayTrainReportCallback` reports metrics every iteration.
@@ -131,7 +131,7 @@ def train_func(config: Dict):
         dval=dval,
         num_boost_round=num_boost_round,
         callbacks=[
-            _RayTrainPeriodicReportCheckpointCallback(
+            RayTrainPeriodicReportCheckpointCallback(
                 report_every=5,
                 checkpoint_every=50,
                 filename="model.ubj",
@@ -184,6 +184,7 @@ def train(train_dataset, val_dataset, target, storage_path, name, num_classes: i
 
     try:
         if getattr(result, "checkpoint", None):
+            mc_start = time.perf_counter()
             final_metrics.update(
                 xgb_multiclass_metrics_on_val(
                     val_ds=val_dataset,
@@ -192,6 +193,7 @@ def train(train_dataset, val_dataset, target, storage_path, name, num_classes: i
                     booster_checkpoint=result.checkpoint,
                 )
             )
+            final_metrics["multiclass_metrics_time_sec"] = time.perf_counter() - mc_start
     except Exception as e:
         logger.warning(
             "[xgboost] Falló el cálculo de métricas multiclass en val: %s",
