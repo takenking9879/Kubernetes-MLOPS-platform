@@ -18,7 +18,13 @@ spec:
       NUM_WORKERS_TUNE: "2"
       CPUS_PER_WORKER_TUNE: "2"
       # With ~13GB RAM total, 4GB/trial typically allows 2 concurrent trials safely.
-      MAX_CONCURRENT_TRIALS: "2"
+      # Start conservative to avoid Ray OOM kills; increase to 2 once stable.
+      MAX_CONCURRENT_TRIALS: "1"
+
+      # Hard caps to prevent per-trial pandas materializations from OOM'ing.
+      # Tune loads Ray Datasets inside each trial.
+      TUNE_MAX_TRAIN_ROWS: "250000"
+      TUNE_MAX_VAL_ROWS: "150000"
 
   rayClusterSpec:
     rayVersion: "2.52.0"
@@ -50,10 +56,10 @@ spec:
               resources:
                 limits:
                   cpu: "1"
-                  memory: "2Gi"
+                  memory: "3Gi"
                 requests:
                   cpu: "1"
-                  memory: "2Gi"
+                  memory: "3Gi"
               volumeMounts:
                 - name: job-files
                   mountPath: /home/ray/app
@@ -130,10 +136,10 @@ spec:
                     # Laptop single-node "simulate 2 nodes": run 2 worker pods on the same host.
                     # Sized so both worker pods can be scheduled together.
                     cpu: "9"
-                    memory: "5Gi"
+                    memory: "4Gi"
                   requests:
                     cpu: "9"
-                    memory: "5Gi"
+                    memory: "4Gi"
                 volumeMounts:
                   - name: job-files
                     mountPath: /home/ray/app

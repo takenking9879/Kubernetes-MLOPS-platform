@@ -96,6 +96,13 @@ def tune_model(
         train_dataset = _maybe_sample_train_ds(ray.data.read_parquet(train_path))
         val_dataset = ray.data.read_parquet(val_path)
 
+        max_train_rows = int(os.getenv("TUNE_MAX_TRAIN_ROWS", "0"))
+        max_val_rows = int(os.getenv("TUNE_MAX_VAL_ROWS", "0"))
+        if max_train_rows > 0:
+            train_dataset = train_dataset.limit(max_train_rows)
+        if max_val_rows > 0:
+            val_dataset = val_dataset.limit(max_val_rows)
+
         train_loop_config = {
             "target": target,
             "pytorch_params": trial_config["pytorch_params"],
