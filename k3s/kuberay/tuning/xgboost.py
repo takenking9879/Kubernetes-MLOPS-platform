@@ -175,7 +175,11 @@ def tune_model(
             **{k: v for k, v in metrics.items() if isinstance(v, (int, float))},
         )
 
-    trainable = _trainable
+    # Make Tune account for the full CPU budget per trial.
+    # This controls the "Logical resource usage" line in Tune output.
+    # Default to num_workers * cpus_per_worker unless overridden.
+    cpus_per_trial = int(os.getenv("CPUS_PER_TRIAL", str(num_workers * cpus_per_worker)))
+    trainable = tune.with_resources(_trainable, resources={"cpu": cpus_per_trial})
 
     callbacks = []
     if mlflow_tracking_uri and mlflow_experiment_name:
@@ -192,7 +196,7 @@ def tune_model(
         trainable,
         param_space=param_space,
         tune_config=tune.TuneConfig(
-            num_samples=8,
+            num_samples=3,
             scheduler=scheduler,
             max_concurrent_trials=int(os.getenv("MAX_CONCURRENT_TRIALS", "1")),
         ),

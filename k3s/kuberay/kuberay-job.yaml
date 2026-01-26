@@ -16,7 +16,9 @@ spec:
       CPUS_PER_WORKER: "8"
       # Tuning stage: lighter per-trial footprint; bounded by laptop RAM.
       NUM_WORKERS_TUNE: "2"
-      CPUS_PER_WORKER_TUNE: "2"
+      CPUS_PER_WORKER_TUNE: "4"
+      # Reserve CPUs per Tune trial (controls Tune's placement group accounting).
+      CPUS_PER_TRIAL: "8"
       # With ~13GB RAM total, 4GB/trial typically allows 2 concurrent trials safely.
       # Start conservative to avoid Ray OOM kills; increase to 2 once stable.
       MAX_CONCURRENT_TRIALS: "1"
@@ -150,7 +152,7 @@ spec:
                   - name: RAY_enable_infeasible_task_early_exit
                     value: "true"
                   - name: RAY_DEFAULT_OBJECT_STORE_MEMORY_PROPORTION
-                    value: "0.5"
+                    value: "0.6"
 
             initContainers:
               - name: git-sync

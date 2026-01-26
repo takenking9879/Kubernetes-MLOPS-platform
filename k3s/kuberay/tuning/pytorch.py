@@ -123,7 +123,8 @@ def tune_model(
             **{k: v for k, v in metrics.items() if isinstance(v, (int, float))},
         )
 
-    trainable = _trainable
+    cpus_per_trial = int(os.getenv("CPUS_PER_TRIAL", str(num_workers * cpus_per_worker)))
+    trainable = tune.with_resources(_trainable, resources={"cpu": cpus_per_trial})
 
     callbacks = []
     if mlflow_tracking_uri and mlflow_experiment_name:
