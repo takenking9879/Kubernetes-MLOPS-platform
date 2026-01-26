@@ -43,7 +43,9 @@ def train_func(config: Dict):
         print(f"[xgboost] Worker using nthread={cpus_per_worker} | "
               f"OMP_NUM_THREADS={os.environ.get('OMP_NUM_THREADS', 'not set')}")
     
-    num_boost_round = params.get("num_boost_round", 100)
+    # `num_boost_round` is a top-level argument to xgboost.train, not a param.
+    # Keep it out of `params` to avoid XGBoost warnings (and keep logs clean).
+    num_boost_round = int(params.pop("num_boost_round", 100))
     dtrain, dval = get_train_val_dmatrix(target)
     run_xgboost_train(
         params=params,
@@ -53,7 +55,11 @@ def train_func(config: Dict):
         callbacks=[
             RayTrainReportCallback(
                 metrics=["validation-mlogloss", "validation-merror"],
-                frequency=1,
+                # IMPORTANT (Ray docs): frequency controls checkpointing.
+                # frequency=0 disables per-iteration checkpoint uploads (big overhead on S3)
+                # while still reporting metrics every iteration; a final checkpoint is saved
+                # at the end by default (checkpoint_at_end=True).
+                frequency=50,
             )
         ],
     )

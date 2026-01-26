@@ -8,6 +8,7 @@ from typing import Any, Dict
 import numpy as np
 import pandas as pd
 import xgboost
+from ray.train.xgboost import RayTrainReportCallback
 
 logger_std = logging.getLogger(__name__)
 
@@ -68,7 +69,9 @@ def xgb_multiclass_metrics_on_val(
     """
 
     try:
-        booster = booster_checkpoint.get_model()
+        # Ray Train stores XGBoost models inside a generic `ray.train.Checkpoint`.
+        # Per Ray docs, use RayTrainReportCallback.get_model(checkpoint) to load it.
+        booster = RayTrainReportCallback.get_model(booster_checkpoint)
         model_bytes = booster.save_raw()
 
         def predict_batch(df: "pd.DataFrame") -> "pd.DataFrame":

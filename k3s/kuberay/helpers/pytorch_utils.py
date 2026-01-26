@@ -1,10 +1,13 @@
 from typing import Dict
 
 import os
+import json
 import logging
+import tempfile
 
 import ray
 import ray.train
+from ray.train import Checkpoint
 import torch
 from torch import nn
 
@@ -107,6 +110,12 @@ def train_func(config: Dict):
         print(f"[pytorch_utils] Worker using {cpus_per_worker} CPU thread(s) | "
               f"torch.get_num_threads()={torch.get_num_threads()}")
 
+    # RayTrainReportCallback-like cadence:
+    # - Report metrics every 5 epochs (and always on the last epoch)
+    # - Save a checkpoint every 50 epochs (and always on the last epoch)
+    report_every = 5
+    checkpoint_every = 50
+
     for epoch in range(max_epochs):
         model.train()
         # prefetch_batches > 1 enables async data loading using background threads
@@ -167,4 +176,39 @@ def train_func(config: Dict):
             "val_loss": avg_val_loss,
             **metrics,
         }
-        ray.train.report(report)
+
+        should_report = ((epoch + 1) % report_every == 0) or (epoch == max_epochs - 1)
+        if not should_report:
+            continue
+
+        should_checkpoint = ((epoch + 1) % checkpoint_every == 0) or (epoch == max_epochs - 1)
+
+        # Mimic XGBoost RayTrainReportCallback semantics:
+        # - all ranks report metrics
+        # - only rank 0 attaches checkpoints to avoid duplicated uploads
+        world_rank = ray.train.get_context().get_world_rank()
+        if should_checkpoint and world_rank in (0, None):
+            base_model = model.module if hasattr(model, "module") else model
+            with tempfile.TemporaryDirectory() as tmpdir:
+                torch.save(
+                    {"model_state_dict": base_model.state_dict()},
+                    os.path.join(tmpdir, "model.pt"),
+                )
+                torch.save(
+                    {"optimizer_state_dict": optimizer.state_dict()},
+                    os.path.join(tmpdir, "optimizer.pt"),
+                )
+                with open(os.path.join(tmpdir, "meta.json"), "w", encoding="utf-8") as f:
+                    json.dump(
+                        {
+                            "epoch": epoch,
+                            "max_epochs": max_epochs,
+                            "report_every": report_every,
+                            "checkpoint_every": checkpoint_every,
+                        },
+                        f,
+                    )
+                checkpoint = Checkpoint.from_directory(tmpdir)
+                ray.train.report(report, checkpoint=checkpoint)
+        else:
+            ray.train.report(report)

@@ -9,6 +9,7 @@ import tempfile
 from urllib.parse import urlparse
 from typing import Dict, Any
 import mlflow
+from ray.train.xgboost import RayTrainReportCallback
 
 from schemas.pytorch_params import PYTORCH_PARAMS
 from schemas.xgboost_params import XGBOOST_PARAMS
@@ -60,8 +61,9 @@ class KubeRayTraining(BaseUtils):
                 self.logger.warning("No se encontró un checkpoint válido en el resultado.")
                 return
             if framework == "xgboost":
-                # XGBoost permite obtener el modelo directamente del checkpoint
-                model = checkpoint.to_directory()
+                # Ray Train stores the XGBoost model inside a generic `Checkpoint`.
+                # Use RayTrainReportCallback.get_model(checkpoint) to load the Booster.
+                model = RayTrainReportCallback.get_model(checkpoint)
                 with open(local_path, "wb") as f:
                     pickle.dump(model, f)
             elif framework == "pytorch":
