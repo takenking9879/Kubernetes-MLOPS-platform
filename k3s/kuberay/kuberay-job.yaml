@@ -33,8 +33,6 @@ spec:
       # - reduce number of parquet blocks/tasks
       # - use a unique RunConfig name to avoid snapshot restore overhead
       RAY_MATERIALIZE_DATASETS: "1"
-      RAY_READ_PARQUET_OVERRIDE_NUM_BLOCKS: "4"
-      RAY_UNIQUE_RUN_NAME: "1"
 
   rayClusterSpec:
     rayVersion: "2.52.0"

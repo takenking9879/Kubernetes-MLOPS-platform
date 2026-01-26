@@ -41,22 +41,13 @@ class KubeRayTraining(BaseUtils):
     
     def _load_data(self, path: str):
         try:
-            override_blocks_raw = os.getenv("RAY_READ_PARQUET_OVERRIDE_NUM_BLOCKS", "0")
-            try:
-                override_blocks = int(override_blocks_raw)
-            except Exception:
-                override_blocks = 0
-
-            if override_blocks and override_blocks > 0:
-                ds = ray.data.read_parquet(path, override_num_blocks=override_blocks)
-            else:
-                ds = ray.data.read_parquet(path)
+            ds = ray.data.read_parquet(path, override_num_blocks=self.params.get('num_data_blocks', None))
             # Optional: materialize now so downstream consumers (Train + metrics)
             # can reuse blocks from the object store instead of triggering multiple
             # `ReadParquet` executions.
             # Enable with: RAY_MATERIALIZE_DATASETS=1
-            if os.getenv("RAY_MATERIALIZE_DATASETS", "0") in ("1", "true", "True"):
-                ds = ds.materialize()
+            #if os.getenv("RAY_MATERIALIZE_DATASETS", "0") in ("1", "true", "True"):
+                #ds = ds.materialize()
             self.logger.info(f"Data loaded from {path}.")
             return ds
         except Exception as e:
@@ -241,20 +232,6 @@ class KubeRayTraining(BaseUtils):
 
             # Log final en MLflow (sin artifacts)
             # Prefer métricas ya calculadas por el módulo; si no hay, usamos las del Result.
-            if not final_metrics:
-                self.logger.debug("No se encontraron métricas finales calculadas; extrayendo de result.metrics...")
-                final_metrics = {}
-                try:
-                    if getattr(result, "metrics", None):
-                        for k, v in result.metrics.items():
-                            if isinstance(v, (int, float)):
-                                final_metrics[k] = float(v)
-                except Exception as e:
-                    self.logger.warning(
-                        "No se pudieron extraer métricas numéricas de result.metrics: %s",
-                        str(e),
-                        exc_info=True,
-                    )
 
             mlflow_payload = {
                 **self.params,
