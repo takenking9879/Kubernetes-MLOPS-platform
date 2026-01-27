@@ -134,7 +134,7 @@ def tune_model(
             }
         )
 
-    cpus_per_trial = int(os.getenv("CPUS_PER_TRIAL", str(num_workers * cpus_per_worker)))
+    cpus_per_trial = num_workers * cpus_per_worker
     trainable = tune.with_resources(_trainable, resources={"cpu": cpus_per_trial})
 
     callbacks = []

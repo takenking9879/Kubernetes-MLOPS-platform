@@ -198,7 +198,7 @@ def tune_model(
     # Make Tune account for the full CPU budget per trial.
     # This controls the "Logical resource usage" line in Tune output.
     # Default to num_workers * cpus_per_worker unless overridden.
-    cpus_per_trial = int(os.getenv("CPUS_PER_TRIAL", str(num_workers * cpus_per_worker)))
+    cpus_per_trial = num_workers * cpus_per_worker
     trainable = tune.with_resources(_trainable, resources={"cpu": cpus_per_trial})
 
     callbacks = []
