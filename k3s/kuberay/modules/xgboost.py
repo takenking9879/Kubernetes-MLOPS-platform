@@ -162,17 +162,31 @@ def train(train_dataset, val_dataset, test_dataset, target, storage_path, name, 
             if isinstance(v, (int, float)):
                 final_metrics[k] = float(v)
 
+    # Final Evaluation (Driver-Side) for full datasets
     mc_start = time.perf_counter()
-    eval_ds = test_dataset if test_dataset is not None else val_dataset
+
+    # 1. Validation metrics (full dataset)
     final_metrics.update(
         xgb_multiclass_metrics_on_ds(
-            ds=eval_ds,
-            split="test" if test_dataset is not None else "val",
+            ds=val_dataset,
+            split="val",
             target=target,
             num_classes=int(num_classes),
             booster_checkpoint=result.checkpoint,
         )
     )
+
+    # 2. Test metrics (if exists)
+    if test_dataset is not None:
+        final_metrics.update(
+            xgb_multiclass_metrics_on_ds(
+                ds=test_dataset,
+                split="test",
+                target=target,
+                num_classes=int(num_classes),
+                booster_checkpoint=result.checkpoint,
+            )
+        )
     final_metrics["multiclass_metrics_time_sec"] = time.perf_counter() - mc_start
 
     return result, final_metrics

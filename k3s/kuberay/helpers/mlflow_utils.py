@@ -13,8 +13,10 @@ def log_evaluation_artifacts(metrics: Dict[str, Any], framework: str):
     """
     Generates and logs confusion matrix plots and classification reports to MLflow.
     """
-    cm_val = metrics.get("confusion_matrix")
-    report_val = metrics.get("classification_report")
+    # Prefer standardized names (val_*) but fallback to legacy names (*)
+    cm_val = metrics.get("val_confusion_matrix") or metrics.get("confusion_matrix")
+    report_val = metrics.get("val_classification_report") or metrics.get("classification_report")
+    
     cm_test = metrics.get("test_confusion_matrix")
     report_test = metrics.get("test_classification_report")
 

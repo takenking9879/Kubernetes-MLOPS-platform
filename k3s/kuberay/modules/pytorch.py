@@ -82,6 +82,7 @@ def _evaluate_on_dataset(
     num_classes: int,
     input_dim: int,
     batch_size: int,
+    prefix: str = "test",
 ) -> Dict[str, Any]:
     # Load model weights from the final Ray Train checkpoint.
     model = NeuralNetwork(input_dim=input_dim, num_classes=num_classes)
@@ -113,14 +114,14 @@ def _evaluate_on_dataset(
             conf += counts.reshape(num_classes, num_classes)
 
     metrics: Dict[str, Any] = {}
-    metrics["test_loss"] = total_loss / max(total_batches, 1)
-    metrics.update(_metrics_from_confusion(conf, prefix="test"))
+    metrics[f"{prefix}_loss"] = total_loss / max(total_batches, 1)
+    metrics.update(_metrics_from_confusion(conf, prefix=prefix))
 
     conf_np = conf.detach().cpu().numpy().astype(np.int64)
-    metrics["test_confusion_matrix"] = conf_np.tolist()
+    metrics[f"{prefix}_confusion_matrix"] = conf_np.tolist()
     cr = _classification_report_from_confusion(conf_np, num_classes=num_classes)
     if cr is not None:
-        metrics["test_classification_report"] = cr
+        metrics[f"{prefix}_classification_report"] = cr
 
     return metrics
 
@@ -177,17 +178,37 @@ def train(train_dataset, val_dataset, test_dataset, target, storage_path, name, 
             exc_info=True,
         )
 
-    # Evaluate on full test dataset (driver-side), like XGBoost.
+    # Final Evaluation (Driver-Side) for full datasets
+    mc_start = time.perf_counter()
+    
+    # 1. Validation metrics (full dataset)
     final_metrics.update(
         _evaluate_on_dataset(
             checkpoint=result.checkpoint,
-            ds=test_dataset,
+            ds=val_dataset,
             target=target,
             num_classes=int(num_classes),
             input_dim=int(config.get("input_dim", 14)),
             batch_size=int(params.get("batch_size", 256)),
+            prefix="val",
         )
     )
+
+    # 2. Test metrics (if exists)
+    if test_dataset is not None:
+        final_metrics.update(
+            _evaluate_on_dataset(
+                checkpoint=result.checkpoint,
+                ds=test_dataset,
+                target=target,
+                num_classes=int(num_classes),
+                input_dim=int(config.get("input_dim", 14)),
+                batch_size=int(params.get("batch_size", 256)),
+                prefix="test",
+            )
+        )
+    
+    final_metrics["multiclass_metrics_time_sec"] = time.perf_counter() - mc_start
 
 
     final_metrics["train_time_sec"] = train_time_sec

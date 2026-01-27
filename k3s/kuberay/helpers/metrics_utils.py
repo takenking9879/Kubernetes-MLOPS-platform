@@ -129,7 +129,7 @@ def xgb_multiclass_metrics_on_ds(
             conf += flat.reshape((num_classes, num_classes))
 
         out: Dict[str, Any] = metrics_from_confusion_np(conf, prefix=split)
-        out["confusion_matrix"] = conf.tolist()
+        out[f"{split}_confusion_matrix"] = conf.tolist()
 
         # Build y_true/y_pred for sklearn classification_report.
         # If very large, sample pairs from confusion matrix distribution.
@@ -149,7 +149,7 @@ def xgb_multiclass_metrics_on_ds(
 
                 y_true = (idx // num_classes).astype(np.int64)
                 y_pred = (idx % num_classes).astype(np.int64)
-                out["classification_report"] = classification_report(
+                out[f"{split}_classification_report"] = classification_report(
                     y_true,
                     y_pred,
                     labels=list(range(num_classes)),
