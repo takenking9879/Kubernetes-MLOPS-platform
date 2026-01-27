@@ -190,10 +190,6 @@ class KubeRayTraining(BaseUtils):
 
             framework = self.params.get("framework", "xgboost")
 
-            train_ds = self._load_data(os.path.join(self.data_dir, 'train'))
-            val_ds = self._load_data(os.path.join(self.data_dir, 'val'))
-            test_ds = self._load_data(os.path.join(self.data_dir, 'test'))
-
             self.logger.info(f"Starting training using framework: {framework}")
             best_params = None
             num_classes = int(self.params.get("num_classes", 2))
@@ -227,6 +223,11 @@ class KubeRayTraining(BaseUtils):
 
                 best_params = best_config.get(framework + "_params")
                 self.logger.info(f"Best hyperparameters found: {best_params}")
+
+            self.logger.info("Loading datasets...")
+            train_ds = self._load_data(os.path.join(self.data_dir, 'train'))
+            val_ds = self._load_data(os.path.join(self.data_dir, 'val'))
+            test_ds = self._load_data(os.path.join(self.data_dir, 'test'))
 
             train_kwargs = {
                 "train_dataset": train_ds,

@@ -144,17 +144,8 @@ def tune_model(
 
     def _trainable(trial_config: Dict):
         # read with controlled parallelism and repartition to cpus_for_data blocks
-        train_ds = ray.data.read_parquet(train_path, parallelism=cpus_for_data)
-        val_ds = ray.data.read_parquet(val_path, parallelism=cpus_for_data)
-
-        if cpus_for_data > 1:
-            # repartition reduces number of downstream tasks spawned by Data ops
-            try:
-                train_ds = train_ds.repartition(cpus_for_data)
-                val_ds = val_ds.repartition(cpus_for_data)
-            except Exception:
-                # repartition might not be necessary/available in some versions; ignore safely
-                logger.debug("repartition failed or not supported; continuing without repartition")
+        train_ds = ray.data.read_parquet(train_path, num_cpus=cpus_for_data)
+        val_ds = ray.data.read_parquet(val_path, num_cpus=cpus_for_data)
 
         train_ds = _maybe_sample_train_ds(train_ds)
         # apply limits if configured
