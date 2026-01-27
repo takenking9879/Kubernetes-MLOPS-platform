@@ -1,417 +1,287 @@
-2026-01-26 16:27:10.322 | 2026-01-26 14:27:10,322	INFO cli.py:41 -- Job submission server address: http://kuberay-job-np46m-head-svc.ray.svc.cluster.local:8265
-2026-01-26 16:27:10.680 | 2026-01-26 14:27:10,680	SUCC cli.py:65 -- ----------------------------------------------
-2026-01-26 16:27:10.680 | 2026-01-26 14:27:10,680	SUCC cli.py:66 -- Job 'kuberay-job-dgtzp' submitted successfully
-2026-01-26 16:27:10.680 | 2026-01-26 14:27:10,680	SUCC cli.py:67 -- ----------------------------------------------
-2026-01-26 16:27:10.680 | 2026-01-26 14:27:10,680	INFO cli.py:291 -- Next steps
-2026-01-26 16:27:10.680 | 2026-01-26 14:27:10,680	INFO cli.py:292 -- Query the logs of the job:
-2026-01-26 16:27:10.680 | 2026-01-26 14:27:10,680	INFO cli.py:294 -- ray job logs kuberay-job-dgtzp
-2026-01-26 16:27:10.680 | 2026-01-26 14:27:10,680	INFO cli.py:296 -- Query the status of the job:
-2026-01-26 16:27:10.680 | 2026-01-26 14:27:10,680	INFO cli.py:298 -- ray job status kuberay-job-dgtzp
-2026-01-26 16:27:10.680 | 2026-01-26 14:27:10,680	INFO cli.py:300 -- Request the job to be stopped:
-2026-01-26 16:27:10.680 | 2026-01-26 14:27:10,680	INFO cli.py:302 -- ray job stop kuberay-job-dgtzp
-2026-01-26 16:27:12.277 | 2026-01-26 14:27:12,277	INFO cli.py:41 -- Job submission server address: http://kuberay-job-np46m-head-svc.ray.svc.cluster.local:8265
-2026-01-26 16:27:14.297 | 2026-01-26 14:27:10,397	INFO job_manager.py:568 -- Runtime env is setting up.
-2026-01-26 16:27:14.297 | Running entrypoint for job kuberay-job-dgtzp: python3 /home/ray/app/repo/k3s/kuberay/main.py
-2026-01-26 16:27:17.302 | 2026-01-26 14:27:15,516 - KubeRayTraining - DEBUG - Parameters retrieved from /home/ray/app/repo/k3s/params.yaml
-2026-01-26 16:27:18.303 | 2026-01-26 14:27:16,829 - KubeRayTraining - INFO - [RAY CLUSTER RESOURCES]
-2026-01-26 16:27:18.303 |             ────────────────────────────────
-2026-01-26 16:27:18.303 |             CPU           : 0.0 / 18.0
-2026-01-26 16:27:18.303 |             Memory        : 0B / 13.00GiB
-2026-01-26 16:27:18.303 |             Object Store  : 0B / 8.23GiB
-2026-01-26 16:27:18.303 |             ────────────────────────────────
-2026-01-26 16:27:19.304 | 2026-01-26 14:27:17,354 - KubeRayTraining - INFO - Minio connection verified. Buckets: ['frontend-crm-bucket', 'k8s-mlops-platform-bucket']
-2026-01-26 16:27:21.309 | 2026-01-26 14:27:20,738	INFO worker.py:1696 -- Using address 10.1.5.87:6379 set in the environment variable RAY_ADDRESS
-2026-01-26 16:27:21.309 | 2026-01-26 14:27:20,742	INFO worker.py:1837 -- Connecting to existing Ray cluster at address: 10.1.5.87:6379...
-2026-01-26 16:27:21.309 | 2026-01-26 14:27:20,765	INFO worker.py:2014 -- Connected to Ray cluster. View the dashboard at http://10.1.5.87:8265 
-2026-01-26 16:27:21.309 | 
-2026-01-26 16:27:21.309 |   0%|          | 0.00/1.00 [00:00<?, ? file/s]
-2026-01-26 16:27:24.314 | Parquet dataset sampling: 100%|██████████| 1.00/1.00 [00:01<00:00, 1.72s/ file]
-2026-01-26 16:27:24.314 | 2026-01-26 14:27:22,529	INFO parquet_datasource.py:728 -- Estimated parquet encoding ratio is 2.660.
-2026-01-26 16:27:24.314 | 2026-01-26 14:27:22,529	INFO parquet_datasource.py:788 -- Estimated parquet reader batch size at 1220162 rows
-2026-01-26 16:27:25.313 | 2026-01-26 14:27:23,660 - KubeRayTraining - INFO - Data loaded from s3://k8s-mlops-platform-bucket/v1/processed/train.
-2026-01-26 16:27:25.313 | 
-2026-01-26 16:27:25.313 |   0%|          | 0.00/1.00 [00:00<?, ? file/s]
-2026-01-26 16:27:28.318 | Parquet dataset sampling:   0%|          | 0.00/1.00 [00:01<?, ? file/s]
-2026-01-26 16:27:28.318 | Parquet dataset sampling: 100%|██████████| 1.00/1.00 [00:01<00:00, 1.92s/ file]
-2026-01-26 16:27:28.318 | 2026-01-26 14:27:26,395	INFO parquet_datasource.py:728 -- Estimated parquet encoding ratio is 2.783.
-2026-01-26 16:27:28.318 | 2026-01-26 14:27:26,395	INFO parquet_datasource.py:788 -- Estimated parquet reader batch size at 1220162 rows
-2026-01-26 16:27:28.318 | 2026-01-26 14:27:26,401 - KubeRayTraining - INFO - Data loaded from s3://k8s-mlops-platform-bucket/v1/processed/val.
-2026-01-26 16:27:28.318 | 2026-01-26 14:27:26,401 - KubeRayTraining - INFO - Starting training using framework: pytorch
-2026-01-26 16:27:33.324 | (TrainController pid=1368) A run snapshot was found in storage folder at: 'k8s-mlops-platform-bucket/v1/models/pytorch'
-2026-01-26 16:27:33.324 | (TrainController pid=1368) This snapshot contains a list of checkpoints reported via `ray.train.report` and will be loaded. This allows the latest checkpoint found in the snapshot to be accessible within your training function via `ray.train.get_checkpoint`.
-2026-01-26 16:27:33.324 | (TrainController pid=1368) If you meant to start a brand new training job without any information about previous checkpoints found in this directory, please configure a new, unique `RunConfig(name)` or delete the existing folder at 'k8s-mlops-platform-bucket/v1/models/pytorch'.
-2026-01-26 16:27:33.324 | (TrainController pid=1368) Attempting to start training worker group of size 2 with the following resources: [{'CPU': 8}] * 2
-2026-01-26 16:27:36.477 | (RayTrainWorker pid=510, ip=10.1.5.88) Setting up process group for: env:// [rank=0, world_size=2]
-2026-01-26 16:27:36.477 | (RayTrainWorker pid=447, ip=10.1.5.89) [Gloo] Rank 1 is connected to 1 peer ranks. Expected number of connected peer ranks is : 1
-2026-01-26 16:27:37.479 | (RayTrainWorker pid=510, ip=10.1.5.88) Moving model to device: cpu
-2026-01-26 16:27:37.479 | (RayTrainWorker pid=510, ip=10.1.5.88) Wrapping provided model in DistributedDataParallel.
-2026-01-26 16:27:37.479 | (TrainController pid=1368) Started training worker group of size 2: 
-2026-01-26 16:27:37.479 | (TrainController pid=1368) - (ip=10.1.5.88, pid=510) world_rank=0, local_rank=0, node_rank=0
-2026-01-26 16:27:37.479 | (TrainController pid=1368) - (ip=10.1.5.89, pid=447) world_rank=1, local_rank=0, node_rank=1
-2026-01-26 16:27:40.486 | (RayTrainWorker pid=510, ip=10.1.5.88) [pytorch_utils] Worker using 8 CPU thread(s) | torch.get_num_threads()=8
-2026-01-26 16:27:40.486 | (SplitCoordinator pid=1552) Registered dataset logger for dataset train_2_0
-2026-01-26 16:27:40.486 | (SplitCoordinator pid=1552) Starting execution of Dataset train_2_0. Full logs are in /tmp/ray/session_2026-01-26_14-26-38_570363_1/logs/ray-data
-2026-01-26 16:27:40.486 | (SplitCoordinator pid=1552) Execution plan of Dataset train_2_0: InputDataBuffer[Input] -> TaskPoolMapOperator[ReadParquet] -> OutputSplitter[split(2, equal=True)]
-2026-01-26 16:27:40.486 | (raylet) WARNING: 4 PYTHON worker processes have been started on node: cd1e6a2608916b3cd25d2d92d52b859fb57b7152df2970e989dd6e1d with address: 10.1.5.87. This could be a result of using a large number of actors, or due to tasks blocked in ray.get() calls (see https://github.com/ray-project/ray/issues/3644 for some discussion of workarounds).
-2026-01-26 16:27:40.486 | (RayTrainWorker pid=510, ip=10.1.5.88) [Gloo] Rank 0 is connected to 1 peer ranks. Expected number of connected peer ranks is : 1
-2026-01-26 16:27:40.486 | (SplitCoordinator pid=1552)  ✔️  Dataset train_2_0 execution finished in 1.91 seconds 10… 2k/…   1.06 k row… 
-2026-01-26 16:27:40.486 | (SplitCoordinator pid=1552)   │ Active/total resources: Active & requested resources: 0/2 CPU, 64.7KiB/4.1G…
-2026-01-26 16:27:40.486 | (SplitCoordinator pid=1552)   │                                                                             
-2026-01-26 16:27:40.486 | (SplitCoordinator pid=1552)   ├─   ReadParquet->SplitBlocks(36) 100% ━━━━━━━ 2k/2k [ 0:00:… , 1.07 k row/s ]
-2026-01-26 16:27:40.486 | (SplitCoordinator pid=1552)   │    0.0 CPU, 0.0B object store; Tasks: 0; Queued blocks: 0;                  
-2026-01-26 16:27:40.486 | (SplitCoordinator pid=1552)   ├─   split(2, equal=True) 100% ━━━━━━━━━━ 2k/2k [ 0:00:01 , 1.07 k row/s ]    
-2026-01-26 16:27:40.486 | (SplitCoordinator pid=1552)   │    0.0 CPU, 64.7KiB object store; Tasks: 0: [0/33 objects local]; Queued bl…
-2026-01-26 16:27:43.490 | (RayTrainWorker pid=510, ip=10.1.5.88) Exiting prefetcher's background thread
-2026-01-26 16:27:43.490 | (RayTrainWorker pid=447, ip=10.1.5.89) Moving model to device: cpu
-2026-01-26 16:27:43.490 | (RayTrainWorker pid=447, ip=10.1.5.89) Wrapping provided model in DistributedDataParallel.
-2026-01-26 16:27:43.490 | (SplitCoordinator pid=1609)  ✔️  Dataset val_4_0 execution finished in 1.14 seconds 10… 3k/… [  2.68 k row/s 
-2026-01-26 16:27:43.490 | (RayTrainWorker pid=447, ip=10.1.5.89) [pytorch] Worker train_time_sec=3.55
-2026-01-26 16:27:44.491 | (SplitCoordinator pid=1552)  ✔️  Dataset train_2_1 execution finished in 0.68 seconds 10… 2k/… [  0.00 row/s 
-2026-01-26 16:27:44.491 | (SplitCoordinator pid=1552)   ├─   ReadParquet->SplitBlocks(36) 100% ━━━━━━━━ 2k/2k [ 0:00:00 , 0.00 row/s ]
-2026-01-26 16:27:44.491 | (SplitCoordinator pid=1552)   ├─   split(2, equal=True) 100% ━━━━━━━━━━ 2k/2k [ 0:00:00 , 0.00 row/s ]      
-2026-01-26 16:27:45.494 | (SplitCoordinator pid=1609) Registered dataset logger for dataset val_4_1 [repeated 3x across cluster] (Ray deduplicates logs by default. Set RAY_DEDUP_LOGS=0 to disable log deduplication, or see https://docs.ray.io/en/master/ray-observability/user-guides/configure-logging.html#log-deduplication for more options.)
-2026-01-26 16:27:45.494 | (SplitCoordinator pid=1609) Starting execution of Dataset val_4_1. Full logs are in /tmp/ray/session_2026-01-26_14-26-38_570363_1/logs/ray-data [repeated 3x across cluster]
-2026-01-26 16:27:45.494 | (SplitCoordinator pid=1609) Execution plan of Dataset val_4_1: InputDataBuffer[Input] -> TaskPoolMapOperator[ReadParquet] -> OutputSplitter[split(2, equal=True)] [repeated 3x across cluster]
-2026-01-26 16:27:46.494 | (SplitCoordinator pid=1609)   │ Active/total resources: Active & requested resources: 0/2 CPU, 62.1KiB/4.1G… [repeated 5x across cluster]
-2026-01-26 16:27:46.495 | (SplitCoordinator pid=1609)   │                                                                              [repeated 5x across cluster]
-2026-01-26 16:27:46.495 | (SplitCoordinator pid=1609)   ├─   ReadParquet->SplitBlocks(36) 100% ━━━━━━━ 3k/3k [ 0:00:… , 2.69 k row/s ]
-2026-01-26 16:27:46.495 | (SplitCoordinator pid=1609)   │    0.0 CPU, 0.0B object store; Tasks: 0; Queued blocks: 0;                   [repeated 5x across cluster]
-2026-01-26 16:27:46.495 | (SplitCoordinator pid=1609)   ├─   split(2, equal=True) 100% ━━━━━━━━━━ 3k/3k [ 0:00:01 , 2.69 k row/s ]    
-2026-01-26 16:27:46.495 | (SplitCoordinator pid=1609)   │    0.0 CPU, 62.1KiB object store; Tasks: 0: [0/33 objects local]; Queued bl… [repeated 5x across cluster]
-2026-01-26 16:27:47.496 | (RayTrainWorker pid=447, ip=10.1.5.89) Exiting prefetcher's background thread [repeated 11x across cluster]
-2026-01-26 16:27:48.497 | (RayTrainWorker pid=447, ip=10.1.5.89) [pytorch] Worker train_time_sec=7.08 [repeated 5x across cluster]
-2026-01-26 16:27:49.498 | (SplitCoordinator pid=1552)  ✔️  Dataset train_2_4 execution finished in 0.67 seconds 10… 2k/… [  0.00 row/s  [repeated 6x across cluster]
-2026-01-26 16:27:49.498 | (SplitCoordinator pid=1552)   ├─   ReadParquet->SplitBlocks(36) 100% ━━━━━━━━ 2k/2k [ 0:00:00 , 0.00 row/s ] [repeated 6x across cluster]
-2026-01-26 16:27:49.498 | (SplitCoordinator pid=1552)   ├─   split(2, equal=True) 100% ━━━━━━━━━━ 2k/2k [ 0:00:00 , 0.00 row/s ]       [repeated 6x across cluster]
-2026-01-26 16:27:50.499 | (SplitCoordinator pid=1609) Registered dataset logger for dataset val_4_4 [repeated 6x across cluster]
-2026-01-26 16:27:50.499 | (SplitCoordinator pid=1609) Starting execution of Dataset val_4_4. Full logs are in /tmp/ray/session_2026-01-26_14-26-38_570363_1/logs/ray-data [repeated 6x across cluster]
-2026-01-26 16:27:50.499 | (SplitCoordinator pid=1609) Execution plan of Dataset val_4_4: InputDataBuffer[Input] -> TaskPoolMapOperator[ReadParquet] -> OutputSplitter[split(2, equal=True)] [repeated 6x across cluster]
-2026-01-26 16:27:50.499 | (RayTrainWorker pid=510, ip=10.1.5.88) Reporting training result 1: TrainingReport(checkpoint=None, metrics={'epoch': 4, 'train_loss': 0.19054731354117393, 'val_loss': 0.16471037765343985, 'val_accuracy': 0.9660000205039978, 'val_precision_macro': 0.6133963465690613, 'val_recall_macro': 0.4347677230834961, 'val_f1_macro': 0.46238890290260315, 'val_precision_weighted': 0.9511202573776245, 'val_recall_weighted': 0.9660000205039978, 'val_f1_weighted': 0.954344630241394, 'val_precision_class_0': 0.9715869426727295, 'val_recall_class_0': 0.9992872476577759, 'val_f1_class_0': 0.9852424263954163, 'val_support_class_0': 1403.0, 'val_precision_class_1': 0.7857142686843872, 'val_recall_class_1': 1.0, 'val_f1_class_1': 0.8799999952316284, 'val_support_class_1': 33.0, 'val_precision_class_2': 0.0, 'val_recall_class_2': 0.0, 'val_f1_class_2': 0.0, 'val_support_class_2': 12.0, 'val_precision_class_3': 0.9230769276618958, 'val_recall_class_3': 0.3870967626571655, 'val_f1_class_3': 0.5454545021057129, 'val_support_class_3': 31.0, 'val_precision_class_4': 0.0, 'val_recall_class_4': 0.0, 'val_f1_class_4': 0.0, 'val_support_class_4': 12.0, 'val_precision_class_5': 1.0, 'val_recall_class_5': 0.2222222238779068, 'val_f1_class_5': 0.3636363744735718, 'val_support_class_5': 9.0}, validation_spec=None)
-2026-01-26 16:27:51.500 | (SplitCoordinator pid=1609)   │ Active/total resources: Active & requested resources: 0/2 CPU, 79.9KiB/4.1G… [repeated 6x across cluster]
-2026-01-26 16:27:51.500 | (SplitCoordinator pid=1609)   │                                                                              [repeated 6x across cluster]
-2026-01-26 16:27:51.500 | (SplitCoordinator pid=1609)   │    0.0 CPU, 0.0B object store; Tasks: 0; Queued blocks: 0;                   [repeated 6x across cluster]
-2026-01-26 16:27:51.500 | (SplitCoordinator pid=1609)   │    0.0 CPU, 79.9KiB object store; Tasks: 0: [0/33 objects local]; Queued bl… [repeated 6x across cluster]
-2026-01-26 16:27:51.500 | (SplitCoordinator pid=1609)                                                                                 ✔️  Dataset val_4_5 execution finished in 0.75 seconds [repeated 6x across cluster]
-2026-01-26 16:27:52.502 | (RayTrainWorker pid=447, ip=10.1.5.89) Exiting prefetcher's background thread [repeated 12x across cluster]
-2026-01-26 16:27:53.503 | (RayTrainWorker pid=447, ip=10.1.5.89) [pytorch] Worker train_time_sec=13.73 [repeated 8x across cluster]
-2026-01-26 16:27:54.505 | (SplitCoordinator pid=1552)  ✔️  Dataset train_2_7 execution finished in 0.66 seconds 10… 2k/… [  0.00 row/s  [repeated 6x across cluster]
-2026-01-26 16:27:54.505 | (SplitCoordinator pid=1552)   ├─   ReadParquet->SplitBlocks(36) 100% ━━━━━━━━ 2k/2k [ 0:00:00 , 0.00 row/s ] [repeated 6x across cluster]
-2026-01-26 16:27:54.505 | (SplitCoordinator pid=1552)   ├─   split(2, equal=True) 100% ━━━━━━━━━━ 2k/2k [ 0:00:00 , 0.00 row/s ]       [repeated 6x across cluster]
-2026-01-26 16:27:55.506 | (SplitCoordinator pid=1552) Registered dataset logger for dataset train_2_8 [repeated 7x across cluster]
-2026-01-26 16:27:55.506 | (SplitCoordinator pid=1552) Starting execution of Dataset train_2_8. Full logs are in /tmp/ray/session_2026-01-26_14-26-38_570363_1/logs/ray-data [repeated 7x across cluster]
-2026-01-26 16:27:55.506 | (SplitCoordinator pid=1552) Execution plan of Dataset train_2_8: InputDataBuffer[Input] -> TaskPoolMapOperator[ReadParquet] -> OutputSplitter[split(2, equal=True)] [repeated 7x across cluster]
-2026-01-26 16:27:56.507 | (RayTrainWorker pid=447, ip=10.1.5.89) Reporting training result 1: TrainingReport(checkpoint=None, metrics={'epoch': 4, 'train_loss': 0.17081176489591599, 'val_loss': 0.20191684365272522, 'val_accuracy': 0.9620000123977661, 'val_precision_macro': 0.6270432472229004, 'val_recall_macro': 0.4188033640384674, 'val_f1_macro': 0.4448663890361786, 'val_precision_weighted': 0.940956175327301, 'val_recall_weighted': 0.9619999527931213, 'val_f1_weighted': 0.9470022916793823, 'val_precision_class_0': 0.9668049812316895, 'val_recall_class_0': 1.0, 'val_f1_class_0': 0.9831223487854004, 'val_support_class_0': 1398.0, 'val_precision_class_1': 0.7954545617103577, 'val_recall_class_1': 1.0, 'val_f1_class_1': 0.8860759735107422, 'val_support_class_1': 35.0, 'val_precision_class_2': 0.0, 'val_recall_class_2': 0.0, 'val_f1_class_2': 0.0, 'val_support_class_2': 18.0, 'val_precision_class_3': 1.0, 'val_recall_class_3': 0.3461538553237915, 'val_f1_class_3': 0.5142857432365417, 'val_support_class_3': 26.0, 'val_precision_class_4': 0.0, 'val_recall_class_4': 0.0, 'val_f1_class_4': 0.0, 'val_support_class_4': 17.0, 'val_precision_class_5': 1.0, 'val_recall_class_5': 0.1666666716337204, 'val_f1_class_5': 0.2857142984867096, 'val_support_class_5': 6.0}, validation_spec=None)
-2026-01-26 16:27:57.508 | (SplitCoordinator pid=1552)   │ Active/total resources: Active & requested resources: 0/2 CPU, 41.2KiB/4.1G… [repeated 7x across cluster]
-2026-01-26 16:27:57.508 | (SplitCoordinator pid=1552)   │                                                                              [repeated 7x across cluster]
-2026-01-26 16:27:57.508 | (SplitCoordinator pid=1552)   │    0.0 CPU, 0.0B object store; Tasks: 0; Queued blocks: 0;                   [repeated 7x across cluster]
-2026-01-26 16:27:57.509 | (SplitCoordinator pid=1552)   │    0.0 CPU, 41.2KiB object store; Tasks: 0: [0/33 objects local]; Queued bl… [repeated 7x across cluster]
-2026-01-26 16:27:57.509 | (SplitCoordinator pid=1552)                                                                                 ✔️  Dataset train_2_9 execution finished in 0.64 seconds [repeated 7x across cluster]
-2026-01-26 16:27:58.508 | (RayTrainWorker pid=447, ip=10.1.5.89) Exiting prefetcher's background thread [repeated 14x across cluster]
-2026-01-26 16:27:58.508 | (RayTrainWorker pid=510, ip=10.1.5.88) Reporting training result 2: TrainingReport(checkpoint=None, metrics={'epoch': 9, 'train_loss': 0.07478843908756971, 'val_loss': 0.06544241743783157, 'val_accuracy': 0.9826666712760925, 'val_precision_macro': 0.9887468218803406, 'val_recall_macro': 0.754809558391571, 'val_f1_macro': 0.8131279945373535, 'val_precision_weighted': 0.982580304145813, 'val_recall_weighted': 0.9826666116714478, 'val_f1_weighted': 0.9792817234992981, 'val_precision_class_0': 0.9824807047843933, 'val_recall_class_0': 0.9992872476577759, 'val_f1_class_0': 0.9908127188682556, 'val_support_class_0': 1403.0, 'val_precision_class_1': 1.0, 'val_recall_class_1': 1.0, 'val_f1_class_1': 1.0, 'val_support_class_1': 33.0, 'val_precision_class_2': 1.0, 'val_recall_class_2': 0.1666666716337204, 'val_f1_class_2': 0.2857142984867096, 'val_support_class_2': 12.0, 'val_precision_class_3': 0.949999988079071, 'val_recall_class_3': 0.6129032373428345, 'val_f1_class_3': 0.7450980544090271, 'val_support_class_3': 31.0, 'val_precision_class_4': 1.0, 'val_recall_class_4': 0.75, 'val_f1_class_4': 0.8571428656578064, 'val_support_class_4': 12.0, 'val_precision_class_5': 1.0, 'val_recall_class_5': 1.0, 'val_f1_class_5': 1.0, 'val_support_class_5': 9.0}, validation_spec=None)
-2026-01-26 16:27:59.510 | (RayTrainWorker pid=447, ip=10.1.5.89) [pytorch] Worker train_time_sec=18.61 [repeated 6x across cluster]
-2026-01-26 16:27:59.510 | (SplitCoordinator pid=1552)  ✔️  Dataset train_2_10 execution finished in 0.68 seconds 10… 2k/…   0.00 row/s 
-2026-01-26 16:28:00.512 | (SplitCoordinator pid=1609)  ✔️  Dataset val_4_10 execution finished in 0.74 seconds 100% 3k/… [  0.00 row/s  [repeated 6x across cluster]
-2026-01-26 16:28:00.512 | (SplitCoordinator pid=1609)   ├─   ReadParquet->SplitBlocks(36) 100% ━━━━━━━━ 3k/3k [ 0:00:00 , 0.00 row/s ] [repeated 7x across cluster]
-2026-01-26 16:28:00.512 | (SplitCoordinator pid=1609)   ├─   split(2, equal=True) 100% ━━━━━━━━━━ 3k/3k [ 0:00:00 , 0.00 row/s ]       [repeated 7x across cluster]
-2026-01-26 16:28:00.512 | (SplitCoordinator pid=1552)  ✔️  Dataset train_2_11 execution finished in 0.70 seconds 10… 2k/…   0.00 row/s 
-2026-01-26 16:28:00.512 | (SplitCoordinator pid=1552) Registered dataset logger for dataset train_2_11 [repeated 6x across cluster]
-2026-01-26 16:28:00.512 | (SplitCoordinator pid=1552) Starting execution of Dataset train_2_11. Full logs are in /tmp/ray/session_2026-01-26_14-26-38_570363_1/logs/ray-data [repeated 6x across cluster]
-2026-01-26 16:28:00.512 | (SplitCoordinator pid=1552) Execution plan of Dataset train_2_11: InputDataBuffer[Input] -> TaskPoolMapOperator[ReadParquet] -> OutputSplitter[split(2, equal=True)] [repeated 6x across cluster]
-2026-01-26 16:28:03.516 | (SplitCoordinator pid=1552)  ✔️  Dataset train_2_12 execution finished in 0.66 seconds 10… 2k/…   0.00 row/s 
-2026-01-26 16:28:03.516 | (SplitCoordinator pid=1552)   │ Active/total resources: Active & requested resources: 0/2 CPU, 35.3KiB/4.1G… [repeated 6x across cluster]
-2026-01-26 16:28:03.516 | (SplitCoordinator pid=1552)   │                                                                              [repeated 6x across cluster]
-2026-01-26 16:28:03.516 | (SplitCoordinator pid=1552)   │    0.0 CPU, 0.0B object store; Tasks: 0; Queued blocks: 0;                   [repeated 6x across cluster]
-2026-01-26 16:28:03.516 | (SplitCoordinator pid=1552)   │    0.0 CPU, 35.3KiB object store; Tasks: 0: [0/33 objects local]; Queued bl… [repeated 6x across cluster]
-2026-01-26 16:28:03.516 | (SplitCoordinator pid=1552)                                                                                 ✔️  Dataset train_2_12 execution finished in 0.66 seconds [repeated 6x across cluster]
-2026-01-26 16:28:03.516 | (RayTrainWorker pid=447, ip=10.1.5.89) Exiting prefetcher's background thread [repeated 14x across cluster]
-2026-01-26 16:28:04.518 | (SplitCoordinator pid=1552)  ✔️  Dataset train_2_13 execution finished in 0.77 seconds 10… 2k/…   0.00 row/s 
-2026-01-26 16:28:04.518 | (RayTrainWorker pid=447, ip=10.1.5.89) Reporting training result 2: TrainingReport(checkpoint=None, metrics={'epoch': 9, 'train_loss': 0.06582778692245483, 'val_loss': 0.08082198910415173, 'val_accuracy': 0.9739999771118164, 'val_precision_macro': 0.9770711064338684, 'val_recall_macro': 0.6570028066635132, 'val_f1_macro': 0.741492509841919, 'val_precision_weighted': 0.9740778207778931, 'val_recall_weighted': 0.9739999771118164, 'val_f1_weighted': 0.9680931568145752, 'val_precision_class_0': 0.9735376238822937, 'val_recall_class_0': 1.0, 'val_f1_class_0': 0.9865913987159729, 'val_support_class_0': 1398.0, 'val_precision_class_1': 1.0, 'val_recall_class_1': 0.9714285731315613, 'val_f1_class_1': 0.9855071902275085, 'val_support_class_1': 35.0, 'val_precision_class_2': 1.0, 'val_recall_class_2': 0.1666666716337204, 'val_f1_class_2': 0.2857142984867096, 'val_support_class_2': 18.0, 'val_precision_class_3': 1.0, 'val_recall_class_3': 0.5, 'val_f1_class_3': 0.6666666865348816, 'val_support_class_3': 26.0, 'val_precision_class_4': 0.8888888955116272, 'val_recall_class_4': 0.47058823704719543, 'val_f1_class_4': 0.615384578704834, 'val_support_class_4': 17.0, 'val_precision_class_5': 1.0, 'val_recall_class_5': 0.8333333134651184, 'val_f1_class_5': 0.9090909361839294, 'val_support_class_5': 6.0}, validation_spec=None)
-2026-01-26 16:28:04.518 | (RayTrainWorker pid=447, ip=10.1.5.89) [pytorch] Worker train_time_sec=23.55 [repeated 6x across cluster]
-2026-01-26 16:28:05.521 | (SplitCoordinator pid=1609)  ✔️  Dataset val_4_13 execution finished in 0.74 seconds 100% 3k/… [  0.00 row/s  [repeated 3x across cluster]
-2026-01-26 16:28:05.521 | (SplitCoordinator pid=1609)   ├─   ReadParquet->SplitBlocks(36) 100% ━━━━━━━━ 3k/3k [ 0:00:00 , 0.00 row/s ] [repeated 6x across cluster]
-2026-01-26 16:28:05.521 | (SplitCoordinator pid=1609)   ├─   split(2, equal=True) 100% ━━━━━━━━━━ 3k/3k [ 0:00:00 , 0.00 row/s ]       [repeated 6x across cluster]
-2026-01-26 16:28:05.521 | (SplitCoordinator pid=1552)  ✔️  Dataset train_2_14 execution finished in 0.71 seconds 10… 2k/…   0.00 row/s 
-2026-01-26 16:28:05.521 | (SplitCoordinator pid=1552) Registered dataset logger for dataset train_2_14 [repeated 6x across cluster]
-2026-01-26 16:28:05.521 | (SplitCoordinator pid=1552) Starting execution of Dataset train_2_14. Full logs are in /tmp/ray/session_2026-01-26_14-26-38_570363_1/logs/ray-data [repeated 6x across cluster]
-2026-01-26 16:28:05.521 | (SplitCoordinator pid=1552) Execution plan of Dataset train_2_14: InputDataBuffer[Input] -> TaskPoolMapOperator[ReadParquet] -> OutputSplitter[split(2, equal=True)] [repeated 6x across cluster]
-2026-01-26 16:28:06.657 | (RayTrainWorker pid=510, ip=10.1.5.88) Reporting training result 3: TrainingReport(checkpoint=None, metrics={'epoch': 14, 'train_loss': 0.04469303600490093, 'val_loss': 0.03188308607786894, 'val_accuracy': 0.9926666617393494, 'val_precision_macro': 0.9934433102607727, 'val_recall_macro': 0.8695048689842224, 'val_f1_macro': 0.9033926129341125, 'val_precision_weighted': 0.9927091598510742, 'val_recall_weighted': 0.9926666021347046, 'val_f1_weighted': 0.9913305044174194, 'val_precision_class_0': 0.9929178357124329, 'val_recall_class_0': 0.9992872476577759, 'val_f1_class_0': 0.9960923194885254, 'val_support_class_0': 1403.0, 'val_precision_class_1': 1.0, 'val_recall_class_1': 1.0, 'val_f1_class_1': 1.0, 'val_support_class_1': 33.0, 'val_precision_class_2': 1.0, 'val_recall_class_2': 0.3333333432674408, 'val_f1_class_2': 0.5, 'val_support_class_2': 12.0, 'val_precision_class_3': 0.9677419066429138, 'val_recall_class_3': 0.9677419066429138, 'val_f1_class_3': 0.9677419066429138, 'val_support_class_3': 31.0, 'val_precision_class_4': 1.0, 'val_recall_class_4': 0.9166666865348816, 'val_f1_class_4': 0.95652174949646, 'val_support_class_4': 12.0, 'val_precision_class_5': 1.0, 'val_recall_class_5': 1.0, 'val_f1_class_5': 1.0, 'val_support_class_5': 9.0}, validation_spec=None)
-2026-01-26 16:28:07.659 | (SplitCoordinator pid=1552)  ✔️  Dataset train_2_15 execution finished in 0.78 seconds 10… 2k/…   0.00 row/s 
-2026-01-26 16:28:07.659 | (SplitCoordinator pid=1552)   │ Active/total resources: Active & requested resources: 0/2 CPU, 47.1KiB/4.1G… [repeated 6x across cluster]
-2026-01-26 16:28:07.659 | (SplitCoordinator pid=1552)   │                                                                              [repeated 6x across cluster]
-2026-01-26 16:28:07.659 | (SplitCoordinator pid=1552)   │    0.0 CPU, 0.0B object store; Tasks: 0; Queued blocks: 0;                   [repeated 6x across cluster]
-2026-01-26 16:28:07.659 | (SplitCoordinator pid=1552)   │    0.0 CPU, 47.1KiB object store; Tasks: 0: [0/33 objects local]; Queued bl… [repeated 6x across cluster]
-2026-01-26 16:28:07.659 | (SplitCoordinator pid=1552)                                                                                 ✔️  Dataset train_2_15 execution finished in 0.78 seconds [repeated 6x across cluster]
-2026-01-26 16:28:08.659 | (RayTrainWorker pid=447, ip=10.1.5.89) Exiting prefetcher's background thread [repeated 10x across cluster]
-2026-01-26 16:28:09.661 | (SplitCoordinator pid=1552)  ✔️  Dataset train_2_16 execution finished in 0.68 seconds 10… 2k/…   0.00 row/s 
-2026-01-26 16:28:09.661 | (RayTrainWorker pid=447, ip=10.1.5.89) [pytorch] Worker train_time_sec=28.77 [repeated 6x across cluster]
-2026-01-26 16:28:10.662 | (SplitCoordinator pid=1609)  ✔️  Dataset val_4_16 execution finished in 0.78 seconds 100% 3k/… [  0.00 row/s  [repeated 3x across cluster]
-2026-01-26 16:28:10.662 | (SplitCoordinator pid=1609)   ├─   ReadParquet->SplitBlocks(36) 100% ━━━━━━━━ 3k/3k [ 0:00:00 , 0.00 row/s ] [repeated 6x across cluster]
-2026-01-26 16:28:10.662 | (SplitCoordinator pid=1609)   ├─   split(2, equal=True) 100% ━━━━━━━━━━ 3k/3k [ 0:00:00 , 0.00 row/s ]       [repeated 6x across cluster]
-2026-01-26 16:28:11.662 | (SplitCoordinator pid=1552)  ✔️  Dataset train_2_17 execution finished in 0.71 seconds 10… 2k/…   0.00 row/s 
-2026-01-26 16:28:11.662 | (SplitCoordinator pid=1552) Registered dataset logger for dataset train_2_17 [repeated 6x across cluster]
-2026-01-26 16:28:11.663 | (SplitCoordinator pid=1552) Starting execution of Dataset train_2_17. Full logs are in /tmp/ray/session_2026-01-26_14-26-38_570363_1/logs/ray-data [repeated 6x across cluster]
-2026-01-26 16:28:11.663 | (SplitCoordinator pid=1552) Execution plan of Dataset train_2_17: InputDataBuffer[Input] -> TaskPoolMapOperator[ReadParquet] -> OutputSplitter[split(2, equal=True)] [repeated 6x across cluster]
-2026-01-26 16:28:12.665 | (RayTrainWorker pid=447, ip=10.1.5.89) Reporting training result 3: TrainingReport(checkpoint=None, metrics={'epoch': 14, 'train_loss': 0.03407520055770874, 'val_loss': 0.039625798972944416, 'val_accuracy': 0.9886666536331177, 'val_precision_macro': 0.9765901565551758, 'val_recall_macro': 0.8689234256744385, 'val_f1_macro': 0.8938612937927246, 'val_precision_weighted': 0.9889536499977112, 'val_recall_weighted': 0.9886665940284729, 'val_f1_weighted': 0.9867032170295715, 'val_precision_class_0': 0.9907670617103577, 'val_recall_class_0': 0.9978540539741516, 'val_f1_class_0': 0.9942979216575623, 'val_support_class_0': 1398.0, 'val_precision_class_1': 0.9722222089767456, 'val_recall_class_1': 1.0, 'val_f1_class_1': 0.98591548204422, 'val_support_class_1': 35.0, 'val_precision_class_2': 1.0, 'val_recall_class_2': 0.3333333432674408, 'val_f1_class_2': 0.5, 'val_support_class_2': 18.0, 'val_precision_class_3': 0.8965517282485962, 'val_recall_class_3': 1.0, 'val_f1_class_3': 0.9454545378684998, 'val_support_class_3': 26.0, 'val_precision_class_4': 1.0, 'val_recall_class_4': 0.8823529481887817, 'val_f1_class_4': 0.9375, 'val_support_class_4': 17.0, 'val_precision_class_5': 1.0, 'val_recall_class_5': 1.0, 'val_f1_class_5': 1.0, 'val_support_class_5': 6.0}, validation_spec=None)
-2026-01-26 16:28:12.665 | (SplitCoordinator pid=1552)  ✔️  Dataset train_2_18 execution finished in 0.68 seconds 10… 2k/…   0.00 row/s 
-2026-01-26 16:28:12.665 | (SplitCoordinator pid=1552)   │ Active/total resources: Active & requested resources: 0/2 CPU, 47.1KiB/4.1G… [repeated 6x across cluster]
-2026-01-26 16:28:12.665 | (SplitCoordinator pid=1552)   │                                                                              [repeated 6x across cluster]
-2026-01-26 16:28:12.665 | (SplitCoordinator pid=1552)   │    0.0 CPU, 0.0B object store; Tasks: 0; Queued blocks: 0;                   [repeated 6x across cluster]
-2026-01-26 16:28:12.665 | (SplitCoordinator pid=1552)   │    0.0 CPU, 47.1KiB object store; Tasks: 0: [0/33 objects local]; Queued bl… [repeated 6x across cluster]
-2026-01-26 16:28:12.665 | (SplitCoordinator pid=1552)                                                                                 ✔️  Dataset train_2_18 execution finished in 0.68 seconds [repeated 6x across cluster]
-2026-01-26 16:28:13.665 | (RayTrainWorker pid=447, ip=10.1.5.89) Exiting prefetcher's background thread [repeated 12x across cluster]
-2026-01-26 16:28:14.667 | (SplitCoordinator pid=1552)  ✔️  Dataset train_2_19 execution finished in 0.71 seconds 10… 2k/…   0.00 row/s 
-2026-01-26 16:28:14.667 | (RayTrainWorker pid=447, ip=10.1.5.89) [pytorch] Worker train_time_sec=33.87 [repeated 6x across cluster]
-2026-01-26 16:28:15.668 | (SplitCoordinator pid=1609)  ✔️  Dataset val_4_19 execution finished in 0.73 seconds 100% 3k/… [  0.00 row/s  [repeated 3x across cluster]
-2026-01-26 16:28:15.668 | (SplitCoordinator pid=1609)   ├─   ReadParquet->SplitBlocks(36) 100% ━━━━━━━━ 3k/3k [ 0:00:00 , 0.00 row/s ] [repeated 6x across cluster]
-2026-01-26 16:28:15.668 | (SplitCoordinator pid=1609)   ├─   split(2, equal=True) 100% ━━━━━━━━━━ 3k/3k [ 0:00:00 , 0.00 row/s ]       [repeated 6x across cluster]
-2026-01-26 16:28:15.668 | (RayTrainWorker pid=510, ip=10.1.5.88) Reporting training result 4: TrainingReport(checkpoint=None, metrics={'epoch': 19, 'train_loss': 0.028945521917194128, 'val_loss': 0.021291240118443966, 'val_accuracy': 0.9933333396911621, 'val_precision_macro': 0.9935606122016907, 'val_recall_macro': 0.8833937644958496, 'val_f1_macro': 0.9106981158256531, 'val_precision_weighted': 0.9933673143386841, 'val_recall_weighted': 0.9933332800865173, 'val_f1_weighted': 0.9920094609260559, 'val_precision_class_0': 0.9936215281486511, 'val_recall_class_0': 0.9992872476577759, 'val_f1_class_0': 0.9964463710784912, 'val_support_class_0': 1403.0, 'val_precision_class_1': 1.0, 'val_recall_class_1': 1.0, 'val_f1_class_1': 1.0, 'val_support_class_1': 33.0, 'val_precision_class_2': 1.0, 'val_recall_class_2': 0.3333333432674408, 'val_f1_class_2': 0.5, 'val_support_class_2': 12.0, 'val_precision_class_3': 0.9677419066429138, 'val_recall_class_3': 0.9677419066429138, 'val_f1_class_3': 0.9677419066429138, 'val_support_class_3': 31.0, 'val_precision_class_4': 1.0, 'val_recall_class_4': 1.0, 'val_f1_class_4': 1.0, 'val_support_class_4': 12.0, 'val_precision_class_5': 1.0, 'val_recall_class_5': 1.0, 'val_f1_class_5': 1.0, 'val_support_class_5': 9.0}, validation_spec=None)
-2026-01-26 16:28:16.671 | (SplitCoordinator pid=1552)  ✔️  Dataset train_2_20 execution finished in 0.72 seconds 10… 2k/…   0.00 row/s 
-2026-01-26 16:28:16.671 | (SplitCoordinator pid=1552) Registered dataset logger for dataset train_2_20 [repeated 6x across cluster]
-2026-01-26 16:28:16.671 | (SplitCoordinator pid=1552) Starting execution of Dataset train_2_20. Full logs are in /tmp/ray/session_2026-01-26_14-26-38_570363_1/logs/ray-data [repeated 6x across cluster]
-2026-01-26 16:28:16.671 | (SplitCoordinator pid=1552) Execution plan of Dataset train_2_20: InputDataBuffer[Input] -> TaskPoolMapOperator[ReadParquet] -> OutputSplitter[split(2, equal=True)] [repeated 6x across cluster]
-2026-01-26 16:28:17.672 | (SplitCoordinator pid=1609)   │ Active/total resources: Active & requested resources: 0/2 CPU, 53.2KiB/4.1G… [repeated 5x across cluster]
-2026-01-26 16:28:17.672 | (SplitCoordinator pid=1609)   │                                                                              [repeated 5x across cluster]
-2026-01-26 16:28:17.672 | (SplitCoordinator pid=1609)   │    0.0 CPU, 0.0B object store; Tasks: 0; Queued blocks: 0;                   [repeated 5x across cluster]
-2026-01-26 16:28:17.672 | (SplitCoordinator pid=1609)   │    0.0 CPU, 53.2KiB object store; Tasks: 0: [0/33 objects local]; Queued bl… [repeated 5x across cluster]
-2026-01-26 16:28:17.672 | (SplitCoordinator pid=1609)                                                                                 ✔️  Dataset val_4_20 execution finished in 0.72 seconds [repeated 5x across cluster]
-2026-01-26 16:28:17.672 | (SplitCoordinator pid=1552)  ✔️  Dataset train_2_21 execution finished in 0.66 seconds 10… 2k/…   0.00 row/s 
-2026-01-26 16:28:18.674 | (RayTrainWorker pid=447, ip=10.1.5.89) Exiting prefetcher's background thread [repeated 12x across cluster]
-2026-01-26 16:28:19.675 | (RayTrainWorker pid=447, ip=10.1.5.89) [pytorch] Worker train_time_sec=39.03 [repeated 6x across cluster]
-2026-01-26 16:28:19.675 | (SplitCoordinator pid=1552)  ✔️  Dataset train_2_22 execution finished in 0.72 seconds 10… 2k/…   0.00 row/s 
-2026-01-26 16:28:20.678 | (SplitCoordinator pid=1609)  ✔️  Dataset val_4_22 execution finished in 0.72 seconds 100% 3k/… [  0.00 row/s  [repeated 3x across cluster]
-2026-01-26 16:28:20.678 | (SplitCoordinator pid=1609)   ├─   ReadParquet->SplitBlocks(36) 100% ━━━━━━━━ 3k/3k [ 0:00:00 , 0.00 row/s ] [repeated 6x across cluster]
-2026-01-26 16:28:20.678 | (SplitCoordinator pid=1609)   ├─   split(2, equal=True) 100% ━━━━━━━━━━ 3k/3k [ 0:00:00 , 0.00 row/s ]       [repeated 6x across cluster]
-2026-01-26 16:28:20.678 | (RayTrainWorker pid=447, ip=10.1.5.89) Reporting training result 4: TrainingReport(checkpoint=None, metrics={'epoch': 19, 'train_loss': 0.026015724521130323, 'val_loss': 0.028376510522017877, 'val_accuracy': 0.9946666955947876, 'val_precision_macro': 0.989910364151001, 'val_recall_macro': 0.9074073433876038, 'val_f1_macro': 0.9394404888153076, 'val_precision_weighted': 0.9947268962860107, 'val_recall_weighted': 0.9946666359901428, 'val_f1_weighted': 0.9940884709358215, 'val_precision_class_0': 0.9950177669525146, 'val_recall_class_0': 1.0, 'val_f1_class_0': 0.9975026845932007, 'val_support_class_0': 1398.0, 'val_precision_class_1': 1.0, 'val_recall_class_1': 1.0, 'val_f1_class_1': 1.0, 'val_support_class_1': 35.0, 'val_precision_class_2': 1.0, 'val_recall_class_2': 0.6111111044883728, 'val_f1_class_2': 0.7586206793785095, 'val_support_class_2': 18.0, 'val_precision_class_3': 1.0, 'val_recall_class_3': 1.0, 'val_f1_class_3': 1.0, 'val_support_class_3': 26.0, 'val_precision_class_4': 0.9444444179534912, 'val_recall_class_4': 1.0, 'val_f1_class_4': 0.9714285731315613, 'val_support_class_4': 17.0, 'val_precision_class_5': 1.0, 'val_recall_class_5': 0.8333333134651184, 'val_f1_class_5': 0.9090909361839294, 'val_support_class_5': 6.0}, validation_spec=None)
-2026-01-26 16:28:21.678 | (SplitCoordinator pid=1552) Registered dataset logger for dataset train_2_23 [repeated 6x across cluster]
-2026-01-26 16:28:21.678 | (SplitCoordinator pid=1552) Starting execution of Dataset train_2_23. Full logs are in /tmp/ray/session_2026-01-26_14-26-38_570363_1/logs/ray-data [repeated 6x across cluster]
-2026-01-26 16:28:21.678 | (SplitCoordinator pid=1552) Execution plan of Dataset train_2_23: InputDataBuffer[Input] -> TaskPoolMapOperator[ReadParquet] -> OutputSplitter[split(2, equal=True)] [repeated 6x across cluster]
-2026-01-26 16:28:21.678 | (SplitCoordinator pid=1552)  ✔️  Dataset train_2_23 execution finished in 0.67 seconds 10… 2k/…   0.00 row/s 
-2026-01-26 16:28:24.685 | (SplitCoordinator pid=1552)  ✔️  Dataset train_2_24 execution finished in 0.65 seconds 10… 2k/…   0.00 row/s 
-2026-01-26 16:28:24.685 | (SplitCoordinator pid=1552)   │ Active/total resources: Active & requested resources: 0/2 CPU, 64.7KiB/4.1G… [repeated 7x across cluster]
-2026-01-26 16:28:24.685 | (SplitCoordinator pid=1552)   │                                                                              [repeated 7x across cluster]
-2026-01-26 16:28:24.685 | (SplitCoordinator pid=1552)   │    0.0 CPU, 0.0B object store; Tasks: 0; Queued blocks: 0;                   [repeated 7x across cluster]
-2026-01-26 16:28:24.685 | (SplitCoordinator pid=1552)   │    0.0 CPU, 64.7KiB object store; Tasks: 0: [0/33 objects local]; Queued bl… [repeated 7x across cluster]
-2026-01-26 16:28:24.685 | (SplitCoordinator pid=1552)                                                                                 ✔️  Dataset train_2_24 execution finished in 0.65 seconds [repeated 7x across cluster]
-2026-01-26 16:28:24.685 | (RayTrainWorker pid=447, ip=10.1.5.89) Exiting prefetcher's background thread [repeated 12x across cluster]
-2026-01-26 16:28:24.685 | (RayTrainWorker pid=510, ip=10.1.5.88) Reporting training result 5: TrainingReport(checkpoint=None, metrics={'epoch': 24, 'train_loss': 0.02222523861564696, 'val_loss': 0.015682482238238055, 'val_accuracy': 0.9946666955947876, 'val_precision_macro': 0.9990550875663757, 'val_recall_macro': 0.8888888955116272, 'val_f1_macro': 0.9161928296089172, 'val_precision_weighted': 0.9946969151496887, 'val_recall_weighted': 0.9946666359901428, 'val_f1_weighted': 0.9933409094810486, 'val_precision_class_0': 0.9943302869796753, 'val_recall_class_0': 1.0, 'val_f1_class_0': 0.997157096862793, 'val_support_class_0': 1403.0, 'val_precision_class_1': 1.0, 'val_recall_class_1': 1.0, 'val_f1_class_1': 1.0, 'val_support_class_1': 33.0, 'val_precision_class_2': 1.0, 'val_recall_class_2': 0.3333333432674408, 'val_f1_class_2': 0.5, 'val_support_class_2': 12.0, 'val_precision_class_3': 1.0, 'val_recall_class_3': 1.0, 'val_f1_class_3': 1.0, 'val_support_class_3': 31.0, 'val_precision_class_4': 1.0, 'val_recall_class_4': 1.0, 'val_f1_class_4': 1.0, 'val_support_class_4': 12.0, 'val_precision_class_5': 1.0, 'val_recall_class_5': 1.0, 'val_f1_class_5': 1.0, 'val_support_class_5': 9.0}, validation_spec=None)
-2026-01-26 16:28:24.685 | (SplitCoordinator pid=1552)  ✔️  Dataset train_2_25 execution finished in 0.66 seconds 10… 2k/…   0.00 row/s 
-2026-01-26 16:28:25.687 | (RayTrainWorker pid=447, ip=10.1.5.89) [pytorch] Worker train_time_sec=44.06 [repeated 6x across cluster]
-2026-01-26 16:28:25.687 | (SplitCoordinator pid=1609)  ✔️  Dataset val_4_25 execution finished in 0.71 seconds 100% 3k/… [  0.00 row/s  [repeated 3x across cluster]
-2026-01-26 16:28:25.687 | (SplitCoordinator pid=1609)   ├─   ReadParquet->SplitBlocks(36) 100% ━━━━━━━━ 3k/3k [ 0:00:00 , 0.00 row/s ] [repeated 6x across cluster]
-2026-01-26 16:28:25.687 | (SplitCoordinator pid=1609)   ├─   split(2, equal=True) 100% ━━━━━━━━━━ 3k/3k [ 0:00:00 , 0.00 row/s ]       [repeated 6x across cluster]
-2026-01-26 16:28:26.689 | (SplitCoordinator pid=1552)  ✔️  Dataset train_2_26 execution finished in 0.74 seconds 10… 2k/…   0.00 row/s 
-2026-01-26 16:28:26.690 | (SplitCoordinator pid=1552) Registered dataset logger for dataset train_2_26 [repeated 6x across cluster]
-2026-01-26 16:28:26.690 | (SplitCoordinator pid=1552) Starting execution of Dataset train_2_26. Full logs are in /tmp/ray/session_2026-01-26_14-26-38_570363_1/logs/ray-data [repeated 6x across cluster]
-2026-01-26 16:28:26.690 | (SplitCoordinator pid=1552) Execution plan of Dataset train_2_26: InputDataBuffer[Input] -> TaskPoolMapOperator[ReadParquet] -> OutputSplitter[split(2, equal=True)] [repeated 6x across cluster]
-2026-01-26 16:28:27.690 | (SplitCoordinator pid=1552)  ✔️  Dataset train_2_27 execution finished in 0.68 seconds 10… 2k/…   0.00 row/s 
-2026-01-26 16:28:27.690 | (SplitCoordinator pid=1552)   │ Active/total resources: Active & requested resources: 0/2 CPU, 41.2KiB/4.1G… [repeated 6x across cluster]
-2026-01-26 16:28:27.690 | (SplitCoordinator pid=1552)   │                                                                              [repeated 6x across cluster]
-2026-01-26 16:28:27.690 | (SplitCoordinator pid=1552)   │    0.0 CPU, 0.0B object store; Tasks: 0; Queued blocks: 0;                   [repeated 6x across cluster]
-2026-01-26 16:28:27.690 | (SplitCoordinator pid=1552)   │    0.0 CPU, 41.2KiB object store; Tasks: 0: [0/33 objects local]; Queued bl… [repeated 6x across cluster]
-2026-01-26 16:28:27.690 | (SplitCoordinator pid=1552)                                                                                 ✔️  Dataset train_2_27 execution finished in 0.68 seconds [repeated 6x across cluster]
-2026-01-26 16:28:28.690 | (RayTrainWorker pid=510, ip=10.1.5.88) Exiting prefetcher's background thread [repeated 13x across cluster]
-2026-01-26 16:28:28.690 | (RayTrainWorker pid=447, ip=10.1.5.89) Reporting training result 5: TrainingReport(checkpoint=None, metrics={'epoch': 24, 'train_loss': 0.021206182427704334, 'val_loss': 0.024008764574925106, 'val_accuracy': 0.9953333139419556, 'val_precision_macro': 0.990028440952301, 'val_recall_macro': 0.9166666865348816, 'val_f1_macro': 0.9463963508605957, 'val_precision_weighted': 0.9953873753547668, 'val_recall_weighted': 0.9953333139419556, 'val_f1_weighted': 0.9949167370796204, 'val_precision_class_0': 0.995726466178894, 'val_recall_class_0': 1.0, 'val_f1_class_0': 0.9978586435317993, 'val_support_class_0': 1398.0, 'val_precision_class_1': 1.0, 'val_recall_class_1': 1.0, 'val_f1_class_1': 1.0, 'val_support_class_1': 35.0, 'val_precision_class_2': 1.0, 'val_recall_class_2': 0.6666666865348816, 'val_f1_class_2': 0.800000011920929, 'val_support_class_2': 18.0, 'val_precision_class_3': 1.0, 'val_recall_class_3': 1.0, 'val_f1_class_3': 1.0, 'val_support_class_3': 26.0, 'val_precision_class_4': 0.9444444179534912, 'val_recall_class_4': 1.0, 'val_f1_class_4': 0.9714285731315613, 'val_support_class_4': 17.0, 'val_precision_class_5': 1.0, 'val_recall_class_5': 0.8333333134651184, 'val_f1_class_5': 0.9090909361839294, 'val_support_class_5': 6.0}, validation_spec=None)
-2026-01-26 16:28:29.693 | (SplitCoordinator pid=1552)  ✔️  Dataset train_2_28 execution finished in 0.88 seconds 10… 2k/…   0.00 row/s 
-2026-01-26 16:28:30.693 | (RayTrainWorker pid=510, ip=10.1.5.88) [pytorch] Worker train_time_sec=49.09 [repeated 6x across cluster]
-2026-01-26 16:28:30.693 | (SplitCoordinator pid=1609)  ✔️  Dataset val_4_28 execution finished in 0.80 seconds 100% 3k/… [  0.00 row/s  [repeated 3x across cluster]
-2026-01-26 16:28:30.693 | (SplitCoordinator pid=1609)   ├─   ReadParquet->SplitBlocks(36) 100% ━━━━━━━━ 3k/3k [ 0:00:00 , 0.00 row/s ] [repeated 6x across cluster]
-2026-01-26 16:28:30.693 | (SplitCoordinator pid=1609)   ├─   split(2, equal=True) 100% ━━━━━━━━━━ 3k/3k [ 0:00:00 , 0.00 row/s ]       [repeated 6x across cluster]
-2026-01-26 16:28:31.695 | (SplitCoordinator pid=1552)  ✔️  Dataset train_2_29 execution finished in 0.83 seconds 10… 2k/…   0.00 row/s 
-2026-01-26 16:28:31.695 | (SplitCoordinator pid=1552) Registered dataset logger for dataset train_2_29 [repeated 6x across cluster]
-2026-01-26 16:28:31.695 | (SplitCoordinator pid=1552) Starting execution of Dataset train_2_29. Full logs are in /tmp/ray/session_2026-01-26_14-26-38_570363_1/logs/ray-data [repeated 6x across cluster]
-2026-01-26 16:28:31.695 | (SplitCoordinator pid=1552) Execution plan of Dataset train_2_29: InputDataBuffer[Input] -> TaskPoolMapOperator[ReadParquet] -> OutputSplitter[split(2, equal=True)] [repeated 6x across cluster]
-2026-01-26 16:28:32.696 | (RayTrainWorker pid=447, ip=10.1.5.89) Reporting training result 6: TrainingReport(checkpoint=None, metrics={'epoch': 29, 'train_loss': 0.017230417113751173, 'val_loss': 0.02245522088681658, 'val_accuracy': 0.9959999918937683, 'val_precision_macro': 0.9992877840995789, 'val_recall_macro': 0.9444444179534912, 'val_f1_macro': 0.9663097858428955, 'val_precision_weighted': 0.9960170388221741, 'val_recall_weighted': 0.9959999918937683, 'val_f1_weighted': 0.9956042170524597, 'val_precision_class_0': 0.995726466178894, 'val_recall_class_0': 1.0, 'val_f1_class_0': 0.9978586435317993, 'val_support_class_0': 1398.0, 'val_precision_class_1': 1.0, 'val_recall_class_1': 1.0, 'val_f1_class_1': 1.0, 'val_support_class_1': 35.0, 'val_precision_class_2': 1.0, 'val_recall_class_2': 0.6666666865348816, 'val_f1_class_2': 0.800000011920929, 'val_support_class_2': 18.0, 'val_precision_class_3': 1.0, 'val_recall_class_3': 1.0, 'val_f1_class_3': 1.0, 'val_support_class_3': 26.0, 'val_precision_class_4': 1.0, 'val_recall_class_4': 1.0, 'val_f1_class_4': 1.0, 'val_support_class_4': 17.0, 'val_precision_class_5': 1.0, 'val_recall_class_5': 1.0, 'val_f1_class_5': 1.0, 'val_support_class_5': 6.0}, validation_spec=None)
-2026-01-26 16:28:33.697 | (SplitCoordinator pid=1552)  ✔️  Dataset train_2_30 execution finished in 0.81 seconds 10… 2k/…   0.00 row/s 
-2026-01-26 16:28:33.697 | (SplitCoordinator pid=1552)   │ Active/total resources: Active & requested resources: 0/2 CPU, 41.2KiB/4.1G… [repeated 6x across cluster]
-2026-01-26 16:28:33.697 | (SplitCoordinator pid=1552)   │                                                                              [repeated 6x across cluster]
-2026-01-26 16:28:33.697 | (SplitCoordinator pid=1552)   │    0.0 CPU, 0.0B object store; Tasks: 0; Queued blocks: 0;                   [repeated 6x across cluster]
-2026-01-26 16:28:33.697 | (SplitCoordinator pid=1552)   │    0.0 CPU, 41.2KiB object store; Tasks: 0: [0/33 objects local]; Queued bl… [repeated 6x across cluster]
-2026-01-26 16:28:33.697 | (SplitCoordinator pid=1552)                                                                                 ✔️  Dataset train_2_30 execution finished in 0.81 seconds [repeated 6x across cluster]
-2026-01-26 16:28:34.699 | (RayTrainWorker pid=510, ip=10.1.5.88) Exiting prefetcher's background thread [repeated 11x across cluster]
-2026-01-26 16:28:35.700 | (SplitCoordinator pid=1552)  ✔️  Dataset train_2_31 execution finished in 0.93 seconds 10… 2k/…   0.00 row/s 
-2026-01-26 16:28:35.700 | (RayTrainWorker pid=510, ip=10.1.5.88) [pytorch] Worker train_time_sec=54.95 [repeated 6x across cluster]
-2026-01-26 16:28:35.700 | (SplitCoordinator pid=1609)  ✔️  Dataset val_4_30 execution finished in 0.96 seconds 100% 3k/… [  0.00 row/s  [repeated 2x across cluster]
-2026-01-26 16:28:35.700 | (SplitCoordinator pid=1552)   ├─   ReadParquet->SplitBlocks(36) 100% ━━━━━━━━ 2k/2k [ 0:00:00 , 0.00 row/s ] [repeated 5x across cluster]
-2026-01-26 16:28:35.700 | (SplitCoordinator pid=1552)   ├─   split(2, equal=True) 100% ━━━━━━━━━━ 2k/2k [ 0:00:00 , 0.00 row/s ]       [repeated 5x across cluster]
-2026-01-26 16:28:38.845 | (SplitCoordinator pid=1609) Registered dataset logger for dataset val_4_31 [repeated 5x across cluster]
-2026-01-26 16:28:38.845 | (SplitCoordinator pid=1609) Starting execution of Dataset val_4_31. Full logs are in /tmp/ray/session_2026-01-26_14-26-38_570363_1/logs/ray-data [repeated 5x across cluster]
-2026-01-26 16:28:38.845 | (SplitCoordinator pid=1609) Execution plan of Dataset val_4_31: InputDataBuffer[Input] -> TaskPoolMapOperator[ReadParquet] -> OutputSplitter[split(2, equal=True)] [repeated 5x across cluster]
-2026-01-26 16:28:38.845 | (SplitCoordinator pid=1609)  ✔️  Dataset val_4_31 execution finished in 1.11 seconds 10… 3k/…   2.72 k row/s 
-2026-01-26 16:28:38.845 | (SplitCoordinator pid=1609)   ├─   ReadParquet->SplitBlocks(36) 100% ━━━━━━━ 3k/3k [ 0:00:… , 2.78 k row/s ]
-2026-01-26 16:28:38.845 | (SplitCoordinator pid=1609)   ├─   split(2, equal=True) 100% ━━━━━━━━━━ 3k/3k [ 0:00:01 , 2.77 k row/s ]    
-2026-01-26 16:28:38.845 | (RayTrainWorker pid=510, ip=10.1.5.88) Reporting training result 6: TrainingReport(checkpoint=None, metrics={'epoch': 29, 'train_loss': 0.02030089031904936, 'val_loss': 0.013253800493354598, 'val_accuracy': 0.9953333139419556, 'val_precision_macro': 0.9991725087165833, 'val_recall_macro': 0.9027777314186096, 'val_f1_macro': 0.9309577941894531, 'val_precision_weighted': 0.9953565001487732, 'val_recall_weighted': 0.9953333139419556, 'val_f1_weighted': 0.994378387928009, 'val_precision_class_0': 0.9950354695320129, 'val_recall_class_0': 1.0, 'val_f1_class_0': 0.9975115656852722, 'val_support_class_0': 1403.0, 'val_precision_class_1': 1.0, 'val_recall_class_1': 1.0, 'val_f1_class_1': 1.0, 'val_support_class_1': 33.0, 'val_precision_class_2': 1.0, 'val_recall_class_2': 0.4166666567325592, 'val_f1_class_2': 0.5882353186607361, 'val_support_class_2': 12.0, 'val_precision_class_3': 1.0, 'val_recall_class_3': 1.0, 'val_f1_class_3': 1.0, 'val_support_class_3': 31.0, 'val_precision_class_4': 1.0, 'val_recall_class_4': 1.0, 'val_f1_class_4': 1.0, 'val_support_class_4': 12.0, 'val_precision_class_5': 1.0, 'val_recall_class_5': 1.0, 'val_f1_class_5': 1.0, 'val_support_class_5': 9.0}, validation_spec=None)
-2026-01-26 16:28:38.845 | (SplitCoordinator pid=1552)  ✔️  Dataset train_2_32 execution finished in 1.17 seconds 10… 2k/…   1.58 k ro… 
-2026-01-26 16:28:39.846 | (SplitCoordinator pid=1609)  ✔️  Dataset val_4_32 execution finished in 1.27 seconds 10… 3k/…   2.38 k row/s 
-2026-01-26 16:28:39.846 | (SplitCoordinator pid=1609)   │ Active/total resources: Active & requested resources: 0/2 CPU, 62.1KiB/4.1G… [repeated 5x across cluster]
-2026-01-26 16:28:39.846 | (SplitCoordinator pid=1609)   │                                                                              [repeated 5x across cluster]
-2026-01-26 16:28:39.846 | (SplitCoordinator pid=1609)   │    0.0 CPU, 0.0B object store; Tasks: 0; Queued blocks: 0;                   [repeated 5x across cluster]
-2026-01-26 16:28:39.846 | (SplitCoordinator pid=1609)   │    0.0 CPU, 62.1KiB object store; Tasks: 0: [0/33 objects local]; Queued bl… [repeated 5x across cluster]
-2026-01-26 16:28:39.846 | (SplitCoordinator pid=1609)                                                                                 ✔️  Dataset val_4_32 execution finished in 1.27 seconds [repeated 5x across cluster]
-2026-01-26 16:28:39.846 | (RayTrainWorker pid=510, ip=10.1.5.88) Exiting prefetcher's background thread [repeated 8x across cluster]
-2026-01-26 16:28:41.850 | (RayTrainWorker pid=510, ip=10.1.5.88) [pytorch] Worker train_time_sec=59.93 [repeated 4x across cluster]
-2026-01-26 16:28:41.850 | (SplitCoordinator pid=1552)  ✔️  Dataset train_2_33 execution finished in 1.26 seconds 10… 2k/…   1.60 k ro… 
-2026-01-26 16:28:41.850 | (SplitCoordinator pid=1609)  ✔️  Dataset val_4_33 execution finished in 1.00 seconds 100% 3k/… [  0.00 row/s 
-2026-01-26 16:28:41.850 | (SplitCoordinator pid=1609)   ├─   ReadParquet->SplitBlocks(36) 100% ━━━━━━━━ 3k/3k [ 0:00:00 , 0.00 row/s ]
-2026-01-26 16:28:41.850 | (SplitCoordinator pid=1609)   ├─   split(2, equal=True) 100% ━━━━━━━━━━ 3k/3k [ 0:00:00 , 0.00 row/s ]      
-2026-01-26 16:28:41.850 | (SplitCoordinator pid=1609) Registered dataset logger for dataset val_4_33 [repeated 4x across cluster]
-2026-01-26 16:28:41.850 | (SplitCoordinator pid=1609) Starting execution of Dataset val_4_33. Full logs are in /tmp/ray/session_2026-01-26_14-26-38_570363_1/logs/ray-data [repeated 4x across cluster]
-2026-01-26 16:28:41.850 | (SplitCoordinator pid=1609) Execution plan of Dataset val_4_33: InputDataBuffer[Input] -> TaskPoolMapOperator[ReadParquet] -> OutputSplitter[split(2, equal=True)] [repeated 4x across cluster]
-2026-01-26 16:28:41.850 | (SplitCoordinator pid=1552)   ├─   ReadParquet->SplitBlocks(36) 100% ━━━━━━━ 2k/2k [ 0:00:… , 1.61 k row/s ] [repeated 3x across cluster]
-2026-01-26 16:28:41.850 | (SplitCoordinator pid=1552)   ├─   split(2, equal=True) 100% ━━━━━━━━━━ 2k/2k [ 0:00:01 , 1.61 k row/s ]     [repeated 3x across cluster]
-2026-01-26 16:28:44.857 | (SplitCoordinator pid=1552)  ✔️  Dataset train_2_34 execution finished in 1.04 seconds 10… 2k/…   1.96 k ro… 
-2026-01-26 16:28:44.857 | (SplitCoordinator pid=1609)  ✔️  Dataset val_4_34 execution finished in 0.82 seconds 100% 3k/… [  0.00 row/s 
-2026-01-26 16:28:44.857 | (SplitCoordinator pid=1609)   ├─   ReadParquet->SplitBlocks(36) 100% ━━━━━━━━ 3k/3k [ 0:00:00 , 0.00 row/s ]
-2026-01-26 16:28:44.857 | (SplitCoordinator pid=1609)   ├─   split(2, equal=True) 100% ━━━━━━━━━━ 3k/3k [ 0:00:00 , 0.00 row/s ]      
-2026-01-26 16:28:44.857 | (RayTrainWorker pid=447, ip=10.1.5.89) Reporting training result 7: TrainingReport(checkpoint=None, metrics={'epoch': 34, 'train_loss': 0.01818790566176176, 'val_loss': 0.021455474896356463, 'val_accuracy': 0.9959999918937683, 'val_precision_macro': 0.9992877840995789, 'val_recall_macro': 0.9444444179534912, 'val_f1_macro': 0.9663097858428955, 'val_precision_weighted': 0.9960170388221741, 'val_recall_weighted': 0.9959999918937683, 'val_f1_weighted': 0.9956042170524597, 'val_precision_class_0': 0.995726466178894, 'val_recall_class_0': 1.0, 'val_f1_class_0': 0.9978586435317993, 'val_support_class_0': 1398.0, 'val_precision_class_1': 1.0, 'val_recall_class_1': 1.0, 'val_f1_class_1': 1.0, 'val_support_class_1': 35.0, 'val_precision_class_2': 1.0, 'val_recall_class_2': 0.6666666865348816, 'val_f1_class_2': 0.800000011920929, 'val_support_class_2': 18.0, 'val_precision_class_3': 1.0, 'val_recall_class_3': 1.0, 'val_f1_class_3': 1.0, 'val_support_class_3': 26.0, 'val_precision_class_4': 1.0, 'val_recall_class_4': 1.0, 'val_f1_class_4': 1.0, 'val_support_class_4': 17.0, 'val_precision_class_5': 1.0, 'val_recall_class_5': 1.0, 'val_f1_class_5': 1.0, 'val_support_class_5': 6.0}, validation_spec=None)
-2026-01-26 16:28:45.858 | (SplitCoordinator pid=1552)  ✔️  Dataset train_2_35 execution finished in 0.70 seconds 10… 2k/…   0.00 row/s 
-2026-01-26 16:28:45.859 | (SplitCoordinator pid=1552)   │ Active/total resources: Active & requested resources: 0/2 CPU, 53.0KiB/4.1G… [repeated 5x across cluster]
-2026-01-26 16:28:45.859 | (SplitCoordinator pid=1552)   │                                                                              [repeated 5x across cluster]
-2026-01-26 16:28:45.859 | (SplitCoordinator pid=1552)   │    0.0 CPU, 0.0B object store; Tasks: 0; Queued blocks: 0;                   [repeated 5x across cluster]
-2026-01-26 16:28:45.859 | (SplitCoordinator pid=1552)   │    0.0 CPU, 53.0KiB object store; Tasks: 0: [0/33 objects local]; Queued bl… [repeated 5x across cluster]
-2026-01-26 16:28:45.859 | (SplitCoordinator pid=1552)                                                                                 ✔️  Dataset train_2_35 execution finished in 0.70 seconds [repeated 5x across cluster]
-2026-01-26 16:28:45.859 | (RayTrainWorker pid=510, ip=10.1.5.88) Exiting prefetcher's background thread [repeated 10x across cluster]
-2026-01-26 16:28:46.860 | (SplitCoordinator pid=1609)  ✔️  Dataset val_4_35 execution finished in 0.78 seconds 100% 3k/… [  0.00 row/s 
-2026-01-26 16:28:46.861 | (RayTrainWorker pid=510, ip=10.1.5.88) [pytorch] Worker train_time_sec=64.55 [repeated 4x across cluster]
-2026-01-26 16:28:46.861 | (SplitCoordinator pid=1552)  ✔️  Dataset train_2_36 execution finished in 0.72 seconds 10… 2k/…   0.00 row/s 
-2026-01-26 16:28:47.863 | (SplitCoordinator pid=1609)  ✔️  Dataset val_4_36 execution finished in 0.78 seconds 100% 3k/… [  0.00 row/s 
-2026-01-26 16:28:47.863 | (SplitCoordinator pid=1609)   ├─   ReadParquet->SplitBlocks(36) 100% ━━━━━━━━ 3k/3k [ 0:00:00 , 0.00 row/s ] [repeated 4x across cluster]
-2026-01-26 16:28:47.863 | (SplitCoordinator pid=1609)   ├─   split(2, equal=True) 100% ━━━━━━━━━━ 3k/3k [ 0:00:00 , 0.00 row/s ]       [repeated 4x across cluster]
-2026-01-26 16:28:47.863 | (SplitCoordinator pid=1609) Registered dataset logger for dataset val_4_36 [repeated 6x across cluster]
-2026-01-26 16:28:47.863 | (SplitCoordinator pid=1609) Starting execution of Dataset val_4_36. Full logs are in /tmp/ray/session_2026-01-26_14-26-38_570363_1/logs/ray-data [repeated 6x across cluster]
-2026-01-26 16:28:47.863 | (SplitCoordinator pid=1609) Execution plan of Dataset val_4_36: InputDataBuffer[Input] -> TaskPoolMapOperator[ReadParquet] -> OutputSplitter[split(2, equal=True)] [repeated 6x across cluster]
-2026-01-26 16:28:47.863 | (SplitCoordinator pid=1552)   ├─   ReadParquet->SplitBlocks(36) 100% ━━━━━━━ 2k/2k [ 0:00:… , 1.98 k row/s ]
-2026-01-26 16:28:47.863 | (SplitCoordinator pid=1552)   ├─   split(2, equal=True) 100% ━━━━━━━━━━ 2k/2k [ 0:00:01 , 1.98 k row/s ]    
-2026-01-26 16:28:48.863 | (SplitCoordinator pid=1552)  ✔️  Dataset train_2_37 execution finished in 0.91 seconds 10… 2k/…   0.00 row/s 
-2026-01-26 16:28:49.864 | (SplitCoordinator pid=1609)  ✔️  Dataset val_4_37 execution finished in 0.87 seconds 100% 3k/… [  0.00 row/s 
-2026-01-26 16:28:49.864 | (RayTrainWorker pid=510, ip=10.1.5.88) Reporting training result 7: TrainingReport(checkpoint=None, metrics={'epoch': 34, 'train_loss': 0.019505125819705427, 'val_loss': 0.011600510062028965, 'val_accuracy': 0.9959999918937683, 'val_precision_macro': 0.9992902874946594, 'val_recall_macro': 0.9166666865348816, 'val_f1_macro': 0.944088876247406, 'val_precision_weighted': 0.9960170388221741, 'val_recall_weighted': 0.9959999918937683, 'val_f1_weighted': 0.9953376054763794, 'val_precision_class_0': 0.9957416653633118, 'val_recall_class_0': 1.0, 'val_f1_class_0': 0.9978663325309753, 'val_support_class_0': 1403.0, 'val_precision_class_1': 1.0, 'val_recall_class_1': 1.0, 'val_f1_class_1': 1.0, 'val_support_class_1': 33.0, 'val_precision_class_2': 1.0, 'val_recall_class_2': 0.5, 'val_f1_class_2': 0.6666666865348816, 'val_support_class_2': 12.0, 'val_precision_class_3': 1.0, 'val_recall_class_3': 1.0, 'val_f1_class_3': 1.0, 'val_support_class_3': 31.0, 'val_precision_class_4': 1.0, 'val_recall_class_4': 1.0, 'val_f1_class_4': 1.0, 'val_support_class_4': 12.0, 'val_precision_class_5': 1.0, 'val_recall_class_5': 1.0, 'val_f1_class_5': 1.0, 'val_support_class_5': 9.0}, validation_spec=None)
-2026-01-26 16:28:50.865 | (SplitCoordinator pid=1552)  ✔️  Dataset train_2_38 execution finished in 0.71 seconds 10… 2k/…   0.00 row/s 
-2026-01-26 16:28:50.865 | (SplitCoordinator pid=1552)   │ Active/total resources: Active & requested resources: 0/2 CPU, 29.4KiB/4.1G… [repeated 6x across cluster]
-2026-01-26 16:28:50.865 | (SplitCoordinator pid=1552)   │                                                                              [repeated 6x across cluster]
-2026-01-26 16:28:50.865 | (SplitCoordinator pid=1552)   │    0.0 CPU, 0.0B object store; Tasks: 0; Queued blocks: 0;                   [repeated 6x across cluster]
-2026-01-26 16:28:50.865 | (SplitCoordinator pid=1552)   │    0.0 CPU, 29.4KiB object store; Tasks: 0: [0/33 objects local]; Queued bl… [repeated 6x across cluster]
-2026-01-26 16:28:50.865 | (SplitCoordinator pid=1552)                                                                                 ✔️  Dataset train_2_38 execution finished in 0.71 seconds [repeated 6x across cluster]
-2026-01-26 16:28:50.865 | (RayTrainWorker pid=447, ip=10.1.5.89) Exiting prefetcher's background thread [repeated 12x across cluster]
-2026-01-26 16:28:51.866 | (SplitCoordinator pid=1609)  ✔️  Dataset val_4_38 execution finished in 0.86 seconds 100% 3k/… [  0.00 row/s 
-2026-01-26 16:28:51.866 | (RayTrainWorker pid=447, ip=10.1.5.89) [pytorch] Worker train_time_sec=70.05 [repeated 6x across cluster]
-2026-01-26 16:28:52.868 | (SplitCoordinator pid=1552)  ✔️  Dataset train_2_39 execution finished in 0.75 seconds 10… 2k/…   0.00 row/s 
-2026-01-26 16:28:53.870 | (SplitCoordinator pid=1609)  ✔️  Dataset val_4_39 execution finished in 0.80 seconds 100% 3k/… [  0.00 row/s 
-2026-01-26 16:28:53.870 | (SplitCoordinator pid=1609)   ├─   ReadParquet->SplitBlocks(36) 100% ━━━━━━━━ 3k/3k [ 0:00:00 , 0.00 row/s ] [repeated 6x across cluster]
-2026-01-26 16:28:53.870 | (SplitCoordinator pid=1609)   ├─   split(2, equal=True) 100% ━━━━━━━━━━ 3k/3k [ 0:00:00 , 0.00 row/s ]       [repeated 6x across cluster]
-2026-01-26 16:28:53.870 | (SplitCoordinator pid=1609) Registered dataset logger for dataset val_4_39 [repeated 6x across cluster]
-2026-01-26 16:28:53.870 | (SplitCoordinator pid=1609) Starting execution of Dataset val_4_39. Full logs are in /tmp/ray/session_2026-01-26_14-26-38_570363_1/logs/ray-data [repeated 6x across cluster]
-2026-01-26 16:28:53.870 | (SplitCoordinator pid=1609) Execution plan of Dataset val_4_39: InputDataBuffer[Input] -> TaskPoolMapOperator[ReadParquet] -> OutputSplitter[split(2, equal=True)] [repeated 6x across cluster]
-2026-01-26 16:28:53.870 | (RayTrainWorker pid=510, ip=10.1.5.88) Reporting training result 8: TrainingReport(checkpoint=None, metrics={'epoch': 39, 'train_loss': 0.017309204791672528, 'val_loss': 0.011023330152966082, 'val_accuracy': 0.9959999918937683, 'val_precision_macro': 0.9992902874946594, 'val_recall_macro': 0.9166666865348816, 'val_f1_macro': 0.944088876247406, 'val_precision_weighted': 0.9960170388221741, 'val_recall_weighted': 0.9959999918937683, 'val_f1_weighted': 0.9953376054763794, 'val_precision_class_0': 0.9957416653633118, 'val_recall_class_0': 1.0, 'val_f1_class_0': 0.9978663325309753, 'val_support_class_0': 1403.0, 'val_precision_class_1': 1.0, 'val_recall_class_1': 1.0, 'val_f1_class_1': 1.0, 'val_support_class_1': 33.0, 'val_precision_class_2': 1.0, 'val_recall_class_2': 0.5, 'val_f1_class_2': 0.6666666865348816, 'val_support_class_2': 12.0, 'val_precision_class_3': 1.0, 'val_recall_class_3': 1.0, 'val_f1_class_3': 1.0, 'val_support_class_3': 31.0, 'val_precision_class_4': 1.0, 'val_recall_class_4': 1.0, 'val_f1_class_4': 1.0, 'val_support_class_4': 12.0, 'val_precision_class_5': 1.0, 'val_recall_class_5': 1.0, 'val_f1_class_5': 1.0, 'val_support_class_5': 9.0}, validation_spec=None)
-2026-01-26 16:28:54.871 | (SplitCoordinator pid=1552)  ✔️  Dataset train_2_40 execution finished in 0.72 seconds 10… 2k/…   0.00 row/s 
-2026-01-26 16:28:55.872 | (SplitCoordinator pid=1609)  ✔️  Dataset val_4_40 execution finished in 0.86 seconds 100% 3k/… [  0.00 row/s 
-2026-01-26 16:28:56.873 | (SplitCoordinator pid=1552)  ✔️  Dataset train_2_41 execution finished in 0.75 seconds 10… 2k/…   0.00 row/s 
-2026-01-26 16:28:56.873 | (SplitCoordinator pid=1552)   │ Active/total resources: Active & requested resources: 0/2 CPU, 47.1KiB/4.1G… [repeated 6x across cluster]
-2026-01-26 16:28:56.873 | (SplitCoordinator pid=1552)   │                                                                              [repeated 6x across cluster]
-2026-01-26 16:28:56.873 | (SplitCoordinator pid=1552)   │    0.0 CPU, 0.0B object store; Tasks: 0; Queued blocks: 0;                   [repeated 6x across cluster]
-2026-01-26 16:28:56.873 | (SplitCoordinator pid=1552)   │    0.0 CPU, 47.1KiB object store; Tasks: 0: [0/33 objects local]; Queued bl… [repeated 6x across cluster]
-2026-01-26 16:28:56.873 | (SplitCoordinator pid=1552)                                                                                 ✔️  Dataset train_2_41 execution finished in 0.75 seconds [repeated 6x across cluster]
-2026-01-26 16:28:56.873 | (RayTrainWorker pid=510, ip=10.1.5.88) Exiting prefetcher's background thread [repeated 12x across cluster]
-2026-01-26 16:28:57.874 | (SplitCoordinator pid=1609)  ✔️  Dataset val_4_41 execution finished in 0.77 seconds 100% 3k/… [  0.00 row/s 
-2026-01-26 16:28:57.874 | (RayTrainWorker pid=447, ip=10.1.5.89) [pytorch] Worker train_time_sec=75.53 [repeated 6x across cluster]
-2026-01-26 16:28:57.874 | (SplitCoordinator pid=1552)  ✔️  Dataset train_2_42 execution finished in 0.78 seconds 10… 2k/…   0.00 row/s 
-2026-01-26 16:28:58.875 | (SplitCoordinator pid=1552)   ├─   ReadParquet->SplitBlocks(36) 100% ━━━━━━━━ 2k/2k [ 0:00:00 , 0.00 row/s ] [repeated 5x across cluster]
-2026-01-26 16:28:58.875 | (SplitCoordinator pid=1552)   ├─   split(2, equal=True) 100% ━━━━━━━━━━ 2k/2k [ 0:00:00 , 0.00 row/s ]       [repeated 5x across cluster]
-2026-01-26 16:28:58.875 | (SplitCoordinator pid=1609) Registered dataset logger for dataset val_4_42 [repeated 6x across cluster]
-2026-01-26 16:28:58.875 | (SplitCoordinator pid=1609) Starting execution of Dataset val_4_42. Full logs are in /tmp/ray/session_2026-01-26_14-26-38_570363_1/logs/ray-data [repeated 6x across cluster]
-2026-01-26 16:28:58.875 | (SplitCoordinator pid=1609) Execution plan of Dataset val_4_42: InputDataBuffer[Input] -> TaskPoolMapOperator[ReadParquet] -> OutputSplitter[split(2, equal=True)] [repeated 6x across cluster]
-2026-01-26 16:28:58.875 | (RayTrainWorker pid=447, ip=10.1.5.89) Reporting training result 8: TrainingReport(checkpoint=None, metrics={'epoch': 39, 'train_loss': 0.011788150644861162, 'val_loss': 0.021982295904308558, 'val_accuracy': 0.9953333139419556, 'val_precision_macro': 0.999169647693634, 'val_recall_macro': 0.9351851940155029, 'val_f1_macro': 0.9593539237976074, 'val_precision_weighted': 0.995356559753418, 'val_recall_weighted': 0.9953333139419556, 'val_f1_weighted': 0.9947759509086609, 'val_precision_class_0': 0.9950177669525146, 'val_recall_class_0': 1.0, 'val_f1_class_0': 0.9975026845932007, 'val_support_class_0': 1398.0, 'val_precision_class_1': 1.0, 'val_recall_class_1': 1.0, 'val_f1_class_1': 1.0, 'val_support_class_1': 35.0, 'val_precision_class_2': 1.0, 'val_recall_class_2': 0.6111111044883728, 'val_f1_class_2': 0.7586206793785095, 'val_support_class_2': 18.0, 'val_precision_class_3': 1.0, 'val_recall_class_3': 1.0, 'val_f1_class_3': 1.0, 'val_support_class_3': 26.0, 'val_precision_class_4': 1.0, 'val_recall_class_4': 1.0, 'val_f1_class_4': 1.0, 'val_support_class_4': 17.0, 'val_precision_class_5': 1.0, 'val_recall_class_5': 1.0, 'val_f1_class_5': 1.0, 'val_support_class_5': 6.0}, validation_spec=None)
-2026-01-26 16:28:58.876 | (SplitCoordinator pid=1609)  ✔️  Dataset val_4_42 execution finished in 0.81 seconds 100% 3k/… [  0.00 row/s 
-2026-01-26 16:28:59.877 | (SplitCoordinator pid=1552)  ✔️  Dataset train_2_43 execution finished in 0.75 seconds 10… 2k/…   0.00 row/s 
-2026-01-26 16:29:00.878 | (SplitCoordinator pid=1609)  ✔️  Dataset val_4_43 execution finished in 0.76 seconds 100% 3k/… [  0.00 row/s 
-2026-01-26 16:29:01.879 | (SplitCoordinator pid=1609)   │ Active/total resources: Active & requested resources: 0/2 CPU, 62.1KiB/4.1G… [repeated 5x across cluster]
-2026-01-26 16:29:01.879 | (SplitCoordinator pid=1609)   │                                                                              [repeated 5x across cluster]
-2026-01-26 16:29:01.879 | (SplitCoordinator pid=1609)   │    0.0 CPU, 0.0B object store; Tasks: 0; Queued blocks: 0;                   [repeated 5x across cluster]
-2026-01-26 16:29:01.879 | (SplitCoordinator pid=1609)   │    0.0 CPU, 62.1KiB object store; Tasks: 0: [0/33 objects local]; Queued bl… [repeated 5x across cluster]
-2026-01-26 16:29:01.879 | (SplitCoordinator pid=1609)                                                                                 ✔️  Dataset val_4_43 execution finished in 0.76 seconds [repeated 5x across cluster]
-2026-01-26 16:29:01.879 | (RayTrainWorker pid=447, ip=10.1.5.89) Exiting prefetcher's background thread [repeated 13x across cluster]
-2026-01-26 16:29:01.879 | (SplitCoordinator pid=1552)  ✔️  Dataset train_2_44 execution finished in 0.79 seconds 10… 2k/…   0.00 row/s 
-2026-01-26 16:29:02.881 | (SplitCoordinator pid=1609)  ✔️  Dataset val_4_44 execution finished in 0.73 seconds 100% 3k/… [  0.00 row/s 
-2026-01-26 16:29:02.881 | (RayTrainWorker pid=447, ip=10.1.5.89) [pytorch] Worker train_time_sec=80.90 [repeated 6x across cluster]
-2026-01-26 16:29:02.881 | (RayTrainWorker pid=510, ip=10.1.5.88) Reporting training result 9: TrainingReport(checkpoint=None, metrics={'epoch': 44, 'train_loss': 0.017106567043811083, 'val_loss': 0.01032685860991478, 'val_accuracy': 0.9959999918937683, 'val_precision_macro': 0.9992902874946594, 'val_recall_macro': 0.9166666865348816, 'val_f1_macro': 0.944088876247406, 'val_precision_weighted': 0.9960170388221741, 'val_recall_weighted': 0.9959999918937683, 'val_f1_weighted': 0.9953376054763794, 'val_precision_class_0': 0.9957416653633118, 'val_recall_class_0': 1.0, 'val_f1_class_0': 0.9978663325309753, 'val_support_class_0': 1403.0, 'val_precision_class_1': 1.0, 'val_recall_class_1': 1.0, 'val_f1_class_1': 1.0, 'val_support_class_1': 33.0, 'val_precision_class_2': 1.0, 'val_recall_class_2': 0.5, 'val_f1_class_2': 0.6666666865348816, 'val_support_class_2': 12.0, 'val_precision_class_3': 1.0, 'val_recall_class_3': 1.0, 'val_f1_class_3': 1.0, 'val_support_class_3': 31.0, 'val_precision_class_4': 1.0, 'val_recall_class_4': 1.0, 'val_f1_class_4': 1.0, 'val_support_class_4': 12.0, 'val_precision_class_5': 1.0, 'val_recall_class_5': 1.0, 'val_f1_class_5': 1.0, 'val_support_class_5': 9.0}, validation_spec=None)
-2026-01-26 16:29:03.882 | (SplitCoordinator pid=1552)  ✔️  Dataset train_2_45 execution finished in 0.73 seconds 10… 2k/…   0.00 row/s 
-2026-01-26 16:29:04.884 | (SplitCoordinator pid=1609)  ✔️  Dataset val_4_45 execution finished in 0.77 seconds 100% 3k/… [  0.00 row/s 
-2026-01-26 16:29:04.884 | (SplitCoordinator pid=1609)   ├─   ReadParquet->SplitBlocks(36) 100% ━━━━━━━━ 3k/3k [ 0:00:00 , 0.00 row/s ] [repeated 7x across cluster]
-2026-01-26 16:29:04.884 | (SplitCoordinator pid=1609)   ├─   split(2, equal=True) 100% ━━━━━━━━━━ 3k/3k [ 0:00:00 , 0.00 row/s ]       [repeated 7x across cluster]
-2026-01-26 16:29:04.884 | (SplitCoordinator pid=1609) Registered dataset logger for dataset val_4_45 [repeated 6x across cluster]
-2026-01-26 16:29:04.884 | (SplitCoordinator pid=1609) Starting execution of Dataset val_4_45. Full logs are in /tmp/ray/session_2026-01-26_14-26-38_570363_1/logs/ray-data [repeated 6x across cluster]
-2026-01-26 16:29:04.884 | (SplitCoordinator pid=1609) Execution plan of Dataset val_4_45: InputDataBuffer[Input] -> TaskPoolMapOperator[ReadParquet] -> OutputSplitter[split(2, equal=True)] [repeated 6x across cluster]
-2026-01-26 16:29:05.885 | (SplitCoordinator pid=1552)  ✔️  Dataset train_2_46 execution finished in 0.85 seconds 10… 2k/…   0.00 row/s 
-2026-01-26 16:29:05.885 | (SplitCoordinator pid=1609)  ✔️  Dataset val_4_46 execution finished in 0.74 seconds 100% 3k/… [  0.00 row/s 
-2026-01-26 16:29:05.885 | (SplitCoordinator pid=1609)   │    0.0 CPU, 106.5KiB object store; Tasks: 0: [0/33 objects local]; Queued b…
-2026-01-26 16:29:07.034 | (SplitCoordinator pid=1552)  ✔️  Dataset train_2_47 execution finished in 0.83 seconds 10… 2k/…   0.00 row/s 
-2026-01-26 16:29:07.034 | (SplitCoordinator pid=1552)   │ Active/total resources: Active & requested resources: 0/2 CPU, 41.2KiB/4.1G… [repeated 7x across cluster]
-2026-01-26 16:29:07.034 | (SplitCoordinator pid=1552)   │                                                                              [repeated 7x across cluster]
-2026-01-26 16:29:07.034 | (SplitCoordinator pid=1552)   │    0.0 CPU, 0.0B object store; Tasks: 0; Queued blocks: 0;                   [repeated 7x across cluster]
-2026-01-26 16:29:07.034 | (SplitCoordinator pid=1552)   │    0.0 CPU, 41.2KiB object store; Tasks: 0: [0/33 objects local]; Queued bl… [repeated 6x across cluster]
-2026-01-26 16:29:07.034 | (SplitCoordinator pid=1552)                                                                                 ✔️  Dataset train_2_47 execution finished in 0.83 seconds [repeated 7x across cluster]
-2026-01-26 16:29:07.034 | (RayTrainWorker pid=510, ip=10.1.5.88) Exiting prefetcher's background thread [repeated 11x across cluster]
-2026-01-26 16:29:08.035 | (SplitCoordinator pid=1609)  ✔️  Dataset val_4_47 execution finished in 0.71 seconds 100% 3k/… [  0.00 row/s 
-2026-01-26 16:29:08.035 | (RayTrainWorker pid=447, ip=10.1.5.89) [pytorch] Worker train_time_sec=86.22 [repeated 6x across cluster]
-2026-01-26 16:29:08.035 | (RayTrainWorker pid=447, ip=10.1.5.89) Reporting training result 9: TrainingReport(checkpoint=None, metrics={'epoch': 44, 'train_loss': 0.014693020610138774, 'val_loss': 0.0210717242055883, 'val_accuracy': 0.9953333139419556, 'val_precision_macro': 0.999169647693634, 'val_recall_macro': 0.9351851940155029, 'val_f1_macro': 0.9593539237976074, 'val_precision_weighted': 0.995356559753418, 'val_recall_weighted': 0.9953333139419556, 'val_f1_weighted': 0.9947759509086609, 'val_precision_class_0': 0.9950177669525146, 'val_recall_class_0': 1.0, 'val_f1_class_0': 0.9975026845932007, 'val_support_class_0': 1398.0, 'val_precision_class_1': 1.0, 'val_recall_class_1': 1.0, 'val_f1_class_1': 1.0, 'val_support_class_1': 35.0, 'val_precision_class_2': 1.0, 'val_recall_class_2': 0.6111111044883728, 'val_f1_class_2': 0.7586206793785095, 'val_support_class_2': 18.0, 'val_precision_class_3': 1.0, 'val_recall_class_3': 1.0, 'val_f1_class_3': 1.0, 'val_support_class_3': 26.0, 'val_precision_class_4': 1.0, 'val_recall_class_4': 1.0, 'val_f1_class_4': 1.0, 'val_support_class_4': 17.0, 'val_precision_class_5': 1.0, 'val_recall_class_5': 1.0, 'val_f1_class_5': 1.0, 'val_support_class_5': 6.0}, validation_spec=None)
-2026-01-26 16:29:09.037 | (SplitCoordinator pid=1552)  ✔️  Dataset train_2_48 execution finished in 0.71 seconds 10… 2k/…   0.00 row/s 
-2026-01-26 16:29:10.039 | (SplitCoordinator pid=1609)  ✔️  Dataset val_4_48 execution finished in 0.74 seconds 100% 3k/… [  0.00 row/s 
-2026-01-26 16:29:10.039 | (SplitCoordinator pid=1609)   ├─   ReadParquet->SplitBlocks(36) 100% ━━━━━━━━ 3k/3k [ 0:00:00 , 0.00 row/s ] [repeated 6x across cluster]
-2026-01-26 16:29:10.039 | (SplitCoordinator pid=1609)   ├─   split(2, equal=True) 100% ━━━━━━━━━━ 3k/3k [ 0:00:00 , 0.00 row/s ]       [repeated 6x across cluster]
-2026-01-26 16:29:10.039 | (SplitCoordinator pid=1609) Registered dataset logger for dataset val_4_48 [repeated 6x across cluster]
-2026-01-26 16:29:10.039 | (SplitCoordinator pid=1609) Starting execution of Dataset val_4_48. Full logs are in /tmp/ray/session_2026-01-26_14-26-38_570363_1/logs/ray-data [repeated 6x across cluster]
-2026-01-26 16:29:10.039 | (SplitCoordinator pid=1609) Execution plan of Dataset val_4_48: InputDataBuffer[Input] -> TaskPoolMapOperator[ReadParquet] -> OutputSplitter[split(2, equal=True)] [repeated 6x across cluster]
-2026-01-26 16:29:11.041 | (SplitCoordinator pid=1552)  ✔️  Dataset train_2_49 execution finished in 0.72 seconds 10… 2k/…   0.00 row/s 
-2026-01-26 16:29:12.043 | (SplitCoordinator pid=1609)  ✔️  Dataset val_4_49 execution finished in 0.81 seconds 100% 3k/… [  0.00 row/s 
-2026-01-26 16:29:12.043 | (RayTrainWorker pid=447, ip=10.1.5.89) Reporting training result 10: TrainingReport(checkpoint=None, metrics={'epoch': 49, 'train_loss': 0.011939802556298673, 'val_loss': 0.022294888583322365, 'val_accuracy': 0.9953333139419556, 'val_precision_macro': 0.999169647693634, 'val_recall_macro': 0.9351851940155029, 'val_f1_macro': 0.9593539237976074, 'val_precision_weighted': 0.995356559753418, 'val_recall_weighted': 0.9953333139419556, 'val_f1_weighted': 0.9947759509086609, 'val_precision_class_0': 0.9950177669525146, 'val_recall_class_0': 1.0, 'val_f1_class_0': 0.9975026845932007, 'val_support_class_0': 1398.0, 'val_precision_class_1': 1.0, 'val_recall_class_1': 1.0, 'val_f1_class_1': 1.0, 'val_support_class_1': 35.0, 'val_precision_class_2': 1.0, 'val_recall_class_2': 0.6111111044883728, 'val_f1_class_2': 0.7586206793785095, 'val_support_class_2': 18.0, 'val_precision_class_3': 1.0, 'val_recall_class_3': 1.0, 'val_f1_class_3': 1.0, 'val_support_class_3': 26.0, 'val_precision_class_4': 1.0, 'val_recall_class_4': 1.0, 'val_f1_class_4': 1.0, 'val_support_class_4': 17.0, 'val_precision_class_5': 1.0, 'val_recall_class_5': 1.0, 'val_f1_class_5': 1.0, 'val_support_class_5': 6.0}, validation_spec=None)
-2026-01-26 16:29:15.047 | (RayTrainWorker pid=510, ip=10.1.5.88) Checkpoint successfully created at: Checkpoint(filesystem=s3, path=k8s-mlops-platform-bucket/v1/models/pytorch/checkpoint_2026-01-26_14-29-10.358435)
-2026-01-26 16:29:15.047 | (RayTrainWorker pid=510, ip=10.1.5.88) Reporting training result 10: TrainingReport(checkpoint=Checkpoint(filesystem=s3, path=k8s-mlops-platform-bucket/v1/models/pytorch/checkpoint_2026-01-26_14-29-10.358435), metrics={'epoch': 49, 'train_loss': 0.015575673780404031, 'val_loss': 0.010764264443423599, 'val_accuracy': 0.9959999918937683, 'val_precision_macro': 0.9992902874946594, 'val_recall_macro': 0.9166666865348816, 'val_f1_macro': 0.944088876247406, 'val_precision_weighted': 0.9960170388221741, 'val_recall_weighted': 0.9959999918937683, 'val_f1_weighted': 0.9953376054763794, 'val_precision_class_0': 0.9957416653633118, 'val_recall_class_0': 1.0, 'val_f1_class_0': 0.9978663325309753, 'val_support_class_0': 1403.0, 'val_precision_class_1': 1.0, 'val_recall_class_1': 1.0, 'val_f1_class_1': 1.0, 'val_support_class_1': 33.0, 'val_precision_class_2': 1.0, 'val_recall_class_2': 0.5, 'val_f1_class_2': 0.6666666865348816, 'val_support_class_2': 12.0, 'val_precision_class_3': 1.0, 'val_recall_class_3': 1.0, 'val_f1_class_3': 1.0, 'val_support_class_3': 31.0, 'val_precision_class_4': 1.0, 'val_recall_class_4': 1.0, 'val_f1_class_4': 1.0, 'val_support_class_4': 12.0, 'val_precision_class_5': 1.0, 'val_recall_class_5': 1.0, 'val_f1_class_5': 1.0, 'val_support_class_5': 9.0}, validation_spec=None)
-2026-01-26 16:29:15.047 | (SplitCoordinator pid=1609)   │ Active/total resources: Active & requested resources: 0/2 CPU, 71.0KiB/4.1G… [repeated 5x across cluster]
-2026-01-26 16:29:15.047 | (SplitCoordinator pid=1609)   │                                                                              [repeated 5x across cluster]
-2026-01-26 16:29:15.047 | (SplitCoordinator pid=1609)   │    0.0 CPU, 0.0B object store; Tasks: 0; Queued blocks: 0;                   [repeated 5x across cluster]
-2026-01-26 16:29:15.047 | (SplitCoordinator pid=1609)   │    0.0 CPU, 71.0KiB object store; Tasks: 0: [0/33 objects local]; Queued bl… [repeated 5x across cluster]
-2026-01-26 16:29:15.047 | (SplitCoordinator pid=1609)                                                                                 ✔️  Dataset val_4_49 execution finished in 0.81 seconds [repeated 5x across cluster]
-2026-01-26 16:29:15.047 | (RayTrainWorker pid=447, ip=10.1.5.89) Exiting prefetcher's background thread [repeated 12x across cluster]
-2026-01-26 16:29:15.047 | (RayTrainWorker pid=447, ip=10.1.5.89) [pytorch] Worker train_time_sec=91.53 [repeated 6x across cluster]
-2026-01-26 16:29:19.055 | [pytorch] distributed train_time_sec=110.82
-2026-01-26 16:29:19.055 | 2026-01-26 14:29:17,795 - KubeRayTraining - INFO - Training completed successfully.
-2026-01-26 16:29:19.055 | 2026-01-26 14:29:17,795 - KubeRayTraining - INFO - Exportando modelo final de pytorch a S3...
-2026-01-26 16:29:19.055 | 2026-01-26 14:29:17,796 - KubeRayTraining - ERROR - Error en el export del modelo: 'Checkpoint' object has no attribute 'to_dict'
-2026-01-26 16:29:19.055 | Traceback (most recent call last):
-2026-01-26 16:29:19.055 |   File "/home/ray/app/repo/k3s/kuberay/main.py", line 80, in _save_model
-2026-01-26 16:29:19.055 |     pickle.dump(checkpoint.to_dict(), f)
-2026-01-26 16:29:19.055 |                 ^^^^^^^^^^^^^^^^^^
-2026-01-26 16:29:19.055 | AttributeError: 'Checkpoint' object has no attribute 'to_dict'
-2026-01-26 16:29:19.055 | 2026-01-26 14:29:17,796 - KubeRayTraining - ERROR - Training job failed: float() argument must be a string or a real number, not 'NoneType'
-2026-01-26 16:29:19.055 | Traceback (most recent call last):
-2026-01-26 16:29:19.055 |   File "/home/ray/app/repo/k3s/kuberay/main.py", line 252, in train
-2026-01-26 16:29:19.055 |     self.logger.info("%s multiclass metrics time = %.2f s",framework,float(mc_time_sec))
-2026-01-26 16:29:19.055 |                                                                      ^^^^^^^^^^^^^^^^^^
-2026-01-26 16:29:19.055 | TypeError: float() argument must be a string or a real number, not 'NoneType'
-2026-01-26 16:29:19.055 | Traceback (most recent call last):
-2026-01-26 16:29:19.055 |   File "/home/ray/app/repo/k3s/kuberay/main.py", line 284, in <module>
-2026-01-26 16:29:19.055 |     main()
-2026-01-26 16:29:19.055 |   File "/home/ray/app/repo/k3s/kuberay/main.py", line 281, in main
-2026-01-26 16:29:19.055 |     model.train()
-2026-01-26 16:29:20.056 |   File "/home/ray/app/repo/k3s/kuberay/main.py", line 252, in train
-2026-01-26 16:29:20.056 |     self.logger.info("%s multiclass metrics time = %.2f s",framework,float(mc_time_sec))
-2026-01-26 16:29:20.056 |                                                                      ^^^^^^^^^^^^^^^^^^
-2026-01-26 16:29:20.056 | TypeError: float() argument must be a string or a real number, not 'NoneType'
-2026-01-26 16:29:20.056 | (SplitCoordinator pid=1609)   ├─   ReadParquet->SplitBlocks(36) 100% ━━━━━━━━ 3k/3k [ 0:00:00 , 0.00 row/s ] [repeated 2x across cluster]
-2026-01-26 16:29:20.056 | (SplitCoordinator pid=1609)   ├─   split(2, equal=True) 100% ━━━━━━━━━━ 3k/3k [ 0:00:00 , 0.00 row/s ]       [repeated 2x across cluster]
-2026-01-26 16:29:20.056 | (SplitCoordinator pid=1609) Registered dataset logger for dataset val_4_49 [repeated 2x across cluster]
-2026-01-26 16:29:20.056 | (SplitCoordinator pid=1609) Starting execution of Dataset val_4_49. Full logs are in /tmp/ray/session_2026-01-26_14-26-38_570363_1/logs/ray-data [repeated 2x across cluster]
-2026-01-26 16:29:20.056 | (SplitCoordinator pid=1609) Execution plan of Dataset val_4_49: InputDataBuffer[Input] -> TaskPoolMapOperator[ReadParquet] -> OutputSplitter[split(2, equal=True)] [repeated 2x across cluster]
-2026-01-26 16:29:25.077 | 2026-01-26 14:29:25,077	ERR cli.py:73 -- ------------------------------
-2026-01-26 16:29:25.078 | 2026-01-26 14:29:25,077	ERR cli.py:74 -- Job 'kuberay-job-dgtzp' failed
-2026-01-26 16:29:25.078 | 2026-01-26 14:29:25,077	ERR cli.py:75 -- ------------------------------
-2026-01-26 16:29:25.078 | 2026-01-26 14:29:25,077	INFO cli.py:88 -- Status message: Job entrypoint command failed with exit code 1, last available logs (truncated to 20,000 chars):
-2026-01-26 16:29:25.078 |     model.train()
-2026-01-26 16:29:25.078 |   File "/home/ray/app/repo/k3s/kuberay/main.py", line 252, in train
-2026-01-26 16:29:25.078 |     self.logger.info("%s multiclass metrics time = %.2f s",framework,float(mc_time_sec))
-2026-01-26 16:29:25.078 |                                                                      ^^^^^^^^^^^^^^^^^^
-2026-01-26 16:29:25.078 | TypeError: float() argument must be a string or a real number, not 'NoneType'
-2026-01-26 16:29:25.078 | (SplitCoordinator pid=1609)   ├─   ReadParquet->SplitBlocks(36) 100% ━━━━━━━━ 3k/3k [ 0:00:00 , 0.00 row/s ] [repeated 2x across cluster]
-2026-01-26 16:29:25.078 | (SplitCoordinator pid=1609)   ├─   split(2, equal=True) 100% ━━━━━━━━━━ 3k/3k [ 0:00:00 , 0.00 row/s ]       [repeated 2x across cluster]
-2026-01-26 16:29:25.078 | (SplitCoordinator pid=1609) Registered dataset logger for dataset val_4_49 [repeated 2x across cluster]
-2026-01-26 16:29:25.078 | (SplitCoordinator pid=1609) Starting execution of Dataset val_4_49. Full logs are in /tmp/ray/session_2026-01-26_14-26-38_570363_1/logs/ray-data [repeated 2x across cluster]
-2026-01-26 16:29:25.078 | (SplitCoordinator pid=1609) Execution plan of Dataset val_4_49: InputDataBuffer[Input] -> TaskPoolMapOperator[ReadParquet] -> OutputSplitter[split(2, equal=True)] [repeated 2x across cluster]
-2026-01-26 16:29:25.078 | 
+2026-01-27 12:34:43.264 | 2026-01-27 10:34:43,264	INFO cli.py:41 -- Job submission server address: http://kuberay-job-gkjqr-head-svc.ray.svc.cluster.local:8265
+2026-01-27 12:34:43.799 | 2026-01-27 10:34:43,799	SUCC cli.py:65 -- ----------------------------------------------
+2026-01-27 12:34:43.799 | 2026-01-27 10:34:43,799	SUCC cli.py:66 -- Job 'kuberay-job-8j5tw' submitted successfully
+2026-01-27 12:34:43.799 | 2026-01-27 10:34:43,799	SUCC cli.py:67 -- ----------------------------------------------
+2026-01-27 12:34:43.799 | 2026-01-27 10:34:43,799	INFO cli.py:291 -- Next steps
+2026-01-27 12:34:43.799 | 2026-01-27 10:34:43,799	INFO cli.py:292 -- Query the logs of the job:
+2026-01-27 12:34:43.799 | 2026-01-27 10:34:43,799	INFO cli.py:294 -- ray job logs kuberay-job-8j5tw
+2026-01-27 12:34:43.799 | 2026-01-27 10:34:43,799	INFO cli.py:296 -- Query the status of the job:
+2026-01-27 12:34:43.799 | 2026-01-27 10:34:43,799	INFO cli.py:298 -- ray job status kuberay-job-8j5tw
+2026-01-27 12:34:43.799 | 2026-01-27 10:34:43,799	INFO cli.py:300 -- Request the job to be stopped:
+2026-01-27 12:34:43.799 | 2026-01-27 10:34:43,799	INFO cli.py:302 -- ray job stop kuberay-job-8j5tw
+2026-01-27 12:34:46.193 | 2026-01-27 10:34:46,193	INFO cli.py:41 -- Job submission server address: http://kuberay-job-gkjqr-head-svc.ray.svc.cluster.local:8265
+2026-01-27 12:34:48.216 | 2026-01-27 10:34:43,402	INFO job_manager.py:568 -- Runtime env is setting up.
+2026-01-27 12:34:48.216 | Running entrypoint for job kuberay-job-8j5tw: python3 /home/ray/app/repo/k3s/kuberay/main.py
+2026-01-27 12:34:55.228 | 2026-01-27 10:34:52,704 - KubeRayTraining - DEBUG - Parameters retrieved from /home/ray/app/repo/k3s/params.yaml
+2026-01-27 12:34:56.230 | 2026-01-27 10:34:54,716 - KubeRayTraining - INFO - [RAY CLUSTER RESOURCES]
+2026-01-27 12:34:56.230 |             ────────────────────────────────
+2026-01-27 12:34:56.230 |             CPU           : 0.0 / 18.0
+2026-01-27 12:34:56.230 |             Memory        : 0B / 13.00GiB
+2026-01-27 12:34:56.230 |             Object Store  : 0B / 8.23GiB
+2026-01-27 12:34:56.230 |             ────────────────────────────────
+2026-01-27 12:34:57.230 | 2026-01-27 10:34:55,309 - KubeRayTraining - INFO - Minio connection verified. Buckets: ['frontend-crm-bucket', 'k8s-mlops-platform-bucket']
+2026-01-27 12:34:57.230 | 2026-01-27 10:34:56,539	INFO worker.py:1696 -- Using address 10.1.5.142:6379 set in the environment variable RAY_ADDRESS
+2026-01-27 12:34:57.230 | 2026-01-27 10:34:56,544	INFO worker.py:1837 -- Connecting to existing Ray cluster at address: 10.1.5.142:6379...
+2026-01-27 12:34:57.230 | 2026-01-27 10:34:56,573	INFO worker.py:2014 -- Connected to Ray cluster. View the dashboard at http://10.1.5.142:8265 
+2026-01-27 12:34:57.230 | 
+2026-01-27 12:34:57.230 |   0%|          | 0.00/1.00 [00:00<?, ? file/s]
+2026-01-27 12:34:57.230 | Parquet dataset sampling:   0%|          | 0.00/1.00 [00:00<?, ? file/s]
+2026-01-27 12:34:57.230 | Parquet dataset sampling:   0%|          | 0.00/1.00 [00:00<?, ? file/s]
+2026-01-27 12:34:57.230 | Parquet dataset sampling:   0%|          | 0.00/1.00 [00:00<?, ? file/s]
+2026-01-27 12:34:57.230 | Parquet dataset sampling:   0%|          | 0.00/1.00 [00:00<?, ? file/s]
+2026-01-27 12:34:57.230 | Parquet dataset sampling:   0%|          | 0.00/1.00 [00:00<?, ? file/s]
+2026-01-27 12:34:58.231 | Parquet dataset sampling:   0%|          | 0.00/1.00 [00:00<?, ? file/s]
+2026-01-27 12:34:58.231 | Parquet dataset sampling:   0%|          | 0.00/1.00 [00:00<?, ? file/s]
+2026-01-27 12:34:58.231 | Parquet dataset sampling:   0%|          | 0.00/1.00 [00:00<?, ? file/s]
+2026-01-27 12:34:58.231 | Parquet dataset sampling:   0%|          | 0.00/1.00 [00:00<?, ? file/s]
+2026-01-27 12:34:58.231 | Parquet dataset sampling:   0%|          | 0.00/1.00 [00:00<?, ? file/s]
+2026-01-27 12:34:58.231 | Parquet dataset sampling:   0%|          | 0.00/1.00 [00:01<?, ? file/s]
+2026-01-27 12:34:58.231 | Parquet dataset sampling:   0%|          | 0.00/1.00 [00:01<?, ? file/s]
+2026-01-27 12:34:58.231 | Parquet dataset sampling:   0%|          | 0.00/1.00 [00:01<?, ? file/s]
+2026-01-27 12:34:58.231 | Parquet dataset sampling:   0%|          | 0.00/1.00 [00:01<?, ? file/s]
+2026-01-27 12:34:58.231 | Parquet dataset sampling:   0%|          | 0.00/1.00 [00:01<?, ? file/s]
+2026-01-27 12:34:59.232 | Parquet dataset sampling:   0%|          | 0.00/1.00 [00:01<?, ? file/s]
+2026-01-27 12:34:59.232 | Parquet dataset sampling:   0%|          | 0.00/1.00 [00:01<?, ? file/s]
+2026-01-27 12:34:59.232 | Parquet dataset sampling:   0%|          | 0.00/1.00 [00:01<?, ? file/s]
+2026-01-27 12:34:59.232 | Parquet dataset sampling:   0%|          | 0.00/1.00 [00:01<?, ? file/s]
+2026-01-27 12:34:59.232 | Parquet dataset sampling:   0%|          | 0.00/1.00 [00:01<?, ? file/s]
+2026-01-27 12:34:59.232 | Parquet dataset sampling:   0%|          | 0.00/1.00 [00:02<?, ? file/s]
+2026-01-27 12:34:59.232 | Parquet dataset sampling:   0%|          | 0.00/1.00 [00:02<?, ? file/s]
+2026-01-27 12:34:59.232 | Parquet dataset sampling:   0%|          | 0.00/1.00 [00:02<?, ? file/s]
+2026-01-27 12:34:59.232 | Parquet dataset sampling:   0%|          | 0.00/1.00 [00:02<?, ? file/s]
+2026-01-27 12:34:59.232 | Parquet dataset sampling: 100%|██████████| 1.00/1.00 [00:02<00:00, 2.33s/ file]
+2026-01-27 12:35:00.233 | 2026-01-27 10:34:58,971	INFO parquet_datasource.py:728 -- Estimated parquet encoding ratio is 2.660.
+2026-01-27 12:35:00.233 | 2026-01-27 10:34:58,972	INFO parquet_datasource.py:788 -- Estimated parquet reader batch size at 1220162 rows
+2026-01-27 12:35:03.240 | 2026-01-27 10:35:00,933 - KubeRayTraining - INFO - Schema validation passed. Total columns: 15
+2026-01-27 12:35:03.240 | 2026-01-27 10:35:00,933 - KubeRayTraining - INFO - Materializing dataset in Ray Object Store for performance.
+2026-01-27 12:35:03.240 | 2026-01-27 10:35:00,951	INFO logging.py:397 -- Registered dataset logger for dataset dataset_1_0
+2026-01-27 12:35:03.240 | 2026-01-27 10:35:00,968	INFO streaming_executor.py:174 -- Starting execution of Dataset dataset_1_0. Full logs are in /tmp/ray/session_2026-01-27_10-34-03_056529_1/logs/ray-data
+2026-01-27 12:35:03.240 | 2026-01-27 10:35:00,968	INFO streaming_executor.py:175 -- Execution plan of Dataset dataset_1_0: InputDataBuffer[Input] -> TaskPoolMapOperator[ReadParquet]
+2026-01-27 12:35:05.413 |  ✔️  Dataset dataset_1_0 execution finished in 2.78 seconds 10… 2k/… [  ? rows/s 
+2026-01-27 12:35:05.413 |   │ Active/total resources: Active & requested resources: 0/18 CPU, 0.0B/4.1GiB…
+2026-01-27 12:35:05.413 |   │                                                                             
+2026-01-27 12:35:05.413 |   ├─   ReadParquet->SplitBlocks(36) 100% ━━━━━━━ 2k/2k [ 0:00:… , 728.52 row/s ]
+2026-01-27 12:35:05.413 |   │    0.0 CPU, 0.0B object store; Tasks: 0; Queued blocks: 0;                  
+2026-01-27 12:35:05.413 |                                                                                 2026-01-27 10:35:03,777	INFO progress_manager.py:347 -- ✔️  Dataset dataset_1_0 execution finished in 2.78 seconds
+2026-01-27 12:35:05.413 | 2026-01-27 10:35:03,892 - KubeRayTraining - INFO - Data loaded from s3://k8s-mlops-platform-bucket/v1/processed/train.
+2026-01-27 12:35:05.413 | 
+2026-01-27 12:35:05.413 |   0%|          | 0.00/1.00 [00:00<?, ? file/s]
+2026-01-27 12:35:05.413 | Parquet dataset sampling:   0%|          | 0.00/1.00 [00:00<?, ? file/s]
+2026-01-27 12:35:06.414 | Parquet dataset sampling:   0%|          | 0.00/1.00 [00:00<?, ? file/s]
+2026-01-27 12:35:06.414 | Parquet dataset sampling:   0%|          | 0.00/1.00 [00:00<?, ? file/s]
+2026-01-27 12:35:06.414 | Parquet dataset sampling:   0%|          | 0.00/1.00 [00:00<?, ? file/s]
+2026-01-27 12:35:06.414 | Parquet dataset sampling:   0%|          | 0.00/1.00 [00:00<?, ? file/s]
+2026-01-27 12:35:06.414 | Parquet dataset sampling:   0%|          | 0.00/1.00 [00:00<?, ? file/s]
+2026-01-27 12:35:06.414 | Parquet dataset sampling:   0%|          | 0.00/1.00 [00:00<?, ? file/s]
+2026-01-27 12:35:06.414 | Parquet dataset sampling:   0%|          | 0.00/1.00 [00:00<?, ? file/s]
+2026-01-27 12:35:06.414 | Parquet dataset sampling: 100%|██████████| 1.00/1.00 [00:00<00:00, 1.29 file/s]
+2026-01-27 12:35:06.414 | 2026-01-27 10:35:05,912	INFO parquet_datasource.py:728 -- Estimated parquet encoding ratio is 2.783.
+2026-01-27 12:35:06.414 | 2026-01-27 10:35:05,912	INFO parquet_datasource.py:788 -- Estimated parquet reader batch size at 1220162 rows
+2026-01-27 12:35:06.414 | 2026-01-27 10:35:05,920 - KubeRayTraining - INFO - Schema validation passed. Total columns: 15
+2026-01-27 12:35:07.415 | 2026-01-27 10:35:05,920 - KubeRayTraining - INFO - Materializing dataset in Ray Object Store for performance.
+2026-01-27 12:35:07.415 | 2026-01-27 10:35:05,924	INFO logging.py:397 -- Registered dataset logger for dataset dataset_4_0
+2026-01-27 12:35:07.415 | 2026-01-27 10:35:05,932	INFO streaming_executor.py:174 -- Starting execution of Dataset dataset_4_0. Full logs are in /tmp/ray/session_2026-01-27_10-34-03_056529_1/logs/ray-data
+2026-01-27 12:35:07.415 | 2026-01-27 10:35:05,932	INFO streaming_executor.py:175 -- Execution plan of Dataset dataset_4_0: InputDataBuffer[Input] -> TaskPoolMapOperator[ReadParquet]
+2026-01-27 12:35:08.416 |  ✔️  Dataset dataset_4_0 execution finished in 0.78 seconds 10… 3k/…   0.00 row… 
+2026-01-27 12:35:08.417 |   │ Active/total resources: Active & requested resources: 0/18 CPU, 26.6KiB/4.1…
+2026-01-27 12:35:08.417 |   │                                                                             
+2026-01-27 12:35:08.417 |   ├─   ReadParquet->SplitBlocks(36) 100% ━━━━━━━━ 3k/3k [ 0:00:00 , 0.00 row/s ]
+2026-01-27 12:35:08.417 |   │    0.0 CPU, 26.6KiB object store; Tasks: 0; Queued blocks: 0;               
+2026-01-27 12:35:08.417 |                                                                                 2026-01-27 10:35:06,743	INFO progress_manager.py:347 -- ✔️  Dataset dataset_4_0 execution finished in 0.78 seconds
+2026-01-27 12:35:08.417 | 2026-01-27 10:35:06,772 - KubeRayTraining - INFO - Data loaded from s3://k8s-mlops-platform-bucket/v1/processed/val.
+2026-01-27 12:35:09.419 | 
+2026-01-27 12:35:09.419 |   0%|          | 0.00/1.00 [00:00<?, ? file/s]
+2026-01-27 12:35:09.419 | Parquet dataset sampling:   0%|          | 0.00/1.00 [00:00<?, ? file/s]
+2026-01-27 12:35:09.419 | Parquet dataset sampling:   0%|          | 0.00/1.00 [00:00<?, ? file/s]
+2026-01-27 12:35:09.419 | Parquet dataset sampling:   0%|          | 0.00/1.00 [00:00<?, ? file/s]
+2026-01-27 12:35:09.419 | Parquet dataset sampling:   0%|          | 0.00/1.00 [00:00<?, ? file/s]
+2026-01-27 12:35:09.419 | Parquet dataset sampling:   0%|          | 0.00/1.00 [00:00<?, ? file/s]
+2026-01-27 12:35:09.419 | Parquet dataset sampling:   0%|          | 0.00/1.00 [00:00<?, ? file/s]
+2026-01-27 12:35:09.419 | Parquet dataset sampling:   0%|          | 0.00/1.00 [00:00<?, ? file/s]
+2026-01-27 12:35:09.419 | Parquet dataset sampling:   0%|          | 0.00/1.00 [00:00<?, ? file/s]
+2026-01-27 12:35:09.419 | Parquet dataset sampling:   0%|          | 0.00/1.00 [00:00<?, ? file/s]
+2026-01-27 12:35:09.419 | Parquet dataset sampling:   0%|          | 0.00/1.00 [00:00<?, ? file/s]
+2026-01-27 12:35:09.419 | Parquet dataset sampling: 100%|██████████| 1.00/1.00 [00:00<00:00, 1.08 file/s]
+2026-01-27 12:35:09.419 | 2026-01-27 10:35:08,661	INFO parquet_datasource.py:728 -- Estimated parquet encoding ratio is 2.968.
+2026-01-27 12:35:09.419 | 2026-01-27 10:35:08,662	INFO parquet_datasource.py:788 -- Estimated parquet reader batch size at 1220162 rows
+2026-01-27 12:35:09.419 | 2026-01-27 10:35:08,668 - KubeRayTraining - INFO - Schema validation passed. Total columns: 15
+2026-01-27 12:35:09.419 | 2026-01-27 10:35:08,668 - KubeRayTraining - INFO - Materializing dataset in Ray Object Store for performance.
+2026-01-27 12:35:09.419 | 2026-01-27 10:35:08,672	INFO logging.py:397 -- Registered dataset logger for dataset dataset_7_0
+2026-01-27 12:35:10.420 | 2026-01-27 10:35:08,679	INFO streaming_executor.py:174 -- Starting execution of Dataset dataset_7_0. Full logs are in /tmp/ray/session_2026-01-27_10-34-03_056529_1/logs/ray-data
+2026-01-27 12:35:10.420 | 2026-01-27 10:35:08,679	INFO streaming_executor.py:175 -- Execution plan of Dataset dataset_7_0: InputDataBuffer[Input] -> TaskPoolMapOperator[ReadParquet]
+2026-01-27 12:35:11.423 |  ✔️  Dataset dataset_7_0 execution finished in 1.22 seconds 10… 9k/… [  ? rows/s 
+2026-01-27 12:35:11.423 |   │ Active/total resources: Active & requested resources: 0/18 CPU, 0.0B/4.1GiB…
+2026-01-27 12:35:11.423 |   │                                                                             
+2026-01-27 12:35:11.423 |   ├─   ReadParquet->SplitBlocks(36) 100% ━━━━━━━ 9k/9k [ 0:00:… , 7.55 k row/s ]
+2026-01-27 12:35:11.423 |   │    0.0 CPU, 0.0B object store; Tasks: 0; Queued blocks: 0;                  
+2026-01-27 12:35:11.423 |                                                                                 2026-01-27 10:35:09,930	INFO progress_manager.py:347 -- ✔️  Dataset dataset_7_0 execution finished in 1.22 seconds
+2026-01-27 12:35:11.423 | 2026-01-27 10:35:10,002 - KubeRayTraining - INFO - Data loaded from s3://k8s-mlops-platform-bucket/v1/processed/test.
+2026-01-27 12:35:11.423 | 2026-01-27 10:35:10,002 - KubeRayTraining - INFO - Starting training using framework: xgboost
+2026-01-27 12:35:11.423 | 2026-01-27 10:35:10,002 - KubeRayTraining - INFO - Starting hyperparameter tuning...
+2026-01-27 12:35:16.433 | /home/ray/anaconda3/lib/python3.11/site-packages/google/rpc/__init__.py:18: UserWarning: pkg_resources is deprecated as an API. See https://setuptools.pypa.io/en/latest/pkg_resources.html. The pkg_resources package is slated for removal as early as 2025-11-30. Refrain from using this package or pin to Setuptools<81.
+2026-01-27 12:35:16.433 |   import pkg_resources
+2026-01-27 12:35:18.436 | ╭──────────────────────────────────────────────────────────╮
+2026-01-27 12:35:18.436 | │ Configuration for experiment     xgboost_tune            │
+2026-01-27 12:35:18.436 | ├──────────────────────────────────────────────────────────┤
+2026-01-27 12:35:18.436 | │ Search algorithm                 BasicVariantGenerator   │
+2026-01-27 12:35:18.436 | │ Scheduler                        AsyncHyperBandScheduler │
+2026-01-27 12:35:18.436 | │ Number of trials                 3                       │
+2026-01-27 12:35:18.436 | ╰──────────────────────────────────────────────────────────╯
+2026-01-27 12:35:18.436 | 
+2026-01-27 12:35:18.436 | View detailed results here: k8s-mlops-platform-bucket/v1/models/xgboost_tune
+2026-01-27 12:35:18.436 | To visualize your results with TensorBoard, run: `tensorboard --logdir /tmp/ray/session_2026-01-27_10-34-03_056529_1/artifacts/2026-01-27_10-35-13/xgboost_tune/driver_artifacts`
+2026-01-27 12:35:18.436 | 
+2026-01-27 12:35:18.436 | Trial status: 2 PENDING
+2026-01-27 12:35:18.436 | Current time: 2026-01-27 10:35:17. Total running time: 0s
+2026-01-27 12:35:18.436 | Logical resource usage: 16.0/18 CPUs, 0/0 GPUs
+2026-01-27 12:35:18.436 | ╭───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+2026-01-27 12:35:18.436 | │ Trial name               status       ..._params/max_depth     .../min_child_weight     ..._params/subsample     xgboost_params/eta     ...ost_params/lambda     xgboost_params/alpha │
+2026-01-27 12:35:18.436 | ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
+2026-01-27 12:35:18.436 | │ _trainable_eb203_00000   PENDING                        10                        3                 0.908539            0.00552863                0.00129776                 2.5874   │
+2026-01-27 12:35:18.436 | │ _trainable_eb203_00001   PENDING                        10                        2                 0.934458            0.000471906               2.75432                    0.422153 │
+2026-01-27 12:35:18.436 | ╰───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+2026-01-27 12:35:24.448 | 
+2026-01-27 12:35:24.448 | 2026-01-27 10:35:23,977 - KubeRayTraining - ERROR - Training job failed: INVALID_PARAMETER_VALUE: The experiment 1 must be in the 'active' state. Current state is deleted.
+2026-01-27 12:35:24.448 | Traceback (most recent call last):
+2026-01-27 12:35:24.448 |   File "/home/ray/app/repo/k3s/kuberay/main.py", line 216, in train
+2026-01-27 12:35:24.448 |     best_config = tuner.tune_model(
+2026-01-27 12:35:24.448 |                   ^^^^^^^^^^^^^^^^^
+2026-01-27 12:35:24.448 |   File "/home/ray/app/.worktrees/c34d9aaf314735f55ee491f755755ebf0006690b/k3s/kuberay/tuning/xgboost.py", line 234, in tune_model
+2026-01-27 12:35:24.448 |     results = tuner.fit()
+2026-01-27 12:35:24.448 |               ^^^^^^^^^^^
+2026-01-27 12:35:24.448 |   File "/home/ray/anaconda3/lib/python3.11/site-packages/ray/tune/tuner.py", line 345, in fit
+2026-01-27 12:35:24.448 |     return self._local_tuner.fit()
+2026-01-27 12:35:24.448 |            ^^^^^^^^^^^^^^^^^^^^^^^
+2026-01-27 12:35:24.448 |   File "/home/ray/anaconda3/lib/python3.11/site-packages/ray/tune/impl/tuner_internal.py", line 506, in fit
+2026-01-27 12:35:24.448 |     analysis = self._fit_internal(trainable, param_space)
+2026-01-27 12:35:24.448 |                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-01-27 12:35:24.448 |   File "/home/ray/anaconda3/lib/python3.11/site-packages/ray/tune/impl/tuner_internal.py", line 622, in _fit_internal
+2026-01-27 12:35:24.448 |     analysis = run(
+2026-01-27 12:35:24.448 |                ^^^^
+2026-01-27 12:35:24.448 |   File "/home/ray/anaconda3/lib/python3.11/site-packages/ray/tune/tune.py", line 994, in run
+2026-01-27 12:35:24.448 |     runner.step()
+2026-01-27 12:35:24.448 |   File "/home/ray/anaconda3/lib/python3.11/site-packages/ray/tune/execution/tune_controller.py", line 685, in step
+2026-01-27 12:35:24.448 |     if not self._actor_manager.next(timeout=0.1):
+2026-01-27 12:35:24.448 |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-01-27 12:35:24.448 |   File "/home/ray/anaconda3/lib/python3.11/site-packages/ray/air/execution/_internal/actor_manager.py", line 221, in next
+2026-01-27 12:35:24.448 |     self._actor_state_events.resolve_future(future)
+2026-01-27 12:35:24.448 |   File "/home/ray/anaconda3/lib/python3.11/site-packages/ray/air/execution/_internal/event_manager.py", line 118, in resolve_future
+2026-01-27 12:35:24.448 |     on_result(result)
+2026-01-27 12:35:24.448 |   File "/home/ray/anaconda3/lib/python3.11/site-packages/ray/air/execution/_internal/actor_manager.py", line 380, in on_actor_start
+2026-01-27 12:35:24.448 |     self._actor_start_resolved(
+2026-01-27 12:35:24.448 |   File "/home/ray/anaconda3/lib/python3.11/site-packages/ray/air/execution/_internal/actor_manager.py", line 242, in _actor_start_resolved
+2026-01-27 12:35:24.448 |     tracked_actor._on_start(tracked_actor)
+2026-01-27 12:35:24.448 |   File "/home/ray/anaconda3/lib/python3.11/site-packages/ray/tune/execution/tune_controller.py", line 1131, in _actor_started
+2026-01-27 12:35:24.448 |     self._callbacks.on_trial_start(
+2026-01-27 12:35:24.448 |   File "/home/ray/anaconda3/lib/python3.11/site-packages/ray/tune/callback.py", line 398, in on_trial_start
+2026-01-27 12:35:24.448 |     callback.on_trial_start(**info)
+2026-01-27 12:35:24.448 |   File "/home/ray/anaconda3/lib/python3.11/site-packages/ray/tune/logger/logger.py", line 147, in on_trial_start
+2026-01-27 12:35:24.448 |     self.log_trial_start(trial)
+2026-01-27 12:35:24.448 |   File "/home/ray/anaconda3/lib/python3.11/site-packages/ray/air/integrations/mlflow.py", line 307, in log_trial_start
+2026-01-27 12:35:24.448 |     run = self.mlflow_util.start_run(tags=tags, run_name=str(trial))
+2026-01-27 12:35:24.448 |           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-01-27 12:35:24.448 |   File "/home/ray/anaconda3/lib/python3.11/site-packages/ray/air/_internal/mlflow.py", line 214, in start_run
+2026-01-27 12:35:24.448 |     run = client.create_run(
+2026-01-27 12:35:24.448 |           ^^^^^^^^^^^^^^^^^^
+2026-01-27 12:35:24.448 |   File "/home/ray/anaconda3/lib/python3.11/site-packages/mlflow/tracking/client.py", line 479, in create_run
+2026-01-27 12:35:24.448 |     return self._tracking_client.create_run(experiment_id, start_time, tags, run_name)
+2026-01-27 12:35:24.448 |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-01-27 12:35:24.448 |   File "/home/ray/anaconda3/lib/python3.11/site-packages/mlflow/telemetry/track.py", line 30, in wrapper
+2026-01-27 12:35:24.448 |     result = func(*args, **kwargs)
+2026-01-27 12:35:24.448 |              ^^^^^^^^^^^^^^^^^^^^^
+2026-01-27 12:35:24.448 |   File "/home/ray/anaconda3/lib/python3.11/site-packages/mlflow/tracking/_tracking_service/client.py", line 183, in create_run
+2026-01-27 12:35:24.448 |     return self.store.create_run(
+2026-01-27 12:35:24.448 |            ^^^^^^^^^^^^^^^^^^^^^^
+2026-01-27 12:35:24.448 |   File "/home/ray/anaconda3/lib/python3.11/site-packages/mlflow/store/tracking/rest_store.py", line 340, in create_run
+2026-01-27 12:35:24.448 |     response_proto = self._call_endpoint(CreateRun, req_body)
+2026-01-27 12:35:24.448 |                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-01-27 12:35:24.448 |   File "/home/ray/anaconda3/lib/python3.11/site-packages/mlflow/store/tracking/rest_store.py", line 203, in _call_endpoint
+2026-01-27 12:35:24.448 |     return call_endpoint(
+2026-01-27 12:35:24.448 |            ^^^^^^^^^^^^^^
+2026-01-27 12:35:24.448 |   File "/home/ray/anaconda3/lib/python3.11/site-packages/mlflow/utils/rest_utils.py", line 596, in call_endpoint
+2026-01-27 12:35:24.448 |     response = verify_rest_response(response, endpoint)
+2026-01-27 12:35:24.448 |                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-01-27 12:35:24.448 |   File "/home/ray/anaconda3/lib/python3.11/site-packages/mlflow/utils/rest_utils.py", line 315, in verify_rest_response
+2026-01-27 12:35:24.448 |     raise RestException(json.loads(response.text))
+2026-01-27 12:35:24.448 | mlflow.exceptions.RestException: INVALID_PARAMETER_VALUE: The experiment 1 must be in the 'active' state. Current state is deleted.
+2026-01-27 12:35:24.448 | Traceback (most recent call last):
+2026-01-27 12:35:24.448 |   File "/home/ray/app/repo/k3s/kuberay/main.py", line 308, in <module>
+2026-01-27 12:35:24.448 |     main()
+2026-01-27 12:35:24.448 |   File "/home/ray/app/repo/k3s/kuberay/main.py", line 305, in main
+2026-01-27 12:35:24.448 |     model.train()
+2026-01-27 12:35:24.448 |   File "/home/ray/app/repo/k3s/kuberay/main.py", line 216, in train
+2026-01-27 12:35:24.448 |     best_config = tuner.tune_model(
+2026-01-27 12:35:24.448 |                   ^^^^^^^^^^^^^^^^^
+2026-01-27 12:35:24.448 |   File "/home/ray/app/.worktrees/c34d9aaf314735f55ee491f755755ebf0006690b/k3s/kuberay/tuning/xgboost.py", line 234, in tune_model
+2026-01-27 12:35:24.448 |     results = tuner.fit()
+2026-01-27 12:35:24.448 |               ^^^^^^^^^^^
+2026-01-27 12:35:24.448 |   File "/home/ray/anaconda3/lib/python3.11/site-packages/ray/tune/tuner.py", line 345, in fit
+2026-01-27 12:35:24.448 |     return self._local_tuner.fit()
+2026-01-27 12:35:24.448 |            ^^^^^^^^^^^^^^^^^^^^^^^
+2026-01-27 12:35:24.448 |   File "/home/ray/anaconda3/lib/python3.11/site-packages/ray/tune/impl/tuner_internal.py", line 506, in fit
+2026-01-27 12:35:24.448 |     analysis = self._fit_internal(trainable, param_space)
+2026-01-27 12:35:24.448 |                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-01-27 12:35:24.448 |   File "/home/ray/anaconda3/lib/python3.11/site-packages/ray/tune/impl/tuner_internal.py", line 622, in _fit_internal
+2026-01-27 12:35:24.448 |     analysis = run(
+2026-01-27 12:35:24.448 |                ^^^^
+2026-01-27 12:35:24.448 |   File "/home/ray/anaconda3/lib/python3.11/site-packages/ray/tune/tune.py", line 994, in run
+2026-01-27 12:35:24.448 |     runner.step()
+2026-01-27 12:35:24.448 |   File "/home/ray/anaconda3/lib/python3.11/site-packages/ray/tune/execution/tune_controller.py", line 685, in step
+2026-01-27 12:35:24.448 |     if not self._actor_manager.next(timeout=0.1):
+2026-01-27 12:35:24.448 |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-01-27 12:35:24.448 |   File "/home/ray/anaconda3/lib/python3.11/site-packages/ray/air/execution/_internal/actor_manager.py", line 221, in next
+2026-01-27 12:35:24.448 |     self._actor_state_events.resolve_future(future)
+2026-01-27 12:35:24.448 |   File "/home/ray/anaconda3/lib/python3.11/site-packages/ray/air/execution/_internal/event_manager.py", line 118, in resolve_future
+2026-01-27 12:35:24.448 |     on_result(result)
+2026-01-27 12:35:24.448 |   File "/home/ray/anaconda3/lib/python3.11/site-packages/ray/air/execution/_internal/actor_manager.py", line 380, in on_actor_start
+2026-01-27 12:35:24.448 |     self._actor_start_resolved(
+2026-01-27 12:35:24.448 |   File "/home/ray/anaconda3/lib/python3.11/site-packages/ray/air/execution/_internal/actor_manager.py", line 242, in _actor_start_resolved
+2026-01-27 12:35:24.448 |     tracked_actor._on_start(tracked_actor)
+2026-01-27 12:35:24.448 |   File "/home/ray/anaconda3/lib/python3.11/site-packages/ray/tune/execution/tune_controller.py", line 1131, in _actor_started
+2026-01-27 12:35:24.448 |     self._callbacks.on_trial_start(
+2026-01-27 12:35:24.448 |   File "/home/ray/anaconda3/lib/python3.11/site-packages/ray/tune/callback.py", line 398, in on_trial_start
+2026-01-27 12:35:24.448 |     callback.on_trial_start(**info)
+2026-01-27 12:35:24.448 |   File "/home/ray/anaconda3/lib/python3.11/site-packages/ray/tune/logger/logger.py", line 147, in on_trial_start
+2026-01-27 12:35:24.448 |     self.log_trial_start(trial)
+2026-01-27 12:35:24.448 |   File "/home/ray/anaconda3/lib/python3.11/site-packages/ray/air/integrations/mlflow.py", line 307, in log_trial_start
+2026-01-27 12:35:24.448 |     run = self.mlflow_util.start_run(tags=tags, run_name=str(trial))
+2026-01-27 12:35:24.448 |           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-01-27 12:35:24.448 |   File "/home/ray/anaconda3/lib/python3.11/site-packages/ray/air/_internal/mlflow.py", line 214, in start_run
+2026-01-27 12:35:24.448 |     run = client.create_run(
+2026-01-27 12:35:24.448 |           ^^^^^^^^^^^^^^^^^^
+2026-01-27 12:35:24.448 |   File "/home/ray/anaconda3/lib/python3.11/site-packages/mlflow/tracking/client.py", line 479, in create_run
+2026-01-27 12:35:24.448 |     return self._tracking_client.create_run(experiment_id, start_time, tags, run_name)
+2026-01-27 12:35:24.448 |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-01-27 12:35:24.449 |   File "/home/ray/anaconda3/lib/python3.11/site-packages/mlflow/telemetry/track.py", line 30, in wrapper
+2026-01-27 12:35:24.449 |     result = func(*args, **kwargs)
+2026-01-27 12:35:24.449 |              ^^^^^^^^^^^^^^^^^^^^^
+2026-01-27 12:35:24.449 |   File "/home/ray/anaconda3/lib/python3.11/site-packages/mlflow/tracking/_tracking_service/client.py", line 183, in create_run
+2026-01-27 12:35:24.449 |     return self.store.create_run(
+2026-01-27 12:35:24.449 |            ^^^^^^^^^^^^^^^^^^^^^^
+2026-01-27 12:35:24.449 |   File "/home/ray/anaconda3/lib/python3.11/site-packages/mlflow/store/tracking/rest_store.py", line 340, in create_run
+2026-01-27 12:35:24.449 |     response_proto = self._call_endpoint(CreateRun, req_body)
+2026-01-27 12:35:24.449 |                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-01-27 12:35:24.449 |   File "/home/ray/anaconda3/lib/python3.11/site-packages/mlflow/store/tracking/rest_store.py", line 203, in _call_endpoint
+2026-01-27 12:35:24.449 |     return call_endpoint(
+2026-01-27 12:35:24.449 |            ^^^^^^^^^^^^^^
+2026-01-27 12:35:24.449 |   File "/home/ray/anaconda3/lib/python3.11/site-packages/mlflow/utils/rest_utils.py", line 596, in call_endpoint
+2026-01-27 12:35:24.449 |     response = verify_rest_response(response, endpoint)
+2026-01-27 12:35:24.449 |                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-01-27 12:35:24.449 |   File "/home/ray/anaconda3/lib/python3.11/site-packages/mlflow/utils/rest_utils.py", line 315, in verify_rest_response
+2026-01-27 12:35:24.449 |     raise RestException(json.loads(response.text))
+2026-01-27 12:35:24.449 | mlflow.exceptions.RestException: INVALID_PARAMETER_VALUE: The experiment 1 must be in the 'active' state. Current state is deleted.
+2026-01-27 12:35:29.473 | 2026-01-27 10:35:29,472	ERR cli.py:73 -- ------------------------------
+2026-01-27 12:35:29.473 | 2026-01-27 10:35:29,472	ERR cli.py:74 -- Job 'kuberay-job-8j5tw' failed
+2026-01-27 12:35:29.473 | 2026-01-27 10:35:29,472	ERR cli.py:75 -- ------------------------------
+2026-01-27 12:35:29.473 | 2026-01-27 10:35:29,472	INFO cli.py:88 -- Status message: Job entrypoint command failed with exit code 1, last available logs (truncated to 20,000 chars):
+2026-01-27 12:35:29.473 |                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-01-27 12:35:29.473 |   File "/home/ray/anaconda3/lib/python3.11/site-packages/mlflow/store/tracking/rest_store.py", line 203, in _call_endpoint
+2026-01-27 12:35:29.473 |     return call_endpoint(
+2026-01-27 12:35:29.473 |            ^^^^^^^^^^^^^^
+2026-01-27 12:35:29.473 |   File "/home/ray/anaconda3/lib/python3.11/site-packages/mlflow/utils/rest_utils.py", line 596, in call_endpoint
+2026-01-27 12:35:29.473 |     response = verify_rest_response(response, endpoint)
+2026-01-27 12:35:29.473 |                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-01-27 12:35:29.473 |   File "/home/ray/anaconda3/lib/python3.11/site-packages/mlflow/utils/rest_utils.py", line 315, in verify_rest_response
+2026-01-27 12:35:29.473 |     raise RestException(json.loads(response.text))
+2026-01-27 12:35:29.473 | mlflow.exceptions.RestException: INVALID_PARAMETER_VALUE: The experiment 1 must be in the 'active' state. Current state is deleted.
+2026-01-27 12:35:29.473 | 

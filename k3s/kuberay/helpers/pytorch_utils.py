@@ -68,15 +68,6 @@ def train_func(config: Dict):
     cpus_per_worker = int(config.get("cpus_per_worker", os.getenv("CPUS_PER_WORKER", "1")))
     cpus_per_worker = max(cpus_per_worker, 1)
 
-    for var in (
-        "OMP_NUM_THREADS",
-        "MKL_NUM_THREADS",
-        "OPENBLAS_NUM_THREADS",
-        "NUMEXPR_NUM_THREADS",
-        "VECLIB_MAXIMUM_THREADS",
-    ):
-        os.environ[var] = str(cpus_per_worker)
-
     torch.set_num_threads(cpus_per_worker)
     # Inter-op threads >2 often hurts on small CPU pods.
     try:
