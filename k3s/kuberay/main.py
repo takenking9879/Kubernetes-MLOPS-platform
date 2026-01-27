@@ -43,12 +43,12 @@ class KubeRayTraining(BaseUtils):
     def _load_data(self, path: str):
         try:
             ds = ray.data.read_parquet(path, override_num_blocks=self.params.get('num_data_blocks', None))
-            # Optional: materialize now so downstream consumers (Train + metrics)
-            # can reuse blocks from the object store instead of triggering multiple
-            # `ReadParquet` executions.
-            # Enable with: RAY_MATERIALIZE_DATASETS=1
-            #if os.getenv("RAY_MATERIALIZE_DATASETS", "0") in ("1", "true", "True"):
-                #ds = ds.materialize()
+            # Senior Optimization: Materialize data in the Object Store once.
+            # This avoids re-scanning S3/Parquet files during each epoch of training.
+            # It keeps only 1 batch in the Python worker memory while sharing blocks via shared-memory.
+            if os.getenv("RAY_MATERIALIZE_DATASETS", "0") in ("1", "true", "True"):
+                self.logger.info("Materializing dataset in Ray Object Store for performance.")
+                ds = ds.materialize()
             self.logger.info(f"Data loaded from {path}.")
             return ds
         except Exception as e:
@@ -74,10 +74,14 @@ class KubeRayTraining(BaseUtils):
                 with open(local_path, "wb") as f:
                     pickle.dump(model, f)
             elif framework == "pytorch":
-                # Para PyTorch u otros, guardamos el diccionario del checkpoint
-                # que contiene los pesos/state_dict.
+                # Ray Train PyTorch checkpoints are directories (written by our train loop).
+                # Keep it simple: persist the raw `model.pt` bytes.
+                with checkpoint.as_directory() as ckpt_dir:
+                    model_path = os.path.join(ckpt_dir, "model.pt")
+                    with open(model_path, "rb") as mf:
+                        payload = {"model_pt": mf.read()}
                 with open(local_path, "wb") as f:
-                    pickle.dump(checkpoint.to_dict(), f)
+                    pickle.dump(payload, f)
 
             # Subir a S3 usando el cliente boto3 ya configurado
             parsed_url = urlparse(self.output_dir)
@@ -249,7 +253,12 @@ class KubeRayTraining(BaseUtils):
             }
 
             mc_time_sec = final_metrics.get("multiclass_metrics_time_sec")
-            self.logger.info("%s multiclass metrics time = %.2f s",framework,float(mc_time_sec))
+            if mc_time_sec is not None:
+                self.logger.info(
+                    "%s multiclass metrics time = %.2f s",
+                    framework,
+                    float(mc_time_sec),
+                )
 
             # If tuning is disabled, log default params as the effective params.
             

@@ -29,9 +29,6 @@ spec:
       TUNE_MAX_VAL_ROWS: "150000"
 
       # Performance knobs (small datasets):
-      # - materialize train/val once (avoid repeated ReadParquet for metrics)
-      # - reduce number of parquet blocks/tasks
-      # - use a unique RunConfig name to avoid snapshot restore overhead
       RAY_MATERIALIZE_DATASETS: "1"
 
   rayClusterSpec:

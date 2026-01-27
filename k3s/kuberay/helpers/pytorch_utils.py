@@ -117,6 +117,7 @@ def train_func(config: Dict):
     checkpoint_every = 50
 
     start_time = time.perf_counter()
+    feature_cols = None
     for epoch in range(max_epochs):
         model.train()
         # prefetch_batches > 1 enables async data loading using background threads
@@ -124,13 +125,15 @@ def train_func(config: Dict):
             batch_size=batch_size, 
             dtypes=torch.float32,
             prefetch_batches=max(2, cpus_per_worker // 2),  # Async prefetch
+            local_shuffle_buffer_size=batch_size * 8,       # Randomness without high RAM
         )
         train_loss, train_batches = 0.0, 0
         for batch in train_loader:
             # Separar target de features dinámicamente
             y = batch.pop(target).long()
             # X son todas las columnas restantes concatenadas
-            feature_cols = sorted(batch.keys())
+            if feature_cols is None:
+                feature_cols = sorted(batch.keys())
             X = torch.stack([batch[c] for c in feature_cols], dim=1)
             
             optimizer.zero_grad()
@@ -154,7 +157,8 @@ def train_func(config: Dict):
         with torch.no_grad():
             for batch in val_loader:
                 y = batch.pop(target).long()
-                feature_cols = sorted(batch.keys())
+                if feature_cols is None:
+                    feature_cols = sorted(batch.keys())
                 X = torch.stack([batch[c] for c in feature_cols], dim=1)
                 
                 preds = model(X)
@@ -162,17 +166,22 @@ def train_func(config: Dict):
                 val_loss += loss.item()
                 val_batches += 1
                 y_pred = preds.argmax(dim=1)
-                for t, p in zip(y, y_pred):
-                    ti = int(t.item())
-                    pi = int(p.item())
-                    if 0 <= ti < num_classes and 0 <= pi < num_classes:
-                        conf[ti, pi] += 1
+                
+                # Vectorización senior: usamos bincount para evitar el loop de Python
+                # Desplazamos y para que cada par (y, y_pred) sea un índice único [0, n^2-1]
+                indices = y * num_classes + y_pred
+                counts = torch.bincount(indices, minlength=num_classes * num_classes)
+                conf += counts.reshape(num_classes, num_classes)
 
         train_time_sec = time.perf_counter() - start_time
         logger.info(f"[pytorch] Worker train_time_sec={train_time_sec:.2f}")
 
         avg_val_loss = val_loss / max(val_batches, 1)
+        
+        # Medimos el tiempo que tarda en derivar precisión, recall, etc. de la matriz
+        metrics_start = time.perf_counter()
         metrics = _metrics_from_confusion(conf)
+        metrics["multiclass_metrics_time_sec"] = time.perf_counter() - metrics_start
 
         report = {
             "epoch": epoch,
