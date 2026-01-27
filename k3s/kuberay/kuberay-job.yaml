@@ -16,9 +16,14 @@ spec:
       NUM_WORKERS: "2"
       # Recommended NUM_CPUS of the NODE minus 1 for system overhead.
       CPUS_PER_WORKER: "8"
-      # Each trial will use NUM_WORKERS_TUNE * CPUS_PER_WORKER_TUNE CPUs
-      NUM_WORKERS_TUNE: "2"
-      CPUS_PER_WORKER_TUNE: "4"
+
+      # Each trial (train) will use NUM_WORKERS_TUNE
+      NUM_WORKERS_TUNE: "1"
+      # Each trial (train) will use CPUS_PER_WORKER_TUNE
+      CPUS_PER_WORKER_TUNE: "6"
+      # The total number of CPUS will be NUM_WORKERS_TUNE * CPUS_PER_WORKER_TUNE
+      # Number of CPUs to use for Ray Datasets during tuning.
+      NUM_CPUS_DATA_TUNE: "4"
       # Maximum concurrent trials during tuning. 
       MAX_CONCURRENT_TRIALS: "2"
 

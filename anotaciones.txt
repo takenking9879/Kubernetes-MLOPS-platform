@@ -10,3 +10,14 @@ chatgpt suele alucionar y no es muy bueno buscando las ultimas versiones y que r
 
 https://strimzi.io/docs/operators/latest/deploying.html#ref-metrics-dashboards-str #doc strimzi
 
+
+Cada trial es entrenar un modelo.
+Cuando se trata de tune, tienes que checar que si la cantidad de trials al mismo tiempo es de 2 entonces 
+
+NUM_WORKERS_TUNE = 1
+CPUS_PER_WORKER_TUNE: 8
+
+Significa que para entrenar cada modelo va a usar un worker con 8 CPUs
+
+
+

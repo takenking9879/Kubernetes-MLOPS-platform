@@ -81,10 +81,7 @@ def tune_model(
     mlflow_tracking_uri: str | None = None,
     mlflow_experiment_name: str | None = None,
 ):
-
     # Two-stage idea:
-    # - Use a cheaper resource config for tuning (fewer workers / CPUs)
-    # - Use a larger resource config for the final distributed training
     num_workers = int(os.getenv("NUM_WORKERS_TUNE", os.getenv("NUM_WORKERS", 2)))
     cpus_per_worker = int(os.getenv("CPUS_PER_WORKER_TUNE", os.getenv("CPUS_PER_WORKER", 1)))
 
@@ -93,12 +90,33 @@ def tune_model(
         resources_per_worker={"CPU": cpus_per_worker},
     )
 
+    # Compute default CPUs for Ray Data during tuning:
+    # env NUM_CPUS_DATA_TUNE overrides; otherwise use cluster_total - (num_workers * cpus_per_worker)
+    def _get_cluster_total_cpus():
+        try:
+            # ray.cluster_resources() returns totals; prefer that if ray is initialized
+            total = ray.cluster_resources().get("CPU", 0)
+            total = int(total)
+            if total > 0:
+                logger.info("Ray reports that the total CPUs is: %d", total)
+                return total
+        except Exception:
+            logger.debug("ray.cluster_resources() not available")
+
+    total_cluster_cpus = _get_cluster_total_cpus()
+    default_data_cpus = max(1, total_cluster_cpus - (num_workers * cpus_per_worker))
+    env_val = int(os.getenv("NUM_CPUS_DATA_TUNE", str(default_data_cpus)))
+    # safety clamps
+    cpus_for_data = max(1, min(env_val, max(1, total_cluster_cpus)))
+
+    logger.info(
+        f"[tune_model] total_cluster_cpus={total_cluster_cpus}\n"
+        f"num_workers={num_workers}, cpus_per_worker={cpus_per_worker}, num_concurrent_trials={int(os.getenv('MAX_CONCURRENT_TRIALS', '1'))}\n"
+        f"cpus_for_data={cpus_for_data}"
+    )
+
     # --- Search space (cheap tuning) ---
-    # NOTE: We keep the keys aligned with main.py expectations.
-    # main.py does: best_config.get("xgboost_params")
-    param_space = {
-        "xgboost_params": SEARCH_SPACE_XGBOOST_PARAMS,
-    }
+    param_space = {"xgboost_params": SEARCH_SPACE_XGBOOST_PARAMS}
 
     # --- Early stopping ---
     asha = ASHAScheduler(
@@ -109,17 +127,8 @@ def tune_model(
         reduction_factor=XGBOOST_TUNE_SETTINGS["reduction_factor"],
     )
 
-    # --- Dynamic CPU allocation (optional) ---
-    # ResourceChangingScheduler can request larger resource bundles over time.
-    # In small clusters this may produce "infeasible resource requests" warnings.
     enable_rcs = os.getenv("ENABLE_RESOURCE_CHANGING_SCHEDULER", "false").lower() in ("1", "true", "yes")
     scheduler = ResourceChangingScheduler(base_scheduler=asha) if enable_rcs else asha
-
-    # IMPORTANT:
-    # Do NOT pass Ray Datasets via `tune.with_parameters(...)`.
-    # Tune stores those params via `ray.put`, and Ray Datasets are not picklable
-    # under Ray 2.52 in that code path.
-    # Workaround: pass dataset *paths* and load datasets inside each trial.
 
     def _maybe_sample_train_ds(ds: ray.data.Dataset) -> ray.data.Dataset:
         if sample_fraction is None:
@@ -127,36 +136,39 @@ def tune_model(
         frac = float(sample_fraction)
         if frac >= 1.0 or frac <= 0.0:
             return ds
-
-        # Avoid groupby/map_groups here because it triggers shuffles. In Ray Tune, trial
-        # placement groups can capture child tasks, and Ray Data shuffle tasks request
-        # the implicit `memory` resource, which isn't in the placement group bundles by
-        # default (causing scheduling errors).
         if hasattr(ds, "random_sample"):
-            return ds.random_sample(frac, seed=seed)
-
-        # Fallback (best-effort): no sampling.
+            # do sampling; repartition afterwards to control parallelism
+            ds = ds.random_sample(frac, seed=seed)
+            return ds
         return ds
 
     def _trainable(trial_config: Dict):
-        train_dataset = _maybe_sample_train_ds(ray.data.read_parquet(train_path))
-        val_dataset = ray.data.read_parquet(val_path)
+        # read with controlled parallelism and repartition to cpus_for_data blocks
+        train_ds = ray.data.read_parquet(train_path, parallelism=cpus_for_data)
+        val_ds = ray.data.read_parquet(val_path, parallelism=cpus_for_data)
 
-        # Extra safety for laptop-sized RAM: cap rows for tuning to avoid large
-        # per-worker pandas materializations.
+        if cpus_for_data > 1:
+            # repartition reduces number of downstream tasks spawned by Data ops
+            try:
+                train_ds = train_ds.repartition(cpus_for_data)
+                val_ds = val_ds.repartition(cpus_for_data)
+            except Exception:
+                # repartition might not be necessary/available in some versions; ignore safely
+                logger.debug("repartition failed or not supported; continuing without repartition")
+
+        train_ds = _maybe_sample_train_ds(train_ds)
+        # apply limits if configured
         max_train_rows = int(os.getenv("TUNE_MAX_TRAIN_ROWS", "0"))
         max_val_rows = int(os.getenv("TUNE_MAX_VAL_ROWS", "0"))
         if max_train_rows > 0:
-            train_dataset = train_dataset.limit(max_train_rows)
+            train_ds = train_ds.limit(max_train_rows)
         if max_val_rows > 0:
-            val_dataset = val_dataset.limit(max_val_rows)
+            val_ds = val_ds.limit(max_val_rows)
 
-        # Optional: materialize per-trial datasets to avoid repeated `ReadParquet`
-        # executions across epochs inside the Train loop.
-        # Keep default OFF because many concurrent trials can pressure the object store.
+        # optionally materialize (careful: materialize uses cluster CPUs but we've limited blocks)
         if os.getenv("RAY_MATERIALIZE_DATASETS_TUNE", "0").lower() in ("1", "true", "yes"):
-            train_dataset = train_dataset.materialize()
-            val_dataset = val_dataset.materialize()
+            train_ds = train_ds.materialize()
+            val_ds = val_ds.materialize()
 
         train_loop_config = {
             "target": target,
@@ -166,10 +178,6 @@ def tune_model(
             "xgboost_params": trial_config["xgboost_params"],
         }
 
-        # Ray Train may emit checkpoints via RayTrainReportCallback. In a multi-pod
-        # Ray cluster, the default local filesystem path is not shared across pods.
-        # Ensure Train uses a shared storage URI (S3/MinIO) so checkpoint/reporting
-        # doesn't fail with "cluster storage" errors.
         try:
             trial_id = tune.get_context().get_trial_id()
         except Exception:
@@ -179,7 +187,7 @@ def tune_model(
             train_loop_per_worker=train_func,
             train_loop_config=train_loop_config,
             scaling_config=scaling_config,
-            datasets={"train": train_dataset, "val": val_dataset},
+            datasets={"train": train_ds, "val": val_ds},
             run_config=ray.train.RunConfig(
                 storage_path=storage_path,
                 name=f"{name}_train_{trial_id}",
@@ -196,8 +204,6 @@ def tune_model(
         )
 
     # Make Tune account for the full CPU budget per trial.
-    # This controls the "Logical resource usage" line in Tune output.
-    # Default to num_workers * cpus_per_worker unless overridden.
     cpus_per_trial = num_workers * cpus_per_worker
     trainable = tune.with_resources(_trainable, resources={"cpu": cpus_per_trial})
 
@@ -228,9 +234,6 @@ def tune_model(
     )
 
     results = tuner.fit()
-    best = results.get_best_result(
-        metric="validation-mlogloss",
-        mode="min",
-    )
-    # Return the best trial config (contains `xgboost_params` and other keys)
+    best = results.get_best_result(metric="validation-mlogloss", mode="min")
     return best.config
+
