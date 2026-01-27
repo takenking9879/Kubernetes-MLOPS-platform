@@ -43,6 +43,10 @@ def _metrics_from_confusion(conf: torch.Tensor, *, prefix: str = "val") -> Dict[
         f"{prefix}_precision_macro": float(macro_precision.item()),
         f"{prefix}_recall_macro": float(macro_recall.item()),
         f"{prefix}_f1_macro": float(macro_f1.item()),
+        # User aliases for easier interpretation
+        f"{prefix}_precision_avg": float(macro_precision.item()),
+        f"{prefix}_recall_avg": float(macro_recall.item()),
+        f"{prefix}_f1_avg": float(macro_f1.item()),
         f"{prefix}_precision_weighted": float(weighted_precision.item()),
         f"{prefix}_recall_weighted": float(weighted_recall.item()),
         f"{prefix}_f1_weighted": float(weighted_f1.item()),

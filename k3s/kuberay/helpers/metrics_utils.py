@@ -43,6 +43,10 @@ def metrics_from_confusion_np(conf, *, prefix: str = "val") -> Dict[str, float]:
         f"{prefix}_precision_macro": macro_precision,
         f"{prefix}_recall_macro": macro_recall,
         f"{prefix}_f1_macro": macro_f1,
+        # User aliases for easier interpretation
+        f"{prefix}_precision_avg": macro_precision,
+        f"{prefix}_recall_avg": macro_recall,
+        f"{prefix}_f1_avg": macro_f1,
         f"{prefix}_precision_weighted": weighted_precision,
         f"{prefix}_recall_weighted": weighted_recall,
         f"{prefix}_f1_weighted": weighted_f1,
