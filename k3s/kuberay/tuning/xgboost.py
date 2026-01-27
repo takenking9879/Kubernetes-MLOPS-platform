@@ -118,22 +118,6 @@ def tune_model(
         return ds
 
     def _trainable(trial_config: Dict):
-
-        # Compute default CPUs for Ray Data during tuning:
-        # env NUM_CPUS_DATA_TUNE overrides; otherwise use cluster_total - (num_workers * cpus_per_worker)
-        total_cluster_cpus = int(os.getenv("NUM_CPUS_CLUSTER"))
-        default_data_cpus = max(1, (total_cluster_cpus - (num_workers * cpus_per_worker * int(os.getenv("MAX_CONCURRENT_TRIALS", "1"))))/num_workers)
-        cpus_for_data  = int(os.getenv("NUM_CPUS_DATA_TUNE", str(default_data_cpus)))
-
-        cpus_for_data = max(1, cpus_for_data)
-        
-        logger.info(
-            f"[tune_model] total_cluster_cpus={total_cluster_cpus}\n"
-            f"num_workers={num_workers}, cpus_per_worker={cpus_per_worker}, num_concurrent_trials={int(os.getenv('MAX_CONCURRENT_TRIALS', '1'))}\n"
-            f"cpus_for_data_per_worker={cpus_for_data}"
-        )
-
-        # read with controlled parallelism and repartition to cpus_for_data blocks
         train_ds = ray.data.read_parquet(train_path)
         val_ds = ray.data.read_parquet(val_path)
 
