@@ -184,9 +184,12 @@ def tune_model(
             }
         )
 
-    # Make Tune account for the full CPU budget per trial.
-    cpus_per_trial = num_workers * cpus_per_worker
-    trainable = tune.with_resources(_trainable, resources={"cpu": cpus_per_trial})
+    # IMPORTANT:
+    # Do NOT reserve `num_workers * cpus_per_worker` on the Tune trial actor.
+    # The XGBoostTrainer will create a placement group with those resources.
+    # Reserving them here causes fragmentation and unschedulable placement groups
+    # (especially with MAX_CONCURRENT_TRIALS > 1).
+    trainable = _trainable
 
     callbacks = []
     if mlflow_tracking_uri and mlflow_experiment_name:
