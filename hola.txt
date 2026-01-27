@@ -1,344 +1,343 @@
-2026-01-27 15:56:53.843 | 2026-01-27 13:56:52,166 - KubeRayTraining - INFO - Starting hyperparameter tuning...
-2026-01-27 15:56:56.849 | 2026-01-27 13:56:54,897	INFO worker.py:1696 -- Using address 10.1.5.204:6379 set in the environment variable RAY_ADDRESS
-2026-01-27 15:56:56.849 | 2026-01-27 13:56:54,903	INFO worker.py:1837 -- Connecting to existing Ray cluster at address: 10.1.5.204:6379...
-2026-01-27 15:56:56.849 | 2026-01-27 13:56:54,924	INFO worker.py:2014 -- Connected to Ray cluster. View the dashboard at http://10.1.5.204:8265 
-2026-01-27 15:56:56.849 | 2026-01-27 13:56:54,947	INFO tune.py:253 -- Initializing Ray automatically. For cluster usage or custom Ray initialization, call `ray.init(...)` before `Tuner(...)`.
-2026-01-27 15:56:57.850 | /home/ray/anaconda3/lib/python3.11/site-packages/google/rpc/__init__.py:18: UserWarning: pkg_resources is deprecated as an API. See https://setuptools.pypa.io/en/latest/pkg_resources.html. The pkg_resources package is slated for removal as early as 2025-11-30. Refrain from using this package or pin to Setuptools<81.
-2026-01-27 15:56:57.851 |   import pkg_resources
-2026-01-27 15:56:59.932 | ╭──────────────────────────────────────────────────────────╮
-2026-01-27 15:56:59.933 | │ Configuration for experiment     xgboost_tune            │
-2026-01-27 15:56:59.933 | ├──────────────────────────────────────────────────────────┤
-2026-01-27 15:56:59.933 | │ Search algorithm                 BasicVariantGenerator   │
-2026-01-27 15:56:59.933 | │ Scheduler                        AsyncHyperBandScheduler │
-2026-01-27 15:56:59.933 | │ Number of trials                 3                       │
-2026-01-27 15:56:59.933 | ╰──────────────────────────────────────────────────────────╯
-2026-01-27 15:56:59.933 | 
-2026-01-27 15:56:59.933 | View detailed results here: k8s-mlops-platform-bucket/v1/models/xgboost_tune
-2026-01-27 15:56:59.933 | To visualize your results with TensorBoard, run: `tensorboard --logdir /tmp/ray/session_2026-01-27_13-56-04_803499_1/artifacts/2026-01-27_13-56-56/xgboost_tune/driver_artifacts`
-2026-01-27 15:56:59.933 | 
-2026-01-27 15:56:59.933 | Trial status: 2 PENDING
-2026-01-27 15:56:59.933 | Current time: 2026-01-27 13:56:59. Total running time: 0s
-2026-01-27 15:56:59.933 | Logical resource usage: 0/18 CPUs, 0/0 GPUs
-2026-01-27 15:56:59.933 | ╭───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
-2026-01-27 15:56:59.933 | │ Trial name               status       ..._params/max_depth     .../min_child_weight     ..._params/subsample     xgboost_params/eta     ...ost_params/lambda     xgboost_params/alpha │
-2026-01-27 15:56:59.933 | ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
-2026-01-27 15:56:59.933 | │ _trainable_18f82_00000   PENDING                         9                        3                 0.807811            0.000188613               0.00103731                0.0063065 │
-2026-01-27 15:56:59.933 | │ _trainable_18f82_00001   PENDING                         3                        1                 0.885372            0.0050955                 0.0012903                 0.0336412 │
-2026-01-27 15:56:59.933 | ╰───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
-2026-01-27 15:57:09.956 | 
-2026-01-27 15:57:09.956 | Trial _trainable_18f82_00000 started with configuration:
-2026-01-27 15:57:09.956 | ╭────────────────────────────────────────────────────────────────╮
-2026-01-27 15:57:09.956 | │ Trial _trainable_18f82_00000 config                            │
-2026-01-27 15:57:09.956 | ├────────────────────────────────────────────────────────────────┤
-2026-01-27 15:57:09.956 | │ xgboost_params/alpha                      0.006306495830155453 │
-2026-01-27 15:57:09.956 | │ xgboost_params/eta                      0.00018861254050326807 │
-2026-01-27 15:57:09.956 | │ xgboost_params/eval_metric                ...gloss', 'merror'] │
-2026-01-27 15:57:09.956 | │ xgboost_params/lambda                    0.0010373064195149382 │
-2026-01-27 15:57:09.956 | │ xgboost_params/max_depth                                     9 │
-2026-01-27 15:57:09.956 | │ xgboost_params/min_child_weight                              3 │
-2026-01-27 15:57:09.956 | │ xgboost_params/objective                        multi:softprob │
-2026-01-27 15:57:09.956 | │ xgboost_params/subsample                    0.8078110566255094 │
-2026-01-27 15:57:09.956 | ╰────────────────────────────────────────────────────────────────╯
-2026-01-27 15:57:09.956 | 
-2026-01-27 15:57:09.956 | Trial _trainable_18f82_00001 started with configuration:
-2026-01-27 15:57:09.956 | ╭───────────────────────────────────────────────────────────────╮
-2026-01-27 15:57:09.956 | │ Trial _trainable_18f82_00001 config                           │
-2026-01-27 15:57:09.956 | ├───────────────────────────────────────────────────────────────┤
-2026-01-27 15:57:09.956 | │ xgboost_params/alpha                     0.033641239118369345 │
-2026-01-27 15:57:09.956 | │ xgboost_params/eta                       0.005095496680608182 │
-2026-01-27 15:57:09.956 | │ xgboost_params/eval_metric               ...gloss', 'merror'] │
-2026-01-27 15:57:09.956 | │ xgboost_params/lambda                   0.0012902980073281982 │
-2026-01-27 15:57:09.956 | │ xgboost_params/max_depth                                    3 │
-2026-01-27 15:57:09.956 | │ xgboost_params/min_child_weight                             1 │
-2026-01-27 15:57:09.956 | │ xgboost_params/objective                       multi:softprob │
-2026-01-27 15:57:09.956 | │ xgboost_params/subsample                   0.8853718957711911 │
-2026-01-27 15:57:09.956 | ╰───────────────────────────────────────────────────────────────╯
-2026-01-27 15:57:09.956 | (_trainable pid=433, ip=10.1.5.206) [tune_model] total_cluster_cpus=16
-2026-01-27 15:57:09.956 | (_trainable pid=433, ip=10.1.5.206) num_workers=1, cpus_per_worker=6, num_concurrent_trials=2
-2026-01-27 15:57:10.957 | (_trainable pid=433, ip=10.1.5.206) cpus_for_data_per_worker=2
-2026-01-27 15:57:10.957 | (_trainable pid=433, ip=10.1.5.205) num_workers=1, cpus_per_worker=6, num_concurrent_trials=2
-2026-01-27 15:57:10.957 | (_trainable pid=433, ip=10.1.5.205) cpus_for_data_per_worker=2
-2026-01-27 15:57:13.963 | 
-2026-01-27 15:57:13.963 | (pid=433, ip=10.1.5.206) Parquet dataset sampling 0:   0%|          | 0.00/1.00 [00:00<?, ? file/s]
-2026-01-27 15:57:13.963 | 
-2026-01-27 15:57:13.963 | (pid=433, ip=10.1.5.205) Parquet dataset sampling 0:   0%|          | 0.00/1.00 [00:00<?, ? file/s]
-2026-01-27 15:57:13.963 | (pid=433, ip=10.1.5.206) Parquet dataset sampling 0:   0%|          | 0.00/1.00 [00:01<?, ? file/s]
-2026-01-27 15:57:30.077 | Trial status: 2 RUNNING
-2026-01-27 15:57:30.077 | Current time: 2026-01-27 13:57:29. Total running time: 30s
-2026-01-27 15:57:30.077 | Logical resource usage: 2.0/18 CPUs, 0/0 GPUs
-2026-01-27 15:57:30.077 | ╭───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
-2026-01-27 15:57:30.077 | │ Trial name               status       ..._params/max_depth     .../min_child_weight     ..._params/subsample     xgboost_params/eta     ...ost_params/lambda     xgboost_params/alpha │
-2026-01-27 15:57:30.077 | ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
-2026-01-27 15:57:30.077 | │ _trainable_18f82_00000   RUNNING                         9                        3                 0.807811            0.000188613               0.00103731                0.0063065 │
-2026-01-27 15:57:30.077 | │ _trainable_18f82_00001   RUNNING                         3                        1                 0.885372            0.0050955                 0.0012903                 0.0336412 │
-2026-01-27 15:57:30.077 | ╰───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
-2026-01-27 15:57:38.103 | (TrainController pid=829, ip=10.1.5.205) Started training worker group of size 1: 
-2026-01-27 15:57:38.103 | (TrainController pid=829, ip=10.1.5.205) - (ip=10.1.5.205, pid=1062) world_rank=0, local_rank=0, node_rank=0
-2026-01-27 15:57:38.103 | (TrainController pid=829, ip=10.1.5.205) Attempting to start training worker group of size 1 with the following resources: [{'CPU': 6}] * 1
-2026-01-27 15:57:38.103 | (RayTrainWorker pid=1062, ip=10.1.5.205) [13:57:36] Task [xgboost.ray-rank=00000000]:ef9fd3ab88cfb339b98cd1ef02000000 got rank 0
-2026-01-27 15:57:38.103 | (SplitCoordinator pid=1207, ip=10.1.5.205) Registered dataset logger for dataset train_20_0
-2026-01-27 15:57:38.103 | (SplitCoordinator pid=1207, ip=10.1.5.205) Starting execution of Dataset train_20_0. Full logs are in /tmp/ray/session_2026-01-27_13-56-04_803499_1/logs/ray-data
-2026-01-27 15:57:38.103 | (SplitCoordinator pid=1207, ip=10.1.5.205) Execution plan of Dataset train_20_0: InputDataBuffer[Input] -> OutputSplitter[split(1, equal=True)]
-2026-01-27 15:57:38.103 | (SplitCoordinator pid=1207, ip=10.1.5.205) [dataset]: A new progress UI is available. To enable, set `ray.data.DataContext.get_current().enable_rich_progress_bars = True` and `ray.data.DataContext.get_current().use_ray_tqdm = False`.
-2026-01-27 15:57:38.103 | (SplitCoordinator pid=1207, ip=10.1.5.205) ✔️  Dataset train_20_0 execution finished in 0.05 seconds
-2026-01-27 15:57:38.103 | 
-2026-01-27 15:57:38.103 | (pid=1207, ip=10.1.5.205) Running 0: 0.00 row [00:00, ? row/s]
-2026-01-27 15:57:38.103 | (pid=1207, ip=10.1.5.205) ✔️  Dataset train_20_0 execution finished in 0.05 seconds: : 0.00 row [00:00, ? row/s]
-2026-01-27 15:57:38.103 | (pid=1207, ip=10.1.5.205) ✔️  Dataset train_20_0 execution finished in 0.05 seconds: : 412 row [00:00, 2.73M row/s]
-2026-01-27 15:57:38.103 |                                                                                                                    
-2026-01-27 15:57:38.103 | 
-2026-01-27 15:57:38.103 | (pid=1207, ip=10.1.5.205) ✔️  Dataset train_20_0 execution finished in 0.05 seconds: : 412 row [00:00, 1.35M row/s]
-2026-01-27 15:57:38.103 | 
-2026-01-27 15:57:38.103 | (pid=1201, ip=10.1.5.206) Running 0: 0.00 row [00:00, ? row/s]
-2026-01-27 15:57:38.103 | (pid=1201, ip=10.1.5.206) ✔️  Dataset train_18_0 execution finished in 0.06 seconds: : 0.00 row [00:00, ? row/s]
-2026-01-27 15:57:38.103 | (pid=1201, ip=10.1.5.206) ✔️  Dataset train_18_0 execution finished in 0.06 seconds: : 412 row [00:00, 3.92k row/s]
-2026-01-27 15:57:38.103 | (pid=1201, ip=10.1.5.206) ✔️  Dataset train_18_0 execution finished in 0.06 seconds: : 412 row [00:00, 3.92k row/s]
-2026-01-27 15:57:38.103 |                                                                                                                    
-2026-01-27 15:57:38.103 | 
-2026-01-27 15:57:38.103 | (pid=1201, ip=10.1.5.206) ✔️  Dataset train_18_0 execution finished in 0.06 seconds: : 412 row [00:00, 3.91k row/s]
-2026-01-27 15:57:38.103 | 
-2026-01-27 15:57:38.103 | (pid=1062, ip=10.1.5.205) Running 0: 0.00 row [00:00, ? row/s]
-2026-01-27 15:57:38.103 |                                                               
-2026-01-27 15:57:38.103 | (RayTrainWorker pid=1062, ip=10.1.5.205) 
-2026-01-27 15:57:38.103 | 
-2026-01-27 15:57:38.103 | (pid=1062, ip=10.1.5.205) Running 0: 0.00 row [00:00, ? row/s]
-2026-01-27 15:57:38.103 | (pid=1062, ip=10.1.5.205) ✔️  Dataset dataset_26_0 execution finished in 0.00 seconds: : 0.00 row [00:00, ? row/s]
-2026-01-27 15:57:38.103 | (pid=1062, ip=10.1.5.205) ✔️  Dataset dataset_26_0 execution finished in 0.00 seconds: : 412 row [00:00, 167k row/s]
-2026-01-27 15:57:38.103 |                                                                                                                     
-2026-01-27 15:57:38.103 | 
-2026-01-27 15:57:38.103 | (pid=1062, ip=10.1.5.205) ✔️  Dataset dataset_26_0 execution finished in 0.00 seconds: : 412 row [00:00, 147k row/s]
-2026-01-27 15:57:38.103 | (RayTrainWorker pid=1062, ip=10.1.5.205) 
-2026-01-27 15:57:38.103 | (RayTrainWorker pid=1062, ip=10.1.5.205) Exiting prefetcher's background thread
-2026-01-27 15:57:38.103 | 
-2026-01-27 15:57:38.103 | (pid=1057, ip=10.1.5.206) Running 0: 0.00 row [00:00, ? row/s]
-2026-01-27 15:57:38.103 |                                                               
-2026-01-27 15:57:38.103 | (RayTrainWorker pid=1057, ip=10.1.5.206) 
-2026-01-27 15:57:38.103 | 
-2026-01-27 15:57:38.103 | (pid=1057, ip=10.1.5.206) Running 0: 0.00 row [00:00, ? row/s]
-2026-01-27 15:57:38.103 | (pid=1057, ip=10.1.5.206) ✔️  Dataset dataset_27_0 execution finished in 0.00 seconds: : 0.00 row [00:00, ? row/s]
-2026-01-27 15:57:38.103 | (pid=1057, ip=10.1.5.206) ✔️  Dataset dataset_27_0 execution finished in 0.00 seconds: : 412 row [00:00, 1.57M row/s]
-2026-01-27 15:57:38.103 |                                                                                                                      
-2026-01-27 15:57:38.103 | 
-2026-01-27 15:57:38.103 | (pid=1057, ip=10.1.5.206) ✔️  Dataset dataset_27_0 execution finished in 0.00 seconds: : 412 row [00:00, 1.05M row/s]
-2026-01-27 15:57:38.103 | (RayTrainWorker pid=1057, ip=10.1.5.206) 
-2026-01-27 15:57:38.103 | 
-2026-01-27 15:57:38.103 | (pid=1208, ip=10.1.5.205) Running 0: 0.00 row [00:00, ? row/s]
-2026-01-27 15:57:38.103 | 
-2026-01-27 15:57:38.103 | (pid=1200, ip=10.1.5.206) Running 0: 0.00 row [00:00, ? row/s]
-2026-01-27 15:57:38.103 | (pid=1208, ip=10.1.5.205) ✔️  Dataset val_24_0 execution finished in 0.06 seconds: : 0.00 row [00:00, ? row/s]
-2026-01-27 15:57:38.103 | (pid=1208, ip=10.1.5.205) ✔️  Dataset val_24_0 execution finished in 0.06 seconds: : 3.00k row [00:00, 28.3k row/s]
-2026-01-27 15:57:38.103 | (pid=1208, ip=10.1.5.205) ✔️  Dataset val_24_0 execution finished in 0.06 seconds: : 3.00k row [00:00, 28.3k row/s]
-2026-01-27 15:57:38.103 |                                                                                                                    
-2026-01-27 15:57:38.103 | 
-2026-01-27 15:57:38.103 |                                                               
-2026-01-27 15:57:38.103 | 
-2026-01-27 15:57:38.103 | (pid=1208, ip=10.1.5.205) ✔️  Dataset val_24_0 execution finished in 0.06 seconds: : 3.00k row [00:00, 28.2k row/s]
-2026-01-27 15:57:38.103 | 
-2026-01-27 15:57:38.103 | 
-2026-01-27 15:57:38.103 | (pid=1200, ip=10.1.5.206) Running 0: 0.00 row [00:00, ? row/s]
-2026-01-27 15:57:38.103 | 
-2026-01-27 15:57:38.103 |                                                               
-2026-01-27 15:57:38.103 | 
-2026-01-27 15:57:38.103 | (pid=1200, ip=10.1.5.206) Running 0: 0.00 row [00:00, ? row/s]
-2026-01-27 15:57:38.103 | (pid=1200, ip=10.1.5.206) ✔️  Dataset val_22_0 execution finished in 0.06 seconds: : 0.00 row [00:00, ? row/s]
-2026-01-27 15:57:38.103 | (pid=1200, ip=10.1.5.206) ✔️  Dataset val_22_0 execution finished in 0.06 seconds: : 3.00k row [00:00, 28.6k row/s]
-2026-01-27 15:57:38.103 | (pid=1200, ip=10.1.5.206) ✔️  Dataset val_22_0 execution finished in 0.06 seconds: : 3.00k row [00:00, 28.6k row/s]
-2026-01-27 15:57:38.103 |                                                                                                                    
-2026-01-27 15:57:38.103 | 
-2026-01-27 15:57:38.103 | (pid=1200, ip=10.1.5.206) ✔️  Dataset val_22_0 execution finished in 0.06 seconds: : 3.00k row [00:00, 28.5k row/s]
-2026-01-27 15:57:38.103 | 
-2026-01-27 15:57:38.103 | (pid=1062, ip=10.1.5.205) Running 0: 0.00 row [00:00, ? row/s]
-2026-01-27 15:57:38.103 |                                                               
-2026-01-27 15:57:38.103 | (RayTrainWorker pid=1062, ip=10.1.5.205) 
-2026-01-27 15:57:38.103 | 
-2026-01-27 15:57:38.103 | (pid=1062, ip=10.1.5.205) Running 0: 0.00 row [00:00, ? row/s]
-2026-01-27 15:57:38.103 | (pid=1062, ip=10.1.5.205) ✔️  Dataset dataset_28_0 execution finished in 0.00 seconds: : 0.00 row [00:00, ? row/s]
-2026-01-27 15:57:38.103 | (pid=1062, ip=10.1.5.205) ✔️  Dataset dataset_28_0 execution finished in 0.00 seconds: : 3.00k row [00:00, 10.5M row/s]
-2026-01-27 15:57:38.103 |                                                                                                                        
-2026-01-27 15:57:38.103 | 
-2026-01-27 15:57:38.103 | (pid=1062, ip=10.1.5.205) ✔️  Dataset dataset_28_0 execution finished in 0.00 seconds: : 3.00k row [00:00, 7.16M row/s]
-2026-01-27 15:57:38.103 | (RayTrainWorker pid=1062, ip=10.1.5.205) 
-2026-01-27 15:57:38.103 | (RayTrainWorker pid=1062, ip=10.1.5.205) Reporting training result 1: TrainingReport(checkpoint=None, metrics={'validation-mlogloss': 1.106584935426712, 'validation-merror': 0.06633333333333333, 'training_iteration': 5}, validation_spec=None)
-2026-01-27 15:57:38.103 | 
-2026-01-27 15:57:38.103 | (pid=1057, ip=10.1.5.206) Running 0: 0.00 row [00:00, ? row/s]
-2026-01-27 15:57:38.103 |                                                               
-2026-01-27 15:57:38.103 | (RayTrainWorker pid=1057, ip=10.1.5.206) 
-2026-01-27 15:57:38.103 | 
-2026-01-27 15:57:38.103 | (pid=1057, ip=10.1.5.206) Running 0: 0.00 row [00:00, ? row/s]
-2026-01-27 15:57:38.103 | (pid=1057, ip=10.1.5.206) ✔️  Dataset dataset_29_0 execution finished in 0.00 seconds: : 0.00 row [00:00, ? row/s]
-2026-01-27 15:57:38.103 | (pid=1057, ip=10.1.5.206) ✔️  Dataset dataset_29_0 execution finished in 0.00 seconds: : 3.00k row [00:00, 7.44M row/s]
-2026-01-27 15:57:38.103 |                                                                                                                        
-2026-01-27 15:57:38.103 | 
-2026-01-27 15:57:38.103 | (pid=1057, ip=10.1.5.206) ✔️  Dataset dataset_29_0 execution finished in 0.00 seconds: : 3.00k row [00:00, 4.97M row/s]
-2026-01-27 15:57:38.103 | (RayTrainWorker pid=1057, ip=10.1.5.206) 
-2026-01-27 15:57:38.103 | (RayTrainWorker pid=1062, ip=10.1.5.205) Reporting training result 2: TrainingReport(checkpoint=None, metrics={'validation-mlogloss': 1.0743300383090972, 'validation-merror': 0.06633333333333333, 'training_iteration': 10}, validation_spec=None)
-2026-01-27 15:57:43.112 | (RayTrainWorker pid=1057, ip=10.1.5.206) Checkpoint successfully created at: Checkpoint(filesystem=s3, path=k8s-mlops-platform-bucket/v1/models/xgboost_tune_train_18f82_00000/checkpoint_2026-01-27_13-57-38.986351)
-2026-01-27 15:57:43.112 | (RayTrainWorker pid=1057, ip=10.1.5.206) Reporting training result 3: TrainingReport(checkpoint=Checkpoint(filesystem=s3, path=k8s-mlops-platform-bucket/v1/models/xgboost_tune_train_18f82_00000/checkpoint_2026-01-27_13-57-38.986351), metrics={}, validation_spec=None)
-2026-01-27 15:57:43.112 | (RayTrainWorker pid=1062, ip=10.1.5.205) [xgboost-tune] Worker train_time_sec=3.35
-2026-01-27 15:57:47.122 | 
-2026-01-27 15:57:47.122 | 2026-01-27 13:57:46,016 - KubeRayTraining - ERROR - Training job failed: Traceback (most recent call last):
-2026-01-27 15:57:47.122 |   File "/home/ray/anaconda3/lib/python3.11/site-packages/ray/tune/execution/tune_controller.py", line 1220, in _on_result
-2026-01-27 15:57:47.122 |     on_result(trial, *args, **kwargs)
-2026-01-27 15:57:47.122 |   File "/home/ray/anaconda3/lib/python3.11/site-packages/ray/tune/execution/tune_controller.py", line 1519, in _on_training_result
-2026-01-27 15:57:47.122 |     self._process_trial_results(trial, result)
-2026-01-27 15:57:47.122 |   File "/home/ray/anaconda3/lib/python3.11/site-packages/ray/tune/execution/tune_controller.py", line 1532, in _process_trial_results
-2026-01-27 15:57:47.122 |     decision = self._process_trial_result(trial, result)
-2026-01-27 15:57:47.122 |                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-2026-01-27 15:57:47.122 |   File "/home/ray/anaconda3/lib/python3.11/site-packages/ray/tune/execution/tune_controller.py", line 1570, in _process_trial_result
-2026-01-27 15:57:47.122 |     self._validate_result_metrics(flat_result)
-2026-01-27 15:57:47.122 |   File "/home/ray/anaconda3/lib/python3.11/site-packages/ray/tune/execution/tune_controller.py", line 1681, in _validate_result_metrics
-2026-01-27 15:57:47.122 |     raise ValueError(
-2026-01-27 15:57:47.122 | ValueError: Trial returned a result which did not include the specified metric(s) `validation-mlogloss` that `AsyncHyperBandScheduler` expects. Make sure your calls to `tune.report()` include the metric, or set the TUNE_DISABLE_STRICT_METRIC_CHECKING environment variable to 1. Result: {'timestamp': 1769551065, 'checkpoint_dir_name': None, 'done': False, 'training_iteration': 1, 'trial_id': '18f82_00001', 'date': '2026-01-27_13-57-45', 'time_this_iter_s': 36.4831817150116, 'time_total_s': 36.4831817150116, 'pid': 433, 'hostname': 'kuberay-job-tr4j6-small-group-worker-cjbzt', 'node_ip': '10.1.5.205', 'time_since_restore': 36.4831817150116, 'iterations_since_restore': 1, 'config/xgboost_params/objective': 'multi:softprob', 'config/xgboost_params/eval_metric': ['mlogloss', 'merror'], 'config/xgboost_params/max_depth': 3, 'config/xgboost_params/min_child_weight': 1, 'config/xgboost_params/subsample': 0.8853718957711911, 'config/xgboost_params/eta': 0.005095496680608182, 'config/xgboost_params/lambda': 0.0012902980073281982, 'config/xgboost_params/alpha': 0.033641239118369345}
-2026-01-27 15:57:47.122 | Traceback (most recent call last):
-2026-01-27 15:57:47.122 |   File "/home/ray/anaconda3/lib/python3.11/site-packages/ray/tune/execution/tune_controller.py", line 1220, in _on_result
-2026-01-27 15:57:47.122 |     on_result(trial, *args, **kwargs)
-2026-01-27 15:57:47.122 |   File "/home/ray/anaconda3/lib/python3.11/site-packages/ray/tune/execution/tune_controller.py", line 1519, in _on_training_result
-2026-01-27 15:57:47.122 |     self._process_trial_results(trial, result)
-2026-01-27 15:57:47.122 |   File "/home/ray/anaconda3/lib/python3.11/site-packages/ray/tune/execution/tune_controller.py", line 1532, in _process_trial_results
-2026-01-27 15:57:47.122 |     decision = self._process_trial_result(trial, result)
-2026-01-27 15:57:47.122 |                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-2026-01-27 15:57:47.122 |   File "/home/ray/anaconda3/lib/python3.11/site-packages/ray/tune/execution/tune_controller.py", line 1570, in _process_trial_result
-2026-01-27 15:57:47.122 |     self._validate_result_metrics(flat_result)
-2026-01-27 15:57:47.122 |   File "/home/ray/anaconda3/lib/python3.11/site-packages/ray/tune/execution/tune_controller.py", line 1681, in _validate_result_metrics
-2026-01-27 15:57:47.122 |     raise ValueError(
-2026-01-27 15:57:47.122 | ValueError: Trial returned a result which did not include the specified metric(s) `validation-mlogloss` that `AsyncHyperBandScheduler` expects. Make sure your calls to `tune.report()` include the metric, or set the TUNE_DISABLE_STRICT_METRIC_CHECKING environment variable to 1. Result: {'timestamp': 1769551065, 'checkpoint_dir_name': None, 'done': False, 'training_iteration': 1, 'trial_id': '18f82_00001', 'date': '2026-01-27_13-57-45', 'time_this_iter_s': 36.4831817150116, 'time_total_s': 36.4831817150116, 'pid': 433, 'hostname': 'kuberay-job-tr4j6-small-group-worker-cjbzt', 'node_ip': '10.1.5.205', 'time_since_restore': 36.4831817150116, 'iterations_since_restore': 1, 'config/xgboost_params/objective': 'multi:softprob', 'config/xgboost_params/eval_metric': ['mlogloss', 'merror'], 'config/xgboost_params/max_depth': 3, 'config/xgboost_params/min_child_weight': 1, 'config/xgboost_params/subsample': 0.8853718957711911, 'config/xgboost_params/eta': 0.005095496680608182, 'config/xgboost_params/lambda': 0.0012902980073281982, 'config/xgboost_params/alpha': 0.033641239118369345}
-2026-01-27 15:57:47.122 | 
-2026-01-27 15:57:47.122 | During handling of the above exception, another exception occurred:
-2026-01-27 15:57:47.122 | 
-2026-01-27 15:57:47.122 | Traceback (most recent call last):
-2026-01-27 15:57:47.122 |   File "/home/ray/app/repo/k3s/kuberay/main.py", line 211, in train
-2026-01-27 15:57:47.122 |     best_config = tuner.tune_model(
-2026-01-27 15:57:47.122 |                   ^^^^^^^^^^^^^^^^^
-2026-01-27 15:57:47.122 |   File "/home/ray/app/.worktrees/e99d42f7c16b961cd3ea67e129d4f237fc197552/k3s/kuberay/tuning/xgboost.py", line 220, in tune_model
-2026-01-27 15:57:47.122 |     results = tuner.fit()
-2026-01-27 15:57:47.122 |               ^^^^^^^^^^^
-2026-01-27 15:57:47.122 |   File "/home/ray/anaconda3/lib/python3.11/site-packages/ray/tune/tuner.py", line 345, in fit
-2026-01-27 15:57:47.122 |     return self._local_tuner.fit()
-2026-01-27 15:57:47.122 |            ^^^^^^^^^^^^^^^^^^^^^^^
-2026-01-27 15:57:47.122 |   File "/home/ray/anaconda3/lib/python3.11/site-packages/ray/tune/impl/tuner_internal.py", line 506, in fit
-2026-01-27 15:57:47.122 |     analysis = self._fit_internal(trainable, param_space)
-2026-01-27 15:57:47.122 |                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-2026-01-27 15:57:47.122 |   File "/home/ray/anaconda3/lib/python3.11/site-packages/ray/tune/impl/tuner_internal.py", line 622, in _fit_internal
-2026-01-27 15:57:47.122 |     analysis = run(
-2026-01-27 15:57:47.122 |                ^^^^
-2026-01-27 15:57:47.122 |   File "/home/ray/anaconda3/lib/python3.11/site-packages/ray/tune/tune.py", line 994, in run
-2026-01-27 15:57:47.122 |     runner.step()
-2026-01-27 15:57:47.122 |   File "/home/ray/anaconda3/lib/python3.11/site-packages/ray/tune/execution/tune_controller.py", line 685, in step
-2026-01-27 15:57:47.122 |     if not self._actor_manager.next(timeout=0.1):
-2026-01-27 15:57:47.122 |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-2026-01-27 15:57:47.122 |   File "/home/ray/anaconda3/lib/python3.11/site-packages/ray/air/execution/_internal/actor_manager.py", line 223, in next
-2026-01-27 15:57:47.122 |     self._actor_task_events.resolve_future(future)
-2026-01-27 15:57:47.122 |   File "/home/ray/anaconda3/lib/python3.11/site-packages/ray/air/execution/_internal/event_manager.py", line 118, in resolve_future
-2026-01-27 15:57:47.122 |     on_result(result)
-2026-01-27 15:57:47.122 |   File "/home/ray/anaconda3/lib/python3.11/site-packages/ray/air/execution/_internal/actor_manager.py", line 766, in on_result
-2026-01-27 15:57:47.122 |     self._actor_task_resolved(
-2026-01-27 15:57:47.122 |   File "/home/ray/anaconda3/lib/python3.11/site-packages/ray/air/execution/_internal/actor_manager.py", line 299, in _actor_task_resolved
-2026-01-27 15:57:47.122 |     tracked_actor_task._on_result(tracked_actor, result)
-2026-01-27 15:57:47.122 |   File "/home/ray/anaconda3/lib/python3.11/site-packages/ray/tune/execution/tune_controller.py", line 1229, in _on_result
-2026-01-27 15:57:47.122 |     raise TuneError(traceback.format_exc())
-2026-01-27 15:57:47.122 | ray.tune.error.TuneError: Traceback (most recent call last):
-2026-01-27 15:57:47.122 |   File "/home/ray/anaconda3/lib/python3.11/site-packages/ray/tune/execution/tune_controller.py", line 1220, in _on_result
-2026-01-27 15:57:47.122 |     on_result(trial, *args, **kwargs)
-2026-01-27 15:57:47.122 |   File "/home/ray/anaconda3/lib/python3.11/site-packages/ray/tune/execution/tune_controller.py", line 1519, in _on_training_result
-2026-01-27 15:57:47.122 |     self._process_trial_results(trial, result)
-2026-01-27 15:57:47.122 |   File "/home/ray/anaconda3/lib/python3.11/site-packages/ray/tune/execution/tune_controller.py", line 1532, in _process_trial_results
-2026-01-27 15:57:47.122 |     decision = self._process_trial_result(trial, result)
-2026-01-27 15:57:47.122 |                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-2026-01-27 15:57:47.122 |   File "/home/ray/anaconda3/lib/python3.11/site-packages/ray/tune/execution/tune_controller.py", line 1570, in _process_trial_result
-2026-01-27 15:57:47.122 |     self._validate_result_metrics(flat_result)
-2026-01-27 15:57:47.122 |   File "/home/ray/anaconda3/lib/python3.11/site-packages/ray/tune/execution/tune_controller.py", line 1681, in _validate_result_metrics
-2026-01-27 15:57:47.122 |     raise ValueError(
-2026-01-27 15:57:47.122 | ValueError: Trial returned a result which did not include the specified metric(s) `validation-mlogloss` that `AsyncHyperBandScheduler` expects. Make sure your calls to `tune.report()` include the metric, or set the TUNE_DISABLE_STRICT_METRIC_CHECKING environment variable to 1. Result: {'timestamp': 1769551065, 'checkpoint_dir_name': None, 'done': False, 'training_iteration': 1, 'trial_id': '18f82_00001', 'date': '2026-01-27_13-57-45', 'time_this_iter_s': 36.4831817150116, 'time_total_s': 36.4831817150116, 'pid': 433, 'hostname': 'kuberay-job-tr4j6-small-group-worker-cjbzt', 'node_ip': '10.1.5.205', 'time_since_restore': 36.4831817150116, 'iterations_since_restore': 1, 'config/xgboost_params/objective': 'multi:softprob', 'config/xgboost_params/eval_metric': ['mlogloss', 'merror'], 'config/xgboost_params/max_depth': 3, 'config/xgboost_params/min_child_weight': 1, 'config/xgboost_params/subsample': 0.8853718957711911, 'config/xgboost_params/eta': 0.005095496680608182, 'config/xgboost_params/lambda': 0.0012902980073281982, 'config/xgboost_params/alpha': 0.033641239118369345}
-2026-01-27 15:57:47.122 | 
-2026-01-27 15:57:47.122 | Traceback (most recent call last):
-2026-01-27 15:57:47.122 |   File "/home/ray/anaconda3/lib/python3.11/site-packages/ray/tune/execution/tune_controller.py", line 1220, in _on_result
-2026-01-27 15:57:47.122 |     on_result(trial, *args, **kwargs)
-2026-01-27 15:57:47.122 |   File "/home/ray/anaconda3/lib/python3.11/site-packages/ray/tune/execution/tune_controller.py", line 1519, in _on_training_result
-2026-01-27 15:57:47.122 |     self._process_trial_results(trial, result)
-2026-01-27 15:57:47.122 |   File "/home/ray/anaconda3/lib/python3.11/site-packages/ray/tune/execution/tune_controller.py", line 1532, in _process_trial_results
-2026-01-27 15:57:47.122 |     decision = self._process_trial_result(trial, result)
-2026-01-27 15:57:47.122 |                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-2026-01-27 15:57:47.122 |   File "/home/ray/anaconda3/lib/python3.11/site-packages/ray/tune/execution/tune_controller.py", line 1570, in _process_trial_result
-2026-01-27 15:57:47.122 |     self._validate_result_metrics(flat_result)
-2026-01-27 15:57:47.122 |   File "/home/ray/anaconda3/lib/python3.11/site-packages/ray/tune/execution/tune_controller.py", line 1681, in _validate_result_metrics
-2026-01-27 15:57:47.122 |     raise ValueError(
-2026-01-27 15:57:47.122 | ValueError: Trial returned a result which did not include the specified metric(s) `validation-mlogloss` that `AsyncHyperBandScheduler` expects. Make sure your calls to `tune.report()` include the metric, or set the TUNE_DISABLE_STRICT_METRIC_CHECKING environment variable to 1. Result: {'timestamp': 1769551065, 'checkpoint_dir_name': None, 'done': False, 'training_iteration': 1, 'trial_id': '18f82_00001', 'date': '2026-01-27_13-57-45', 'time_this_iter_s': 36.4831817150116, 'time_total_s': 36.4831817150116, 'pid': 433, 'hostname': 'kuberay-job-tr4j6-small-group-worker-cjbzt', 'node_ip': '10.1.5.205', 'time_since_restore': 36.4831817150116, 'iterations_since_restore': 1, 'config/xgboost_params/objective': 'multi:softprob', 'config/xgboost_params/eval_metric': ['mlogloss', 'merror'], 'config/xgboost_params/max_depth': 3, 'config/xgboost_params/min_child_weight': 1, 'config/xgboost_params/subsample': 0.8853718957711911, 'config/xgboost_params/eta': 0.005095496680608182, 'config/xgboost_params/lambda': 0.0012902980073281982, 'config/xgboost_params/alpha': 0.033641239118369345}
-2026-01-27 15:57:47.122 | 
-2026-01-27 15:57:47.122 | During handling of the above exception, another exception occurred:
-2026-01-27 15:57:47.122 | 
-2026-01-27 15:57:47.122 | Traceback (most recent call last):
-2026-01-27 15:57:47.122 |   File "/home/ray/app/repo/k3s/kuberay/main.py", line 308, in <module>
-2026-01-27 15:57:47.122 |     main()
-2026-01-27 15:57:47.122 |   File "/home/ray/app/repo/k3s/kuberay/main.py", line 305, in main
-2026-01-27 15:57:47.122 |     model.train()
-2026-01-27 15:57:47.122 |   File "/home/ray/app/repo/k3s/kuberay/main.py", line 211, in train
-2026-01-27 15:57:47.122 |     best_config = tuner.tune_model(
-2026-01-27 15:57:47.122 |                   ^^^^^^^^^^^^^^^^^
-2026-01-27 15:57:47.122 |   File "/home/ray/app/.worktrees/e99d42f7c16b961cd3ea67e129d4f237fc197552/k3s/kuberay/tuning/xgboost.py", line 220, in tune_model
-2026-01-27 15:57:47.122 |     results = tuner.fit()
-2026-01-27 15:57:47.122 |               ^^^^^^^^^^^
-2026-01-27 15:57:47.122 |   File "/home/ray/anaconda3/lib/python3.11/site-packages/ray/tune/tuner.py", line 345, in fit
-2026-01-27 15:57:47.122 |     return self._local_tuner.fit()
-2026-01-27 15:57:47.122 |            ^^^^^^^^^^^^^^^^^^^^^^^
-2026-01-27 15:57:47.122 |   File "/home/ray/anaconda3/lib/python3.11/site-packages/ray/tune/impl/tuner_internal.py", line 506, in fit
-2026-01-27 15:57:47.122 |     analysis = self._fit_internal(trainable, param_space)
-2026-01-27 15:57:47.122 |                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-2026-01-27 15:57:47.122 |   File "/home/ray/anaconda3/lib/python3.11/site-packages/ray/tune/impl/tuner_internal.py", line 622, in _fit_internal
-2026-01-27 15:57:47.122 |     analysis = run(
-2026-01-27 15:57:47.122 |                ^^^^
-2026-01-27 15:57:47.122 |   File "/home/ray/anaconda3/lib/python3.11/site-packages/ray/tune/tune.py", line 994, in run
-2026-01-27 15:57:47.122 |     runner.step()
-2026-01-27 15:57:47.122 |   File "/home/ray/anaconda3/lib/python3.11/site-packages/ray/tune/execution/tune_controller.py", line 685, in step
-2026-01-27 15:57:47.122 |     if not self._actor_manager.next(timeout=0.1):
-2026-01-27 15:57:47.122 |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-2026-01-27 15:57:47.122 |   File "/home/ray/anaconda3/lib/python3.11/site-packages/ray/air/execution/_internal/actor_manager.py", line 223, in next
-2026-01-27 15:57:47.122 |     self._actor_task_events.resolve_future(future)
-2026-01-27 15:57:47.122 |   File "/home/ray/anaconda3/lib/python3.11/site-packages/ray/air/execution/_internal/event_manager.py", line 118, in resolve_future
-2026-01-27 15:57:47.122 |     on_result(result)
-2026-01-27 15:57:47.122 |   File "/home/ray/anaconda3/lib/python3.11/site-packages/ray/air/execution/_internal/actor_manager.py", line 766, in on_result
-2026-01-27 15:57:47.122 |     self._actor_task_resolved(
-2026-01-27 15:57:47.122 |   File "/home/ray/anaconda3/lib/python3.11/site-packages/ray/air/execution/_internal/actor_manager.py", line 299, in _actor_task_resolved
-2026-01-27 15:57:47.122 |     tracked_actor_task._on_result(tracked_actor, result)
-2026-01-27 15:57:47.122 |   File "/home/ray/anaconda3/lib/python3.11/site-packages/ray/tune/execution/tune_controller.py", line 1229, in _on_result
-2026-01-27 15:57:47.122 |     raise TuneError(traceback.format_exc())
-2026-01-27 15:57:47.122 | ray.tune.error.TuneError: Traceback (most recent call last):
-2026-01-27 15:57:47.122 |   File "/home/ray/anaconda3/lib/python3.11/site-packages/ray/tune/execution/tune_controller.py", line 1220, in _on_result
-2026-01-27 15:57:47.122 |     on_result(trial, *args, **kwargs)
-2026-01-27 15:57:47.122 |   File "/home/ray/anaconda3/lib/python3.11/site-packages/ray/tune/execution/tune_controller.py", line 1519, in _on_training_result
-2026-01-27 15:57:47.122 |     self._process_trial_results(trial, result)
-2026-01-27 15:57:47.122 |   File "/home/ray/anaconda3/lib/python3.11/site-packages/ray/tune/execution/tune_controller.py", line 1532, in _process_trial_results
-2026-01-27 15:57:47.122 |     decision = self._process_trial_result(trial, result)
-2026-01-27 15:57:47.122 |                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-2026-01-27 15:57:47.122 |   File "/home/ray/anaconda3/lib/python3.11/site-packages/ray/tune/execution/tune_controller.py", line 1570, in _process_trial_result
-2026-01-27 15:57:47.122 |     self._validate_result_metrics(flat_result)
-2026-01-27 15:57:47.122 |   File "/home/ray/anaconda3/lib/python3.11/site-packages/ray/tune/execution/tune_controller.py", line 1681, in _validate_result_metrics
-2026-01-27 15:57:47.122 |     raise ValueError(
-2026-01-27 15:57:47.122 | ValueError: Trial returned a result which did not include the specified metric(s) `validation-mlogloss` that `AsyncHyperBandScheduler` expects. Make sure your calls to `tune.report()` include the metric, or set the TUNE_DISABLE_STRICT_METRIC_CHECKING environment variable to 1. Result: {'timestamp': 1769551065, 'checkpoint_dir_name': None, 'done': False, 'training_iteration': 1, 'trial_id': '18f82_00001', 'date': '2026-01-27_13-57-45', 'time_this_iter_s': 36.4831817150116, 'time_total_s': 36.4831817150116, 'pid': 433, 'hostname': 'kuberay-job-tr4j6-small-group-worker-cjbzt', 'node_ip': '10.1.5.205', 'time_since_restore': 36.4831817150116, 'iterations_since_restore': 1, 'config/xgboost_params/objective': 'multi:softprob', 'config/xgboost_params/eval_metric': ['mlogloss', 'merror'], 'config/xgboost_params/max_depth': 3, 'config/xgboost_params/min_child_weight': 1, 'config/xgboost_params/subsample': 0.8853718957711911, 'config/xgboost_params/eta': 0.005095496680608182, 'config/xgboost_params/lambda': 0.0012902980073281982, 'config/xgboost_params/alpha': 0.033641239118369345}
-2026-01-27 15:57:47.122 | 
-2026-01-27 15:57:47.123 | (TrainController pid=886, ip=10.1.5.206) Started training worker group of size 1: 
-2026-01-27 15:57:47.123 | (TrainController pid=886, ip=10.1.5.206) - (ip=10.1.5.206, pid=1057) world_rank=0, local_rank=0, node_rank=0
-2026-01-27 15:57:47.123 | (RayTrainWorker pid=1057, ip=10.1.5.206) [13:57:37] Task [xgboost.ray-rank=00000000]:41b7d7a541f1369db9e53f8802000000 got rank 0
-2026-01-27 15:57:47.123 | (RayTrainWorker pid=1057, ip=10.1.5.206) Registered dataset logger for dataset dataset_29_0 [repeated 7x across cluster]
-2026-01-27 15:57:47.123 | (SplitCoordinator pid=1200, ip=10.1.5.206) Starting execution of Dataset val_22_0. Full logs are in /tmp/ray/session_2026-01-27_13-56-04_803499_1/logs/ray-data [repeated 3x across cluster]
-2026-01-27 15:57:47.123 | (SplitCoordinator pid=1200, ip=10.1.5.206) Execution plan of Dataset val_22_0: InputDataBuffer[Input] -> OutputSplitter[split(1, equal=True)] [repeated 3x across cluster]
-2026-01-27 15:57:47.123 | (SplitCoordinator pid=1200, ip=10.1.5.206) [dataset]: A new progress UI is available. To enable, set `ray.data.DataContext.get_current().enable_rich_progress_bars = True` and `ray.data.DataContext.get_current().use_ray_tqdm = False`. [repeated 5x across cluster]
-2026-01-27 15:57:47.123 | (RayTrainWorker pid=1057, ip=10.1.5.206) ✔️  Dataset dataset_29_0 execution finished in 0.00 seconds [repeated 7x across cluster]
-2026-01-27 15:57:47.123 | (RayTrainWorker pid=1057, ip=10.1.5.206) Exiting prefetcher's background thread [repeated 3x across cluster]
-2026-01-27 15:57:47.123 | (RayTrainWorker pid=1057, ip=10.1.5.206) Reporting training result 2: TrainingReport(checkpoint=None, metrics={'validation-mlogloss': 1.1381034117937088, 'validation-merror': 0.06633333333333333, 'training_iteration': 10}, validation_spec=None) [repeated 2x across cluster]
-2026-01-27 15:57:48.123 | (RayTrainWorker pid=1062, ip=10.1.5.205) Checkpoint successfully created at: Checkpoint(filesystem=s3, path=k8s-mlops-platform-bucket/v1/models/xgboost_tune_train_18f82_00001/checkpoint_2026-01-27_13-57-38.946264)
-2026-01-27 15:57:48.124 | (RayTrainWorker pid=1062, ip=10.1.5.205) Reporting training result 3: TrainingReport(checkpoint=Checkpoint(filesystem=s3, path=k8s-mlops-platform-bucket/v1/models/xgboost_tune_train_18f82_00001/checkpoint_2026-01-27_13-57-38.946264), metrics={}, validation_spec=None)
-2026-01-27 15:57:48.124 | (RayTrainWorker pid=1057, ip=10.1.5.206) [xgboost-tune] Worker train_time_sec=3.31
-2026-01-27 15:57:53.150 | 2026-01-27 13:57:53,149	ERR cli.py:73 -- ------------------------------
-2026-01-27 15:57:53.150 | 2026-01-27 13:57:53,149	ERR cli.py:74 -- Job 'kuberay-job-9m6g4' failed
-2026-01-27 15:57:53.150 | 2026-01-27 13:57:53,150	ERR cli.py:75 -- ------------------------------
-2026-01-27 15:57:53.150 | 2026-01-27 13:57:53,150	INFO cli.py:88 -- Status message: Job entrypoint command failed with exit code 1, last available logs (truncated to 20,000 chars):
-2026-01-27 15:57:53.150 | (RayTrainWorker pid=1057, ip=10.1.5.206) Registered dataset logger for dataset dataset_29_0 [repeated 7x across cluster]
-2026-01-27 15:57:53.150 | (SplitCoordinator pid=1200, ip=10.1.5.206) Starting execution of Dataset val_22_0. Full logs are in /tmp/ray/session_2026-01-27_13-56-04_803499_1/logs/ray-data [repeated 3x across cluster]
-2026-01-27 15:57:53.150 | (SplitCoordinator pid=1200, ip=10.1.5.206) Execution plan of Dataset val_22_0: InputDataBuffer[Input] -> OutputSplitter[split(1, equal=True)] [repeated 3x across cluster]
-2026-01-27 15:57:53.150 | (SplitCoordinator pid=1200, ip=10.1.5.206) [dataset]: A new progress UI is available. To enable, set `ray.data.DataContext.get_current().enable_rich_progress_bars = True` and `ray.data.DataContext.get_current().use_ray_tqdm = False`. [repeated 5x across cluster]
-2026-01-27 15:57:53.150 | (RayTrainWorker pid=1057, ip=10.1.5.206) ✔️  Dataset dataset_29_0 execution finished in 0.00 seconds [repeated 7x across cluster]
-2026-01-27 15:57:53.150 | (RayTrainWorker pid=1057, ip=10.1.5.206) Exiting prefetcher's background thread [repeated 3x across cluster]
-2026-01-27 15:57:53.150 | (RayTrainWorker pid=1057, ip=10.1.5.206) Reporting training result 2: TrainingReport(checkpoint=None, metrics={'validation-mlogloss': 1.1381034117937088, 'validation-merror': 0.06633333333333333, 'training_iteration': 10}, validation_spec=None) [repeated 2x across cluster]
-2026-01-27 15:57:53.150 | (RayTrainWorker pid=1062, ip=10.1.5.205) Checkpoint successfully created at: Checkpoint(filesystem=s3, path=k8s-mlops-platform-bucket/v1/models/xgboost_tune_train_18f82_00001/checkpoint_2026-01-27_13-57-38.946264)
-2026-01-27 15:57:53.150 | (RayTrainWorker pid=1062, ip=10.1.5.205) Reporting training result 3: TrainingReport(checkpoint=Checkpoint(filesystem=s3, path=k8s-mlops-platform-bucket/v1/models/xgboost_tune_train_18f82_00001/checkpoint_2026-01-27_13-57-38.946264), metrics={}, validation_spec=None)
-2026-01-27 15:57:53.150 | (RayTrainWorker pid=1057, ip=10.1.5.206) [xgboost-tune] Worker train_time_sec=3.31
+2026-01-27 16:02:14.902 | 2026-01-27 14:02:14,902	INFO cli.py:41 -- Job submission server address: http://kuberay-job-4tltw-head-svc.ray.svc.cluster.local:8265
+2026-01-27 16:02:15.545 | 2026-01-27 14:02:15,544	SUCC cli.py:65 -- ----------------------------------------------
+2026-01-27 16:02:15.545 | 2026-01-27 14:02:15,545	SUCC cli.py:66 -- Job 'kuberay-job-phhht' submitted successfully
+2026-01-27 16:02:15.545 | 2026-01-27 14:02:15,545	SUCC cli.py:67 -- ----------------------------------------------
+2026-01-27 16:02:15.545 | 2026-01-27 14:02:15,545	INFO cli.py:291 -- Next steps
+2026-01-27 16:02:15.545 | 2026-01-27 14:02:15,545	INFO cli.py:292 -- Query the logs of the job:
+2026-01-27 16:02:15.546 | 2026-01-27 14:02:15,546	INFO cli.py:294 -- ray job logs kuberay-job-phhht
+2026-01-27 16:02:15.546 | 2026-01-27 14:02:15,546	INFO cli.py:296 -- Query the status of the job:
+2026-01-27 16:02:15.546 | 2026-01-27 14:02:15,546	INFO cli.py:298 -- ray job status kuberay-job-phhht
+2026-01-27 16:02:15.546 | 2026-01-27 14:02:15,546	INFO cli.py:300 -- Request the job to be stopped:
+2026-01-27 16:02:15.547 | 2026-01-27 14:02:15,546	INFO cli.py:302 -- ray job stop kuberay-job-phhht
+2026-01-27 16:02:19.177 | 2026-01-27 14:02:19,177	INFO cli.py:41 -- Job submission server address: http://kuberay-job-4tltw-head-svc.ray.svc.cluster.local:8265
+2026-01-27 16:02:21.205 | 2026-01-27 14:02:15,045	INFO job_manager.py:568 -- Runtime env is setting up.
+2026-01-27 16:02:21.205 | Running entrypoint for job kuberay-job-phhht: python3 /home/ray/app/repo/k3s/kuberay/main.py
+2026-01-27 16:02:30.297 | 2026-01-27 14:02:28,672 - KubeRayTraining - DEBUG - Parameters retrieved from /home/ray/app/repo/k3s/params.yaml
+2026-01-27 16:02:33.302 | 2026-01-27 14:02:30,452 - KubeRayTraining - INFO - [RAY CLUSTER RESOURCES]
+2026-01-27 16:02:33.302 |             ────────────────────────────────
+2026-01-27 16:02:33.302 |             CPU           : 0.0 / 18.0
+2026-01-27 16:02:33.302 |             Memory        : 0B / 13.00GiB
+2026-01-27 16:02:33.302 |             Object Store  : 0B / 8.23GiB
+2026-01-27 16:02:33.302 |             ────────────────────────────────
+2026-01-27 16:02:33.302 | 2026-01-27 14:02:30,829 - KubeRayTraining - INFO - Minio connection verified. Buckets: ['frontend-crm-bucket', 'k8s-mlops-platform-bucket']
+2026-01-27 16:02:33.302 | 2026-01-27 14:02:30,835 - KubeRayTraining - INFO - Starting training using framework: xgboost
+2026-01-27 16:02:33.302 | 2026-01-27 14:02:30,835 - KubeRayTraining - INFO - Starting hyperparameter tuning...
+2026-01-27 16:02:34.303 | 2026-01-27 14:02:33,047	INFO worker.py:1696 -- Using address 10.1.5.210:6379 set in the environment variable RAY_ADDRESS
+2026-01-27 16:02:34.303 | 2026-01-27 14:02:33,051	INFO worker.py:1837 -- Connecting to existing Ray cluster at address: 10.1.5.210:6379...
+2026-01-27 16:02:34.303 | 2026-01-27 14:02:33,077	INFO worker.py:2014 -- Connected to Ray cluster. View the dashboard at http://10.1.5.210:8265 
+2026-01-27 16:02:34.303 | 2026-01-27 14:02:33,114	INFO tune.py:253 -- Initializing Ray automatically. For cluster usage or custom Ray initialization, call `ray.init(...)` before `Tuner(...)`.
+2026-01-27 16:02:37.310 | /home/ray/anaconda3/lib/python3.11/site-packages/google/rpc/__init__.py:18: UserWarning: pkg_resources is deprecated as an API. See https://setuptools.pypa.io/en/latest/pkg_resources.html. The pkg_resources package is slated for removal as early as 2025-11-30. Refrain from using this package or pin to Setuptools<81.
+2026-01-27 16:02:37.310 |   import pkg_resources
+2026-01-27 16:02:39.313 | ╭──────────────────────────────────────────────────────────╮
+2026-01-27 16:02:39.313 | │ Configuration for experiment     xgboost_tune            │
+2026-01-27 16:02:39.313 | ├──────────────────────────────────────────────────────────┤
+2026-01-27 16:02:39.313 | │ Search algorithm                 BasicVariantGenerator   │
+2026-01-27 16:02:39.313 | │ Scheduler                        AsyncHyperBandScheduler │
+2026-01-27 16:02:39.313 | │ Number of trials                 3                       │
+2026-01-27 16:02:39.313 | ╰──────────────────────────────────────────────────────────╯
+2026-01-27 16:02:39.313 | 
+2026-01-27 16:02:39.313 | View detailed results here: k8s-mlops-platform-bucket/v1/models/xgboost_tune
+2026-01-27 16:02:39.313 | To visualize your results with TensorBoard, run: `tensorboard --logdir /tmp/ray/session_2026-01-27_14-01-38_448886_1/artifacts/2026-01-27_14-02-34/xgboost_tune/driver_artifacts`
+2026-01-27 16:02:39.313 | 
+2026-01-27 16:02:39.313 | Trial status: 2 PENDING
+2026-01-27 16:02:39.313 | Current time: 2026-01-27 14:02:38. Total running time: 0s
+2026-01-27 16:02:39.313 | Logical resource usage: 0/18 CPUs, 0/0 GPUs
+2026-01-27 16:02:39.313 | ╭───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+2026-01-27 16:02:39.313 | │ Trial name               status       ..._params/max_depth     .../min_child_weight     ..._params/subsample     xgboost_params/eta     ...ost_params/lambda     xgboost_params/alpha │
+2026-01-27 16:02:39.313 | ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
+2026-01-27 16:02:39.313 | │ _trainable_e25e8_00000   PENDING                         8                        2                 0.805711             0.00810624                0.228573                  0.593128 │
+2026-01-27 16:02:39.313 | │ _trainable_e25e8_00001   PENDING                         4                        2                 0.976506             0.0143265                 0.0947398                 9.74931  │
+2026-01-27 16:02:39.313 | ╰───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+2026-01-27 16:02:47.333 | 
+2026-01-27 16:02:47.333 | Trial _trainable_e25e8_00000 started with configuration:
+2026-01-27 16:02:47.333 | ╭──────────────────────────────────────────────────────────────╮
+2026-01-27 16:02:47.333 | │ Trial _trainable_e25e8_00000 config                          │
+2026-01-27 16:02:47.333 | ├──────────────────────────────────────────────────────────────┤
+2026-01-27 16:02:47.333 | │ xgboost_params/alpha                      0.5931276472712042 │
+2026-01-27 16:02:47.333 | │ xgboost_params/eta                      0.008106241808725038 │
+2026-01-27 16:02:47.333 | │ xgboost_params/eval_metric              ...gloss', 'merror'] │
+2026-01-27 16:02:47.333 | │ xgboost_params/lambda                      0.228572522846955 │
+2026-01-27 16:02:47.333 | │ xgboost_params/max_depth                                   8 │
+2026-01-27 16:02:47.333 | │ xgboost_params/min_child_weight                            2 │
+2026-01-27 16:02:47.333 | │ xgboost_params/objective                      multi:softprob │
+2026-01-27 16:02:47.333 | │ xgboost_params/subsample                  0.8057106828240203 │
+2026-01-27 16:02:47.333 | ╰──────────────────────────────────────────────────────────────╯
+2026-01-27 16:02:47.333 | 
+2026-01-27 16:02:47.333 | Trial _trainable_e25e8_00001 started with configuration:
+2026-01-27 16:02:47.333 | ╭──────────────────────────────────────────────────────────────╮
+2026-01-27 16:02:47.333 | │ Trial _trainable_e25e8_00001 config                          │
+2026-01-27 16:02:47.333 | ├──────────────────────────────────────────────────────────────┤
+2026-01-27 16:02:47.333 | │ xgboost_params/alpha                       9.749309657904798 │
+2026-01-27 16:02:48.334 | │ xgboost_params/eta                      0.014326532995528512 │
+2026-01-27 16:02:48.334 | │ xgboost_params/eval_metric              ...gloss', 'merror'] │
+2026-01-27 16:02:48.334 | │ xgboost_params/lambda                    0.09473984279504967 │
+2026-01-27 16:02:48.334 | │ xgboost_params/max_depth                                   4 │
+2026-01-27 16:02:48.334 | │ xgboost_params/min_child_weight                            2 │
+2026-01-27 16:02:48.334 | │ xgboost_params/objective                      multi:softprob │
+2026-01-27 16:02:48.334 | │ xgboost_params/subsample                  0.9765055939403413 │
+2026-01-27 16:02:48.334 | ╰──────────────────────────────────────────────────────────────╯
+2026-01-27 16:02:51.340 | 
+2026-01-27 16:02:51.340 | (pid=449, ip=10.1.5.208) Parquet dataset sampling 0:   0%|          | 0.00/1.00 [00:00<?, ? file/s]
+2026-01-27 16:02:51.340 | 
+2026-01-27 16:02:51.340 | (pid=449, ip=10.1.5.209) Parquet dataset sampling 0:   0%|          | 0.00/1.00 [00:00<?, ? file/s]
+2026-01-27 16:02:51.340 | (pid=449, ip=10.1.5.208) Parquet dataset sampling 0:   0%|          | 0.00/1.00 [00:01<?, ? file/s]
+2026-01-27 16:02:51.340 | worktrees                                                                                       
+2026-01-27 16:03:13.454 | 
+2026-01-27 16:03:13.454 | (pid=991, ip=10.1.5.208) ✔️  Dataset dataset_29_0 execution finished in 0.00 seconds: : 3.00k row [00:00, 3.14M row/s]
+2026-01-27 16:03:13.454 | (RayTrainWorker pid=991, ip=10.1.5.208) 
+2026-01-27 16:03:14.456 | (RayTrainWorker pid=1127, ip=10.1.5.209) Reporting training result 1: TrainingReport(checkpoint=None, metrics={'validation-mlogloss': 1.0895445252656937, 'validation-merror': 0.06633333333333333, 'training_iteration': 5}, validation_spec=None)
+2026-01-27 16:03:14.456 | (RayTrainWorker pid=1127, ip=10.1.5.209) Reporting training result 2: TrainingReport(checkpoint=None, metrics={'validation-mlogloss': 1.0419010637203852, 'validation-merror': 0.06633333333333333, 'training_iteration': 10}, validation_spec=None)
+2026-01-27 16:03:17.461 | (RayTrainWorker pid=1127, ip=10.1.5.209) Checkpoint successfully created at: Checkpoint(filesystem=s3, path=k8s-mlops-platform-bucket/v1/models/xgboost_tune_train_e25e8_00000/checkpoint_2026-01-27_14-03-13.679284)
+2026-01-27 16:03:17.462 | (RayTrainWorker pid=1127, ip=10.1.5.209) Repo
+
+
+rting training result 3: TrainingReport(checkpoint=Checkpoint(filesystem=s3, path=k8s-mlops-platform-bucket/v1/models/xgboost_tune_train_e25e8_00000/checkpoint_2026-01-27_14-03-13.679284), metrics={'validation-mlogloss': 1.0419010637203852, 'validation-merror': 0.06633333333333333, 'training_iteration': 10}, validation_spec=None)
+2026-01-27 16:03:17.462 | (RayTrainWorker pid=1127, ip=10.1.5.209) [xgboost-tune] Worker train_time_sec=3.28
+2026-01-27 16:03:21.472 | 
+2026-01-27 16:03:21.472 | 2026-01-27 14:03:20,678 - KubeRayTraining - ERROR - Training job failed: Traceback (most recent call last):
+2026-01-27 16:03:21.472 |   File "/home/ray/anaconda3/lib/python3.11/site-packages/ray/tune/execution/tune_controller.py", line 1220, in _on_result
+2026-01-27 16:03:21.472 |     on_result(trial, *args, **kwargs)
+2026-01-27 16:03:21.472 |   File "/home/ray/anaconda3/lib/python3.11/site-packages/ray/tune/execution/tune_controller.py", line 1519, in _on_training_result
+2026-01-27 16:03:21.472 |     self._process_trial_results(trial, result)
+2026-01-27 16:03:21.472 |   File "/home/ray/anaconda3/lib/python3.11/site-packages/ray/tune/execution/tune_controller.py", line 1532, in _process_trial_results
+2026-01-27 16:03:21.472 |     decision = self._process_trial_result(trial, result)
+2026-01-27 16:03:21.472 |                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-01-27 16:03:21.472 |   File "/home/ray/anaconda3/lib/python3.11/site-packages/ray/tune/execution/tune_controller.py", line 1590, in _process_trial_result
+2026-01-27 16:03:21.472 |     self._callbacks.on_trial_result(
+2026-01-27 16:03:21.472 |   File "/home/ray/anaconda3/lib/python3.11/site-packages/ray/tune/callback.py", line 410, in on_trial_result
+2026-01-27 16:03:21.472 |     callback.on_trial_result(**info)
+2026-01-27 16:03:21.472 |   File "/home/ray/anaconda3/lib/python3.11/site-packages/ray/tune/logger/logger.py", line 142, in on_trial_result
+2026-01-27 16:03:21.472 |     self.log_trial_result(iteration, trial, result)
+2026-01-27 16:03:21.472 |   File "/home/ray/anaconda3/lib/python3.11/site-packages/ray/air/integrations/mlflow.py", line 320, in log_trial_result
+2026-01-27 16:03:21.472 |     self.mlflow_util.log_metrics(run_id=run_id, metrics_to_log=result, step=step)
+2026-01-27 16:03:21.472 |   File "/home/ray/anaconda3/lib/python3.11/site-packages/ray/air/_internal/mlflow.py", line 297, in log_metrics
+2026-01-27 16:03:21.472 |     client.log_metric(run_id=run_id, key=key, value=value, step=step)
+2026-01-27 16:03:21.472 |   File "/home/ray/anaconda3/lib/python3.11/site-packages/mlflow/tracking/client.py", line 2079, in log_metric
+2026-01-27 16:03:21.472 |     return self._tracking_client.log_metric(
+2026-01-27 16:03:21.472 |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-01-27 16:03:21.472 |   File "/home/ray/anaconda3/lib/python3.11/site-packages/mlflow/telemetry/track.py", line 30, in wrapper
+2026-01-27 16:03:21.472 |     result = func(*args, **kwargs)
+2026-01-27 16:03:21.472 |              ^^^^^^^^^^^^^^^^^^^^^
+2026-01-27 16:03:21.472 |   File "/home/ray/anaconda3/lib/python3.11/site-packages/mlflow/tracking/_tracking_service/client.py", line 385, in log_metric
+2026-01-27 16:03:21.472 |     self.store.log_metric(run_id, metric)
+2026-01-27 16:03:21.472 |   File "/home/ray/anaconda3/lib/python3.11/site-packages/mlflow/store/tracking/rest_store.py", line 727, in log_metric
+2026-01-27 16:03:21.472 |     LogMetric(
+2026-01-27 16:03:21.472 | TypeError: 'float' object cannot be interpreted as an integer
+2026-01-27 16:03:21.472 | Traceback (most recent call last):
+2026-01-27 16:03:21.472 |   File "/home/ray/anaconda3/lib/python3.11/site-packages/ray/tune/execution/tune_controller.py", line 1220, in _on_result
+2026-01-27 16:03:21.472 |     on_result(trial, *args, **kwargs)
+2026-01-27 16:03:21.472 |   File "/home/ray/anaconda3/lib/python3.11/site-packages/ray/tune/execution/tune_controller.py", line 1519, in _on_training_result
+2026-01-27 16:03:21.472 |     self._process_trial_results(trial, result)
+2026-01-27 16:03:21.472 |   File "/home/ray/anaconda3/lib/python3.11/site-packages/ray/tune/execution/tune_controller.py", line 1532, in _process_trial_results
+2026-01-27 16:03:21.472 |     decision = self._process_trial_result(trial, result)
+2026-01-27 16:03:21.472 |                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-01-27 16:03:21.472 |   File "/home/ray/anaconda3/lib/python3.11/site-packages/ray/tune/execution/tune_controller.py", line 1590, in _process_trial_result
+2026-01-27 16:03:21.472 |     self._callbacks.on_trial_result(
+2026-01-27 16:03:21.472 |   File "/home/ray/anaconda3/lib/python3.11/site-packages/ray/tune/callback.py", line 410, in on_trial_result
+2026-01-27 16:03:21.472 |     callback.on_trial_result(**info)
+2026-01-27 16:03:21.472 |   File "/home/ray/anaconda3/lib/python3.11/site-packages/ray/tune/logger/logger.py", line 142, in on_trial_result
+2026-01-27 16:03:21.472 |     self.log_trial_result(iteration, trial, result)
+2026-01-27 16:03:21.472 |   File "/home/ray/anaconda3/lib/python3.11/site-packages/ray/air/integrations/mlflow.py", line 320, in log_trial_result
+2026-01-27 16:03:21.472 |     self.mlflow_util.log_metrics(run_id=run_id, metrics_to_log=result, step=step)
+2026-01-27 16:03:21.472 |   File "/home/ray/anaconda3/lib/python3.11/site-packages/ray/air/_internal/mlflow.py", line 297, in log_metrics
+2026-01-27 16:03:21.472 |     client.log_metric(run_id=run_id, key=key, value=value, step=step)
+2026-01-27 16:03:21.472 |   File "/home/ray/anaconda3/lib/python3.11/site-packages/mlflow/tracking/client.py", line 2079, in log_metric
+2026-01-27 16:03:21.472 |     return self._tracking_client.log_metric(
+2026-01-27 16:03:21.472 |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-01-27 16:03:21.472 |   File "/home/ray/anaconda3/lib/python3.11/site-packages/mlflow/telemetry/track.py", line 30, in wrapper
+2026-01-27 16:03:21.472 |     result = func(*args, **kwargs)
+2026-01-27 16:03:21.472 |              ^^^^^^^^^^^^^^^^^^^^^
+2026-01-27 16:03:21.472 |   File "/home/ray/anaconda3/lib/python3.11/site-packages/mlflow/tracking/_tracking_service/client.py", line 385, in log_metric
+2026-01-27 16:03:21.472 |     self.store.log_metric(run_id, metric)
+2026-01-27 16:03:21.472 |   File "/home/ray/anaconda3/lib/python3.11/site-packages/mlflow/store/tracking/rest_store.py", line 727, in log_metric
+2026-01-27 16:03:21.472 |     LogMetric(
+2026-01-27 16:03:21.472 | TypeError: 'float' object cannot be interpreted as an integer
+2026-01-27 16:03:21.472 | 
+2026-01-27 16:03:21.472 | During handling of the above exception, another exception occurred:
+2026-01-27 16:03:21.472 | 
+2026-01-27 16:03:21.472 | Traceback (most recent call last):
+2026-01-27 16:03:21.472 |   File "/home/ray/app/repo/k3s/kuberay/main.py", line 211, in train
+2026-01-27 16:03:21.472 |     best_config = tuner.tune_model(
+2026-01-27 16:03:21.472 |                   ^^^^^^^^^^^^^^^^^
+2026-01-27 16:03:21.472 |   File "/home/ray/app/.worktrees/441d133f7e20c1136f7e09adfb600b3a8fd5b182/k3s/kuberay/tuning/xgboost.py", line 220, in tune_model
+2026-01-27 16:03:21.472 |     results = tuner.fit()
+2026-01-27 16:03:21.472 |               ^^^^^^^^^^^
+2026-01-27 16:03:21.472 |   File "/home/ray/anaconda3/lib/python3.11/site-packages/ray/tune/tuner.py", line 345, in fit
+2026-01-27 16:03:21.472 |     return self._local_tuner.fit()
+2026-01-27 16:03:21.472 |            ^^^^^^^^^^^^^^^^^^^^^^^
+2026-01-27 16:03:21.472 |   File "/home/ray/anaconda3/lib/python3.11/site-packages/ray/tune/impl/tuner_internal.py", line 506, in fit
+2026-01-27 16:03:21.472 |     analysis = self._fit_internal(trainable, param_space)
+2026-01-27 16:03:21.472 |                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-01-27 16:03:21.472 |   File "/home/ray/anaconda3/lib/python3.11/site-packages/ray/tune/impl/tuner_internal.py", line 622, in _fit_internal
+2026-01-27 16:03:21.472 |     analysis = run(
+2026-01-27 16:03:21.472 |                ^^^^
+2026-01-27 16:03:21.472 |   File "/home/ray/anaconda3/lib/python3.11/site-packages/ray/tune/tune.py", line 994, in run
+2026-01-27 16:03:21.472 |     runner.step()
+2026-01-27 16:03:21.472 |   File "/home/ray/anaconda3/lib/python3.11/site-packages/ray/tune/execution/tune_controller.py", line 685, in step
+2026-01-27 16:03:21.473 |     if not self._actor_manager.next(timeout=0.1):
+2026-01-27 16:03:21.473 |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-01-27 16:03:21.473 |   File "/home/ray/anaconda3/lib/python3.11/site-packages/ray/air/execution/_internal/actor_manager.py", line 223, in next
+2026-01-27 16:03:21.473 |     self._actor_task_events.resolve_future(future)
+2026-01-27 16:03:21.473 |   File "/home/ray/anaconda3/lib/python3.11/site-packages/ray/air/execution/_internal/event_manager.py", line 118, in resolve_future
+2026-01-27 16:03:21.473 |     on_result(result)
+2026-01-27 16:03:21.473 |   File "/home/ray/anaconda3/lib/python3.11/site-packages/ray/air/execution/_internal/actor_manager.py", line 766, in on_result
+2026-01-27 16:03:21.473 |     self._actor_task_resolved(
+2026-01-27 16:03:21.473 |   File "/home/ray/anaconda3/lib/python3.11/site-packages/ray/air/execution/_internal/actor_manager.py", line 299, in _actor_task_resolved
+2026-01-27 16:03:21.473 |     tracked_actor_task._on_result(tracked_actor, result)
+2026-01-27 16:03:21.473 |   File "/home/ray/anaconda3/lib/python3.11/site-packages/ray/tune/execution/tune_controller.py", line 1229, in _on_result
+2026-01-27 16:03:21.473 |     raise TuneError(traceback.format_exc())
+2026-01-27 16:03:21.473 | ray.tune.error.TuneError: Traceback (most recent call last):
+2026-01-27 16:03:21.473 |   File "/home/ray/anaconda3/lib/python3.11/site-packages/ray/tune/execution/tune_controller.py", line 1220, in _on_result
+2026-01-27 16:03:21.473 |     on_result(trial, *args, **kwargs)
+2026-01-27 16:03:21.473 |   File "/home/ray/anaconda3/lib/python3.11/site-packages/ray/tune/execution/tune_controller.py", line 1519, in _on_training_result
+2026-01-27 16:03:21.473 |     self._process_trial_results(trial, result)
+2026-01-27 16:03:21.473 |   File "/home/ray/anaconda3/lib/python3.11/site-packages/ray/tune/execution/tune_controller.py", line 1532, in _process_trial_results
+2026-01-27 16:03:21.473 |     decision = self._process_trial_result(trial, result)
+2026-01-27 16:03:21.473 |                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-01-27 16:03:21.473 |   File "/home/ray/anaconda3/lib/python3.11/site-packages/ray/tune/execution/tune_controller.py", line 1590, in _process_trial_result
+2026-01-27 16:03:21.473 |     self._callbacks.on_trial_result(
+2026-01-27 16:03:21.473 |   File "/home/ray/anaconda3/lib/python3.11/site-packages/ray/tune/callback.py", line 410, in on_trial_result
+2026-01-27 16:03:21.473 |     callback.on_trial_result(**info)
+2026-01-27 16:03:21.473 |   File "/home/ray/anaconda3/lib/python3.11/site-packages/ray/tune/logger/logger.py", line 142, in on_trial_result
+2026-01-27 16:03:21.473 |     self.log_trial_result(iteration, trial, result)
+2026-01-27 16:03:21.473 |   File "/home/ray/anaconda3/lib/python3.11/site-packages/ray/air/integrations/mlflow.py", line 320, in log_trial_result
+2026-01-27 16:03:21.473 |     self.mlflow_util.log_metrics(run_id=run_id, metrics_to_log=result, step=step)
+2026-01-27 16:03:21.473 |   File "/home/ray/anaconda3/lib/python3.11/site-packages/ray/air/_internal/mlflow.py", line 297, in log_metrics
+2026-01-27 16:03:21.473 |     client.log_metric(run_id=run_id, key=key, value=value, step=step)
+2026-01-27 16:03:21.473 |   File "/home/ray/anaconda3/lib/python3.11/site-packages/mlflow/tracking/client.py", line 2079, in log_metric
+2026-01-27 16:03:21.473 |     return self._tracking_client.log_metric(
+2026-01-27 16:03:21.473 |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-01-27 16:03:21.473 |   File "/home/ray/anaconda3/lib/python3.11/site-packages/mlflow/telemetry/track.py", line 30, in wrapper
+2026-01-27 16:03:21.473 |     result = func(*args, **kwargs)
+2026-01-27 16:03:21.473 |              ^^^^^^^^^^^^^^^^^^^^^
+2026-01-27 16:03:21.473 |   File "/home/ray/anaconda3/lib/python3.11/site-packages/mlflow/tracking/_tracking_service/client.py", line 385, in log_metric
+2026-01-27 16:03:21.473 |     self.store.log_metric(run_id, metric)
+2026-01-27 16:03:21.473 |   File "/home/ray/anaconda3/lib/python3.11/site-packages/mlflow/store/tracking/rest_store.py", line 727, in log_metric
+2026-01-27 16:03:21.473 |     LogMetric(
+2026-01-27 16:03:21.473 | TypeError: 'float' object cannot be interpreted as an integer
+2026-01-27 16:03:21.473 | 
+2026-01-27 16:03:21.473 | Traceback (most recent call last):
+2026-01-27 16:03:21.473 |   File "/home/ray/anaconda3/lib/python3.11/site-packages/ray/tune/execution/tune_controller.py", line 1220, in _on_result
+2026-01-27 16:03:21.473 |     on_result(trial, *args, **kwargs)
+2026-01-27 16:03:21.473 |   File "/home/ray/anaconda3/lib/python3.11/site-packages/ray/tune/execution/tune_controller.py", line 1519, in _on_training_result
+2026-01-27 16:03:21.473 |     self._process_trial_results(trial, result)
+2026-01-27 16:03:21.473 |   File "/home/ray/anaconda3/lib/python3.11/site-packages/ray/tune/execution/tune_controller.py", line 1532, in _process_trial_results
+2026-01-27 16:03:21.473 |     decision = self._process_trial_result(trial, result)
+2026-01-27 16:03:21.473 |                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-01-27 16:03:21.473 |   File "/home/ray/anaconda3/lib/python3.11/site-packages/ray/tune/execution/tune_controller.py", line 1590, in _process_trial_result
+2026-01-27 16:03:21.473 |     self._callbacks.on_trial_result(
+2026-01-27 16:03:21.473 |   File "/home/ray/anaconda3/lib/python3.11/site-packages/ray/tune/callback.py", line 410, in on_trial_result
+2026-01-27 16:03:21.473 |     callback.on_trial_result(**info)
+2026-01-27 16:03:21.473 |   File "/home/ray/anaconda3/lib/python3.11/site-packages/ray/tune/logger/logger.py", line 142, in on_trial_result
+2026-01-27 16:03:21.473 |     self.log_trial_result(iteration, trial, result)
+2026-01-27 16:03:21.473 |   File "/home/ray/anaconda3/lib/python3.11/site-packages/ray/air/integrations/mlflow.py", line 320, in log_trial_result
+2026-01-27 16:03:21.473 |     self.mlflow_util.log_metrics(run_id=run_id, metrics_to_log=result, step=step)
+2026-01-27 16:03:21.473 |   File "/home/ray/anaconda3/lib/python3.11/site-packages/ray/air/_internal/mlflow.py", line 297, in log_metrics
+2026-01-27 16:03:21.473 |     client.log_metric(run_id=run_id, key=key, value=value, step=step)
+2026-01-27 16:03:21.473 |   File "/home/ray/anaconda3/lib/python3.11/site-packages/mlflow/tracking/client.py", line 2079, in log_metric
+2026-01-27 16:03:21.473 |     return self._tracking_client.log_metric(
+2026-01-27 16:03:21.473 |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-01-27 16:03:21.473 |   File "/home/ray/anaconda3/lib/python3.11/site-packages/mlflow/telemetry/track.py", line 30, in wrapper
+2026-01-27 16:03:21.473 |     result = func(*args, **kwargs)
+2026-01-27 16:03:21.473 |              ^^^^^^^^^^^^^^^^^^^^^
+2026-01-27 16:03:21.473 |   File "/home/ray/anaconda3/lib/python3.11/site-packages/mlflow/tracking/_tracking_service/client.py", line 385, in log_metric
+2026-01-27 16:03:21.473 |     self.store.log_metric(run_id, metric)
+2026-01-27 16:03:21.473 |   File "/home/ray/anaconda3/lib/python3.11/site-packages/mlflow/store/tracking/rest_store.py", line 727, in log_metric
+2026-01-27 16:03:21.473 |     LogMetric(
+2026-01-27 16:03:21.473 | TypeError: 'float' object cannot be interpreted as an integer
+2026-01-27 16:03:21.473 | 
+2026-01-27 16:03:21.473 | During handling of the above exception, another exception occurred:
+2026-01-27 16:03:21.473 | 
+2026-01-27 16:03:21.473 | Traceback (most recent call last):
+2026-01-27 16:03:21.473 |   File "/home/ray/app/repo/k3s/kuberay/main.py", line 308, in <module>
+2026-01-27 16:03:21.473 |     main()
+2026-01-27 16:03:21.473 |   File "/home/ray/app/repo/k3s/kuberay/main.py", line 305, in main
+2026-01-27 16:03:21.473 |     model.train()
+2026-01-27 16:03:21.473 |   File "/home/ray/app/repo/k3s/kuberay/main.py", line 211, in train
+2026-01-27 16:03:21.473 |     best_config = tuner.tune_model(
+2026-01-27 16:03:21.473 |                   ^^^^^^^^^^^^^^^^^
+2026-01-27 16:03:21.473 |   File "/home/ray/app/.worktrees/441d133f7e20c1136f7e09adfb600b3a8fd5b182/k3s/kuberay/tuning/xgboost.py", line 220, in tune_model
+2026-01-27 16:03:21.473 |     results = tuner.fit()
+2026-01-27 16:03:21.473 |               ^^^^^^^^^^^
+2026-01-27 16:03:21.473 |   File "/home/ray/anaconda3/lib/python3.11/site-packages/ray/tune/tuner.py", line 345, in fit
+2026-01-27 16:03:21.473 |     return self._local_tuner.fit()
+2026-01-27 16:03:21.473 |            ^^^^^^^^^^^^^^^^^^^^^^^
+2026-01-27 16:03:21.473 |   File "/home/ray/anaconda3/lib/python3.11/site-packages/ray/tune/impl/tuner_internal.py", line 506, in fit
+2026-01-27 16:03:21.473 |     analysis = self._fit_internal(trainable, param_space)
+2026-01-27 16:03:21.473 |                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-01-27 16:03:21.473 |   File "/home/ray/anaconda3/lib/python3.11/site-packages/ray/tune/impl/tuner_internal.py", line 622, in _fit_internal
+2026-01-27 16:03:21.473 |     analysis = run(
+2026-01-27 16:03:21.473 |                ^^^^
+2026-01-27 16:03:21.473 |   File "/home/ray/anaconda3/lib/python3.11/site-packages/ray/tune/tune.py", line 994, in run
+2026-01-27 16:03:21.473 |     runner.step()
+2026-01-27 16:03:21.473 |   File "/home/ray/anaconda3/lib/python3.11/site-packages/ray/tune/execution/tune_controller.py", line 685, in step
+2026-01-27 16:03:21.473 |     if not self._actor_manager.next(timeout=0.1):
+2026-01-27 16:03:21.473 |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-01-27 16:03:21.473 |   File "/home/ray/anaconda3/lib/python3.11/site-packages/ray/air/execution/_internal/actor_manager.py", line 223, in next
+2026-01-27 16:03:21.473 |     self._actor_task_events.resolve_future(future)
+2026-01-27 16:03:21.473 |   File "/home/ray/anaconda3/lib/python3.11/site-packages/ray/air/execution/_internal/event_manager.py", line 118, in resolve_future
+2026-01-27 16:03:21.473 |     on_result(result)
+2026-01-27 16:03:21.473 |   File "/home/ray/anaconda3/lib/python3.11/site-packages/ray/air/execution/_internal/actor_manager.py", line 766, in on_result
+2026-01-27 16:03:21.473 |     self._actor_task_resolved(
+2026-01-27 16:03:21.473 |   File "/home/ray/anaconda3/lib/python3.11/site-packages/ray/air/execution/_internal/actor_manager.py", line 299, in _actor_task_resolved
+2026-01-27 16:03:21.473 |     tracked_actor_task._on_result(tracked_actor, result)
+2026-01-27 16:03:21.473 |   File "/home/ray/anaconda3/lib/python3.11/site-packages/ray/tune/execution/tune_controller.py", line 1229, in _on_result
+2026-01-27 16:03:21.473 |     raise TuneError(traceback.format_exc())
+2026-01-27 16:03:21.473 | ray.tune.error.TuneError: Traceback (most recent call last):
+2026-01-27 16:03:21.473 |   File "/home/ray/anaconda3/lib/python3.11/site-packages/ray/tune/execution/tune_controller.py", line 1220, in _on_result
+2026-01-27 16:03:21.473 |     on_result(trial, *args, **kwargs)
+2026-01-27 16:03:21.473 |   File "/home/ray/anaconda3/lib/python3.11/site-packages/ray/tune/execution/tune_controller.py", line 1519, in _on_training_result
+2026-01-27 16:03:21.473 |     self._process_trial_results(trial, result)
+2026-01-27 16:03:21.473 |   File "/home/ray/anaconda3/lib/python3.11/site-packages/ray/tune/execution/tune_controller.py", line 1532, in _process_trial_results
+2026-01-27 16:03:21.473 |     decision = self._process_trial_result(trial, result)
+2026-01-27 16:03:21.473 |                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-01-27 16:03:21.473 |   File "/home/ray/anaconda3/lib/python3.11/site-packages/ray/tune/execution/tune_controller.py", line 1590, in _process_trial_result
+2026-01-27 16:03:21.473 |     self._callbacks.on_trial_result(
+2026-01-27 16:03:21.473 |   File "/home/ray/anaconda3/lib/python3.11/site-packages/ray/tune/callback.py", line 410, in on_trial_result
+2026-01-27 16:03:21.473 |     callback.on_trial_result(**info)
+2026-01-27 16:03:21.473 |   File "/home/ray/anaconda3/lib/python3.11/site-packages/ray/tune/logger/logger.py", line 142, in on_trial_result
+2026-01-27 16:03:21.473 |     self.log_trial_result(iteration, trial, result)
+2026-01-27 16:03:21.473 |   File "/home/ray/anaconda3/lib/python3.11/site-packages/ray/air/integrations/mlflow.py", line 320, in log_trial_result
+2026-01-27 16:03:21.473 |     self.mlflow_util.log_metrics(run_id=run_id, metrics_to_log=result, step=step)
+2026-01-27 16:03:21.473 |   File "/home/ray/anaconda3/lib/python3.11/site-packages/ray/air/_internal/mlflow.py", line 297, in log_metrics
+2026-01-27 16:03:21.473 |     client.log_metric(run_id=run_id, key=key, value=value, step=step)
+2026-01-27 16:03:21.473 |   File "/home/ray/anaconda3/lib/python3.11/site-packages/mlflow/tracking/client.py", line 2079, in log_metric
+2026-01-27 16:03:21.473 |     return self._tracking_client.log_metric(
+2026-01-27 16:03:21.473 |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-01-27 16:03:21.473 |   File "/home/ray/anaconda3/lib/python3.11/site-packages/mlflow/telemetry/track.py", line 30, in wrapper
+2026-01-27 16:03:21.473 |     result = func(*args, **kwargs)
+2026-01-27 16:03:21.473 |              ^^^^^^^^^^^^^^^^^^^^^
+2026-01-27 16:03:21.473 |   File "/home/ray/anaconda3/lib/python3.11/site-packages/mlflow/tracking/_tracking_service/client.py", line 385, in log_metric
+2026-01-27 16:03:21.473 |     self.store.log_metric(run_id, metric)
+2026-01-27 16:03:21.473 |   File "/home/ray/anaconda3/lib/python3.11/site-packages/mlflow/store/tracking/rest_store.py", line 727, in log_metric
+2026-01-27 16:03:21.473 |     LogMetric(
+2026-01-27 16:03:21.473 | TypeError: 'float' object cannot be interpreted as an integer
+2026-01-27 16:03:21.473 | 
+2026-01-27 16:03:23.476 | (TrainController pid=899, ip=10.1.5.209) Started training worker group of size 1: 
+2026-01-27 16:03:23.476 | (TrainController pid=899, ip=10.1.5.209) - (ip=10.1.5.208, pid=991) world_rank=0, local_rank=0, node_rank=0
+2026-01-27 16:03:23.476 | (RayTrainWorker pid=991, ip=10.1.5.208) [14:03:11] Task [xgboost.ray-rank=00000000]:b3359de4ac13043ad4279d1102000000 got rank 0
+2026-01-27 16:03:23.476 | (RayTrainWorker pid=991, ip=10.1.5.208) Registered dataset logger for dataset dataset_29_0 [repeated 7x across cluster]
+2026-01-27 16:03:23.476 | (SplitCoordinator pid=1143, ip=10.1.5.208) Starting execution of Dataset val_24_0. Full logs are in /tmp/ray/session_2026-01-27_14-01-38_448886_1/logs/ray-data [repeated 3x across cluster]
+2026-01-27 16:03:23.476 | (SplitCoordinator pid=1143, ip=10.1.5.208) Execution plan of Dataset val_24_0: InputDataBuffer[Input] -> OutputSplitter[split(1, equal=True)] [repeated 3x across cluster]
+2026-01-27 16:03:23.476 | (SplitCoordinator pid=1143, ip=10.1.5.208) [dataset]: A new progress UI is available. To enable, set `ray.data.DataContext.get_current().enable_rich_progress_bars = True` and `ray.data.DataContext.get_current().use_ray_tqdm = False`. [repeated 5x across cluster]
+2026-01-27 16:03:23.476 | (RayTrainWorker pid=991, ip=10.1.5.208) ✔️  Dataset dataset_29_0 execution finished in 0.00 seconds [repeated 7x across cluster]
+2026-01-27 16:03:23.476 | (RayTrainWorker pid=991, ip=10.1.5.208) Exiting prefetcher's background thread [repeated 3x across cluster]
+2026-01-27 16:03:23.476 | (RayTrainWorker pid=991, ip=10.1.5.208) Reporting training result 2: TrainingReport(checkpoint=None, metrics={'validation-mlogloss': 0.9927853331963221, 'validation-merror': 0.06633333333333333, 'training_iteration': 10}, validation_spec=None) [repeated 2x across cluster]
+2026-01-27 16:03:24.478 | (RayTrainWorker pid=991, ip=10.1.5.208) Checkpoint successfully created at: Checkpoint(filesystem=s3, path=k8s-mlops-platform-bucket/v1/models/xgboost_tune_train_e25e8_00001/checkpoint_2026-01-27_14-03-13.698628)
+2026-01-27 16:03:24.478 | (RayTrainWorker pid=991, ip=10.1.5.208) Reporting training result 3: TrainingReport(checkpoint=Checkpoint(filesystem=s3, path=k8s-mlops-platform-bucket/v1/models/xgboost_tune_train_e25e8_00001/checkpoint_2026-01-27_14-03-13.698628), metrics={'validation-mlogloss': 0.9927853331963221, 'validation-merror': 0.06633333333333333, 'training_iteration': 10}, validation_spec=None)
+2026-01-27 16:03:24.478 | (RayTrainWorker pid=991, ip=10.1.5.208) [xgboost-tune] Worker train_time_sec=3.29
+2026-01-27 16:03:27.492 | 2026-01-27 14:03:27,492	ERR cli.py:73 -- ------------------------------
+2026-01-27 16:03:27.492 | 2026-01-27 14:03:27,492	ERR cli.py:74 -- Job 'kuberay-job-phhht' failed
+2026-01-27 16:03:27.492 | 2026-01-27 14:03:27,492	ERR cli.py:75 -- ------------------------------
+2026-01-27 16:03:27.492 | 2026-01-27 14:03:27,492	INFO cli.py:88 -- Status message: Job entrypoint command failed with exit code 1, last available logs (truncated to 20,000 chars):
+2026-01-27 16:03:27.492 | (RayTrainWorker pid=991, ip=10.1.5.208) Registered dataset logger for dataset dataset_29_0 [repeated 7x across cluster]
+2026-01-27 16:03:27.492 | (SplitCoordinator pid=1143, ip=10.1.5.208) Starting execution of Dataset val_24_0. Full logs are in /tmp/ray/session_2026-01-27_14-01-38_448886_1/logs/ray-data [repeated 3x across cluster]
+2026-01-27 16:03:27.492 | (SplitCoordinator pid=1143, ip=10.1.5.208) Execution plan of Dataset val_24_0: InputDataBuffer[Input] -> OutputSplitter[split(1, equal=True)] [repeated 3x across cluster]
+2026-01-27 16:03:27.492 | (SplitCoordinator pid=1143, ip=10.1.5.208) [dataset]: A new progress UI is available. To enable, set `ray.data.DataContext.get_current().enable_rich_progress_bars = True` and `ray.data.DataContext.get_current().use_ray_tqdm = False`. [repeated 5x across cluster]
+2026-01-27 16:03:27.492 | (RayTrainWorker pid=991, ip=10.1.5.208) ✔️  Dataset dataset_29_0 execution finished in 0.00 seconds [repeated 7x across cluster]
+2026-01-27 16:03:27.492 | (RayTrainWorker pid=991, ip=10.1.5.208) Exiting prefetcher's background thread [repeated 3x across cluster]
+2026-01-27 16:03:27.492 | (RayTrainWorker pid=991, ip=10.1.5.208) Reporting training result 2: TrainingReport(checkpoint=None, metrics={'validation-mlogloss': 0.9927853331963221, 'validation-merror': 0.06633333333333333, 'training_iteration': 10}, validation_spec=None) [repeated 2x across cluster]
+2026-01-27 16:03:27.492 | (RayTrainWorker pid=991, ip=10.1.5.208) Checkpoint successfully created at: Checkpoint(filesystem=s3, path=k8s-mlops-platform-bucket/v1/models/xgboost_tune_train_e25e8_00001/checkpoint_2026-01-27_14-03-13.698628)
+2026-01-27 16:03:27.493 | (RayTrainWorker pid=991, ip=10.1.5.208) Reporting training result 3: TrainingReport(checkpoint=Checkpoint(filesystem=s3, path=k8s-mlops-platform-bucket/v1/models/xgboost_tune_train_e25e8_00001/checkpoint_2026-01-27_14-03-13.698628), metrics={'validation-mlogloss': 0.9927853331963221, 'validation-merror': 0.06633333333333333, 'training_iteration': 10}, validation_spec=None)
+2026-01-27 16:03:27.493 | (RayTrainWorker pid=991, ip=10.1.5.208) [xgboost-tune] Worker train_time_sec=3.29
+2026-01-27 16:03:27.493 | 

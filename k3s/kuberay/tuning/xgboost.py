@@ -176,13 +176,17 @@ def tune_model(
         )
         result = trainer.fit()
         metrics = getattr(result, "metrics", None) or {}
-        tune.report(
-            {
-                k: float(v)
-                for k, v in metrics.items()
-                if isinstance(v, numbers.Real) and not isinstance(v, bool)
-            }
-        )
+        report_dict: Dict[str, numbers.Real] = {}
+        for k, v in metrics.items():
+            if not isinstance(v, numbers.Real) or isinstance(v, bool):
+                continue
+            # MLflow expects `step` to be an int; Ray's MLflowLoggerCallback uses
+            # `training_iteration` as the step.
+            if k in ("training_iteration", "epoch", "step"):
+                report_dict[k] = int(v)
+            else:
+                report_dict[k] = float(v)
+        tune.report(report_dict)
 
     # IMPORTANT:
     # Do NOT reserve `num_workers * cpus_per_worker` on the Tune trial actor.
