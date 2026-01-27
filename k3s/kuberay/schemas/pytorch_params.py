@@ -20,7 +20,7 @@ PYTORCH_PARAMS: Dict[str, Any] = {
 PYTORCH_TUNE_SETTINGS: Dict[str, int] = {
     "grace_period": 5,
     "reduction_factor": 2,
-    "max_epochs": 50,
+    "max_epochs": 10,
 }
 
 SEARCH_SPACE_PYTORCH_PARAMS: Dict[str, Any] = {

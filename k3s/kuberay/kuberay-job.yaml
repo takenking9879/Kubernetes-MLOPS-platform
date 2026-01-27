@@ -21,7 +21,7 @@ spec:
       CPUS_PER_TRIAL: "8"
       # With ~13GB RAM total, 4GB/trial typically allows 2 concurrent trials safely.
       # Start conservative to avoid Ray OOM kills; increase to 2 once stable.
-      MAX_CONCURRENT_TRIALS: "1"
+      MAX_CONCURRENT_TRIALS: "2"
 
       # Hard caps to prevent per-trial pandas materializations from OOM'ing.
       # Tune loads Ray Datasets inside each trial.

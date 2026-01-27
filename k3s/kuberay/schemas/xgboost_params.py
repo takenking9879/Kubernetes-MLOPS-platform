@@ -28,7 +28,7 @@ XGBOOST_PARAMS: Dict[str, Any] = {
 
 # Ray Tune scheduler settings.
 XGBOOST_TUNE_SETTINGS: Dict[str, int] = {
-  "num_boost_round": 50,
+  "num_boost_round": 10,
   "grace_period": 5,
   "reduction_factor": 2,
 }

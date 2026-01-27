@@ -5,22 +5,23 @@ Supports cheap HPT with ASHA + ResourceChangingScheduler.
 
 import os
 import numbers
+from time import time
 from typing import Dict
-
+import logging
 import xgboost
 import ray
 import ray.train
 from ray import tune
 from ray.train import ScalingConfig
 from ray.tune import RunConfig
-from ray.train.xgboost import RayTrainReportCallback, XGBoostTrainer
+from ray.train.xgboost import XGBoostTrainer
 from ray.air.integrations.mlflow import MLflowLoggerCallback
 from ray.tune.schedulers import ASHAScheduler, ResourceChangingScheduler
 
 from schemas.xgboost_params import SEARCH_SPACE_XGBOOST_PARAMS, XGBOOST_TUNE_SETTINGS
-from helpers.xgboost_utils import get_train_val_dmatrix, run_xgboost_train
+from helpers.xgboost_utils import get_train_val_dmatrix, run_xgboost_train, RayTrainPeriodicReportCheckpointCallback
 
-
+logger = logging.getLogger(__name__)
 CHECKPOINT_FILENAME = "xgb_checkpoint.json"
 
 # --------------------------------------------------
@@ -44,30 +45,27 @@ def train_func(config: Dict):
 
     # IMPORTANT (Ray docs): if num_cpus isn't set on the worker, Ray defaults
     # to OMP_NUM_THREADS=1. We set it explicitly to actually use the allocated CPUs.
-    for var in (
-        "OMP_NUM_THREADS",
-        "MKL_NUM_THREADS",
-        "OPENBLAS_NUM_THREADS",
-        "NUMEXPR_NUM_THREADS",
-        "VECLIB_MAXIMUM_THREADS",
-    ):
-        os.environ[var] = str(cpus_per_worker)
 
     params["nthread"] = cpus_per_worker
     params["num_class"] = num_classes
 
+    start_time = time.perf_counter()
     run_xgboost_train(
         params=params,
         dtrain=dtrain,
         dval=dval,
         num_boost_round=num_boost_round,
         callbacks=[
-            RayTrainReportCallback(
+            RayTrainPeriodicReportCheckpointCallback(
                 metrics=["validation-mlogloss", "validation-merror"],
-                frequency=1,
+                report_every=5,
+                checkpoint_every=50,
+                filename="model.ubj",
             ),
         ],
     )
+    train_time_sec = time.perf_counter() - start_time
+    logger.info(f"[xgboost-tune] Worker train_time_sec={train_time_sec:.2f}")
 
 # --------------------------------------------------
 # Tuning entrypoint
