@@ -10,7 +10,7 @@ import ray
 from ray import tune
 from ray.train.torch import TorchTrainer
 from ray.train import ScalingConfig
-from ray.train import RunConfig
+from ray.tune import RunConfig
 from ray.tune.schedulers import ASHAScheduler, ResourceChangingScheduler
 from typing import Dict
 
@@ -132,7 +132,7 @@ def tune_model(
             train_loop_config=train_loop_config,
             scaling_config=scaling_config,
             datasets={"train": train_dataset, "val": val_dataset},
-            run_config=RunConfig(
+            run_config=ray.train.RunConfig(
                 storage_path=storage_path,
                 name=f"{name}_train_{trial_id}",
             ),
