@@ -8,30 +8,26 @@ import tempfile
 import importlib
 from typing import Dict
 from starlette.requests import Request
-from kuberay.utils import create_logger, BaseUtils
+from k3s.kuberay.utils import create_logger, BaseUtils
 
-from inference.modules.preprocessor import InferencePreprocessor
-from inference.modules.pytorch import PyTorchHandler
-from inference.modules.xgboost import XGBoostHandler
-# Export variables
-FRAMEWORK = os.getenv("FRAMEWORK", "xgboost")
-MODEL_BUCKET = os.getenv("MODEL_BUCKET", "mlops-platform")
-# Defaults assume standard paths
-MODEL_KEY = os.getenv("MODEL_KEY", f"models/model_{FRAMEWORK}.pkl")
-ARTIFACTS_KEY = os.getenv("ARTIFACTS_KEY", "processed/pipeline_model.json")
+from k3s.kuberay.inference.modules.preprocessor import InferencePreprocessor
+from k3s.kuberay.inference.modules.pytorch import PyTorchHandler
+from k3s.kuberay.inference.modules.xgboost import XGBoostHandler
 
 @serve.deployment(num_replicas=1, ray_actor_options={"num_cpus": 1})
 class InferenceService(BaseUtils):
     def __init__(self, params_path: str, artifacts_path: str):
         logger = create_logger("InferenceService")
         super().__init__(logger, params_path)
-        self.params = self.load_params(params_path)['kuberay']['model']
-        self.framework = self.params.get("framework", "xgboost")
+        self.params = self.load_params().get('kuberay', {}).get('model', {})
+        self.framework = os.getenv("FRAMEWORK", self.params.get("framework", "xgboost"))
         self.s3_client = self._init_s3()
         self.bucket = os.getenv("S3_BUCKET_NAME", "k8s-mlops-platform-bucket")
         # Download resources
-        self.model_path = self._download_file(f"models/model_{self.framework}.pkl", f"model_{self.framework}.pkl")
-        self.artifacts_path = self._download_file(artifacts_path)
+        model_key = os.getenv("MODEL_KEY", f"models/model_{self.framework}.pkl")
+        artifacts_key = os.getenv("ARTIFACTS_KEY", artifacts_path)
+        self.model_path = self._download_file(model_key, f"model_{self.framework}.pkl")
+        self.artifacts_path = self._download_file(artifacts_key, "pipeline_model.json")
         
         # Initialize components
         self.preprocessor = InferencePreprocessor(self.artifacts_path)

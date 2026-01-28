@@ -50,10 +50,9 @@ class InferencePreprocessor:
             scaler = self.artifacts['scaler']
             for col_name in self.num_cols:
                 stats = scaler.get(col_name, {"mean": 0.0, "std": 1.0})
-            mean = stats['mean']
-            std = stats['std'] if stats['std'] != 0 else 1.0
-            
-            df[f'{col_name}_norm'] = (df[col_name] - mean) / std
+                mean = stats.get('mean', 0.0)
+                std = stats.get('std', 1.0) or 1.0
+                df[f'{col_name}_norm'] = (df[col_name] - mean) / std
             return df
         except Exception as e:
             raise RuntimeError(f"Scaling failed: {e}")

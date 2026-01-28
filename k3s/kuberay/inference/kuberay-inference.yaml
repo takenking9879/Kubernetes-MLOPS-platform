@@ -118,22 +118,3 @@ spec:
               - name: job-files
                 emptyDir: {}
 
----
-# Service LoadBalancer para exponer Ray Serve
-# Apuntamos al servicio estable que el operador crea automáticamente
-apiVersion: v1
-kind: Service
-metadata:
-  name: inference-external
-  namespace: ray
-spec:
-  type: LoadBalancer
-  ports:
-  - name: http
-    port: 80
-    targetPort: 8000 # Puerto de Ray Serve
-  selector:
-    # Este label lo añade el operador RayService a todos sus pods
-    ray.io/service: inference-service 
-    ray.io/node-type: head
-

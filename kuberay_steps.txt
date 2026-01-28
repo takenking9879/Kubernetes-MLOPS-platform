@@ -33,3 +33,42 @@ kubectl port-forward kuberay-job-xv4md-head-72sw9 8265:8265 -n ray
 kubectl apply -f k3s/kuberay/kuberay-job.yaml
 
 kubectl delete rayjob kuberay-job -n ray
+
+## inferencia
+
+# ================================
+# FASE 1: Serving (Ray Serve) sin Kafka
+# ================================
+# Despliega el modelo como RayService (ClusterIP) y valida con port-forward.
+# NO usar LoadBalancer/Ingress en esta etapa.
+
+kubectl apply -f k3s/kuberay/serving/rayservice-model-serving.yaml
+
+# Ver estado
+kubectl get rayservice -n ray
+kubectl describe rayservice model-serving -n ray
+
+# Port-forward al endpoint de Ray Serve
+kubectl port-forward -n ray svc/model-serving-serve-svc 8000:8000
+
+# Prueba rápida (health)
+curl -sS http://localhost:8000/infer/healthz
+
+# Prueba inferencia (ejemplo; ajusta campos según tu pipeline)
+curl -sS -X POST http://localhost:8000/infer \
+  -H 'Content-Type: application/json' \
+  -d '{"data": [{"protocol": "tcp", "conn_state": "S0", "src_port": 443, "dst_port": 51515, "packet_count": 12, "bytes_transferred": 2048, "hour": 10, "dayofweek": 1, "is_weekend": 0, "hour_sin": 0.5, "hour_cos": 0.86}]}'
+
+# Dashboard (Serve/metrics/rollouts)
+kubectl port-forward -n ray svc/model-serving-head-svc 8265:8265
+# Abrir: http://localhost:8265/#/serve
+
+# Canary rollout (ejemplo): subir 5% de tráfico a CanaryModel
+# 1) Edita k3s/kuberay/serving/rayservice-model-serving.yaml
+# 2) cambia canary_probability: 0.05
+# 3) kubectl apply -f k3s/kuberay/serving/rayservice-model-serving.yaml
+
+# ================================
+# FASE 2: Streaming desacoplado (Kafka -> microservicio -> Ray Serve -> Kafka)
+# ================================
+# Se implementa como componente separado (NO dentro de Ray Serve).

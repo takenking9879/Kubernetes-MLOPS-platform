@@ -1,0 +1,185 @@
+apiVersion: ray.io/v1
+kind: RayService
+metadata:
+  name: model-serving
+  namespace: ray
+spec:
+  # Conservative health thresholds for model loading + cold starts.
+  serviceUnhealthySecondThreshold: 900
+  deploymentUnhealthySecondThreshold: 900
+
+  # Ray Serve application: serving only (no Kafka).
+  serveConfigV2: |
+    applications:
+      - name: inference
+        import_path: k3s.kuberay.serving.app:deployment_graph
+        route_prefix: /infer
+        deployments:
+          - name: ModelRouter
+            ray_actor_options:
+              num_cpus: 0.1
+            user_config:
+              canary_probability: 0.0
+          - name: StableModel
+            ray_actor_options:
+              num_cpus: 1
+            autoscaling_config:
+              min_replicas: 1
+              initial_replicas: 1
+              max_replicas: 10
+              target_ongoing_requests: 8
+              upscale_delay_s: 1
+              downscale_delay_s: 30
+            user_config:
+              framework: xgboost
+              model_key: models/model_xgboost.pkl
+              artifacts_key: processed/pipeline_model.json
+          - name: CanaryModel
+            ray_actor_options:
+              num_cpus: 1
+            autoscaling_config:
+              min_replicas: 0
+              initial_replicas: 0
+              max_replicas: 3
+              target_ongoing_requests: 8
+              upscale_delay_s: 1
+              downscale_delay_s: 30
+            user_config:
+              framework: xgboost
+              # Point this at your canary artifact when you have one.
+              model_key: models/model_xgboost_canary.pkl
+              artifacts_key: processed/pipeline_model.json
+
+  rayClusterConfig:
+    rayVersion: "2.52.0"
+    enableInTreeAutoscaling: true
+    autoscalerOptions:
+      version: v2
+      upscalingMode: Default
+      idleTimeoutSeconds: 60
+
+    headGroupSpec:
+      rayStartParams:
+        dashboard-host: "0.0.0.0"
+        # Best practice: keep head free of CPU workloads.
+        num-cpus: "0"
+      template:
+        spec:
+          containers:
+            - name: ray-head
+              image: ray-cluster:2.52.0
+              ports:
+                - containerPort: 6379
+                  name: gcs-server
+                - containerPort: 8265
+                  name: dashboard
+                - containerPort: 10001
+                  name: client
+                - containerPort: 8000
+                  name: serve
+              envFrom:
+                - secretRef:
+                    name: env-secret
+              env:
+                - name: PYTHONPATH
+                  value: /home/ray/app/repo
+              resources:
+                requests:
+                  cpu: "1"
+                  memory: "3Gi"
+                limits:
+                  cpu: "2"
+                  memory: "4Gi"
+              volumeMounts:
+                - name: job-files
+                  mountPath: /home/ray/app
+
+          initContainers:
+            - name: git-sync
+              image: registry.k8s.io/git-sync/git-sync:v4.1.0
+              resources:
+                requests:
+                  cpu: 100m
+                  memory: 128Mi
+                limits:
+                  cpu: 200m
+                  memory: 256Mi
+              env:
+                - name: GITSYNC_REPO
+                  value: "https://github.com/takenking9879/Kubernetes-MLOPS-platform"
+                - name: GIT_SYNC_BRANCH
+                  value: "main"
+                - name: GIT_SYNC_ROOT
+                  value: "/git"
+                - name: GIT_SYNC_DEST
+                  value: "repo"
+                - name: GIT_SYNC_WAIT
+                  value: "30"
+                - name: GITSYNC_ONE_TIME
+                  value: "true"
+              volumeMounts:
+                - name: job-files
+                  mountPath: /git
+
+          volumes:
+            - name: job-files
+              emptyDir: {}
+
+    workerGroupSpecs:
+      - groupName: serve-workers
+        replicas: 1
+        minReplicas: 0
+        maxReplicas: 4
+        rayStartParams: {}
+        template:
+          spec:
+            containers:
+              - name: ray-worker
+                image: ray-cluster:2.52.0
+                envFrom:
+                  - secretRef:
+                      name: env-secret
+                env:
+                  - name: PYTHONPATH
+                    value: /home/ray/app/repo
+                resources:
+                  requests:
+                    cpu: "2"
+                    memory: "4Gi"
+                  limits:
+                    cpu: "4"
+                    memory: "6Gi"
+                volumeMounts:
+                  - name: job-files
+                    mountPath: /home/ray/app
+
+            initContainers:
+              - name: git-sync
+                image: registry.k8s.io/git-sync/git-sync:v4.1.0
+                resources:
+                  requests:
+                    cpu: 100m
+                    memory: 128Mi
+                  limits:
+                    cpu: 200m
+                    memory: 256Mi
+                env:
+                  - name: GITSYNC_REPO
+                    value: "https://github.com/takenking9879/Kubernetes-MLOPS-platform"
+                  - name: GIT_SYNC_BRANCH
+                    value: "main"
+                  - name: GIT_SYNC_ROOT
+                    value: "/git"
+                  - name: GIT_SYNC_DEST
+                    value: "repo"
+                  - name: GIT_SYNC_WAIT
+                    value: "30"
+                  - name: GITSYNC_ONE_TIME
+                    value: "true"
+                volumeMounts:
+                  - name: job-files
+                    mountPath: /git
+
+            volumes:
+              - name: job-files
+                emptyDir: {}
