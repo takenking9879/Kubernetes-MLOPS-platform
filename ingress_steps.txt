@@ -1,0 +1,5 @@
+
+##### Controller
+# Instalar el controller ingress
+helm upgrade --install ingress-nginx ingress-nginx --repo https://kubernetes.github.io/ingress-nginx --namespace ingress-nginx --create-namespace
+helm upgrade --install platform-ingress ./k3s/ingress -f k3s/ingress/values.yaml

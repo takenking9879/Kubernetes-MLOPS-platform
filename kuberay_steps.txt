@@ -34,7 +34,7 @@ kubectl apply -f k3s/kuberay/kuberay-job.yaml
 
 kubectl delete rayjob kuberay-job -n ray
 
-## inferencia
+## Serving
 
 # ================================
 # FASE 1: Serving (Ray Serve) sin Kafka

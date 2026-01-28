@@ -1,0 +1,57 @@
+{{- if .Values.ingress.enabled }}
+{{- $mode := default "cloud" .Values.ingress.mode }}
+{{- $domain := default "" .Values.ingress.domain }}
+{{- $class := .Values.ingress.ingressClassName }}
+{{- $ingressVals := (.Values.ingress | default dict) }}
+{{- $localVals := (index $ingressVals "local" | default dict) }}
+{{- $localHost := (index $localVals "host" | default "") }}
+
+{{- range $i, $resource := .Values.ingress.resources }}
+{{- if gt $i 0 }}
+---
+{{- end }}
+
+{{- $hosts := list }}
+{{- if $resource.hosts }}
+{{- $hosts = $resource.hosts }}
+{{- else if $resource.host }}
+{{- $hosts = list $resource.host }}
+{{- else }}
+{{- $subdomain := default $resource.name $resource.subdomain }}
+{{- if and (eq $mode "local") (ne $localHost "") }}
+{{- $hosts = list $localHost }}
+{{- else if ne $domain "" }}
+{{- $hosts = list (printf "%s.%s" $subdomain $domain) }}
+{{- else }}
+{{- $hosts = list $subdomain }}
+{{- end }}
+{{- end }}
+
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ $resource.name }}
+  namespace: {{ $resource.namespace }}
+  annotations:
+    kubernetes.io/ingress.class: {{ $class }}
+{{- with $resource.annotations }}
+{{ toYaml . | indent 4 }}
+{{- end }}
+spec:
+  ingressClassName: {{ $class }}
+  rules:
+{{- range $hosts }}
+    - host: {{ . | quote }}
+      http:
+        paths:
+          - path: {{ default "/" $resource.path }}
+            pathType: {{ default "Prefix" $resource.pathType }}
+            backend:
+              service:
+                name: {{ $resource.serviceName }}
+                port:
+                  number: {{ $resource.servicePort }}
+{{- end }}
+
+{{- end }}
+{{- end }}

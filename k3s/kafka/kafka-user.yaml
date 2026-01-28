@@ -3,37 +3,82 @@ kind: KafkaUser
 metadata:
   name: ml-platform
   labels:
+    # Nombre del cluster de Kafka en Strimzi
     strimzi.io/cluster: my-kafka-cluster
   namespace: kafka
+
 spec:
   authentication:
+    # Autenticación SCRAM (user/password)
     type: scram-sha-512
+
   authorization:
+    # Usamos ACLs explícitas (no RBAC amplio)
     type: simple
     acls:
-      # Example consumer Acls for topic topic-traffic using consumer group my-group
+
+      # --------------------------------------------------
+      # 1) Permisos a nivel CLUSTER
+      # Necesario para:
+      # - Kafka UI
+      # - AdminClient
+      # - Descubrir brokers, topics, metadata
+      # --------------------------------------------------
+      - resource:
+          type: cluster
+        operations:
+          - Describe
+        host: "*"
+
+      # --------------------------------------------------
+      # 2) topic-traffic (INPUT)
+      # Usado por:
+      # - Producer externo (produce eventos de tráfico)
+      # - Servicio de inferencia (consume eventos)
+      #
+      # Requiere:
+      # - Produce: Write (+ Create si el topic no existe)
+      # - Consume: Read
+      # --------------------------------------------------
       - resource:
           type: topic
           name: topic-traffic
           patternType: literal
         operations:
-          - Describe
-          - Read
+          - Create    # crear el topic si no existe
+          - Describe  # leer metadata
+          - Read      # consumir mensajes
+          - Write     # producir mensajes
         host: "*"
+
+      # --------------------------------------------------
+      # 3) Consumer Group del servicio de inferencia
+      # Representa a la APLICACIÓN que consume datos
+      #
+      # - NO lo usa el producer externo
+      # - SOLO lo usa el servicio que consume topic-traffic
+      # --------------------------------------------------
       - resource:
           type: group
-          name: my-group
+          name: ml-platform-inference
           patternType: literal
         operations:
-          - Read
+          - Read      # permitir commits de offsets
         host: "*"
-      # Example Producer Acls for topic my-topic
+
+      # --------------------------------------------------
+      # 4) topic-prediction (OUTPUT)
+      # Usado por:
+      # - Servicio de inferencia (produce predicciones)
+      #
+      # NO se consume aquí, solo se produce
+      # --------------------------------------------------
       - resource:
           type: topic
-          name: topic-traffic
+          name: topic-prediction
           patternType: literal
         operations:
-          - Create
-          - Describe
-          - Write
+          - Create    # crear el topic si no existe
+          - Describe  # metadata (Kafka UI, tooling)
+          - Write     # producir predicciones
         host: "*"

@@ -1,0 +1,74 @@
+# values.yaml
+# ... (Sección Ingress)
+ingress:
+  enabled: true
+  ingressClassName: nginx
+  # mode:
+  # - local: optimized for localhost / local clusters
+  # - cloud: uses domain + subdomain (e.g. airflow.mycompany.ai)
+  mode: local
+
+  # Cloud mode domain. Example: takenking9879.me
+  # Local mode can also use "localhost" to produce subdomains like airflow.localhost.
+  domain: localhost
+
+  # Local mode settings
+  local:
+    # When mode=local and resource.host/hosts is not set, host is derived as:
+    # - if domain is set: <subdomain>.<domain>
+    # - else: <subdomain>
+    # Recommended: keep domain=localhost so airflow.localhost, mlflow.localhost, etc.
+    enabled: true
+    # Optional: force a single host for ALL ingresses when mode=local (e.g. "localhost").
+    # If you set this, make sure each resource has a distinct `path` to avoid conflicts.
+    # host: localhost
+
+  # When true, the chart will create any namespaces referenced by `resources[].namespace`.
+  # Useful for local/dev clusters where namespaces may not exist yet.
+  # Set to false to avoid creating namespaces from this chart (recommended).
+  createNamespaces: false
+  # Optional explicit list of namespaces to create. If set, the chart will ONLY create these.
+  # This avoids Helm install failures when a namespace already exists (e.g. `kafka`).
+  namespaces:
+    - mlops-fraud
+    - spark
+    - ray
+  resources:
+    # Uncomment these when you deploy the corresponding services.
+    # - name: airflow
+    #   namespace: airflow
+    #   subdomain: airflow
+    #   serviceName: my-airflow-api-server
+    #   servicePort: 8080
+    #   path: /
+    #   pathType: Prefix
+    # - name: mlflow
+    #   namespace: ray
+    #   subdomain: mlflow
+    #   serviceName: my-mlflow
+    #   servicePort: 80
+    #   path: /
+    #   pathType: Prefix
+    # - name: spark-ui
+    #   namespace: spark
+    #   subdomain: spark
+    #   serviceName: spark-ui-service
+    #   servicePort: 8080
+    #   path: /
+    #   pathType: Prefix
+    # - name: ray-serving
+    #   namespace: ray
+    #   subdomain: serving
+    #   serviceName: model-serving-serve-svc
+    #   servicePort: 8000
+    #   path: /infer
+    #   pathType: Prefix
+    - name: kafka-ui
+      namespace: kafka
+      subdomain: kafka
+      serviceName: kafka-ui-service
+      servicePort: 8083
+      path: /
+      pathType: Prefix
+      annotations:
+        nginx.ingress.kubernetes.io/service-upstream: "true"

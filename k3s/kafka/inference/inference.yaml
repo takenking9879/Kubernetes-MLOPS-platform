@@ -1,0 +1,166 @@
+apiVersion: ray.io/v1
+kind: RayJob
+metadata:
+  name: kafka-inference-job
+  namespace: kafka
+spec:
+  entrypoint: python /home/ray/app/kafka_main.py
+  
+  # Para streaming continuo, queremos que el job corra indefinidamente
+  shutdownAfterJobFinishes: false
+  ttlSecondsAfterFinished: 86400  # 24h después de que termine (si llega a terminar)
+  
+  runtimeEnvYAML: |
+    pip:
+      - confluent-kafka==2.3.0
+    env_vars:
+      NUM_ACTORS: "6"  # Número de actores = particiones de Kafka
+  
+  rayClusterSpec:
+    rayVersion: "2.9.0"
+    enableInTreeAutoscaling: false
+    
+    ########################
+    # HEAD
+    ########################
+    headGroupSpec:
+      rayStartParams:
+        num-cpus: "0"  # Head no procesa, solo coordina
+        dashboard-host: "0.0.0.0"
+      template:
+        spec:
+          containers:
+            - name: ray-head
+              image: rayproject/ray:2.9.0-py310
+              ports:
+                - containerPort: 6379
+                  name: gcs-server
+                - containerPort: 8265
+                  name: dashboard
+                - containerPort: 10001
+                  name: client
+              resources:
+                limits:
+                  cpu: "2"
+                  memory: "4Gi"
+                requests:
+                  cpu: "1"
+                  memory: "2Gi"
+              volumeMounts:
+                - name: app-code
+                  mountPath: /home/ray/app
+              env:
+                - name: RAY_enable_infeasible_task_early_exit
+                  value: "true"
+          
+          initContainers:
+            - name: git-sync
+              image: registry.k8s.io/git-sync/git-sync:v4.1.0
+              resources:
+                requests:
+                  cpu: 100m
+                  memory: 128Mi
+                limits:
+                  cpu: 200m
+                  memory: 256Mi
+              env:
+                - name: GITSYNC_REPO
+                  value: "https://github.com/YOUR_USERNAME/YOUR_REPO"  # Tu repo
+                - name: GIT_SYNC_BRANCH
+                  value: "main"
+                - name: GIT_SYNC_ROOT
+                  value: "/git"
+                - name: GIT_SYNC_DEST
+                  value: "app"
+                - name: GITSYNC_ONE_TIME
+                  value: "true"
+              volumeMounts:
+                - name: app-code
+                  mountPath: /git
+          
+          volumes:
+            - name: app-code
+              emptyDir: {}
+    
+    ########################
+    # WORKERS
+    ########################
+    workerGroupSpecs:
+      - replicas: 6
+        minReplicas: 6
+        maxReplicas: 6
+        groupName: kafka-consumers
+        rayStartParams: {}
+        
+        template:
+          spec:
+            # Anti-affinity para distribuir workers en diferentes nodos si es posible
+            affinity:
+              podAntiAffinity:
+                preferredDuringSchedulingIgnoredDuringExecution:
+                  - weight: 100
+                    podAffinityTerm:
+                      labelSelector:
+                        matchExpressions:
+                          - key: ray.io/group
+                            operator: In
+                            values:
+                              - kafka-consumers
+                      topologyKey: kubernetes.io/hostname
+            
+            containers:
+              - name: ray-worker
+                image: rayproject/ray:2.9.0-py310
+                resources:
+                  limits:
+                    cpu: "2"
+                    memory: "4Gi"
+                  requests:
+                    cpu: "1"
+                    memory: "2Gi"
+                volumeMounts:
+                  - name: app-code
+                    mountPath: /home/ray/app
+                envFrom:
+                  - secretRef:
+                      name: kafka-config  # Tus credenciales de Kafka
+                env:
+                  - name: RAY_enable_infeasible_task_early_exit
+                    value: "true"
+                  - name: KAFKA_TOPIC
+                    value: "topic-traffic"
+                  - name: KAFKA_TOPIC_OUTPUT
+                    value: "topic-prediction"
+                  - name: KAFKA_SASL_MECHANISM
+                    value: "PLAIN"
+                  - name: KAFKA_SECURITY_PROTOCOL
+                    value: "SASL_SSL"
+            
+            initContainers:
+              - name: git-sync
+                image: registry.k8s.io/git-sync/git-sync:v4.1.0
+                resources:
+                  requests:
+                    cpu: 100m
+                    memory: 128Mi
+                  limits:
+                    cpu: 200m
+                    memory: 256Mi
+                env:
+                  - name: GITSYNC_REPO
+                    value: "https://github.com/YOUR_USERNAME/YOUR_REPO"
+                  - name: GIT_SYNC_BRANCH
+                    value: "main"
+                  - name: GIT_SYNC_ROOT
+                    value: "/git"
+                  - name: GIT_SYNC_DEST
+                    value: "app"
+                  - name: GITSYNC_ONE_TIME
+                    value: "true"
+                volumeMounts:
+                  - name: app-code
+                    mountPath: /git
+            
+            volumes:
+              - name: app-code
+                emptyDir: {}

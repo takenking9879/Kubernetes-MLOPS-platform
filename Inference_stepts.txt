@@ -1,0 +1,2 @@
+# Haber seguido kafka_steps.txt
+

@@ -4,16 +4,9 @@ metadata:
   name: kafka-ui-config
   namespace: kafka
 data:
-  # UI binds to 8080
-  UI_PORT: "8080"
+  UI_PORT: "8083"
 
 ---
-# Secret expected: kafka-ui-secret in namespace kafka
-# It should contain key: SASL_JAAS with value:
-# org.apache.kafka.common.security.scram.ScramLoginModule required username="ml-platform" password="<PASSWORD>";
-# Create it with:
-# kubectl create secret generic kafka-ui-secret -n kafka --from-literal=SASL_JAAS='org.apache.kafka.common.security.scram.ScramLoginModule required username="ml-platform" password="<PASS>";'
-
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -36,23 +29,57 @@ spec:
           image: provectuslabs/kafka-ui:latest
           imagePullPolicy: IfNotPresent
           ports:
-            - containerPort: 8080
+            - containerPort: 8083
           env:
+            # --- App port (Spring Boot) ---
+            - name: SERVER_PORT
+              valueFrom:
+                configMapKeyRef:
+                  name: kafka-ui-config
+                  key: UI_PORT
+
+            # --- Kafka cluster ---
             - name: KAFKA_CLUSTERS_0_NAME
               value: "my-kafka-cluster"
+
             - name: KAFKA_CLUSTERS_0_BOOTSTRAP_SERVERS
-              value: "my-kafka-cluster-kafka-bootstrap:9093" #192.168.65.3:31386 checar si es este o el otro 
+              value: "my-kafka-cluster-kafka-bootstrap:9093"
+
             - name: KAFKA_CLUSTERS_0_PROPERTIES_SECURITY_PROTOCOL
-              value: "SASL_PLAINTEXT"
+              value: "SASL_SSL"
+
             - name: KAFKA_CLUSTERS_0_PROPERTIES_SASL_MECHANISM
               value: "SCRAM-SHA-512"
-            - name: KAFKA_CLUSTERS_0_PROPERTIES_SASL_JAAS_CONFIG
+
+            # --- Credentials from Secret ---
+            - name: KAFKA_USERNAME
               valueFrom:
                 secretKeyRef:
-                  name: kafka-ui-secret
-                  key: SASL_JAAS
+                  name: kafka-secret
+                  key: KAFKA_USERNAME
+
+            - name: KAFKA_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: kafka-secret
+                  key: KAFKA_PASSWORD
+
+            # --- JAAS built dynamically ---
+            - name: KAFKA_CLUSTERS_0_PROPERTIES_SASL_JAAS_CONFIG
+              value: >
+                org.apache.kafka.common.security.scram.ScramLoginModule required
+                username="${KAFKA_USERNAME}"
+                password="${KAFKA_PASSWORD}";
+
             - name: KAFKA_CLUSTERS_0_PROPERTIES_SSL_ENDPOINT_IDENTIFICATION_ALGORITHM
               value: ""
+
+            # --- Trust Strimzi cluster CA (TLS listener on 9093) ---
+            - name: KAFKA_CLUSTERS_0_PROPERTIES_SSL_TRUSTSTORE_TYPE
+              value: "PEM"
+            - name: KAFKA_CLUSTERS_0_PROPERTIES_SSL_TRUSTSTORE_LOCATION
+              value: "/etc/kafka/ca/ca.crt"
+
           resources:
             limits:
               cpu: "500m"
@@ -61,6 +88,16 @@ spec:
               cpu: "250m"
               memory: "256Mi"
 
+          volumeMounts:
+            - name: kafka-cluster-ca
+              mountPath: /etc/kafka/ca
+              readOnly: true
+
+      volumes:
+        - name: kafka-cluster-ca
+          secret:
+            secretName: my-kafka-cluster-cluster-ca-cert
+
 ---
 apiVersion: v1
 kind: Service
@@ -68,10 +105,9 @@ metadata:
   name: kafka-ui-service
   namespace: kafka
 spec:
-  type: NodePort
+  type: ClusterIP
   selector:
     app: kafka-ui
   ports:
-    - port: 8080
-      targetPort: 8080
-      nodePort: 32080
+    - port: 8083
+      targetPort: 8083

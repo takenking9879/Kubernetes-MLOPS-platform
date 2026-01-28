@@ -43,3 +43,10 @@ docker run -d \
   --cpus="2" \
   --memory="1g" \
   k3s-kafka-producer 
+
+# UI secret
+kubectl create secret generic kafka-secret \
+  -n kafka \
+  --from-env-file=.env
+
+kubectl apply -f k3s/kafka/kafka-ui.yaml
