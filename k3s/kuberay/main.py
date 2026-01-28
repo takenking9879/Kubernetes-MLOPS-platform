@@ -84,45 +84,49 @@ class KubeRayTraining(BaseUtils):
     def _save_model(self, result, framework):
         """
         Extrae el mejor modelo del resultado y lo guarda en S3 como un archivo .pkl.
+        Usa boto3 directo para evitar archivos temporales y el error de checksum de pyarrow.
         """
         self.logger.info(f"Exportando modelo final de {framework} a S3...")
         try:
-            filename = f"model_{framework}.pkl"
-            local_path = os.path.join(tempfile.gettempdir(), filename)
             checkpoint = result.checkpoint
             if not checkpoint:
                 self.logger.warning("No se encontró un checkpoint válido en el resultado.")
                 return
+
+            # 1. Obtener el path de S3 del checkpoint
+            parsed_ckpt = urlparse(checkpoint.path)
+            bucket_in = parsed_ckpt.netloc
+            prefix_in = parsed_ckpt.path.lstrip('/')
+
+            # 2. Definir qué archivo buscar según el framework
             if framework == "xgboost":
-                # Ray Train stores the XGBoost model inside a generic `Checkpoint`.
-                # Use RayTrainReportCallback.get_model(checkpoint) to load the Booster.
-                model = RayTrainReportCallback.get_model(checkpoint)
-                with open(local_path, "wb") as f:
-                    pickle.dump(model, f)
+                target_file = "model.ubj"
             elif framework == "pytorch":
-                # Ray Train PyTorch checkpoints are directories (written by our train loop).
-                # Keep it simple: persist the raw `model.pt` bytes.
-                with checkpoint.as_directory() as ckpt_dir:
-                    model_path = os.path.join(ckpt_dir, "model.pt")
-                    with open(model_path, "rb") as mf:
-                        payload = {"model_pt": mf.read()}
-                with open(local_path, "wb") as f:
-                    pickle.dump(payload, f)
+                target_file = "model.pt"
+                
+            key_in = os.path.join(prefix_in, target_file)
 
-            # Subir a S3 usando el cliente boto3 ya configurado
-            parsed_url = urlparse(self.output_dir)
-            bucket = parsed_url.netloc
-            prefix = parsed_url.path.lstrip('/')
-            s3_key = os.path.join(prefix, filename)
+            # 3. Leer directamente de S3 a memoria
+            self.logger.info(f"Leyendo {target_file} desde {checkpoint.path}")
+            response = self.s3.get_object(Bucket=bucket_in, Key=key_in)
+            model_bytes = response['Body'].read()
 
-            self.s3.upload_file(local_path, bucket, s3_key)
-            self.logger.info(f"Modelo guardado exitosamente en: s3://{bucket}/{s3_key}")
-            
-            if os.path.exists(local_path):
-                os.remove(local_path)
+            if framework == "xgboost":
+                payload = model_bytes # O pickle.dumps(model_bytes) si prefieres mantener el formato
+            else:
+                # Para PyTorch mantenemos tu estructura de dict
+                payload = pickle.dumps({"model_pt": model_bytes})
+
+            # 4. Subir al destino final
+            parsed_out = urlparse(self.output_dir)
+            bucket_out = parsed_out.netloc
+            s3_key_out = os.path.join(parsed_out.path.lstrip('/'), f"model_{framework}.pkl")
+
+            self.s3.put_object(Bucket=bucket_out, Key=s3_key_out, Body=payload if isinstance(payload, bytes) else pickle.dumps(payload))
+            self.logger.info(f"Modelo guardado exitosamente en: s3://{bucket_out}/{s3_key_out}")
                 
         except Exception as e:
-            self.logger.error(f"Error en el export del modelo: {str(e)}", exc_info=True)
+            self.logger.error(f"Error en el export del modelo (S3 direct): {str(e)}", exc_info=True)
 
     def _log_final_to_mlflow(self, *, framework: str, params: Dict[str, Any], metrics: Dict[str, Any]) -> None:
         # Senior Optimization: Encapsulated MLflow logic into a helper utility.
