@@ -127,17 +127,6 @@ def tune_model(
         except Exception:
             trial_id = str(os.getpid())
 
-        callbacks = []
-        if mlflow_tracking_uri and mlflow_experiment_name:
-            callbacks.append(
-                MLflowLoggerCallback(
-                    tracking_uri=mlflow_tracking_uri,
-                    experiment_name=mlflow_experiment_name,
-                    save_artifact=False,
-                    log_params_on_trial_end=True,
-                )
-            )
-
         trainer = TorchTrainer(
             train_loop_per_worker=train_func,
             train_loop_config=train_loop_config,
@@ -146,7 +135,6 @@ def tune_model(
             run_config=RunConfig(
                 storage_path=storage_path,
                 name=f"{name}_train_{trial_id}",
-                callbacks=callbacks
             ),
         )
         result = trainer.fit()
@@ -167,6 +155,17 @@ def tune_model(
     # Reserving them here can cause fragmentation and unschedulable placement groups.
     trainable = _trainable
 
+    callbacks = []
+    if mlflow_tracking_uri and mlflow_experiment_name:
+        callbacks.append(
+            MLflowLoggerCallback(
+                tracking_uri=mlflow_tracking_uri,
+                experiment_name=mlflow_experiment_name,
+                save_artifact=False,
+                log_params_on_trial_end=True,
+            )
+        )
+
     tuner = tune.Tuner(
         trainable,
         param_space=param_space,
@@ -174,7 +173,12 @@ def tune_model(
             num_samples=5,
             scheduler=scheduler,
             max_concurrent_trials=int(os.getenv("MAX_CONCURRENT_TRIALS", "1")),
-        )
+        ),
+        run_config=RunConfig(
+            storage_path=storage_path,
+            name=name,
+            callbacks=callbacks,
+        ),
     )
 
     results = tuner.fit()
