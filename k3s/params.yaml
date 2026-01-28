@@ -14,7 +14,7 @@ kuberay:
     seed: 42
     mlflow_tracking_uri: "http://my-mlflow"
     mlflow_experiment_name: "kuberay-attack-detection"
-    path: "../../models/fraud_detection_model.pkl"
+    mlflow_artifact_location: "s3://k8s-mlops-platform-bucket/mlflow-artifacts/" 
     
 
 spark:

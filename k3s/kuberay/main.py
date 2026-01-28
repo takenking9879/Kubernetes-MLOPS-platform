@@ -141,9 +141,7 @@ class KubeRayTraining(BaseUtils):
         # Senior Optimization: Encapsulated MLflow logic into a helper utility.
         # This reduces noise in the main orchestrator and separates plotting concerns.
         artifact_location = (
-            params.get("mlflow_artifact_location")
-            or os.getenv("MLFLOW_ARTIFACT_LOCATION")
-            or "s3://k8s-mlops-platform-bucket/v1/mlflow_artifacts/"
+            params.get("mlflow_artifact_location", "s3://k8s-mlops-platform-bucket/mlflow-artifacts/")
         )
 
         try:
@@ -293,13 +291,6 @@ class KubeRayTraining(BaseUtils):
                     framework,
                     float(mc_time_sec),
                 )
-
-            # If tuning is disabled, log default params as the effective params.
-            
-            if framework == "xgboost" and not mlflow_payload.get("xgboost_params"):
-                mlflow_payload["xgboost_params"] = dict(XGBOOST_PARAMS)
-            if framework == "pytorch" and not mlflow_payload.get("pytorch_params"):
-                mlflow_payload["pytorch_params"] = dict(PYTORCH_PARAMS)
                 
             self._log_final_to_mlflow(framework=framework, params=mlflow_payload, metrics=final_metrics)
 
