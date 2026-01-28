@@ -173,8 +173,7 @@ def tune_model(
             num_samples=5,
             scheduler=scheduler,
             max_concurrent_trials=int(os.getenv("MAX_CONCURRENT_TRIALS", "1")),
-        ),
-        run_config=RunConfig(storage_path=storage_path, name=name, callbacks=callbacks),
+        )
     )
 
     results = tuner.fit()
