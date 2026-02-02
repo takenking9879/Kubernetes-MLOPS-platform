@@ -24,4 +24,5 @@ spark:
   write_batch_size: 100000  # Max lines written to S3 per batch
   pipeline:
     module: "preprocessing.preprocessing_001"
+  check_kafka_connection: true
 
