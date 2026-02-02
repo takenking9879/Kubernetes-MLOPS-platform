@@ -301,7 +301,7 @@ class SyntheticTrafficGenerator:
                 "conn_state": row["conn_state"],
                 "bytes_transferred": float(row["bytes_transferred"]),
             },
-            "label": int(label),
+            #"label": int(label),
         }
 
     # -------- Vectorized oracles for batch (no Python loops over rows) --------

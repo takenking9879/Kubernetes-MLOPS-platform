@@ -51,7 +51,7 @@ SCHEMA = {
     'packet_count': {'type': 'int', 'range': (1, 2000)},
     'conn_state': {'type': 'cat', 'vals': ['EST', 'SYN', 'FIN', 'RST']},
     'bytes_transferred': {'type': 'float', 'range': (0.0, 2e6)},
-    'label': {'type': 'int'}
+    #'label': {'type': 'int'}
 }
 }
 

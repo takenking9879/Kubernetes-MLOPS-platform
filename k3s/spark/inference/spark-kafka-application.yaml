@@ -1,0 +1,127 @@
+apiVersion: spark.apache.org/v1
+kind: SparkApplication
+metadata:
+  name: spark-kafka-app
+  namespace: spark
+spec:
+  pyFiles: "local:///app/repo/k3s/spark/kafka_main.py"
+
+  runtimeVersions:
+    sparkVersion: "4.0.1"
+
+  applicationTolerations:
+    instanceConfig:
+      initExecutors: 2
+      minExecutors: 2
+      maxExecutors: 3
+
+  # Spark confs (Kafka + streaming con S3 checkpoint)
+  sparkConf:
+    spark.kubernetes.container.image: k3s-kafka-inference:latest
+    spark.speculation.interval: "30"
+    spark.kubernetes.authenticate.driver.serviceAccountName: "spark"
+
+    # Streaming optimizations
+    spark.sql.streaming.schemaInference: "true"
+    spark.streaming.stopGracefullyOnShutdown: "true"
+
+    # Checkpoint en S3
+    spark.sql.streaming.checkpointLocation: "s3a://k8s-mlops-platform-bucket/checkpoints/spark-kafka-app"
+    spark.hadoop.fs.s3a.impl: org.apache.hadoop.fs.s3a.S3AFileSystem
+    spark.hadoop.fs.s3a.aws.credentials.provider: com.amazonaws.auth.DefaultAWSCredentialsProviderChain
+    spark.hadoop.fs.s3a.endpoint: s3.us-east-2.amazonaws.com
+    spark.hadoop.fs.s3a.aws.region: us-east-2
+    spark.hadoop.fs.s3a.fast.upload: "true"
+    #spark.hadoop.fs.s3a.multipart.size: "104857600"
+    spark.hadoop.fs.s3a.connection.maximum: "100"
+    spark.hadoop.fs.s3a.path.style.access: "true"
+
+  # Driver spec
+  driverSpec:
+    podTemplateSpec:
+      spec:
+        containers:
+          - name: spark-kubernetes-driver
+            image: k3s-kafka-inference:latest
+            volumeMounts:
+              - name: app-files
+                mountPath: /app
+            envFrom:
+              - secretRef:
+                  name: env-secret
+
+        initContainers:
+          - name: git-sync
+            image: registry.k8s.io/git-sync/git-sync:v4.1.0
+            resources:
+              requests:
+                cpu: 100m
+                memory: 128Mi
+              limits:
+                cpu: 200m
+                memory: 256Mi
+            env:
+              - name: GITSYNC_REPO
+                value: "https://github.com/takenking9879/Kubernetes-MLOPS-platform"
+              - name: GIT_SYNC_BRANCH
+                value: "main"
+              - name: GIT_SYNC_ROOT
+                value: "/git"
+              - name: GIT_SYNC_DEST
+                value: "repo"
+              - name: GIT_SYNC_WAIT
+                value: "30"
+              - name: GITSYNC_ONE_TIME
+                value: "true"
+            volumeMounts:
+              - name: app-files
+                mountPath: /git
+
+        volumes:
+          - name: app-files
+            emptyDir: {}
+
+  # Executor spec
+  executorSpec:
+    podTemplateSpec:
+      spec:
+        containers:
+          - name: spark-kubernetes-executor
+            image: k3s-kafka-inference:latest
+            volumeMounts:
+              - name: app-files
+                mountPath: /app
+            envFrom:
+              - secretRef:
+                  name: env-secret
+
+        initContainers:
+          - name: git-sync
+            image: registry.k8s.io/git-sync/git-sync:v4.1.0
+            resources:
+              requests:
+                cpu: 100m
+                memory: 128Mi
+              limits:
+                cpu: 200m
+                memory: 256Mi
+            env:
+              - name: GITSYNC_REPO
+                value: "https://github.com/takenking9879/Kubernetes-MLOPS-platform"
+              - name: GIT_SYNC_BRANCH
+                value: "main"
+              - name: GIT_SYNC_ROOT
+                value: "/git"
+              - name: GIT_SYNC_DEST
+                value: "repo"
+              - name: GIT_SYNC_WAIT
+                value: "30"
+              - name: GITSYNC_ONE_TIME
+                value: "true"
+            volumeMounts:
+              - name: app-files
+                mountPath: /git
+
+        volumes:
+          - name: app-files
+            emptyDir: {}

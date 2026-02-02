@@ -2,6 +2,6 @@
 # Haber seguido kuberay_steps.txt (al menos los necesarios como el operador y el serving)
 
 # Crear la imagen
-docker build -t k3s-kafka-inference ./k3s/kafka/inference
+docker build -t k3s-kafka-inference ./k3s/spark/inference
 
-kubectl apply -f k3s/kafka/inference/inference.yaml
+kubectl apply -f k3s/spark/inference/spark-kafka-application.yaml

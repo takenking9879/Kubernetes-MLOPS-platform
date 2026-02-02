@@ -197,19 +197,8 @@ class SparkPreprocessing(BaseUtils):
 
 
 def main(): 
-
-    schema = StructType([
-        StructField("src_port", LongType(), True),
-        StructField("dst_port", LongType(), True),
-        StructField("protocol", StringType(), True),
-        StructField("packet_count", LongType(), True),
-        StructField("conn_state", StringType(), True),
-        StructField("bytes_transferred", DoubleType(), True),
-        StructField("timestamp", LongType(), True),
-        StructField("attack", LongType(), True)
-    ])
-
-
+    from k3s.spark.schema.schemas import schema_full as schema
+    
     data_dir = "s3a://k8s-mlops-platform-bucket/v1/raw/" #Para Spark
     output_dir = "s3a://k8s-mlops-platform-bucket/v1/processed/" #Para Spark
     artifacts_dir = "s3a://k8s-mlops-platform-bucket/v1/artifacts/"
