@@ -3,7 +3,7 @@ import random
 import tempfile
 import time
 from dataclasses import dataclass
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Protocol
 
 import boto3
 
@@ -11,8 +11,6 @@ from ray import serve
 from starlette.requests import Request
 
 from k3s.kuberay.utils import create_logger
-from k3s.kuberay.serving.modules.preprocessor import InferencePreprocessor
-from k3s.kuberay.serving.modules.xgboost import XGBoostHandler
 
 
 @dataclass(frozen=True)
@@ -42,17 +40,75 @@ class S3Store:
 
 
 def _normalize_payload(payload: Any) -> List[Dict[str, Any]]:
-    # Expect: {"data": [ {...}, {...} ]} or {"data": {...}}
+    """Normalize request payload into a strict matrix.
+
+    Contract: Ray Serve is schema-agnostic and does NOT accept column names.
+    Spark guarantees ordering and types upstream.
+
+    Accepted payloads:
+    - {"data": [[...], [...]]}
+    - {"data": [...]}  (single row)
+    """
     if not isinstance(payload, dict):
         raise ValueError("JSON body must be an object")
-    data = payload.get("data")
-    if data is None:
+    if "data" not in payload:
         raise ValueError("Missing 'data' field")
-    if isinstance(data, dict):
-        return [data]
-    if isinstance(data, list):
-        return data
-    raise ValueError("'data' must be an object or a list of objects")
+
+    data = payload["data"]
+    if isinstance(data, list) and (len(data) == 0 or not isinstance(data[0], (list, tuple))):
+        # single row vector
+        data = [data]
+
+    if not isinstance(data, list) or any(not isinstance(r, (list, tuple)) for r in data):
+        raise ValueError("'data' must be a list of lists (matrix) or a single list (row)")
+
+    lengths = {len(r) for r in data}
+    if len(lengths) != 1:
+        raise ValueError(f"All rows must have the same length. Got lengths={sorted(lengths)}")
+
+    return [list(r) for r in data]
+
+
+class ModelAdapter(Protocol):
+    def predict(self, data: List[List[Any]]) -> Dict[str, Any]:
+        ...
+
+
+class XGBoostAdapter:
+    def __init__(self, model_path: str):
+        from k3s.kuberay.serving.modules.xgboost import XGBoostHandler
+
+        self._handler = XGBoostHandler(model_path)
+
+    def predict(self, data: List[List[Any]]) -> Dict[str, Any]:
+        if not isinstance(data, list) or any(not isinstance(r, list) for r in data):
+            raise TypeError("data must be List[List]")
+        return self._handler.predict(data)
+
+
+class PyTorchAdapter:
+    def __init__(self, model_path: str, *, input_dim: int, num_classes: int):
+        from k3s.kuberay.serving.modules.pytorch import PyTorchHandler
+
+        self._handler = PyTorchHandler(model_path, input_dim=input_dim, num_classes=num_classes)
+
+    def predict(self, data: List[List[Any]]) -> Dict[str, Any]:
+        if not isinstance(data, list) or any(not isinstance(r, list) for r in data):
+            raise TypeError("data must be List[List]")
+        return self._handler.predict(data)
+
+
+class ModelFactory:
+    @staticmethod
+    def create_adapter(framework: str, *, model_path: str) -> ModelAdapter:
+        fw = framework.strip().lower()
+        if fw == "xgboost":
+            return XGBoostAdapter(model_path)
+        if fw == "pytorch":
+            input_dim = int(os.getenv("PYTORCH_INPUT_DIM", "14"))
+            num_classes = int(os.getenv("PYTORCH_NUM_CLASSES", "6"))
+            return PyTorchAdapter(model_path, input_dim=input_dim, num_classes=num_classes)
+        raise ValueError(f"Unsupported MODEL_FRAMEWORK={framework!r}")
 
 
 class _ModelRuntime:
@@ -66,13 +122,12 @@ class _ModelRuntime:
         self._logger = create_logger(name)
         self._variant = variant
         self._store: Optional[S3Store] = None
-        self._pre: Optional[InferencePreprocessor] = None
-        self._handler: Optional[XGBoostHandler] = None
+        self._adapter: Optional[ModelAdapter] = None
         self._spec: Optional[ModelSpec] = None
 
     def _load_from_config(self, config: Dict[str, Any]) -> None:
         bucket = os.getenv("S3_BUCKET_NAME", "k8s-mlops-platform-bucket")
-        framework = str(config.get("framework", os.getenv("FRAMEWORK", "xgboost")))
+        framework = str(config.get("framework", os.getenv("MODEL_FRAMEWORK", "xgboost")))
         model_key = str(config.get("model_key", os.getenv("MODEL_KEY", f"models/model_{framework}.pkl")))
         artifacts_key = str(
             config.get(
@@ -87,26 +142,19 @@ class _ModelRuntime:
             key=self._spec.model_key,
             filename=f"{self._variant}_{framework}.pkl",
         )
-        artifacts_path = self._store.download_to_tmp(
-            key=self._spec.artifacts_key,
-            filename="pipeline_model.json",
-        )
 
-        self._pre = InferencePreprocessor(artifacts_path)
-        if framework != "xgboost":
-            raise ValueError(f"Unsupported framework for this deployment: {framework}")
-        self._handler = XGBoostHandler(model_path)
+        # NOTE: preprocessing lives in Spark. Serving is pure inference only.
+        self._adapter = ModelFactory.create_adapter(framework, model_path=model_path)
 
         self._logger.info("Model loaded (%s): %s", self._variant, self._spec)
 
     def predict(self, payload: Dict[str, Any]) -> Dict[str, Any]:
-        if self._pre is None or self._handler is None or self._spec is None:
-            return {"error": "Model not initialized"}
+        if self._adapter is None or self._spec is None:
+            raise RuntimeError("Model not initialized")
 
         started = time.perf_counter()
-        rows = _normalize_payload(payload)
-        processed = self._pre.transform(rows)
-        result = self._handler.predict(processed.values.tolist())
+        matrix = _normalize_payload(payload)
+        result = self._adapter.predict(matrix)
         result["latency_ms"] = (time.perf_counter() - started) * 1000.0
         result["model"] = {
             "variant": self._variant,
@@ -122,13 +170,18 @@ class StableModel:
         self._rt = _ModelRuntime(name="StableModel", variant="stable")
 
     def reconfigure(self, config: Dict[str, Any]) -> None:
-        self._rt._load_from_config(config)
+        try:
+            self._rt._load_from_config(config)
+        except Exception as e:
+            create_logger("StableModel").error("reconfigure failed: %s", str(e), exc_info=True)
+            raise
 
     async def predict(self, payload: Dict[str, Any]) -> Dict[str, Any]:
         try:
             return self._rt.predict(payload)
         except Exception as e:
-            return {"error": str(e)}
+            create_logger("StableModel").error("predict failed: %s", str(e), exc_info=True)
+            raise
 
 
 @serve.deployment(name="CanaryModel")
@@ -137,13 +190,18 @@ class CanaryModel:
         self._rt = _ModelRuntime(name="CanaryModel", variant="canary")
 
     def reconfigure(self, config: Dict[str, Any]) -> None:
-        self._rt._load_from_config(config)
+        try:
+            self._rt._load_from_config(config)
+        except Exception as e:
+            create_logger("CanaryModel").error("reconfigure failed: %s", str(e), exc_info=True)
+            raise
 
     async def predict(self, payload: Dict[str, Any]) -> Dict[str, Any]:
         try:
             return self._rt.predict(payload)
         except Exception as e:
-            return {"error": str(e)}
+            create_logger("CanaryModel").error("predict failed: %s", str(e), exc_info=True)
+            raise
 
 
 @serve.deployment(name="ModelRouter")

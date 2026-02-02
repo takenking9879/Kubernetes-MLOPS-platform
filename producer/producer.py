@@ -160,4 +160,4 @@ class KafkaProducer:
 
 if __name__ == "__main__":
     producer = KafkaProducer(start_ts="2026-01-12 18:00:00")
-    producer.run_continuous_production(trend='normal', interval=0.2)
+    producer.run_continuous_production(trend='normal', interval=0.01)  # 100 messages per second

@@ -1,6 +1,6 @@
 import os
 import logging
-from typing import Dict, Optional, Iterator, List, Any
+from typing import Dict, Optional, Iterator, List, Any, Tuple
 import json
 from confluent_kafka import Consumer, KafkaException
 from pyspark.sql import SparkSession, Row, DataFrame
@@ -9,11 +9,10 @@ import importlib
 import boto3
 from k3s.spark.utils import create_logger, BaseUtils
 from pyspark.sql.functions import from_json, col, struct, to_json
-from k3s.spark.schema.schemas import schema_features, schema_full
+from k3s.spark.schema.schemas import schema_features, schema_full, kafka_schema_features, schema_preprocessed, prediction_schema
+from k3s.spark.helpers.spark_kafka_helper import kafka_to_schema_features
+from k3s.spark.preprocessing import preprocessing_001
 import requests
-from requests.adapters import HTTPAdapter
-from urllib3.util.retry import Retry
-
 
 class KafkaSparkInference(BaseUtils):
     """
@@ -54,7 +53,7 @@ class KafkaSparkInference(BaseUtils):
         # Internal state
         self.s3 = None
         self.scaler = None
-        self._preprocessing_module = None  # Cache for imported module
+        self.preprocessing_module = None  # Cache for imported module
         
         # Conditional checks based on params
         check_kafka = self.params.get('check_kafka_connection', True)
@@ -167,7 +166,7 @@ class KafkaSparkInference(BaseUtils):
         try:
             pipeline_module = self.params['pipeline']['module']
             self.logger.info(f"Loading preprocessing module: {pipeline_module}")
-            self._preprocessing_module = importlib.import_module('k3s.spark.' + pipeline_module)
+            self.preprocessing_module = importlib.import_module('k3s.spark.' + pipeline_module)
             self.logger.info("✅ Preprocessing module loaded and cached")
         except Exception as e:
             self.logger.error(f'Failed to load preprocessing module: {e}')
@@ -196,10 +195,9 @@ class KafkaSparkInference(BaseUtils):
                 .load()
             )
             
-            # Parse with explicit schema
             parsed_df = (
                 df.selectExpr("CAST(value AS STRING)")
-                .select(from_json(col("value"), schema_features).alias("data"))
+                .select(from_json(col("value"), kafka_schema_features).alias("data"))
                 .select("data.*")
             )
             
@@ -243,6 +241,17 @@ class KafkaSparkInference(BaseUtils):
             self.logger.error(f"Failed to load pipeline artifact: {e}")
             raise
 
+    def from_kafka_schema_to_features(self, df: DataFrame) -> DataFrame:
+        """
+        Convert a DataFrame with `kafka_schema_features` into a DataFrame compatible
+        with preprocessing (features schema + event_id).
+        """
+        try:
+            return kafka_to_schema_features(df)
+        except Exception as e:
+            self.logger.error(f'Failed to convert Kafka schema to features: {e}')
+            raise
+    
     def preprocess(self, df: DataFrame) -> DataFrame:
         """
         Apply preprocessing using cached module and scaler.
@@ -250,7 +259,7 @@ class KafkaSparkInference(BaseUtils):
         Optimization: Uses pre-loaded module instead of dynamic import.
         """
         try:
-            df_out, _ = self._preprocessing_module.preprocess_spark(
+            df_out, _ = self.preprocessing_module.preprocess_spark(
                 df, 
                 model=self.scaler, 
                 train=False
@@ -259,46 +268,6 @@ class KafkaSparkInference(BaseUtils):
             
         except Exception as e:
             self.logger.error(f'Preprocessing failed: {e}')
-            raise
-
-    def validate_schema(self, df: DataFrame, expected_schema: StructType) -> bool:
-        """
-        Robust schema validation with detailed error messages.
-        
-        Improvement: Checks field names, types, and nullability explicitly.
-        Fails fast with clear error messages.
-        """
-        try:
-            actual_fields = {f.name: (f.dataType, f.nullable) for f in df.schema.fields}
-            expected_fields = {f.name: (f.dataType, f.nullable) for f in expected_schema.fields}
-            
-            # Check for missing fields
-            missing = set(expected_fields.keys()) - set(actual_fields.keys())
-            if missing:
-                raise ValueError(f"Schema validation failed. Missing fields: {missing}")
-            
-            # Check for extra fields
-            extra = set(actual_fields.keys()) - set(expected_fields.keys())
-            if extra:
-                self.logger.warning(f"Extra fields found (will be ignored): {extra}")
-            
-            # Check field types
-            for field_name in expected_fields:
-                if field_name in actual_fields:
-                    exp_type, exp_null = expected_fields[field_name]
-                    act_type, act_null = actual_fields[field_name]
-                    
-                    if exp_type != act_type:
-                        raise ValueError(
-                            f"Schema validation failed for field '{field_name}'. "
-                            f"Expected {exp_type}, got {act_type}"
-                        )
-            
-            self.logger.info("✅ Schema validation passed")
-            return True
-            
-        except Exception as e:
-            self.logger.error(f"Schema validation error: {e}")
             raise
 
     def process_batch_with_ray(self, batch_df: DataFrame, batch_id: int):
@@ -318,34 +287,33 @@ class KafkaSparkInference(BaseUtils):
             batch_id: Unique identifier for this batch
         """
         try:
-            if batch_df.isEmpty():
-                self.logger.debug(f"Batch {batch_id}: Empty, skipping")
-                return
-            
-            row_count = batch_df.count()
-            self.logger.info(f"Batch {batch_id}: Processing {row_count} rows")
-            
-            # Apply predictions using mapPartitions on static DataFrame
-            # This is safe because we're inside foreachBatch
-            predictions_rdd = batch_df.rdd.mapPartitions(
-                lambda partition: self._predict_partition(
-                    partition,
-                    batch_id
-                )
+            # Preserve original columns for final join
+            event_ids_df = batch_df.select("event_id", "timestamp", "properties")
+
+            df_features = self.from_kafka_schema_to_features(batch_df)
+            df_preprocessed, _ = self.preprocessing_module.preprocess_spark(df_features, model=self.scaler, train=False)
+
+            # Zip features with IDs to preserve the link WITHOUT using collect()
+            # This is efficient and scalable.
+            rdd_with_ids = df_preprocessed.rdd.zip(batch_df.select("event_id").rdd)
+
+            predictions_rdd = rdd_with_ids.mapPartitions(
+                lambda partition: self._predict_partition(partition)
             )
-            
-            # Convert back to DataFrame with explicit schema
-            predictions_df = self.spark.createDataFrame(predictions_rdd, schema=schema_full)
-            
-            # Validate output schema
-            self.validate_schema(predictions_df, schema_full)
-            
-            # Write to Kafka output topic
+
+            predictions_df = self.spark.createDataFrame(predictions_rdd, schema=prediction_schema)
+
+            output_df = (
+                event_ids_df
+                .join(predictions_df, on="event_id", how="inner")
+                .select("timestamp", "event_id", "properties", "label")
+            )
+
             (
-                predictions_df
+                output_df
                 .selectExpr(
-                    "CAST(timestamp AS STRING) AS key",
-                    "to_json(struct(*)) AS value"
+                    "CAST(event_id AS STRING) AS key",
+                    "to_json(struct(timestamp, event_id, properties, label)) AS value",
                 )
                 .write
                 .format("kafka")
@@ -356,160 +324,68 @@ class KafkaSparkInference(BaseUtils):
                 .option("kafka.sasl.jaas.config", self.kafka_sasl_jaas_config)
                 .save()
             )
-            
-            self.logger.info(f"Batch {batch_id}: ✅ Successfully wrote {row_count} predictions to Kafka")
-            
         except Exception as e:
-            self.logger.error(f"Batch {batch_id}: ❌ Failed to process: {e}", exc_info=True)
+            self.logger.error(f"Batch {batch_id}: Failed to process: {e}", exc_info=True)
             raise
 
-    def _predict_partition(self, partition: Iterator[Row], batch_id: int) -> Iterator[Dict[str, Any]]:
+    def _predict_partition(self, partition: Iterator[Tuple[Row, Row]]) -> Iterator[Row]:
         """
         Process a single partition by batching requests to Ray Serve.
         
-        Optimizations:
-        - Reuses HTTP session with connection pooling
-        - Implements retry logic with exponential backoff
-        - Batches multiple rows per request
-        - Minimal logging (errors only)
-        
         Args:
-            partition: Iterator of Rows from Spark partition
-            batch_id: Identifier for logging context
+            partition: Iterator of (feature_row, id_row) tuples
             
         Yields:
-            Dict with original data + predictions
+            Row with (event_id, label)
         """
-        # Setup logger with batch context
-        logger = logging.getLogger(f"predict_partition_batch_{batch_id}")
-        
-        # Configure HTTP session with connection pooling and retries
-        session = requests.Session()
-        retry_strategy = Retry(
-            total=self.ray_max_retries,
-            backoff_factor=1,
-            status_forcelist=[429, 500, 502, 503, 504],
-            allowed_methods=["POST"]
-        )
-        adapter = HTTPAdapter(
-            max_retries=retry_strategy,
-            pool_connections=10,
-            pool_maxsize=20
-        )
-        session.mount("http://", adapter)
-        session.mount("https://", adapter)
-        
-        def send_batch_to_ray(batch_data: List[Dict]) -> Dict:
-            """Send batch to Ray Serve and return predictions."""
-            try:
-                payload = {"data": batch_data}
-                response = session.post(
+        try:
+            batch_meta: List[str] = []
+            batch_payload: List[Dict[str, Any]] = []
+
+            for feat_row, id_row in partition:
+                event_id = id_row.event_id
+                # Features from helper are already 'clean' for Ray
+                payload_row = feat_row.asDict()
+
+                batch_meta.append(event_id)
+                batch_payload.append(payload_row)
+
+                if len(batch_payload) >= self.ray_batch_size:
+                    response = requests.post(
+                        self.ray_serve_url,
+                        json={"data": batch_payload},
+                        timeout=self.ray_request_timeout,
+                    )
+                    response.raise_for_status()
+                    body = response.json()
+                    preds = body["predictions"]
+
+                    if len(preds) != len(batch_meta):
+                        raise ValueError(f"Prediction count mismatch: {len(preds)} != {len(batch_meta)}")
+
+                    for i, pred in enumerate(preds):
+                        yield Row(event_id=batch_meta[i], label=int(pred))
+
+                    batch_meta = []
+                    batch_payload = []
+
+            if batch_payload:
+                response = requests.post(
                     self.ray_serve_url,
-                    json=payload,
+                    json={"data": batch_payload},
                     timeout=self.ray_request_timeout,
-                    headers={'Content-Type': 'application/json'}
                 )
                 response.raise_for_status()
-                
-                predictions = response.json()
-                
-                if not isinstance(predictions, dict) or "predictions" not in predictions:
-                    raise ValueError(f"Invalid response format: {predictions}")
-                
-                return predictions
-                
-            except requests.exceptions.Timeout:
-                logger.error(f"Request timeout after {self.ray_request_timeout}s for {len(batch_data)} items")
-                raise
-            except requests.exceptions.RequestException as e:
-                logger.error(f"Request failed: {e}")
-                raise
-            except Exception as e:
-                logger.error(f"Unexpected error: {e}")
-                raise
-        
-        def combine_results(batch_data: List[Dict], predictions_response: Dict) -> List[Dict]:
-            """Merge original data with predictions."""
-            pred_list = predictions_response.get("predictions", [])
-            model_variant = predictions_response.get("model", {}).get("variant", "unknown")
-            latency_ms = predictions_response.get("latency_ms", None)
-            
-            if len(pred_list) != len(batch_data):
-                logger.warning(f"Prediction mismatch: expected {len(batch_data)}, got {len(pred_list)}")
-            
-            results = []
-            for i, row_dict in enumerate(batch_data):
-                results.append({
-                    **row_dict,
-                    "prediction": pred_list[i] if i < len(pred_list) else None,
-                    "model_variant": model_variant,
-                    "latency_ms": latency_ms
-                })
-            
-            return results
-        
-        # Process partition in batches
-        batch = []
-        total_processed = 0
-        
-        try:
-            for row in partition:
-                batch.append(row.asDict())
-                
-                if len(batch) >= self.ray_batch_size:
-                    try:
-                        predictions = send_batch_to_ray(batch)
-                        results = combine_results(batch, predictions)
-                        
-                        for result in results:
-                            yield result
-                        
-                        total_processed += len(batch)
-                        
-                    except Exception as e:
-                        logger.error(f"Failed to process batch: {e}")
-                        
-                        # Yield rows with error flag
-                        for row_dict in batch:
-                            yield {
-                                **row_dict,
-                                "prediction": None,
-                                "model_variant": "error",
-                                "latency_ms": None,
-                                "error": str(e)
-                            }
-                    
-                    batch = []
-            
-            # Process final batch
-            if batch:
-                try:
-                    predictions = send_batch_to_ray(batch)
-                    results = combine_results(batch, predictions)
-                    
-                    for result in results:
-                        yield result
-                    
-                    total_processed += len(batch)
-                    
-                except Exception as e:
-                    logger.error(f"Failed to process final batch: {e}")
-                    
-                    for row_dict in batch:
-                        yield {
-                            **row_dict,
-                            "prediction": None,
-                            "model_variant": "error",
-                            "latency_ms": None,
-                            "error": str(e)
-                        }
-            
-            # Only log summary (avoid per-batch noise)
-            if total_processed > 0:
-                logger.info(f"Partition complete: {total_processed} rows processed")
-            
-        finally:
-            session.close()
+                body = response.json()
+                preds = body["predictions"]
+
+                if len(preds) != len(batch_meta):
+                    raise ValueError(f"Prediction count mismatch: {len(preds)} != {len(batch_meta)}")
+
+                for i, pred in enumerate(preds):
+                    yield Row(event_id=batch_meta[i], label=int(pred))
+        except Exception:
+            raise
     
     def run_inference(self):
         """
@@ -530,13 +406,12 @@ class KafkaSparkInference(BaseUtils):
         """
         try:
             self.logger.info("🚀 Starting Kafka-Spark inference pipeline with Ray Serve")
+
+            # Load preprocessing model/artifacts once before starting streaming
+            self.scaler = self.load_scaler_artifact()
             
-            # 1. Read stream from Kafka
-            df_raw = self.read_from_kafka()
-            
-            # 2. Preprocess data
-            df_processed = self.preprocess(df_raw)
-            self.logger.info("✅ Preprocessing configured")
+            # 1. Read stream from Kafka (kafka_schema_features)
+            df_kafka = self.read_from_kafka()
             
             # 3. Configure checkpoint location
             checkpoint_location = os.getenv(
@@ -547,7 +422,7 @@ class KafkaSparkInference(BaseUtils):
             # 4. Start streaming query with foreachBatch
             # This is the CORRECT pattern for Spark Structured Streaming
             query = (
-                df_processed
+                df_kafka
                 .writeStream
                 .foreachBatch(self.process_batch_with_ray)
                 .option("checkpointLocation", checkpoint_location)
