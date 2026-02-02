@@ -9,6 +9,10 @@ spec:
   topicName: topic-traffic
   partitions: 6
   replicas: 1
+  config:
+    # Keep traffic topic short-lived to avoid storage growth from raw events
+    cleanup.policy: delete
+    retention.ms: 3600000
 
 ---
 
@@ -24,4 +28,6 @@ spec:
   partitions: 6
   replicas: 1
   config:
+    # Predictions are kept longer but still bounded
+    cleanup.policy: delete
     retention.ms: 7200000
