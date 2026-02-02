@@ -21,9 +21,22 @@ class XGBoostHandler:
             if isinstance(input_data, dict):
                 df = pd.DataFrame([input_data])
             elif isinstance(input_data, list):
+                # If list of lists, column names will be 0, 1, 2...
                 df = pd.DataFrame(input_data)
             else:
                 df = pd.DataFrame(input_data)
+
+            # Fix for feature names mismatch when input is list of lists
+            # Ray Serve payloads often strip execution headers, resulting in integer columns.
+            # We map the model's expected feature names to the DataFrame if dimensions match.
+            if hasattr(self.model, "feature_names") and self.model.feature_names:
+                if len(df.columns) == len(self.model.feature_names):
+                    # Check if columns are likely auto-generated integers (int or string "0", "1")
+                    first_col = df.columns[0]
+                    is_int_col = isinstance(first_col, int) or (isinstance(first_col, str) and first_col.isdigit())
+                    
+                    if is_int_col:
+                        df.columns = self.model.feature_names
 
             dmatrix = xgb.DMatrix(df)
             probs = self.model.predict(dmatrix)
