@@ -3,7 +3,7 @@ import boto3
 import os
 from pyspark.sql import SparkSession
 import importlib
-from pyspark.sql.types import StructType, StructField, LongType, DoubleType, StringType
+from pyspark.sql.types import StructType
 import json
 
 class SparkPreprocessing(BaseUtils):
@@ -197,7 +197,7 @@ class SparkPreprocessing(BaseUtils):
 
 
 def main(): 
-    from k3s.spark.schema.schemas import schema_full as schema
+    from schema.schemas import schema_full as schema
     
     data_dir = "s3a://k8s-mlops-platform-bucket/v1/raw/" #Para Spark
     output_dir = "s3a://k8s-mlops-platform-bucket/v1/processed/" #Para Spark
