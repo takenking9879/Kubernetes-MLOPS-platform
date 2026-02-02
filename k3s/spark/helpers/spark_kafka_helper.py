@@ -12,6 +12,7 @@ def kafka_to_schema_features(df: DataFrame) -> DataFrame:
     return (
         df
         .select(
+            col("event_id"),
             col("properties.src_port").cast("long").alias("src_port"),
             col("properties.dst_port").cast("long").alias("dst_port"),
             col("properties.protocol").alias("protocol"),

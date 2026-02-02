@@ -86,4 +86,5 @@ spec:
           - Create    # crear el topic si no existe
           - Describe  # metadata (Kafka UI, tooling)
           - Write     # producir predicciones
+          - Read      # Kafka UI needs to read to show messages
         host: "*"

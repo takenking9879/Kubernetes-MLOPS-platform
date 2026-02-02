@@ -85,11 +85,11 @@ spec:
                   value: /home/ray/app/repo
               resources:
                 requests:
-                  cpu: "1"
-                  memory: "3Gi"
+                  cpu: "500m"
+                  memory: "1Gi"
                 limits:
-                  cpu: "2"
-                  memory: "4Gi"
+                  cpu: "1"
+                  memory: "2Gi"
               volumeMounts:
                 - name: job-files
                   mountPath: /home/ray/app
@@ -144,11 +144,11 @@ spec:
                     value: /home/ray/app/repo
                 resources:
                   requests:
-                    cpu: "2"
-                    memory: "4Gi"
+                    cpu: "1"
+                    memory: "2Gi"
                   limits:
-                    cpu: "4"
-                    memory: "6Gi"
+                    cpu: "2"
+                    memory: "3Gi"
                 volumeMounts:
                   - name: job-files
                     mountPath: /home/ray/app

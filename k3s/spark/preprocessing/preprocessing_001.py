@@ -160,6 +160,10 @@ def preprocess_spark(
     if target_col in df.columns:
         final_cols.append(target_col)
     
+    # Preserve event_id for lineage if present
+    if 'event_id' in df.columns:
+        final_cols.append('event_id')
+    
     # Verificación de seguridad: solo seleccionar si existen en el DF
     existing_cols = [c for c in final_cols if c in df.columns]
     df = df.select(*existing_cols)

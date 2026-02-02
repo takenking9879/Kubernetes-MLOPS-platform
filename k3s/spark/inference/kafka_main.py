@@ -14,7 +14,7 @@ from k3s.spark.helpers.spark_kafka_helper import kafka_to_schema_features
 from k3s.spark.preprocessing import preprocessing_001
 import requests
 
-def _process_ray_prediction(partition: Iterator[Tuple[Row, Row]], url: str, batch_size: int, timeout: int) -> Iterator[Row]:
+def _process_ray_prediction(partition: Iterator[Row], url: str, batch_size: int, timeout: int) -> Iterator[Row]:
     """
     Process a single partition by batching requests to Ray Serve.
     Standalone function to avoid pickling 'self'.
@@ -22,10 +22,11 @@ def _process_ray_prediction(partition: Iterator[Tuple[Row, Row]], url: str, batc
     batch_meta: List[str] = []
     batch_payload: List[Dict[str, Any]] = []
 
-    for feat_row, id_row in partition:
-        event_id = id_row.event_id
-        # Ray expects a flat list of values per row (no column names)
-        payload_row = list(feat_row)
+    for row in partition:
+        # Assumes event_id is the LAST column, as appended in preprocessing
+        event_id = row[-1]
+        # Features are everything else
+        payload_row = list(row)[:-1]
 
         batch_meta.append(event_id)
         batch_payload.append(payload_row)
@@ -328,14 +329,8 @@ class KafkaSparkInference(BaseUtils):
             batch_id: Unique identifier for this batch
         """
         try:
-            # Preserve original columns for final join
-            event_ids_df = batch_df.select("event_id", "timestamp", "properties")
-
             df_features = self.from_kafka_schema_to_features(batch_df)
             df_preprocessed, _ = self.preprocessing_module.preprocess_spark(df_features, model=self.scaler, train=False)
-
-            # Zip features with IDs to preserve the link WITHOUT using collect()
-            rdd_with_ids = df_preprocessed.rdd.zip(batch_df.select("event_id").rdd)
 
             # EXTRAER VALORES COMO PRIMITIVOS FUERA DE LA LAMBDA
             # Esto rompe cualquier vínculo con 'self' que cause el PicklingError
@@ -343,14 +338,14 @@ class KafkaSparkInference(BaseUtils):
             target_batch = int(self.ray_batch_size)
             target_timeout = int(self.ray_request_timeout)
 
-            predictions_rdd = rdd_with_ids.mapPartitions(
+            predictions_rdd = df_preprocessed.rdd.mapPartitions(
                 lambda p: _process_ray_prediction(p, target_url, target_batch, target_timeout)
             )
 
             predictions_df = self.spark.createDataFrame(predictions_rdd, schema=prediction_schema)
 
             output_df = (
-                event_ids_df
+                batch_df
                 .join(predictions_df, on="event_id", how="inner")
                 .select("timestamp", "event_id", "properties", "label")
             )
