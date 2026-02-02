@@ -18,21 +18,16 @@ spec:
           - name: ModelRouter
             ray_actor_options:
               num_cpus: 0.1
-            user_config:
-              canary_probability: 0.0
           - name: StableModel
             ray_actor_options:
               num_cpus: 1
             autoscaling_config:
               min_replicas: 1
               initial_replicas: 1
-              max_replicas: 10
+              max_replicas: 5
               target_ongoing_requests: 4
               upscale_delay_s: 1
               downscale_delay_s: 30
-            user_config:
-              model_key: v1/models/model_xgboost.pkl
-              artifacts_key: v1/artifacts/pipeline_model.json
           - name: CanaryModel
             ray_actor_options:
               num_cpus: 1
@@ -43,11 +38,6 @@ spec:
               target_ongoing_requests: 4
               upscale_delay_s: 1
               downscale_delay_s: 30
-            user_config:
-              # Point this at your canary artifact when you have one.
-              model_key: v1/models/model_xgboost_canary.pkl
-              artifacts_key: v1/artifacts/pipeline_model.json
-
   rayClusterConfig:
     rayVersion: "2.52.0"
     enableInTreeAutoscaling: true

@@ -241,7 +241,11 @@ class ModelRouter:
         self._canary_probability = 0.0
 
     def reconfigure(self, config: Dict[str, Any]) -> None:
-        p = float(config.get("canary_probability", 0.0))
+        params = load_params()
+        serving_cfg = params.get("kuberay", {}).get("serving", {})
+        
+        # Priority: Config > serving.canary_probability > default
+        p = float(config.get("canary_probability", serving_cfg.get("canary_probability", 0.0)))
         self._canary_probability = max(0.0, min(1.0, p))
         self._logger.info("Router configured: canary_probability=%s", self._canary_probability)
 

@@ -50,6 +50,27 @@ spec:
       transaction.state.log.min.isr: 1
       default.replication.factor: 1
       min.insync.replicas: 1
+    # ===== PROMETHEUS METRICS (Strimzi Metrics Reporter) =====
+    metricsConfig:
+      type: strimziMetricsReporter
+      values:
+        allowList:
+          - "kafka.server:type=BrokerTopicMetrics,.*"
+          - "kafka.server:type=ReplicaManager,.*"
+          - "kafka.controller:type=KafkaController,.*"
+          - "kafka.network:type=RequestMetrics,.*"
+          - "kafka.log:type=LogFlushStats,.*"
   entityOperator:
     topicOperator: {}
     userOperator: {}
+  # ===== KAFKA EXPORTER (for consumer group lag) =====
+  kafkaExporter:
+    topicRegex: ".*"
+    groupRegex: ".*"
+    resources:
+      requests:
+        cpu: 50m
+        memory: 64Mi
+      limits:
+        cpu: 200m
+        memory: 128Mi

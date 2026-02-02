@@ -19,7 +19,7 @@ kuberay:
     
   serving:
     framework: "pytorch"
-    
+    canary_probability: 0.0    
 
 spark:
   app_name: "spark-preprocessing"

@@ -11,6 +11,7 @@ ENABLE_KAFKA=true
 ENABLE_RAY=true
 ENABLE_MLFLOW=false
 ENABLE_SPARK=true
+ENABLE_MONITORING=true
 
 # ============================================================
 # TIMEOUTS
@@ -28,6 +29,7 @@ INGRESS_ADMISSION_TIMEOUT="120s"
 NS_KAFKA="kafka"
 NS_RAY="ray"
 NS_SPARK="spark"
+NS_MONITORING="monitoring"
 ENV_FILE=".env"
 
 # ============================================================
@@ -59,11 +61,13 @@ info "Creating namespaces"
 kubectl create namespace kafka || true
 kubectl create namespace ray || true
 kubectl create namespace spark || true
+kubectl create namespace monitoring || true
 
 info "Creating secrets from .env"
 kubectl create secret generic kafka-secret -n kafka --from-env-file=.env || true
 kubectl create secret generic env-secret -n ray --from-env-file=.env || true
 kubectl create secret generic env-secret -n spark --from-env-file=.env || true
+kubectl create secret generic env-secret -n monitoring --from-env-file=.env || true
 ok "Namespaces and secrets ready"
 
 # ============================================================
@@ -196,6 +200,43 @@ deploy_spark() {
 }
 
 # ============================================================
+# MONITORING (Prometheus + Grafana + kube-state-metrics)
+# ============================================================
+deploy_monitoring() {
+  sep
+  info "Deploying Monitoring Stack (Prometheus, Grafana, kube-state-metrics, node-exporter)"
+
+  # Apply all monitoring manifests
+  info "Applying Prometheus"
+  kubectl apply -f k3s/monitoring/prometheus-stack.yaml
+
+  info "Applying kube-state-metrics"
+  kubectl apply -f k3s/monitoring/kube-state-metrics.yaml
+
+  info "Applying node-exporter"
+  kubectl apply -f k3s/monitoring/node-exporter.yaml
+
+  info "Applying Grafana"
+  kubectl apply -f k3s/monitoring/grafana.yaml
+
+  # Wait for deployments
+  info "Waiting for Prometheus"
+  kubectl wait deployment/prometheus -n monitoring \
+    --for=condition=Available --timeout=120s
+
+  info "Waiting for Grafana"
+  kubectl wait deployment/grafana -n monitoring \
+    --for=condition=Available --timeout=120s
+
+  info "Waiting for kube-state-metrics"
+  kubectl wait deployment/kube-state-metrics -n monitoring \
+    --for=condition=Available --timeout=120s
+
+  ok "Monitoring stack deployed 📊"
+  info "Grafana available at: http://grafana.localhost"
+}
+
+# ============================================================
 # INGRESS (ABSOLUTELY LAST)
 # ============================================================
 deploy_ingress() {
@@ -253,6 +294,10 @@ fi
 info "Waiting for parallel jobs to finish"
 wait "${PIDS[@]}"
 ok "Parallel workloads completed"
+
+if [ "${ENABLE_MONITORING}" = true ]; then
+  deploy_monitoring
+fi
 
 deploy_ingress
 sep

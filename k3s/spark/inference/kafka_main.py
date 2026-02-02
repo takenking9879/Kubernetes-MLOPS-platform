@@ -6,14 +6,28 @@ Refactorizado desde KafkaSparkInference para soportar múltiples datasets y mode
 """
 import os
 import logging
+import time
+import threading
 from typing import Dict, Optional, Iterator, List, Any
 import json
 import importlib
 from confluent_kafka import Consumer, KafkaException
 from pyspark.sql import SparkSession, Row, DataFrame
 from pyspark.sql.functions import from_json, col, to_json, struct
+from pyspark import SparkContext, AccumulatorParam
 import boto3
 import requests
+
+# ===== PROMETHEUS METRICS =====
+from prometheus_client import start_http_server, Gauge, Counter, Summary
+
+# Custom metrics for MLOps observability
+LATENCY_PREPROCESS = Gauge('latency_preprocess_seconds', 'Time spent in Spark preprocessing per batch')
+LATENCY_INFERENCE = Gauge('latency_inference_seconds', 'Time spent calling Ray Serve per batch')
+LATENCY_TOTAL_BATCH = Gauge('latency_total_batch_seconds', 'Total roundtrip time Kafka->Spark->Ray->Kafka per batch')
+BATCH_RECORDS_TOTAL = Gauge('spark_batch_records_total', 'Number of records processed in the last batch')
+BATCH_ERRORS_TOTAL = Counter('spark_batch_errors_total', 'Total number of batch processing errors')
+INFERENCE_LATENCY_SUMMARY = Summary('inference_latency_summary_seconds', 'Summary of inference latencies')
 
 from k3s.spark.utils import create_logger, BaseUtils
 from k3s.spark.schema.schema_registry import get_schema
@@ -113,6 +127,9 @@ class KafkaSparkInference(BaseUtils):
         super().__init__(logger, params_path)
         self.params = self.load_params()['spark']
         
+        # ===== START PROMETHEUS METRICS SERVER =====
+        self._start_prometheus_server()
+        
         # Cargar configuraciones desde params
         self._load_kafka_config()
         self._load_schema_config()
@@ -142,6 +159,17 @@ class KafkaSparkInference(BaseUtils):
         
         # Crear Spark session
         self.spark = self._create_spark_session()
+    
+    # ===== PROMETHEUS SERVER =====
+    
+    def _start_prometheus_server(self):
+        """Start Prometheus HTTP server on port 8000 for custom metrics."""
+        try:
+            prometheus_port = int(os.getenv('PROMETHEUS_PORT', '8000'))
+            start_http_server(prometheus_port)
+            self.logger.info(f"✅ Prometheus metrics server started on port {prometheus_port}")
+        except Exception as e:
+            self.logger.warning(f"⚠️ Could not start Prometheus server: {e}")
     
     # ===== CONFIGURATION LOADERS =====
     
@@ -533,18 +561,37 @@ class KafkaSparkInference(BaseUtils):
         """
         Procesa un micro-batch completo.
         Pipeline: convert → preprocess → predict → join → write
+        
+        Includes Prometheus metrics for latency tracking.
         """
+        batch_start_time = time.time()
+        
         try:
             self.logger.info(f"Processing batch {batch_id}")
+            
+            # Count records in batch
+            record_count = batch_df.count()
+            BATCH_RECORDS_TOTAL.set(record_count)
+            
+            if record_count == 0:
+                self.logger.info(f"⏭️ Batch {batch_id} is empty, skipping")
+                return
             
             # 1. Convertir schema de Kafka a features
             df_features = self.convert_schema(batch_df)
             
-            # 2. Preprocesar
+            # 2. Preprocesar (with latency tracking)
+            preprocess_start = time.time()
             df_preprocessed = self.preprocess(df_features)
+            preprocess_latency = time.time() - preprocess_start
+            LATENCY_PREPROCESS.set(preprocess_latency)
             
-            # 3. Predecir
+            # 3. Predecir (with latency tracking)
+            inference_start = time.time()
             predictions_df = self.predict_batch(df_preprocessed)
+            inference_latency = time.time() - inference_start
+            LATENCY_INFERENCE.set(inference_latency)
+            INFERENCE_LATENCY_SUMMARY.observe(inference_latency)
             
             # 4. Join con datos originales
             output_df = batch_df.join(
@@ -556,9 +603,18 @@ class KafkaSparkInference(BaseUtils):
             # 5. Escribir a Kafka
             self._write_to_kafka(output_df)
             
-            self.logger.info(f"✅ Batch {batch_id} completed")
+            # Total batch latency (roundtrip)
+            total_latency = time.time() - batch_start_time
+            LATENCY_TOTAL_BATCH.set(total_latency)
+            
+            self.logger.info(
+                f"✅ Batch {batch_id} completed | Records: {record_count} | "
+                f"Preprocess: {preprocess_latency:.3f}s | Inference: {inference_latency:.3f}s | "
+                f"Total: {total_latency:.3f}s"
+            )
             
         except Exception as e:
+            BATCH_ERRORS_TOTAL.inc()
             self.logger.error(f"❌ Batch {batch_id} failed: {e}", exc_info=True)
             raise
     

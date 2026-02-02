@@ -72,3 +72,10 @@ ingress:
       pathType: Prefix
       annotations:
         nginx.ingress.kubernetes.io/service-upstream: "true"
+    - name: grafana
+      namespace: monitoring
+      subdomain: grafana
+      serviceName: grafana
+      servicePort: 3000
+      path: /
+      pathType: Prefix
