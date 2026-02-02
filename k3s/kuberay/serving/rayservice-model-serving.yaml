@@ -31,7 +31,6 @@ spec:
               upscale_delay_s: 1
               downscale_delay_s: 30
             user_config:
-              framework: xgboost
               model_key: v1/models/model_xgboost.pkl
               artifacts_key: v1/artifacts/pipeline_model.json
           - name: CanaryModel
@@ -45,7 +44,6 @@ spec:
               upscale_delay_s: 1
               downscale_delay_s: 30
             user_config:
-              framework: xgboost
               # Point this at your canary artifact when you have one.
               model_key: v1/models/model_xgboost_canary.pkl
               artifacts_key: v1/artifacts/pipeline_model.json

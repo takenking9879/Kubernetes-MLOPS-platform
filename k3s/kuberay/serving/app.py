@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from typing import Any, Dict, List, Optional, Protocol
 
 import boto3
+import yaml
 
 from ray import serve
 from starlette.requests import Request
@@ -18,6 +19,18 @@ class ModelSpec:
     framework: str
     model_key: str
     artifacts_key: str
+
+
+def load_params() -> Dict[str, Any]:
+    """Load common parameters from params.yaml."""
+    params_path = os.getenv("PARAMS_PATH", "/home/ray/app/repo/k3s/params.yaml")
+    try:
+        if os.path.exists(params_path):
+            with open(params_path, "r") as f:
+                return yaml.safe_load(f)
+    except Exception:
+        pass
+    return {}
 
 
 class S3Store:
@@ -100,13 +113,14 @@ class PyTorchAdapter:
 
 class ModelFactory:
     @staticmethod
-    def create_adapter(framework: str, *, model_path: str) -> ModelAdapter:
+    def create_adapter(framework: str, *, model_path: str, params: Dict[str, Any] = None) -> ModelAdapter:
         fw = framework.strip().lower()
         if fw == "xgboost":
             return XGBoostAdapter(model_path)
         if fw == "pytorch":
-            input_dim = int(os.getenv("PYTORCH_INPUT_DIM", "14"))
-            num_classes = int(os.getenv("PYTORCH_NUM_CLASSES", "6"))
+            model_cfg = (params or {}).get("kuberay", {}).get("model", {})
+            input_dim = int(model_cfg.get("input_dim", os.getenv("PYTORCH_INPUT_DIM", "14")))
+            num_classes = int(model_cfg.get("num_classes", os.getenv("PYTORCH_NUM_CLASSES", "6")))
             return PyTorchAdapter(model_path, input_dim=input_dim, num_classes=num_classes)
         raise ValueError(f"Unsupported MODEL_FRAMEWORK={framework!r}")
 
@@ -126,9 +140,23 @@ class _ModelRuntime:
         self._spec: Optional[ModelSpec] = None
 
     def _load_from_config(self, config: Dict[str, Any]) -> None:
+        params = load_params()
+        model_cfg = params.get("kuberay", {}).get("model", {})
+        serving_cfg = params.get("kuberay", {}).get("serving", {})
+
         bucket = os.getenv("S3_BUCKET_NAME", "k8s-mlops-platform-bucket")
-        framework = str(config.get("framework", os.getenv("MODEL_FRAMEWORK", "xgboost")))
-        model_key = str(config.get("model_key", os.getenv("MODEL_KEY", f"models/model_{framework}.pkl")))
+        
+        # Priority: Config > serving.framework > model.framework > ENV > default
+        framework = str(
+            config.get(
+                "framework", 
+                serving_cfg.get(
+                    "framework", 
+                    model_cfg.get("framework", os.getenv("MODEL_FRAMEWORK", "xgboost"))
+                )
+            )
+        )
+        model_key = str(config.get("model_key", os.getenv("MODEL_KEY", f"v1/models/model_{framework}.pkl")))
         artifacts_key = str(
             config.get(
                 "artifacts_key",
@@ -144,7 +172,7 @@ class _ModelRuntime:
         )
 
         # NOTE: preprocessing lives in Spark. Serving is pure inference only.
-        self._adapter = ModelFactory.create_adapter(framework, model_path=model_path)
+        self._adapter = ModelFactory.create_adapter(framework, model_path=model_path, params=params)
 
         self._logger.info("Model loaded (%s): %s", self._variant, self._spec)
 
