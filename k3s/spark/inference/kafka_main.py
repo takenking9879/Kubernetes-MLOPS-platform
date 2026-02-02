@@ -14,6 +14,46 @@ from k3s.spark.helpers.spark_kafka_helper import kafka_to_schema_features
 from k3s.spark.preprocessing import preprocessing_001
 import requests
 
+def _process_ray_prediction(partition: Iterator[Tuple[Row, Row]], url: str, batch_size: int, timeout: int) -> Iterator[Row]:
+    """
+    Process a single partition by batching requests to Ray Serve.
+    Standalone function to avoid pickling 'self'.
+    """
+    batch_meta: List[str] = []
+    batch_payload: List[Dict[str, Any]] = []
+
+    for feat_row, id_row in partition:
+        event_id = id_row.event_id
+        payload_row = feat_row.asDict()
+
+        batch_meta.append(event_id)
+        batch_payload.append(payload_row)
+
+        if len(batch_payload) >= batch_size:
+            response = requests.post(url, json={"data": batch_payload}, timeout=timeout)
+            response.raise_for_status()
+            preds = response.json()["predictions"]
+
+            if len(preds) != len(batch_meta):
+                raise ValueError(f"Prediction count mismatch: {len(preds)} != {len(batch_meta)}")
+
+            for i, pred in enumerate(preds):
+                yield Row(event_id=batch_meta[i], label=int(pred))
+
+            batch_meta = []
+            batch_payload = []
+
+    if batch_payload:
+        response = requests.post(url, json={"data": batch_payload}, timeout=timeout)
+        response.raise_for_status()
+        preds = response.json()["predictions"]
+
+        if len(preds) != len(batch_meta):
+            raise ValueError(f"Prediction count mismatch: {len(preds)} != {len(batch_meta)}")
+
+        for i, pred in enumerate(preds):
+            yield Row(event_id=batch_meta[i], label=int(pred))
+
 class KafkaSparkInference(BaseUtils):
     """
     Production-ready Kafka-Spark inference pipeline with Ray Serve integration.
@@ -294,11 +334,16 @@ class KafkaSparkInference(BaseUtils):
             df_preprocessed, _ = self.preprocessing_module.preprocess_spark(df_features, model=self.scaler, train=False)
 
             # Zip features with IDs to preserve the link WITHOUT using collect()
-            # This is efficient and scalable.
             rdd_with_ids = df_preprocessed.rdd.zip(batch_df.select("event_id").rdd)
 
+            # EXTRAER VALORES COMO PRIMITIVOS FUERA DE LA LAMBDA
+            # Esto rompe cualquier vínculo con 'self' que cause el PicklingError
+            target_url = str(self.ray_serve_url)
+            target_batch = int(self.ray_batch_size)
+            target_timeout = int(self.ray_request_timeout)
+
             predictions_rdd = rdd_with_ids.mapPartitions(
-                lambda partition: self._predict_partition(partition)
+                lambda p: _process_ray_prediction(p, target_url, target_batch, target_timeout)
             )
 
             predictions_df = self.spark.createDataFrame(predictions_rdd, schema=prediction_schema)
@@ -328,65 +373,6 @@ class KafkaSparkInference(BaseUtils):
             self.logger.error(f"Batch {batch_id}: Failed to process: {e}", exc_info=True)
             raise
 
-    def _predict_partition(self, partition: Iterator[Tuple[Row, Row]]) -> Iterator[Row]:
-        """
-        Process a single partition by batching requests to Ray Serve.
-        
-        Args:
-            partition: Iterator of (feature_row, id_row) tuples
-            
-        Yields:
-            Row with (event_id, label)
-        """
-        try:
-            batch_meta: List[str] = []
-            batch_payload: List[Dict[str, Any]] = []
-
-            for feat_row, id_row in partition:
-                event_id = id_row.event_id
-                # Features from helper are already 'clean' for Ray
-                payload_row = feat_row.asDict()
-
-                batch_meta.append(event_id)
-                batch_payload.append(payload_row)
-
-                if len(batch_payload) >= self.ray_batch_size:
-                    response = requests.post(
-                        self.ray_serve_url,
-                        json={"data": batch_payload},
-                        timeout=self.ray_request_timeout,
-                    )
-                    response.raise_for_status()
-                    body = response.json()
-                    preds = body["predictions"]
-
-                    if len(preds) != len(batch_meta):
-                        raise ValueError(f"Prediction count mismatch: {len(preds)} != {len(batch_meta)}")
-
-                    for i, pred in enumerate(preds):
-                        yield Row(event_id=batch_meta[i], label=int(pred))
-
-                    batch_meta = []
-                    batch_payload = []
-
-            if batch_payload:
-                response = requests.post(
-                    self.ray_serve_url,
-                    json={"data": batch_payload},
-                    timeout=self.ray_request_timeout,
-                )
-                response.raise_for_status()
-                body = response.json()
-                preds = body["predictions"]
-
-                if len(preds) != len(batch_meta):
-                    raise ValueError(f"Prediction count mismatch: {len(preds)} != {len(batch_meta)}")
-
-                for i, pred in enumerate(preds):
-                    yield Row(event_id=batch_meta[i], label=int(pred))
-        except Exception:
-            raise
-    
     def run_inference(self):
         """
         Main inference pipeline using proper Spark Structured Streaming patterns.
