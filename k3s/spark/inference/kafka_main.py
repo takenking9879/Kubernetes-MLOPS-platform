@@ -2,15 +2,13 @@ import os
 import logging
 from typing import Dict, Optional, Iterator, List, Any
 import json
-import ray
-from confluent_kafka import Consumer, Producer, KafkaError, KafkaException
+from confluent_kafka import Consumer, KafkaException
 from pyspark.sql import SparkSession, Row
 import importlib
-from pyspark.sql.types import StructType, StructField, LongType, DoubleType, StringType
 import boto3
 from k3s.spark.utils import create_logger, BaseUtils
 from pyspark.sql.functions import (from_json, col)
-from schema.schemas import schema_features
+from schema.schemas import schema_features, schema_full
 import requests
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
@@ -139,7 +137,6 @@ class KafkaSparkInference(BaseUtils):
                 .option("kafka.sasl.jaas.config", self.kafka_sasl_jaas_config)
                 .load()
             )
-            from k3s.spark.schema.schemas import schema_features
             parsed_df = df.selectExpr("CAST(value AS STRING)") \
             .select(from_json(col("value"), schema_features).alias("data")) \
             .select("data.*")
@@ -187,6 +184,13 @@ class KafkaSparkInference(BaseUtils):
             return df_out
         except Exception as e:
             self.logger.error('Preprocess failed to complete: %s', str(e), exc_info=True)
+            raise
+
+    def validate_schema_df(self, df, expected_schema) -> bool:
+        try:
+            return df.schema == expected_schema
+        except Exception:
+            self.logger.error("Schema validation failed", exc_info=True)
             raise
     
     @staticmethod
@@ -387,6 +391,9 @@ class KafkaSparkInference(BaseUtils):
             ).toDF()
             
             self.logger.info("Prediction pipeline configured")
+
+            # Validar que el DataFrame de salida cumple con el schema_full
+            self.validate_schema_df(df_predictions, schema_full)
             
             # 4. Escribir resultados a Kafka de salida
             checkpoint_location = os.getenv(
