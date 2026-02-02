@@ -11,8 +11,8 @@ spec:
 
   applicationTolerations:
     instanceConfig:
-      initExecutors: 2
-      minExecutors: 2
+      initExecutors: 1
+      minExecutors: 1
       maxExecutors: 3
 
   # Spark confs (Kafka + streaming con S3 checkpoint)

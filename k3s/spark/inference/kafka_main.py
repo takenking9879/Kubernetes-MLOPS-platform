@@ -85,7 +85,7 @@ class KafkaSparkInference(BaseUtils):
         )
         
         # Ray Serve configuration
-        self.ray_serve_url = os.getenv("RAY_SERVE_URL", "http://serving.localhost/infer")
+        self.ray_serve_url = os.getenv("RAY_SERVE_URL", "http://model-serving-serve-svc.ray.svc.cluster.local:8000/infer")
         self.ray_batch_size = int(os.getenv("RAY_BATCH_SIZE", "100"))
         self.ray_request_timeout = int(os.getenv("RAY_REQUEST_TIMEOUT", "30"))
         self.ray_max_retries = int(os.getenv("RAY_MAX_RETRIES", "3"))
