@@ -24,7 +24,8 @@ def _process_ray_prediction(partition: Iterator[Tuple[Row, Row]], url: str, batc
 
     for feat_row, id_row in partition:
         event_id = id_row.event_id
-        payload_row = feat_row.asDict()
+        # Ray expects a flat list of values per row (no column names)
+        payload_row = list(feat_row)
 
         batch_meta.append(event_id)
         batch_payload.append(payload_row)
