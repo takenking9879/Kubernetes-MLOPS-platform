@@ -134,7 +134,7 @@ class SyntheticTrafficGenerator:
         delta = float(self.rng.uniform(0, self.epsilon))
         ts = block_start + pd.Timedelta(seconds=delta)
         self.n_step += 1
-        return ts.replace(microsecond=0)
+        return ts.floor('S')
 
     def next_timestamps(self, n: int) -> pd.DatetimeIndex:
         n = int(n)
@@ -291,7 +291,7 @@ class SyntheticTrafficGenerator:
             label = int(attack_id)
 
         return {
-            "timestamp": row["timestamp"].isoformat(), #quitarlo y en producer para que el de kafka sea el que se queda
+            "timestamp": row["timestamp"].strftime('%Y-%m-%dT%H:%M:%S'), #quitarlo y en producer para que el de kafka sea el que se queda
             "event_id": str(uuid.uuid4()),
             "properties": {
                 "src_port": int(row["src_port"]),
