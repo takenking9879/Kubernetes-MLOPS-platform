@@ -250,9 +250,6 @@ class KafkaSparkInference(BaseUtils):
         Optimization: Uses pre-loaded module instead of dynamic import.
         """
         try:
-            if self.scaler is None:
-                self.scaler = self.load_scaler_artifact()
-            
             df_out, _ = self._preprocessing_module.preprocess_spark(
                 df, 
                 model=self.scaler, 
