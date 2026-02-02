@@ -216,6 +216,8 @@ deploy_ingress() {
 
   ok "Ingress NGINX ready"
 
+  sleep 5 # small buffer time
+
   info "Deploying platform ingress (FINAL STEP)"
   helm upgrade --install platform-ingress ./k3s/ingress \
     -f k3s/ingress/values.yaml

@@ -24,5 +24,75 @@ spark:
   write_batch_size: 100000  # Max lines written to S3 per batch
   pipeline:
     module: "preprocessing.preprocessing_001"
-  check_kafka_connection: true
+  
+  # ===== SCHEMAS CONFIGURATION =====
+  # Nombres de schemas definidos en schema/schemas.py
+  schemas:
+    input_schema: "kafka_schema_features"     # Schema para parsear Kafka
+    features_schema: "schema_features"        # Schema después de conversión
+    output_schema: "prediction_schema"        # Schema de predicciones
+    preprocessed_schema: "schema_preprocessed" # Schema después de preprocessing
+  
+  # ===== CONVERTERS CONFIGURATION =====
+  # Nombres de funciones definidas en helpers/spark_kafka_helper.py
+  converters:
+    kafka_to_features: "kafka_to_schema_features"
+    # Puedes agregar más conversores aquí:
+    # features_to_another: "another_converter_function"
+  
+  # ===== PREPROCESSING CONFIGURATION =====
+  preprocessing:
+    module: "preprocessing.preprocessing_001"  # Módulo relativo a k3s.spark
+    function: "preprocess_spark"               # Función a llamar
+    
+    # Configuración de artefactos (scalers, encoders, etc.)
+    artifacts:
+      enabled: true
+      source: "s3"  # s3, local, minio
+      bucket: "k8s-mlops-platform-bucket"
+      key: "v1/artifacts/pipeline_model.json"
+      # Path completo será: s3://bucket/key
+      cache_local: true
+      local_cache_path: "/tmp/pipeline_model.json"
+  
+  # ===== PREDICTION CONFIGURATION =====
+  prediction:
+    type: "ray_serve"  # ray_serve, http, sagemaker, custom
+    
+    # Configuración específica de Ray Serve
+    ray_serve:
+      url: "http://model-serving-serve-svc.ray.svc.cluster.local:8000/infer"
+      batch_size: 100
+      timeout: 30
+      max_retries: 3
+      request_payload_format: "list"  # list, dict
+      response_format: "json"
+      prediction_key: "predictions"   # Key en la respuesta JSON
+    
+    # Configuración de columnas
+    columns:
+      id_column: "event_id"
+      prediction_column: "label"
+  
+  # ===== OUTPUT CONFIGURATION =====
+  output:
+    format: "json"  # json, avro, protobuf
+    key_column: "event_id"
+    # Columnas a incluir en la salida (o "all" para todas)
+    value_columns:
+      - "timestamp"
+      - "event_id"
+      - "properties"
+      - "label"
+  
+  # ===== CHECKPOINT CONFIGURATION =====
+  checkpoint:
+    location: "s3a://k8s-mlops-platform-bucket/checkpoints/kafka-spark-inference"
+    cleanup_on_exit: false
+  
+  # ===== OPERATIONAL CONFIGURATION =====
+  operational:
+    check_kafka_connection: true
+    check_storage_connection: true
+    log_level: "INFO"
 
