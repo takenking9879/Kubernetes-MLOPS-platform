@@ -5,3 +5,5 @@
 docker build -t k3s-kafka-inference ./k3s/spark/inference
 
 kubectl apply -f k3s/spark/inference/spark-kafka-application.yaml
+
+kubectl delete sparkapplication spark-kafka-app -n spark

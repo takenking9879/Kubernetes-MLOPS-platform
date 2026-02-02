@@ -4,7 +4,7 @@ metadata:
   name: spark-kafka-app
   namespace: spark
 spec:
-  pyFiles: "local:///app/repo/k3s/spark/kafka_main.py"
+  pyFiles: "local:///app/repo/k3s/spark/inference/kafka_main.py"
 
   runtimeVersions:
     sparkVersion: "4.0.1"
