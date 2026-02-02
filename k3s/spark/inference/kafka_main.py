@@ -8,7 +8,7 @@ import importlib
 import boto3
 from k3s.spark.utils import create_logger, BaseUtils
 from pyspark.sql.functions import (from_json, col)
-from schema.schemas import schema_features, schema_full
+from k3s.spark.schema.schemas import schema_features, schema_full
 import requests
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry

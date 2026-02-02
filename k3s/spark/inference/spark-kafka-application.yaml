@@ -35,9 +35,10 @@ spec:
     #spark.hadoop.fs.s3a.multipart.size: "104857600"
     spark.hadoop.fs.s3a.connection.maximum: "100"
     spark.hadoop.fs.s3a.path.style.access: "true"
-    # Ensure PYTHONPATH includes the git-sync work dir so `k3s` package is importable
-    spark.kubernetes.driverEnv.PYTHONPATH: "/opt/spark/work-dir:/opt/spark/work-dir/k3s"
-    spark.kubernetes.executorEnv.PYTHONPATH: "/opt/spark/work-dir:/opt/spark/work-dir/k3s"
+    # Ensure PYTHONPATH includes locations where git-sync places the repo
+    # driver/executor mount the shared volume at /app while git-sync writes to /git/repo
+    spark.kubernetes.driverEnv.PYTHONPATH: "/app:/app/repo:/app/repo/k3s:/opt/spark/work-dir:/opt/spark/work-dir/k3s"
+    spark.kubernetes.executorEnv.PYTHONPATH: "/app:/app/repo:/app/repo/k3s:/opt/spark/work-dir:/opt/spark/work-dir/k3s"
 
   # Driver spec
   driverSpec:
