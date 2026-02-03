@@ -1,10 +1,92 @@
-2026-02-03 12:37:33.293 | WARNING: Using incubator modules: jdk.incubator.vector
-2026-02-03 12:37:35.028 | Files local:///app/repo/k3s/spark/main.py from /app/.worktrees/2bdbe0f0556d07a93662ec98ac714e339af990a6/k3s/spark/main.py to /opt/spark/work-dir/main.py
-2026-02-03 12:37:35.150 | 26/02/03 18:37:35 WARN NativeCodeLoader: Unable to load native-hadoop library for your platform... using builtin-java classes where applicable
-2026-02-03 12:37:35.283 | Traceback (most recent call last):
-2026-02-03 12:37:35.283 |   File "/app/repo/k3s/spark/main.py", line 1, in <module>
-2026-02-03 12:37:35.283 |     from src.utils.baseclass import BaseUtils
-2026-02-03 12:37:35.284 | ModuleNotFoundError: No module named 'src'
-2026-02-03 12:37:35.295 | 26/02/03 18:37:35 INFO ShutdownHookManager: Shutdown hook called
-2026-02-03 12:37:35.297 | 26/02/03 18:37:35 INFO ShutdownHookManager: Deleting directory /tmp/localPyFiles-a23f9835-432b-4925-bc2b-a0453e0538bd
-2026-02-03 12:37:35.301 | 26/02/03 18:37:35 INFO ShutdownHookManager: Deleting directory /tmp/spark-9d101ead-fdad-4fe5-b32d-a8519043c88d
+2026-02-03 13:04:38.531 | WARNING: Using incubator modules: jdk.incubator.vector
+2026-02-03 13:04:39.661 | Files local:///app/repo/k3s/spark/main.py from /app/.worktrees/ef64e53c827fa1065499a3e6c83067bdf292efc4/k3s/spark/main.py to /opt/spark/work-dir/main.py
+2026-02-03 13:04:39.739 | 26/02/03 19:04:39 WARN NativeCodeLoader: Unable to load native-hadoop library for your platform... using builtin-java classes where applicable
+2026-02-03 13:04:40.514 | 2026-02-03 19:04:40,513 - SparkPreprocessing - DEBUG - Parameters retrieved from /app/repo/k3s/params.yaml
+2026-02-03 13:04:40.933 | 2026-02-03 19:04:40,932 - SparkPreprocessing - INFO - Minio connection verified. Buckets: ['frontend-crm-bucket', 'k8s-mlops-platform-bucket']
+2026-02-03 13:04:40.933 | 2026-02-03 19:04:40,933 - SparkPreprocessing - INFO - Creating SparkSession with S3A (MinIO) support
+2026-02-03 13:04:41.278 | Using Spark's default log4j profile: org/apache/spark/log4j2-defaults.properties
+2026-02-03 13:04:41.281 | 26/02/03 19:04:41 INFO SparkContext: Running Spark version 4.0.1
+2026-02-03 13:04:41.282 | 26/02/03 19:04:41 INFO SparkContext: OS info Linux, 6.6.87.2-microsoft-standard-WSL2, amd64
+2026-02-03 13:04:41.283 | 26/02/03 19:04:41 INFO SparkContext: Java version 17.0.17
+2026-02-03 13:04:41.299 | 26/02/03 19:04:41 INFO ResourceUtils: ==============================================================
+2026-02-03 13:04:41.299 | 26/02/03 19:04:41 INFO ResourceUtils: No custom resources configured for spark.driver.
+2026-02-03 13:04:41.300 | 26/02/03 19:04:41 INFO ResourceUtils: ==============================================================
+2026-02-03 13:04:41.300 | 26/02/03 19:04:41 INFO SparkContext: Submitted application: spark-preprocessing
+2026-02-03 13:04:41.318 | 26/02/03 19:04:41 INFO ResourceProfile: Default ResourceProfile created, executor resources: Map(cores -> name: cores, amount: 6, script: , vendor: , memory -> name: memory, amount: 4096, script: , vendor: , offHeap -> name: offHeap, amount: 0, script: , vendor: ), task resources: Map(cpus -> name: cpus, amount: 1.0)
+2026-02-03 13:04:41.321 | 26/02/03 19:04:41 INFO ResourceProfile: Limiting resource is cpus at 6 tasks per executor
+2026-02-03 13:04:41.323 | 26/02/03 19:04:41 INFO ResourceProfileManager: Added ResourceProfile id: 0
+2026-02-03 13:04:41.356 | 26/02/03 19:04:41 INFO SecurityManager: Changing view acls to: spark
+2026-02-03 13:04:41.357 | 26/02/03 19:04:41 INFO SecurityManager: Changing modify acls to: spark
+2026-02-03 13:04:41.358 | 26/02/03 19:04:41 INFO SecurityManager: Changing view acls groups to: spark
+2026-02-03 13:04:41.358 | 26/02/03 19:04:41 INFO SecurityManager: Changing modify acls groups to: spark
+2026-02-03 13:04:41.360 | 26/02/03 19:04:41 INFO SecurityManager: SecurityManager: authentication disabled; ui acls disabled; users with view permissions: spark groups with view permissions: EMPTY; users with modify permissions: spark; groups with modify permissions: EMPTY; RPC SSL disabled
+2026-02-03 13:04:41.528 | 26/02/03 19:04:41 INFO Utils: Successfully started service 'sparkDriver' on port 7078.
+2026-02-03 13:04:41.552 | 26/02/03 19:04:41 INFO SparkEnv: Registering MapOutputTracker
+2026-02-03 13:04:41.562 | 26/02/03 19:04:41 INFO SparkEnv: Registering BlockManagerMaster
+2026-02-03 13:04:41.574 | 26/02/03 19:04:41 INFO BlockManagerMasterEndpoint: Using org.apache.spark.storage.DefaultTopologyMapper for getting topology information
+2026-02-03 13:04:41.574 | 26/02/03 19:04:41 INFO BlockManagerMasterEndpoint: BlockManagerMasterEndpoint up
+2026-02-03 13:04:41.577 | 26/02/03 19:04:41 INFO SparkEnv: Registering BlockManagerMasterHeartbeat
+2026-02-03 13:04:41.594 | 26/02/03 19:04:41 INFO DiskBlockManager: Created local directory at /var/data/spark-fa86c2a0-9412-44d5-977e-b3d6e985faea/blockmgr-b232aab7-ba45-44c0-ac69-4443257dcd1a
+2026-02-03 13:04:41.613 | 26/02/03 19:04:41 INFO SparkEnv: Registering OutputCommitCoordinator
+2026-02-03 13:04:41.712 | 26/02/03 19:04:41 INFO JettyUtils: Start Jetty 0.0.0.0:4040 for SparkUI
+2026-02-03 13:04:41.772 | 26/02/03 19:04:41 INFO Utils: Successfully started service 'SparkUI' on port 4040.
+2026-02-03 13:04:41.800 | 26/02/03 19:04:41 WARN SparkContext: File with 'local' scheme local:/app/repo/k3s/spark/main.py is not supported to add to file server, since it is already available on every node.
+2026-02-03 13:04:41.816 | 26/02/03 19:04:41 INFO SecurityManager: Changing view acls to: spark
+2026-02-03 13:04:41.816 | 26/02/03 19:04:41 INFO SecurityManager: Changing modify acls to: spark
+2026-02-03 13:04:41.816 | 26/02/03 19:04:41 INFO SecurityManager: Changing view acls groups to: spark
+2026-02-03 13:04:41.816 | 26/02/03 19:04:41 INFO SecurityManager: Changing modify acls groups to: spark
+2026-02-03 13:04:41.816 | 26/02/03 19:04:41 INFO SecurityManager: SecurityManager: authentication disabled; ui acls disabled; users with view permissions: spark groups with view permissions: EMPTY; users with modify permissions: spark; groups with modify permissions: EMPTY; RPC SSL disabled
+2026-02-03 13:04:41.867 | 26/02/03 19:04:41 INFO SparkKubernetesClientFactory: Auto-configuring K8S client using current context from users K8S config file
+2026-02-03 13:04:43.013 | 26/02/03 19:04:43 INFO ExecutorPodsAllocator: Going to request 2 executors from Kubernetes for ResourceProfile Id: 0, target: 2, known: 0, sharedSlotFromPendingPods: 2147483647.
+2026-02-03 13:04:43.070 | 26/02/03 19:04:43 INFO KubernetesClientUtils: Spark configuration files loaded from Some(/opt/spark/conf) : spark.kubernetes.namespace
+2026-02-03 13:04:43.263 | 26/02/03 19:04:43 INFO ExecutorPodsAllocator: Found 0 reusable PVCs from 0 PVCs
+2026-02-03 13:04:43.328 | 26/02/03 19:04:43 INFO KubernetesClientUtils: Spark configuration files loaded from Some(/opt/spark/conf) : spark.kubernetes.namespace
+2026-02-03 13:04:43.329 | 26/02/03 19:04:43 INFO Utils: Successfully started service 'org.apache.spark.network.netty.NettyBlockTransferService' on port 7079.
+2026-02-03 13:04:43.333 | 26/02/03 19:04:43 INFO NettyBlockTransferService: Server created on spark-app-0-driver-svc.spark.svc 10.1.8.50:7079
+2026-02-03 13:04:43.335 | 26/02/03 19:04:43 INFO BlockManager: Using org.apache.spark.storage.RandomBlockReplicationPolicy for block replication policy
+2026-02-03 13:04:43.337 | 26/02/03 19:04:43 INFO BasicExecutorFeatureStep: Decommissioning not enabled, skipping shutdown script
+2026-02-03 13:04:43.350 | 26/02/03 19:04:43 INFO BlockManagerMaster: Registering BlockManager BlockManagerId(driver, spark-app-0-driver-svc.spark.svc, 7079, None)
+2026-02-03 13:04:43.357 | 26/02/03 19:04:43 INFO BlockManagerMasterEndpoint: Registering block manager spark-app-0-driver-svc.spark.svc:7079 with 1048.8 MiB RAM, BlockManagerId(driver, spark-app-0-driver-svc.spark.svc, 7079, None)
+2026-02-03 13:04:43.360 | 26/02/03 19:04:43 INFO BlockManagerMaster: Registered BlockManager BlockManagerId(driver, spark-app-0-driver-svc.spark.svc, 7079, None)
+2026-02-03 13:04:43.361 | 26/02/03 19:04:43 INFO BlockManager: Initialized BlockManager: BlockManagerId(driver, spark-app-0-driver-svc.spark.svc, 7079, None)
+2026-02-03 13:04:43.435 | 26/02/03 19:04:43 INFO KubernetesClientUtils: Spark configuration files loaded from Some(/opt/spark/conf) : spark.kubernetes.namespace
+2026-02-03 13:04:43.438 | 26/02/03 19:04:43 INFO BasicExecutorFeatureStep: Decommissioning not enabled, skipping shutdown script
+2026-02-03 13:04:48.664 | 26/02/03 19:04:48 INFO KubernetesClusterSchedulerBackend$KubernetesDriverEndpoint: Registered executor NettyRpcEndpointRef(spark-client://Executor) (10.1.8.51:53352) with ID 1, ResourceProfileId 0
+2026-02-03 13:04:48.773 | 26/02/03 19:04:48 INFO BlockManagerMasterEndpoint: Registering block manager 10.1.8.51:33621 with 2.2 GiB RAM, BlockManagerId(1, 10.1.8.51, 33621, None)
+2026-02-03 13:05:14.103 | 26/02/03 19:05:14 INFO KubernetesClusterSchedulerBackend: SchedulerBackend is ready for scheduling beginning after waiting maxRegisteredResourcesWaitingTime: 30000.0(ms)
+2026-02-03 13:05:15.664 | 2026-02-03 19:05:15,663 - SparkPreprocessing - INFO - Starting preprocessing for train dataset
+2026-02-03 13:05:15.664 | 2026-02-03 19:05:15,663 - SparkPreprocessing - ERROR - Preprocess failed to complete: 'pipeline'
+2026-02-03 13:05:15.664 | Traceback (most recent call last):
+2026-02-03 13:05:15.664 |   File "/app/repo/k3s/spark/main.py", line 103, in preprocess
+2026-02-03 13:05:15.664 |     pipeline_module = self.params['pipeline']['preprocessing']['module']
+2026-02-03 13:05:15.664 |                       ~~~~~~~~~~~^^^^^^^^^^^^
+2026-02-03 13:05:15.664 | KeyError: 'pipeline'
+2026-02-03 13:05:15.664 | Traceback (most recent call last):
+2026-02-03 13:05:15.664 |   File "/app/repo/k3s/spark/main.py", line 227, in <module>
+2026-02-03 13:05:15.664 |     main()
+2026-02-03 13:05:15.664 |   File "/app/repo/k3s/spark/main.py", line 216, in main
+2026-02-03 13:05:15.664 |     preprocessing.preprocess('train')
+2026-02-03 13:05:15.664 |   File "/app/repo/k3s/spark/main.py", line 103, in preprocess
+2026-02-03 13:05:15.664 |     pipeline_module = self.params['pipeline']['preprocessing']['module']
+2026-02-03 13:05:15.664 |                       ~~~~~~~~~~~^^^^^^^^^^^^
+2026-02-03 13:05:15.664 | KeyError: 'pipeline'
+2026-02-03 13:05:15.785 | 26/02/03 19:05:15 INFO SparkContext: SparkContext is stopping with exitCode 0 from stop at SparkSubmit.scala:1036.
+2026-02-03 13:05:15.802 | 26/02/03 19:05:15 INFO SparkUI: Stopped Spark web UI at http://spark-app-0-driver-svc.spark.svc:4040
+2026-02-03 13:05:15.805 | 26/02/03 19:05:15 INFO KubernetesClusterSchedulerBackend: Shutting down all executors
+2026-02-03 13:05:15.806 | 26/02/03 19:05:15 INFO KubernetesClusterSchedulerBackend$KubernetesDriverEndpoint: Asking each executor to shut down
+2026-02-03 13:05:15.812 | 26/02/03 19:05:15 INFO ExecutorPodsWatchSnapshotSource: Kubernetes client has been closed.
+2026-02-03 13:05:15.980 | 26/02/03 19:05:15 INFO MapOutputTrackerMasterEndpoint: MapOutputTrackerMasterEndpoint stopped!
+2026-02-03 13:05:15.998 | 26/02/03 19:05:15 INFO MemoryStore: MemoryStore started with capacity 1048.8 MiB
+2026-02-03 13:05:15.999 | 26/02/03 19:05:15 INFO MemoryStore: MemoryStore cleared
+2026-02-03 13:05:16.000 | 26/02/03 19:05:15 INFO BlockManager: BlockManager stopped
+2026-02-03 13:05:16.004 | 26/02/03 19:05:16 INFO BlockManagerMaster: BlockManagerMaster stopped
+2026-02-03 13:05:16.006 | 26/02/03 19:05:16 INFO OutputCommitCoordinator$OutputCommitCoordinatorEndpoint: OutputCommitCoordinator stopped!
+2026-02-03 13:05:16.015 | 26/02/03 19:05:16 INFO SparkContext: Successfully stopped SparkContext
+2026-02-03 13:05:16.017 | 26/02/03 19:05:16 INFO ShutdownHookManager: Shutdown hook called
+2026-02-03 13:05:16.018 | 26/02/03 19:05:16 INFO ShutdownHookManager: Deleting directory /var/data/spark-fa86c2a0-9412-44d5-977e-b3d6e985faea/spark-0e39c9cf-11bd-45d5-a9e9-3c8951ea67d6
+2026-02-03 13:05:16.022 | 26/02/03 19:05:16 INFO ShutdownHookManager: Deleting directory /tmp/spark-ec87d98b-79e3-4c89-a569-fbaa8ec155dc
+2026-02-03 13:05:16.025 | 26/02/03 19:05:16 INFO ShutdownHookManager: Deleting directory /tmp/spark-f98ab4a4-0522-4151-a414-19d3b4007334
+2026-02-03 13:05:16.027 | 26/02/03 19:05:16 INFO ShutdownHookManager: Deleting directory /tmp/spark-ba6b6055-b94c-417f-a786-2b22a0270f52
+2026-02-03 13:05:16.030 | 26/02/03 19:05:16 INFO ShutdownHookManager: Deleting directory /tmp/spark-e398a3dc-ab0f-4426-be82-c9faef8e7eed
+2026-02-03 13:05:16.032 | 26/02/03 19:05:16 INFO ShutdownHookManager: Deleting directory /tmp/localPyFiles-427a0eeb-acd7-4921-b41a-683933bf8a2e
+2026-02-03 13:05:16.035 | 26/02/03 19:05:16 INFO ShutdownHookManager: Deleting directory /var/data/spark-fa86c2a0-9412-44d5-977e-b3d6e985faea/spark-0e39c9cf-11bd-45d5-a9e9-3c8951ea67d6/pyspark-93890f64-cbe7-4f38-a2f0-8a347e5776d6

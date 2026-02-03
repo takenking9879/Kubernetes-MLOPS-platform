@@ -100,7 +100,7 @@ class SparkPreprocessing(BaseUtils):
             if dataset not in ['train', 'val', 'test']:
                 raise ValueError("dataset must be one of ['train', 'val', 'test']")
 
-            pipeline_module = self.params['pipeline']['preprocessing']['module']
+            pipeline_module = self.params['preprocessing']['module']
             self.logger.info(f"Loading feature pipeline: {pipeline_module}")
             module = importlib.import_module(pipeline_module)
 

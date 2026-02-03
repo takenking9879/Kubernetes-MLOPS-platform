@@ -17,6 +17,13 @@ spec:
 
   # Spark confs (S3A + Kubernetes image reference via spark.kubernetes.container.image)
   sparkConf:
+    # Resource allocation
+    spark.driver.memory: "2048m"
+    spark.driver.cores: "1"
+    spark.executor.memory: "4096m"
+    spark.executor.cores: "6"
+
+    # General Spark configs
     spark.kubernetes.container.image: k3s-spark-cluster:latest
     spark.speculation.interval: "30"
     spark.kubernetes.authenticate.driver.serviceAccountName: "spark"
@@ -33,6 +40,10 @@ spec:
     #spark.hadoop.fs.s3a.multipart.purge.age: "86400"
     #spark.hadoop.fs.s3a.threads.keepalivetime: "60"
     #spark.hadoop.fs.s3a.connection.establish.timeout: "5000"
+
+    #PYTHON PATH
+    spark.kubernetes.driverEnv.PYTHONPATH: "/app:/app/repo:/app/repo/k3s:/opt/spark/work-dir:/opt/spark/work-dir/k3s"
+    spark.kubernetes.executorEnv.PYTHONPATH: "/app:/app/repo:/app/repo/k3s:/opt/spark/work-dir:/opt/spark/work-dir/k3s"
 
 
   # shared volumes for git-sync checkout
