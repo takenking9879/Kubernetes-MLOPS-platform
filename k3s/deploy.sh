@@ -151,6 +151,13 @@ deploy_kafka() {
   kubectl apply -f k3s/kafka/kafka-access.yaml
   kubectl apply -f k3s/kafka/kafka-ui.yaml
 
+  # ------------------------------------------------------------
+  # 9. Ensure a stable kafka-exporter Service exists (monitoring)
+  # ------------------------------------------------------------
+  # Prometheus scrapes my-kafka-cluster-kafka-exporter.kafka.svc.cluster.local:9404.
+  # This Service provides a stable name/port even if the exporter pod labels differ.
+  kubectl apply -f k3s/kafka/kafka-exporter-service.yaml
+
   ok "Kafka fully deployed 🚀"
 }
 
@@ -218,6 +225,11 @@ deploy_monitoring() {
 
   info "Applying Grafana"
   kubectl apply -f k3s/monitoring/grafana.yaml
+
+  # Always restart to ensure configmaps are loaded (dashboards / scrape config changes).
+  info "Restarting Prometheus and Grafana to reload configuration"
+  kubectl -n monitoring rollout restart deploy/prometheus || true
+  kubectl -n monitoring rollout restart deploy/grafana || true
 
   # Wait for deployments
   info "Waiting for Prometheus"
@@ -302,3 +314,6 @@ fi
 deploy_ingress
 sep
 ok "DEPLOYMENT FINISHED SUCCESSFULLY"
+
+sep
+info "Next: start inference workloads with ./k3s/inference.sh"

@@ -361,12 +361,12 @@ data:
           "targets": [
             {
               "expr": "sum(kafka_server_brokertopicmetrics_bytesinpersec_total{topic!=\"\"}) by (topic)",
-              "legendFormat": "In - {{topic}}",
+              "legendFormat": "{{topic}} (in)",
               "refId": "A"
             },
             {
               "expr": "sum(kafka_server_brokertopicmetrics_bytesoutpersec_total{topic!=\"\"}) by (topic)",
-              "legendFormat": "Out - {{topic}}",
+              "legendFormat": "{{topic}} (out)",
               "refId": "B"
             }
           ]
@@ -601,21 +601,52 @@ data:
           "datasource": { "type": "prometheus", "name": "Prometheus" },
           "fieldConfig": {
             "defaults": {
+              "color": { "mode": "palette-classic" },
+              "mappings": [],
+              "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }] },
+              "unit": "short"
+            }
+          },
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 41 },
+          "id": 14,
+          "options": {
+            "displayMode": "basic",
+            "minVizHeight": 10,
+            "minVizWidth": 0,
+            "orientation": "horizontal",
+            "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+            "showUnfilled": true,
+            "valueMode": "value"
+          },
+          "title": "Predictions by Class (Selected Range)",
+          "type": "bargauge",
+          "targets": [
+            {
+              "expr": "sum by (class) (increase(spark_predictions_by_class_total[$__range]))\n  or label_replace(vector(0), \"class\", \"0\", \"\", \"\")\n  or label_replace(vector(0), \"class\", \"1\", \"\", \"\")\n  or label_replace(vector(0), \"class\", \"2\", \"\", \"\")\n  or label_replace(vector(0), \"class\", \"3\", \"\", \"\")\n  or label_replace(vector(0), \"class\", \"4\", \"\", \"\")\n  or label_replace(vector(0), \"class\", \"5\", \"\", \"\")",
+              "legendFormat": "Class {{class}}",
+              "refId": "A"
+            }
+          ]
+        },
+        {
+          "datasource": { "type": "prometheus", "name": "Prometheus" },
+          "fieldConfig": {
+            "defaults": {
               "color": { "mode": "thresholds" },
               "mappings": [],
               "thresholds": {
                 "mode": "absolute",
                 "steps": [
                   { "color": "green", "value": null },
-                  { "color": "yellow", "value": 1000 },
-                  { "color": "red", "value": 5000 }
+                  { "color": "yellow", "value": 0.05 },
+                  { "color": "red", "value": 0.07 }
                 ]
               },
-              "unit": "short"
+              "unit": "percentunit"
             }
           },
-          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 41 },
-          "id": 14,
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 41 },
+          "id": 15,
           "options": {
             "displayMode": "gradient",
             "minVizHeight": 10,
@@ -625,12 +656,12 @@ data:
             "showUnfilled": true,
             "valueMode": "color"
           },
-          "title": "Predictions by Class (Last Batch)",
+          "title": "Non-0 Classes vs Class 0 (Selected Range)",
           "type": "bargauge",
           "targets": [
             {
-              "expr": "spark_predictions_by_class_last_batch or vector(0)",
-              "legendFormat": "Class {{class}}",
+              "expr": "(sum by (class) (increase(spark_predictions_by_class_total{class!=\"0\"}[$__range]))\n  / (scalar(sum(increase(spark_predictions_by_class_total{class=\"0\"}[$__range]))) + 1e-9)\n  or label_replace(vector(0), \"class\", \"1\", \"\", \"\")\n  or label_replace(vector(0), \"class\", \"2\", \"\", \"\")\n  or label_replace(vector(0), \"class\", \"3\", \"\", \"\")\n  or label_replace(vector(0), \"class\", \"4\", \"\", \"\")\n  or label_replace(vector(0), \"class\", \"5\", \"\", \"\"))",
+              "legendFormat": "Class {{class}} / Class 0",
               "refId": "A"
             }
           ]
@@ -664,7 +695,7 @@ data:
               "unit": "short"
             }
           },
-          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 41 },
+          "gridPos": { "h": 8, "w": 24, "x": 0, "y": 49 },
           "id": 13,
           "options": {
             "legend": { "calcs": ["mean", "max"], "displayMode": "table", "placement": "bottom", "showLegend": true },
@@ -689,7 +720,7 @@ data:
       "time": { "from": "now-1h", "to": "now" },
       "timepicker": {},
       "timezone": "browser",
-      "title": "MLOps Pipeline Dashboard",
+      "title": "MLOps inference Dashboard",
       "uid": "mlops-pipeline-main",
       "version": 1,
       "weekStart": ""
