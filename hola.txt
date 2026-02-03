@@ -1,29 +1,74 @@
-2026-02-03 14:07:56.510 | 2026-02-03 12:07:56,510	INFO cli.py:41 -- Job submission server address: http://kuberay-job-c5qzw-head-svc.ray.svc.cluster.local:8265
-2026-02-03 14:07:56.881 | 2026-02-03 12:07:56,881	SUCC cli.py:65 -- ----------------------------------------------
-2026-02-03 14:07:56.881 | 2026-02-03 12:07:56,881	SUCC cli.py:66 -- Job 'kuberay-job-ssklb' submitted successfully
-2026-02-03 14:07:56.881 | 2026-02-03 12:07:56,881	SUCC cli.py:67 -- ----------------------------------------------
-2026-02-03 14:07:56.881 | 2026-02-03 12:07:56,881	INFO cli.py:291 -- Next steps
-2026-02-03 14:07:56.881 | 2026-02-03 12:07:56,881	INFO cli.py:292 -- Query the logs of the job:
-2026-02-03 14:07:56.881 | 2026-02-03 12:07:56,881	INFO cli.py:294 -- ray job logs kuberay-job-ssklb
-2026-02-03 14:07:56.881 | 2026-02-03 12:07:56,881	INFO cli.py:296 -- Query the status of the job:
-2026-02-03 14:07:56.881 | 2026-02-03 12:07:56,881	INFO cli.py:298 -- ray job status kuberay-job-ssklb
-2026-02-03 14:07:56.881 | 2026-02-03 12:07:56,881	INFO cli.py:300 -- Request the job to be stopped:
-2026-02-03 14:07:56.881 | 2026-02-03 12:07:56,881	INFO cli.py:302 -- ray job stop kuberay-job-ssklb
-2026-02-03 14:07:58.494 | 2026-02-03 12:07:58,494	INFO cli.py:41 -- Job submission server address: http://kuberay-job-c5qzw-head-svc.ray.svc.cluster.local:8265
-2026-02-03 14:08:00.516 | 2026-02-03 12:07:56,610	INFO job_manager.py:568 -- Runtime env is setting up.
-2026-02-03 14:08:00.516 | Running entrypoint for job kuberay-job-ssklb: python3 /home/ray/app/repo/k3s/kuberay/main.py
-2026-02-03 14:08:00.516 | Traceback (most recent call last):
-2026-02-03 14:08:00.516 |   File "/home/ray/app/repo/k3s/kuberay/main.py", line 1, in <module>
-2026-02-03 14:08:00.516 |     from utils.baseclass import BaseUtils
-2026-02-03 14:08:00.516 | ModuleNotFoundError: No module named 'utils'
-2026-02-03 14:08:03.528 | 2026-02-03 12:08:03,528	ERR cli.py:73 -- ------------------------------
-2026-02-03 14:08:03.528 | 2026-02-03 12:08:03,528	ERR cli.py:74 -- Job 'kuberay-job-ssklb' failed
-2026-02-03 14:08:03.528 | 2026-02-03 12:08:03,528	ERR cli.py:75 -- ------------------------------
-2026-02-03 14:08:03.528 | 2026-02-03 12:08:03,528	INFO cli.py:88 -- Status message: Job entrypoint command failed with exit code 1, last available logs (truncated to 20,000 chars):
-2026-02-03 14:08:03.528 | 2026-02-03 12:07:56,610	INFO job_manager.py:568 -- Runtime env is setting up.
-2026-02-03 14:08:03.528 | Running entrypoint for job kuberay-job-ssklb: python3 /home/ray/app/repo/k3s/kuberay/main.py
-2026-02-03 14:08:03.528 | Traceback (most recent call last):
-2026-02-03 14:08:03.528 |   File "/home/ray/app/repo/k3s/kuberay/main.py", line 1, in <module>
-2026-02-03 14:08:03.528 |     from utils.baseclass import BaseUtils
-2026-02-03 14:08:03.528 | ModuleNotFoundError: No module named 'utils'
-2026-02-03 14:08:03.528 | 
+2026-02-03 14:15:13.782 | 2026-02-03 12:15:13,781	INFO cli.py:41 -- Job submission server address: http://kuberay-job-4xlrp-head-svc.ray.svc.cluster.local:8265
+2026-02-03 14:15:14.143 | 2026-02-03 12:15:14,143	SUCC cli.py:65 -- ----------------------------------------------
+2026-02-03 14:15:14.143 | 2026-02-03 12:15:14,143	SUCC cli.py:66 -- Job 'kuberay-job-7cnqq' submitted successfully
+2026-02-03 14:15:14.143 | 2026-02-03 12:15:14,143	SUCC cli.py:67 -- ----------------------------------------------
+2026-02-03 14:15:14.143 | 2026-02-03 12:15:14,143	INFO cli.py:291 -- Next steps
+2026-02-03 14:15:14.143 | 2026-02-03 12:15:14,143	INFO cli.py:292 -- Query the logs of the job:
+2026-02-03 14:15:14.143 | 2026-02-03 12:15:14,143	INFO cli.py:294 -- ray job logs kuberay-job-7cnqq
+2026-02-03 14:15:14.143 | 2026-02-03 12:15:14,143	INFO cli.py:296 -- Query the status of the job:
+2026-02-03 14:15:14.143 | 2026-02-03 12:15:14,143	INFO cli.py:298 -- ray job status kuberay-job-7cnqq
+2026-02-03 14:15:14.143 | 2026-02-03 12:15:14,143	INFO cli.py:300 -- Request the job to be stopped:
+2026-02-03 14:15:14.143 | 2026-02-03 12:15:14,143	INFO cli.py:302 -- ray job stop kuberay-job-7cnqq
+2026-02-03 14:15:15.675 | 2026-02-03 12:15:15,675	INFO cli.py:41 -- Job submission server address: http://kuberay-job-4xlrp-head-svc.ray.svc.cluster.local:8265
+2026-02-03 14:15:17.693 | 2026-02-03 12:15:13,841	INFO job_manager.py:568 -- Runtime env is setting up.
+2026-02-03 14:15:17.693 | Running entrypoint for job kuberay-job-7cnqq: python3 /home/ray/app/repo/k3s/kuberay/main.py
+2026-02-03 14:15:22.699 | 2026-02-03 12:15:21,076 - KubeRayTraining - DEBUG - Parameters retrieved from /home/ray/app/repo/k3s/params.yaml
+2026-02-03 14:15:23.700 | 2026-02-03 12:15:22,404 - KubeRayTraining - INFO - [RAY CLUSTER RESOURCES]
+2026-02-03 14:15:23.700 |             ────────────────────────────────
+2026-02-03 14:15:23.700 |             CPU           : 0.0 / 18.0
+2026-02-03 14:15:23.700 |             Memory        : 0B / 11.00GiB
+2026-02-03 14:15:23.700 |             Object Store  : 0B / 6.83GiB
+2026-02-03 14:15:23.700 |             ────────────────────────────────
+2026-02-03 14:15:23.700 | 2026-02-03 12:15:23,172 - KubeRayTraining - INFO - Minio connection verified. Buckets: ['frontend-crm-bucket', 'k8s-mlops-platform-bucket']
+2026-02-03 14:15:23.700 | 2026-02-03 12:15:23,174 - KubeRayTraining - ERROR - Training job failed: No module named 'schemas'
+2026-02-03 14:15:23.700 | Traceback (most recent call last):
+2026-02-03 14:15:23.700 |   File "/home/ray/app/repo/k3s/kuberay/main.py", line 201, in train
+2026-02-03 14:15:23.700 |     module = importlib.import_module(f"{'src.pipeline.train.' + self.params.get('framework', 'xgboost')}")
+2026-02-03 14:15:23.700 |              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-02-03 14:15:23.700 |   File "/home/ray/anaconda3/lib/python3.11/importlib/__init__.py", line 126, in import_module
+2026-02-03 14:15:23.700 |     return _bootstrap._gcd_import(name[level:], package, level)
+2026-02-03 14:15:23.700 |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-02-03 14:15:23.700 |   File "<frozen importlib._bootstrap>", line 1204, in _gcd_import
+2026-02-03 14:15:23.700 |   File "<frozen importlib._bootstrap>", line 1176, in _find_and_load
+2026-02-03 14:15:23.700 |   File "<frozen importlib._bootstrap>", line 1147, in _find_and_load_unlocked
+2026-02-03 14:15:23.700 |   File "<frozen importlib._bootstrap>", line 690, in _load_unlocked
+2026-02-03 14:15:23.700 |   File "<frozen importlib._bootstrap_external>", line 940, in exec_module
+2026-02-03 14:15:23.700 |   File "<frozen importlib._bootstrap>", line 241, in _call_with_frames_removed
+2026-02-03 14:15:23.700 |   File "/home/ray/app/repo/src/pipeline/train/xgboost.py", line 12, in <module>
+2026-02-03 14:15:23.700 |     from schemas.model.xgboost_params import XGBOOST_PARAMS
+2026-02-03 14:15:23.700 | ModuleNotFoundError: No module named 'schemas'
+2026-02-03 14:15:23.700 | Traceback (most recent call last):
+2026-02-03 14:15:23.700 |   File "/home/ray/app/repo/k3s/kuberay/main.py", line 319, in <module>
+2026-02-03 14:15:23.700 |     main()
+2026-02-03 14:15:23.700 |   File "/home/ray/app/repo/k3s/kuberay/main.py", line 316, in main
+2026-02-03 14:15:23.700 |     model.train()
+2026-02-03 14:15:23.700 |   File "/home/ray/app/repo/k3s/kuberay/main.py", line 201, in train
+2026-02-03 14:15:23.700 |     module = importlib.import_module(f"{'src.pipeline.train.' + self.params.get('framework', 'xgboost')}")
+2026-02-03 14:15:23.700 |              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-02-03 14:15:23.700 |   File "/home/ray/anaconda3/lib/python3.11/importlib/__init__.py", line 126, in import_module
+2026-02-03 14:15:23.700 |     return _bootstrap._gcd_import(name[level:], package, level)
+2026-02-03 14:15:23.700 |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-02-03 14:15:23.700 |   File "<frozen importlib._bootstrap>", line 1204, in _gcd_import
+2026-02-03 14:15:24.701 |   File "<frozen importlib._bootstrap>", line 1176, in _find_and_load
+2026-02-03 14:15:24.701 |   File "<frozen importlib._bootstrap>", line 1147, in _find_and_load_unlocked
+2026-02-03 14:15:24.701 |   File "<frozen importlib._bootstrap>", line 690, in _load_unlocked
+2026-02-03 14:15:24.701 |   File "<frozen importlib._bootstrap_external>", line 940, in exec_module
+2026-02-03 14:15:24.701 |   File "<frozen importlib._bootstrap>", line 241, in _call_with_frames_removed
+2026-02-03 14:15:24.701 |   File "/home/ray/app/repo/src/pipeline/train/xgboost.py", line 12, in <module>
+2026-02-03 14:15:24.701 |     from schemas.model.xgboost_params import XGBOOST_PARAMS
+2026-02-03 14:15:24.701 | ModuleNotFoundError: No module named 'schemas'
+2026-02-03 14:15:29.719 | 2026-02-03 12:15:29,718	ERR cli.py:73 -- ------------------------------
+2026-02-03 14:15:29.719 | 2026-02-03 12:15:29,718	ERR cli.py:74 -- Job 'kuberay-job-7cnqq' failed
+2026-02-03 14:15:29.719 | 2026-02-03 12:15:29,718	ERR cli.py:75 -- ------------------------------
+2026-02-03 14:15:29.719 | 2026-02-03 12:15:29,718	INFO cli.py:88 -- Status message: Job entrypoint command failed with exit code 1, last available logs (truncated to 20,000 chars):
+2026-02-03 14:15:29.719 |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-02-03 14:15:29.719 |   File "<frozen importlib._bootstrap>", line 1204, in _gcd_import
+2026-02-03 14:15:29.719 |   File "<frozen importlib._bootstrap>", line 1176, in _find_and_load
+2026-02-03 14:15:29.719 |   File "<frozen importlib._bootstrap>", line 1147, in _find_and_load_unlocked
+2026-02-03 14:15:29.719 |   File "<frozen importlib._bootstrap>", line 690, in _load_unlocked
+2026-02-03 14:15:29.719 |   File "<frozen importlib._bootstrap_external>", line 940, in exec_module
+2026-02-03 14:15:29.719 |   File "<frozen importlib._bootstrap>", line 241, in _call_with_frames_removed
+2026-02-03 14:15:29.719 |   File "/home/ray/app/repo/src/pipeline/train/xgboost.py", line 12, in <module>
+2026-02-03 14:15:29.719 |     from schemas.model.xgboost_params import XGBOOST_PARAMS
+2026-02-03 14:15:29.719 | ModuleNotFoundError: No module named 'schemas'
+2026-02-03 14:15:29.719 | 

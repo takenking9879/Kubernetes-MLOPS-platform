@@ -82,6 +82,8 @@ spec:
                   value: "0.7"
                 - name: RAY_ACCEL_ENV_VAR_OVERRIDE_ON_ZERO
                   value: "0"
+                - name: PYTHONPATH
+                  value: /home/ray/app/repo:/home/ray/app/repo/src
 
           initContainers:
             - name: git-sync
@@ -164,6 +166,8 @@ spec:
                     value: "0.7"
                   - name: RAY_ACCEL_ENV_VAR_OVERRIDE_ON_ZERO
                     value: "0"
+                  - name: PYTHONPATH
+                    value: /home/ray/app/repo:/home/ray/app/repo/src
 
             initContainers:
               - name: git-sync
