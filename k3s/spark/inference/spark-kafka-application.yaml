@@ -56,6 +56,9 @@ spec:
   # Driver spec
   driverSpec:
     podTemplateSpec:
+      metadata:
+        labels:
+          app: spark-kafka-app
       spec:
         containers:
           - name: spark-kubernetes-driver
@@ -101,6 +104,9 @@ spec:
   # Executor spec
   executorSpec:
     podTemplateSpec:
+      metadata:
+        labels:
+          app: spark-kafka-app
       spec:
         containers:
           - name: spark-kubernetes-executor

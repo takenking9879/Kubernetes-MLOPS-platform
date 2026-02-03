@@ -8,7 +8,7 @@ metadata:
 spec:
   type: ClusterIP
   selector:
-    spark-app-selector: spark-kafka-app-0
+    app: spark-kafka-app
     spark-role: driver
   ports:
     - name: metrics

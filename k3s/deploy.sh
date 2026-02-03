@@ -80,7 +80,7 @@ deploy_kafka() {
   # ------------------------------------------------------------
   # 1. Install Strimzi operator
   # ------------------------------------------------------------
-  helm install my-strimzi-kafka-operator strimzi/strimzi-kafka-operator \
+  helm upgrade --install my-strimzi-kafka-operator strimzi/strimzi-kafka-operator \
     --version 0.49.1 \
     -n kafka \
     --create-namespace
@@ -167,7 +167,7 @@ deploy_kafka() {
 deploy_ray() {
   sep
   info "Deploying KubeRay Operator"
-  helm install kuberay-operator kuberay/kuberay-operator \
+  helm upgrade --install kuberay-operator kuberay/kuberay-operator \
     --version 1.5.1 -n ray
   ok "KubeRay operator installed"
 }
@@ -178,7 +178,7 @@ deploy_ray() {
 deploy_mlflow() {
   sep
   info "Deploying Postgres"
-  helm install postgres bitnami/postgresql \
+  helm upgrade --install postgres bitnami/postgresql \
     -n ray -f k3s/mlflow/postgres_values.yaml
 
   kubectl wait \
@@ -187,7 +187,7 @@ deploy_mlflow() {
     -n ray --timeout="${POSTGRES_TIMEOUT}"
 
   info "Deploying MLflow"
-  helm install my-mlflow community-charts/mlflow \
+  helm upgrade --install my-mlflow community-charts/mlflow \
     -n ray -f k3s/mlflow/mlflow_values.yaml
 
   ok "MLflow deployed"
@@ -199,7 +199,7 @@ deploy_mlflow() {
 deploy_spark() {
   sep
   info "Deploying Spark Operator"
-  helm install my-spark-kubernetes-operator \
+  helm upgrade --install my-spark-kubernetes-operator \
     spark-kubernetes-operator/spark-kubernetes-operator \
     --version 1.4.0 \
     -n spark -f k3s/spark/values.yaml
@@ -234,15 +234,15 @@ deploy_monitoring() {
   # Wait for deployments
   info "Waiting for Prometheus"
   kubectl wait deployment/prometheus -n monitoring \
-    --for=condition=Available --timeout=120s
+    --for=condition=Available --timeout=300s
 
   info "Waiting for Grafana"
   kubectl wait deployment/grafana -n monitoring \
-    --for=condition=Available --timeout=120s
+    --for=condition=Available --timeout=300s
 
   info "Waiting for kube-state-metrics"
   kubectl wait deployment/kube-state-metrics -n monitoring \
-    --for=condition=Available --timeout=120s
+    --for=condition=Available --timeout=300s
 
   ok "Monitoring stack deployed 📊"
   info "Grafana available at: http://grafana.localhost"

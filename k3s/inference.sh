@@ -21,6 +21,20 @@ require_kubectl() {
   }
 }
 
+wait_for_pod_selector() {
+  # Usage: wait_for_pod_selector <namespace> <label-selector> <timeout-seconds>
+  local ns="$1" selector="$2" timeout_s="$3"
+
+  local deadline=$((SECONDS + timeout_s))
+  while [ $SECONDS -lt $deadline ]; do
+    if kubectl -n "$ns" get pods -l "$selector" -o name 2>/dev/null | grep -q '^pod/'; then
+      return 0
+    fi
+    sleep 3
+  done
+  return 1
+}
+
 wait_for_http_200() {
   # Usage: wait_for_http_200 <pod> <namespace> <container> <url>
   local pod="$1" ns="$2" container="$3" url="$4"
@@ -28,15 +42,25 @@ wait_for_http_200() {
   local deadline=$((SECONDS + 240))
   while [ $SECONDS -lt $deadline ]; do
     if kubectl -n "$ns" exec "$pod" -c "$container" -- bash -lc "python - <<'PY'
-import requests
+import json
+import urllib.request
+
 url='${url}'
 payload={'data': [[0.0]*14]}
+
+req = urllib.request.Request(
+    url,
+    data=json.dumps(payload).encode('utf-8'),
+    headers={'Content-Type': 'application/json'},
+    method='POST',
+)
+
 try:
-  r = requests.post(url, json=payload, timeout=10)
-  print(r.status_code)
-  raise SystemExit(0 if r.status_code == 200 else 1)
+    with urllib.request.urlopen(req, timeout=10) as resp:
+        code = getattr(resp, 'status', 200)
+        raise SystemExit(0 if code == 200 else 1)
 except Exception:
-  raise SystemExit(1)
+    raise SystemExit(1)
 PY" >/dev/null 2>&1; then
       return 0
     fi
@@ -71,8 +95,14 @@ ok "SparkApplication applied"
 sep
 info "Waiting for Spark driver pod to be Ready"
 # Matches the selector used by driver-service.yaml
+if ! wait_for_pod_selector "$NS_SPARK" "app=spark-kafka-app,spark-role=driver" 180; then
+  echo "Timed out waiting for Spark driver pod to be created" >&2
+  kubectl -n "$NS_SPARK" get pods --show-labels >&2 || true
+  exit 1
+fi
+
 kubectl -n "$NS_SPARK" wait --for=condition=Ready pod \
-  -l spark-app-selector=spark-kafka-app-0 -l spark-role=driver \
+  -l app=spark-kafka-app -l spark-role=driver \
   --timeout=300s
 ok "Spark driver Ready"
 
