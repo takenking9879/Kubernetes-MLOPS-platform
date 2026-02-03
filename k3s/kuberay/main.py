@@ -1,5 +1,5 @@
-from utils.baseclass import BaseUtils
-from utils.logger import create_logger
+from src.utils.baseclass import BaseUtils
+from src.utils.logger import create_logger
 import boto3
 import ray
 import re
