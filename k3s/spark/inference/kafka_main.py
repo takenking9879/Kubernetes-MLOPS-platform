@@ -18,7 +18,7 @@ import boto3
 import requests
 from src.utils.baseclass import BaseUtils
 from src.utils.logger import create_logger
-from src.schemas.data.schema_registry import get_schema
+from src.schemas.spark.schema_registry import get_schema
 from src.converters.spark_kafka_helper import get_converter
 
 # ===== PROMETHEUS METRICS =====

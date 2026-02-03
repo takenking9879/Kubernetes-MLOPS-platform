@@ -198,7 +198,7 @@ class SparkPreprocessing(BaseUtils):
 
 
 def main(): 
-    from schemas.data.schemas import schema_full as schema
+    from src.schemas.spark.schemas import schema_full as schema
     
     data_dir = "s3a://k8s-mlops-platform-bucket/v1/raw/" #Para Spark
     output_dir = "s3a://k8s-mlops-platform-bucket/v1/processed/" #Para Spark
