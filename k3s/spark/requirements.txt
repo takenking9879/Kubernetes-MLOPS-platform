@@ -5,3 +5,4 @@ PyYAML==6.0.3
 python-dotenv==1.2.1
 numpy==2.3.3
 pandas==2.3.3
+prometheus-client==0.24.1

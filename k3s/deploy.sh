@@ -11,7 +11,7 @@ ENABLE_KAFKA=false
 ENABLE_RAY=true
 ENABLE_MLFLOW=true
 ENABLE_SPARK=true
-ENABLE_MONITORING=false
+ENABLE_MONITORING=true
 
 # ============================================================
 # TIMEOUTS

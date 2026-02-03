@@ -1,0 +1,19 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: spark-preprocess-driver-svc
+  namespace: spark
+  labels:
+    app: spark-preprocess
+spec:
+  type: ClusterIP
+  selector:
+    app: spark-preprocess
+    spark-role: driver
+  ports:
+    - name: metrics
+      port: 8001
+      targetPort: 8001
+    - name: spark-ui
+      port: 4040
+      targetPort: 4040

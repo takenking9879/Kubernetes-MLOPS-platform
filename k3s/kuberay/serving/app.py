@@ -91,7 +91,7 @@ class ModelAdapter(Protocol):
 
 class XGBoostAdapter:
     def __init__(self, model_path: str):
-        from serve.xgboost import XGBoostHandler
+        from src.serve.xgboost import XGBoostHandler
 
         self._handler = XGBoostHandler(model_path)
 
@@ -103,7 +103,7 @@ class XGBoostAdapter:
 
 class PyTorchAdapter:
     def __init__(self, model_path: str, *, input_dim: int, num_classes: int):
-        from serve.pytorch import PyTorchHandler
+        from src.serve.pytorch import PyTorchHandler
 
         self._handler = PyTorchHandler(model_path, input_dim=input_dim, num_classes=num_classes)
 

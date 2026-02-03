@@ -51,6 +51,9 @@ spec:
         # Per Ray docs: setting num-cpus:"0" prevents scheduling CPU workloads on head.
         num-cpus: "0"
       template:
+        metadata:
+          labels:
+            app: kuberay-training
         spec:
           containers:
             - name: ray-head
@@ -62,6 +65,8 @@ spec:
                   name: dashboard
                 - containerPort: 10001
                   name: client
+                - containerPort: 8002
+                  name: metrics
               resources:
                 limits:
                   cpu: "2"

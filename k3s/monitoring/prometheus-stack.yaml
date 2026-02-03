@@ -45,19 +45,40 @@ data:
       evaluation_interval: 15s
 
     scrape_configs:
-      # ===== SPARK DRIVER CUSTOM METRICS =====
+      # ===== SPARK DRIVER CUSTOM METRICS (Inference) =====
       - job_name: 'spark-driver-custom'
         static_configs:
           - targets: ['spark-kafka-app-driver-svc.spark.svc.cluster.local:8000']
         metrics_path: /metrics
         scrape_interval: 10s
 
-      # ===== SPARK NATIVE METRICS (Prometheus Servlet) =====
+      # ===== SPARK NATIVE METRICS (Prometheus Servlet - Inference) =====
       - job_name: 'spark-driver-native'
         static_configs:
           - targets: ['spark-kafka-app-driver-svc.spark.svc.cluster.local:4040']
         metrics_path: /metrics/prometheus
         scrape_interval: 15s
+
+      # ===== SPARK PREPROCESSING CUSTOM METRICS (Training) =====
+      - job_name: 'spark-preprocess-custom'
+        static_configs:
+          - targets: ['spark-preprocess-driver-svc.spark.svc.cluster.local:8001']
+        metrics_path: /metrics
+        scrape_interval: 10s
+
+      # ===== SPARK PREPROCESSING NATIVE METRICS (Training) =====
+      - job_name: 'spark-preprocess-native'
+        static_configs:
+          - targets: ['spark-preprocess-driver-svc.spark.svc.cluster.local:4040']
+        metrics_path: /metrics/prometheus
+        scrape_interval: 15s
+
+      # ===== RAY TRAINING METRICS (KubeRay Job) =====
+      - job_name: 'ray-training'
+        static_configs:
+          - targets: ['kuberay-training-head-svc.ray.svc.cluster.local:8002']
+        metrics_path: /metrics
+        scrape_interval: 10s
 
       # ===== RAY SERVE METRICS =====
       - job_name: 'ray-serve'

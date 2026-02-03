@@ -2,10 +2,24 @@ from src.utils.baseclass import BaseUtils
 from src.utils.logger import create_logger
 import boto3
 import os
+import time
 from pyspark.sql import SparkSession
 import importlib
 from pyspark.sql.types import StructType
 import json
+
+# ===== PROMETHEUS METRICS =====
+from prometheus_client import start_http_server, Counter, Gauge, Histogram
+
+# Preprocessing metrics
+PREPROCESS_RECORDS = Counter('preprocess_records_total', 'Total records preprocessed', ['dataset'])
+PREPROCESS_BATCHES = Counter('preprocess_batches_total', 'Total batches preprocessed', ['dataset'])
+PREPROCESS_RECORDS_BY_CLASS = Counter('preprocess_records_by_class_total', 'Records per class', ['dataset', 'class'])
+PREPROCESS_RECORDS_LAST_BATCH = Gauge('preprocess_records_last_batch', 'Records in last batch by class', ['dataset', 'class'])
+PREPROCESS_BATCH_LATENCY = Histogram('preprocess_batch_latency_seconds', 'Batch preprocessing latency', ['dataset'], buckets=[1, 5, 10, 30, 60, 120, 300])
+PREPROCESS_ERRORS = Counter('preprocess_errors_total', 'Total preprocessing errors', ['dataset', 'error_type'])
+PREPROCESS_CURRENT_DATASET = Gauge('preprocess_current_dataset_progress', 'Current dataset being processed (0=idle, 1=train, 2=val, 3=test)')
+
 
 class SparkPreprocessing(BaseUtils):
     def __init__(self, schema: StructType,  params_path: str, data_dir: str, output_dir: str, artifacts_dir: str):
@@ -19,6 +33,18 @@ class SparkPreprocessing(BaseUtils):
         self.s3 = None
         self.spark = self._create_spark_session()
         self.scaler = None
+        
+        # Start Prometheus metrics server
+        self._start_prometheus_server()
+    
+    def _start_prometheus_server(self):
+        """Start Prometheus metrics HTTP server on port 8001."""
+        port = int(os.getenv('PROMETHEUS_PORT', 8001))
+        try:
+            start_http_server(port)
+            self.logger.info(f"Prometheus metrics server started on port {port}")
+        except Exception as e:
+            self.logger.warning(f"Could not start Prometheus server: {e}")
 
     def _check_minio_connection(self):
         try:
@@ -93,8 +119,12 @@ class SparkPreprocessing(BaseUtils):
 
     def preprocess(self, dataset: str = 'train'):
         """
-        Unified preprocessing entry.
+        Unified preprocessing entry with Prometheus metrics.
         """
+        dataset_idx = {'train': 1, 'val': 2, 'test': 3}.get(dataset, 0)
+        PREPROCESS_CURRENT_DATASET.set(dataset_idx)
+        
+        start_time = time.time()
         try:
             self.logger.info(f"Starting preprocessing for {dataset} dataset")
             if dataset not in ['train', 'val', 'test']:
@@ -115,10 +145,33 @@ class SparkPreprocessing(BaseUtils):
                     self.scaler = self.load_scaler_artifact()
                 df_out, _ = module.preprocess_spark(df, model=self.scaler, train=False)
 
+            # ===== PROMETHEUS METRICS =====
+            record_count = df_out.count()
+            PREPROCESS_RECORDS.labels(dataset=dataset).inc(record_count)
+            PREPROCESS_BATCHES.labels(dataset=dataset).inc(1)
+            
+            # Per-class distribution (if 'attack' column exists)
+            target_col = self.params.get('preprocessing', {}).get('target', 'attack')
+            if target_col in df_out.columns:
+                class_counts = df_out.groupBy(target_col).count().collect()
+                for row in class_counts:
+                    cls = str(row[target_col])
+                    cnt = row['count']
+                    PREPROCESS_RECORDS_BY_CLASS.labels(dataset=dataset, **{'class': cls}).inc(cnt)
+                    PREPROCESS_RECORDS_LAST_BATCH.labels(dataset=dataset, **{'class': cls}).set(cnt)
+            
+            elapsed = time.time() - start_time
+            PREPROCESS_BATCH_LATENCY.labels(dataset=dataset).observe(elapsed)
+
             self.logger.info(f"Preprocessing completed for {dataset} dataset. Writing output.")
             self.write_data(df_out, os.path.join(self.output_dir, f'{dataset}/'))
             self.logger.info(f"Output written in S3 for {dataset} dataset.")
+            
+            # Reset progress to idle when done
+            PREPROCESS_CURRENT_DATASET.set(0)
         except Exception as e:
+            PREPROCESS_ERRORS.labels(dataset=dataset, error_type=type(e).__name__).inc()
+            PREPROCESS_CURRENT_DATASET.set(0)
             self.logger.error('Preprocess failed to complete: %s', str(e), exc_info=True)
             raise
 

@@ -8,6 +8,7 @@ import importlib
 import pickle
 import subprocess
 import tempfile
+import time
 from urllib.parse import urlparse
 from typing import Dict, Any
 from ray.train.xgboost import RayTrainReportCallback
@@ -16,6 +17,26 @@ from src.schemas.model.pytorch_params import PYTORCH_PARAMS
 from src.schemas.model.xgboost_params import XGBOOST_PARAMS
 from src.pipeline.utils.mlflow_utils import log_training_run
 
+# ===== PROMETHEUS METRICS =====
+from prometheus_client import start_http_server, Counter, Gauge, Histogram
+
+# Training metrics
+TRAIN_EPOCHS = Counter('train_epochs_total', 'Total epochs completed', ['framework'])
+TRAIN_SAMPLES = Counter('train_samples_total', 'Total samples processed', ['framework', 'split'])
+TRAIN_LOSS = Gauge('train_loss', 'Current training loss', ['framework', 'split'])
+TRAIN_ACCURACY = Gauge('train_accuracy', 'Current accuracy metric', ['framework', 'split'])
+TRAIN_F1 = Gauge('train_f1', 'Current F1 score', ['framework', 'split'])
+TRAIN_PRECISION = Gauge('train_precision', 'Current precision', ['framework', 'split'])
+TRAIN_RECALL = Gauge('train_recall', 'Current recall', ['framework', 'split'])
+TRAIN_EPOCH_DURATION = Histogram('train_epoch_duration_seconds', 'Duration per epoch', ['framework'], buckets=[10, 30, 60, 120, 300, 600])
+TRAIN_FAILURES = Counter('train_failures_total', 'Total training failures', ['framework', 'error_type'])
+TRAIN_CURRENT_EPOCH = Gauge('train_current_epoch', 'Current epoch number', ['framework'])
+
+# Tuning metrics
+TUNE_TRIALS = Counter('tune_trials_total', 'Total tuning trials', ['framework'])
+TUNE_TRIAL_STATUS = Gauge('tune_trial_status', 'Trial status (1=running, 2=success, 3=failed)', ['framework', 'trial_id'])
+TUNE_BEST_METRIC = Gauge('tune_best_metric_value', 'Best metric value found', ['framework', 'metric'])
+
 class KubeRayTraining(BaseUtils):
     def __init__(self, params_path: str, data_dir: str, output_dir: str):
         logger = create_logger('KubeRayTraining', 'kuberay_training.log')
@@ -23,6 +44,18 @@ class KubeRayTraining(BaseUtils):
         self.params = self.load_params()['kuberay']['model']
         self.data_dir = data_dir
         self.output_dir = output_dir
+        
+        # Start Prometheus metrics server
+        self._start_prometheus_server()
+    
+    def _start_prometheus_server(self):
+        """Start Prometheus metrics HTTP server on port 8002."""
+        port = int(os.getenv('PROMETHEUS_PORT', 8002))
+        try:
+            start_http_server(port)
+            self.logger.info(f"Prometheus metrics server started on port {port}")
+        except Exception as e:
+            self.logger.warning(f"Could not start Prometheus server: {e}")
 
     def _check_minio_connection(self):
         try:
@@ -271,6 +304,23 @@ class KubeRayTraining(BaseUtils):
             else:
                 result, final_metrics = train_out, {}
             self.logger.info("Training completed successfully.")
+            
+            # ===== PROMETHEUS METRICS: Export final metrics =====
+            TRAIN_EPOCHS.labels(framework=framework).inc(1)
+            
+            # Export performance metrics if available
+            if 'train_loss' in final_metrics:
+                TRAIN_LOSS.labels(framework=framework, split='train').set(final_metrics['train_loss'])
+            if 'val_loss' in final_metrics:
+                TRAIN_LOSS.labels(framework=framework, split='val').set(final_metrics['val_loss'])
+            if 'accuracy' in final_metrics:
+                TRAIN_ACCURACY.labels(framework=framework, split='val').set(final_metrics['accuracy'])
+            if 'f1' in final_metrics:
+                TRAIN_F1.labels(framework=framework, split='val').set(final_metrics['f1'])
+            if 'precision' in final_metrics:
+                TRAIN_PRECISION.labels(framework=framework, split='val').set(final_metrics['precision'])
+            if 'recall' in final_metrics:
+                TRAIN_RECALL.labels(framework=framework, split='val').set(final_metrics['recall'])
 
             # Guardar el modelo en S3 al finalizar
             self._save_model(result, framework)
@@ -297,6 +347,7 @@ class KubeRayTraining(BaseUtils):
 
             return result
         except Exception as e:
+            TRAIN_FAILURES.labels(framework=framework, error_type=type(e).__name__).inc()
             self.logger.error(f'Training job failed: {str(e)}', exc_info=True)
             raise
 
