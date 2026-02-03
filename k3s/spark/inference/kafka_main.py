@@ -29,6 +29,18 @@ BATCH_RECORDS_TOTAL = Gauge('spark_batch_records_total', 'Number of records proc
 BATCH_ERRORS_TOTAL = Counter('spark_batch_errors_total', 'Total number of batch processing errors')
 INFERENCE_LATENCY_SUMMARY = Summary('inference_latency_summary_seconds', 'Summary of inference latencies')
 
+# Predictions distribution (attack classes)
+PREDICTIONS_BY_CLASS_TOTAL = Counter(
+    'spark_predictions_by_class_total',
+    'Total number of predictions produced, labeled by class',
+    ['class'],
+)
+PREDICTIONS_BY_CLASS_LAST_BATCH = Gauge(
+    'spark_predictions_by_class_last_batch',
+    'Number of predictions in the most recent micro-batch, labeled by class',
+    ['class'],
+)
+
 from k3s.spark.utils import create_logger, BaseUtils
 from k3s.spark.schema.schema_registry import get_schema
 from k3s.spark.helpers.spark_kafka_helper import get_converter
@@ -592,6 +604,25 @@ class KafkaSparkInference(BaseUtils):
             inference_latency = time.time() - inference_start
             LATENCY_INFERENCE.set(inference_latency)
             INFERENCE_LATENCY_SUMMARY.observe(inference_latency)
+
+            # 3.1 Distribution of predicted classes (for attack monitoring)
+            try:
+                # Force a compact aggregation: at most 6 rows.
+                rows = (
+                    predictions_df
+                    .selectExpr(f"CAST({self.prediction_column} AS INT) AS cls")
+                    .groupBy("cls")
+                    .count()
+                    .collect()
+                )
+                counts_by_cls = {int(r["cls"]): int(r["count"]) for r in rows if r["cls"] is not None}
+                for cls in range(6):
+                    cnt = counts_by_cls.get(cls, 0)
+                    PREDICTIONS_BY_CLASS_LAST_BATCH.labels(str(cls)).set(cnt)
+                    if cnt:
+                        PREDICTIONS_BY_CLASS_TOTAL.labels(str(cls)).inc(cnt)
+            except Exception as e:
+                self.logger.warning(f"⚠️ Could not compute prediction class distribution: {e}")
             
             # 4. Join con datos originales
             output_df = batch_df.join(

@@ -11,6 +11,8 @@ import yaml
 from ray import serve
 from starlette.requests import Request
 
+from ray.util.metrics import Counter, Histogram
+
 from k3s.kuberay.utils import create_logger
 
 
@@ -139,6 +141,25 @@ class _ModelRuntime:
         self._adapter: Optional[ModelAdapter] = None
         self._spec: Optional[ModelSpec] = None
 
+        # Custom metrics exported via Ray's Prometheus endpoint (metrics-export-port).
+        # These let us break down traffic by model variant/framework (stable/canary, xgboost/pytorch).
+        self._requests_total = Counter(
+            "serve_infer_requests_total",
+            description="Total inference requests handled by a model deployment",
+            tag_keys=("application", "variant", "framework"),
+        )
+        self._errors_total = Counter(
+            "serve_infer_errors_total",
+            description="Total inference errors raised by a model deployment",
+            tag_keys=("application", "variant", "framework"),
+        )
+        self._latency_ms = Histogram(
+            "serve_infer_latency_ms",
+            description="End-to-end latency inside the model deployment (ms)",
+            boundaries=[1, 2, 5, 10, 25, 50, 100, 250, 500, 1000, 2000, 5000],
+            tag_keys=("application", "variant", "framework"),
+        )
+
     def _load_from_config(self, config: Dict[str, Any]) -> None:
         params = load_params()
         model_cfg = params.get("kuberay", {}).get("model", {})
@@ -180,9 +201,24 @@ class _ModelRuntime:
         if self._adapter is None or self._spec is None:
             raise RuntimeError("Model not initialized")
 
+        tags = {
+            "application": "inference",
+            "variant": self._variant,
+            "framework": self._spec.framework,
+        }
+
+        self._requests_total.inc(1, tags=tags)
+
         started = time.perf_counter()
-        matrix = _normalize_payload(payload)
-        result = self._adapter.predict(matrix)
+        try:
+            matrix = _normalize_payload(payload)
+            result = self._adapter.predict(matrix)
+        except Exception:
+            self._errors_total.inc(1, tags=tags)
+            raise
+        finally:
+            self._latency_ms.observe((time.perf_counter() - started) * 1000.0, tags=tags)
+
         result["latency_ms"] = (time.perf_counter() - started) * 1000.0
         result["model"] = {
             "variant": self._variant,

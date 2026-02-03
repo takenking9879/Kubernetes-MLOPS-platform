@@ -360,12 +360,12 @@ data:
           "type": "timeseries",
           "targets": [
             {
-              "expr": "sum(kafka_server_brokertopicmetrics_bytesinpersec_total) by (topic)",
+              "expr": "sum(kafka_server_brokertopicmetrics_bytesinpersec_total{topic!=\"\"}) by (topic)",
               "legendFormat": "In - {{topic}}",
               "refId": "A"
             },
             {
-              "expr": "sum(kafka_server_brokertopicmetrics_bytesoutpersec_total) by (topic)",
+              "expr": "sum(kafka_server_brokertopicmetrics_bytesoutpersec_total{topic!=\"\"}) by (topic)",
               "legendFormat": "Out - {{topic}}",
               "refId": "B"
             }
@@ -598,7 +598,45 @@ data:
           ]
         },
         {
-          "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
+          "datasource": { "type": "prometheus", "name": "Prometheus" },
+          "fieldConfig": {
+            "defaults": {
+              "color": { "mode": "thresholds" },
+              "mappings": [],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "green", "value": null },
+                  { "color": "yellow", "value": 1000 },
+                  { "color": "red", "value": 5000 }
+                ]
+              },
+              "unit": "short"
+            }
+          },
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 41 },
+          "id": 14,
+          "options": {
+            "displayMode": "gradient",
+            "minVizHeight": 10,
+            "minVizWidth": 0,
+            "orientation": "horizontal",
+            "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+            "showUnfilled": true,
+            "valueMode": "color"
+          },
+          "title": "Predictions by Class (Last Batch)",
+          "type": "bargauge",
+          "targets": [
+            {
+              "expr": "spark_predictions_by_class_last_batch or vector(0)",
+              "legendFormat": "Class {{class}}",
+              "refId": "A"
+            }
+          ]
+        },
+        {
+          "datasource": { "type": "prometheus", "name": "Prometheus" },
           "fieldConfig": {
             "defaults": {
               "color": { "mode": "palette-classic" },
@@ -626,7 +664,7 @@ data:
               "unit": "short"
             }
           },
-          "gridPos": { "h": 8, "w": 24, "x": 0, "y": 41 },
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 41 },
           "id": 13,
           "options": {
             "legend": { "calcs": ["mean", "max"], "displayMode": "table", "placement": "bottom", "showLegend": true },
