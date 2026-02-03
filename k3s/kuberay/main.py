@@ -1,4 +1,5 @@
-from utils import BaseUtils, create_logger
+from utils.baseclass import BaseUtils
+from utils.logger import create_logger
 import boto3
 import ray
 import re
@@ -11,9 +12,9 @@ from urllib.parse import urlparse
 from typing import Dict, Any
 from ray.train.xgboost import RayTrainReportCallback
 
-from schemas.pytorch_params import PYTORCH_PARAMS
-from schemas.xgboost_params import XGBOOST_PARAMS
-from helpers.mlflow_utils import log_training_run
+from src.schemas.model.pytorch_params import PYTORCH_PARAMS
+from src.schemas.model.xgboost_params import XGBOOST_PARAMS
+from src.pipeline.utils.mlflow_utils import log_training_run
 
 class KubeRayTraining(BaseUtils):
     def __init__(self, params_path: str, data_dir: str, output_dir: str):
@@ -197,7 +198,7 @@ class KubeRayTraining(BaseUtils):
 
             self.logger.info(pretty_log)
             self._check_minio_connection()
-            module = importlib.import_module(f"{'modules.' + self.params.get('framework', 'xgboost')}")
+            module = importlib.import_module(f"{'src.pipeline.train.' + self.params.get('framework', 'xgboost')}")
 
             framework = self.params.get("framework", "xgboost")
 
@@ -218,7 +219,7 @@ class KubeRayTraining(BaseUtils):
                 train_path = os.path.join(self.data_dir, 'train')
                 val_path = os.path.join(self.data_dir, 'val')
                 
-                tuner = importlib.import_module('tuning.'+ framework)
+                tuner = importlib.import_module('src.pipeline.tuning.'+ framework)
                 best_config = tuner.tune_model(
                     train_path=train_path,
                     val_path=val_path,

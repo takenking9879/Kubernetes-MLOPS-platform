@@ -9,9 +9,9 @@ from typing import Any, Dict
 import ray.train
 from ray.train.xgboost import XGBoostTrainer
 
-from schemas.xgboost_params import XGBOOST_PARAMS
-from helpers.metrics_utils import xgb_multiclass_metrics_on_ds
-from helpers.xgboost_utils import get_train_val_dmatrix, run_xgboost_train, RayTrainPeriodicReportCheckpointCallback
+from schemas.model.xgboost_params import XGBOOST_PARAMS
+from pipeline.utils.metrics_utils import xgb_multiclass_metrics_on_ds
+from pipeline.utils.xgboost_utils import get_train_val_dmatrix, run_xgboost_train, RayTrainPeriodicReportCheckpointCallback
 
 logger = logging.getLogger(__name__)
 

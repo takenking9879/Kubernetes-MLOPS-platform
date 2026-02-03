@@ -5,7 +5,6 @@ Completamente configurable vía params.yaml sin hardcodear lógica específica.
 Refactorizado desde KafkaSparkInference para soportar múltiples datasets y modelos.
 """
 import os
-import logging
 import time
 import threading
 from typing import Dict, Optional, Iterator, List, Any
@@ -17,6 +16,10 @@ from pyspark.sql.functions import from_json, col, to_json, struct
 from pyspark import SparkContext, AccumulatorParam
 import boto3
 import requests
+from src.utils.baseclass import BaseUtils
+from src.utils.logger import create_logger
+from src.schemas.data.schema_registry import get_schema
+from src.converters.spark_kafka_helper import get_converter
 
 # ===== PROMETHEUS METRICS =====
 from prometheus_client import start_http_server, Gauge, Counter, Summary
@@ -40,10 +43,6 @@ PREDICTIONS_BY_CLASS_LAST_BATCH = Gauge(
     'Number of predictions in the most recent micro-batch, labeled by class',
     ['class'],
 )
-
-from k3s.spark.utils import create_logger, BaseUtils
-from k3s.spark.schema.schema_registry import get_schema
-from k3s.spark.helpers.spark_kafka_helper import get_converter
 
 
 # ===== FUNCIÓN STANDALONE PARA PREDICCIONES =====

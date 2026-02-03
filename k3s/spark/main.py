@@ -1,4 +1,5 @@
-from utils import BaseUtils, create_logger
+from src.utils.baseclass import BaseUtils
+from src.utils.logger import create_logger
 import boto3
 import os
 from pyspark.sql import SparkSession
@@ -99,7 +100,7 @@ class SparkPreprocessing(BaseUtils):
             if dataset not in ['train', 'val', 'test']:
                 raise ValueError("dataset must be one of ['train', 'val', 'test']")
 
-            pipeline_module = self.params['pipeline']['module']
+            pipeline_module = self.params['pipeline']['preprocessing']['module']
             self.logger.info(f"Loading feature pipeline: {pipeline_module}")
             module = importlib.import_module(pipeline_module)
 
@@ -197,7 +198,7 @@ class SparkPreprocessing(BaseUtils):
 
 
 def main(): 
-    from schema.schemas import schema_full as schema
+    from schemas.data.schemas import schema_full as schema
     
     data_dir = "s3a://k8s-mlops-platform-bucket/v1/raw/" #Para Spark
     output_dir = "s3a://k8s-mlops-platform-bucket/v1/processed/" #Para Spark

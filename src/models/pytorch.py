@@ -1,6 +1,4 @@
-import torch
 from torch import nn
-
 
 class NeuralNetwork(nn.Module):
     def __init__(self, input_dim=28 * 28, num_classes=10):

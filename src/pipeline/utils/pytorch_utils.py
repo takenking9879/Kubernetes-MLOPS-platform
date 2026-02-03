@@ -11,7 +11,7 @@ from ray.train import Checkpoint
 import torch
 from torch import nn
 
-from pytorch_models.models import NeuralNetwork
+from models.pytorch import NeuralNetwork
 
 logger = logging.getLogger(__name__)
 

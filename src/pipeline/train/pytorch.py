@@ -7,9 +7,9 @@ import ray.train
 from ray.train.torch import TorchTrainer
 from torch import nn
 from typing import Any, Dict
-from schemas.pytorch_params import PYTORCH_PARAMS 
-from helpers.pytorch_utils import train_func
-from pytorch_models.models import NeuralNetwork
+from schemas.model.pytorch_params import PYTORCH_PARAMS 
+from pipeline.utils.pytorch_utils import train_func
+from models.pytorch import NeuralNetwork
 from sklearn.metrics import classification_report
 
 logger = logging.getLogger(__name__)

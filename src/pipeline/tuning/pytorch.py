@@ -14,8 +14,8 @@ from ray.tune import RunConfig
 from ray.tune.schedulers import ASHAScheduler, ResourceChangingScheduler
 from typing import Dict
 
-from schemas.pytorch_params import SEARCH_SPACE_PYTORCH_PARAMS, PYTORCH_TUNE_SETTINGS
-from helpers.pytorch_utils import train_func
+from schemas.model.pytorch_params import SEARCH_SPACE_PYTORCH_PARAMS, PYTORCH_TUNE_SETTINGS
+from pipeline.utils.pytorch_utils import train_func
 from ray.air.integrations.mlflow import MLflowLoggerCallback
 
 

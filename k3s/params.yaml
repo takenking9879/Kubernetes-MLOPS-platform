@@ -26,8 +26,6 @@ spark:
   bucket: "k8s-mlops-platform-bucket" # dummy bucket name
   read_batch_size: 512  # Max MB read into memory per batch
   write_batch_size: 100000  # Max lines written to S3 per batch
-  pipeline:
-    module: "preprocessing.preprocessing_001"
   
   # ===== SCHEMAS CONFIGURATION =====
   # Nombres de schemas definidos en schema/schemas.py
@@ -46,7 +44,7 @@ spark:
   
   # ===== PREPROCESSING CONFIGURATION =====
   preprocessing:
-    module: "preprocessing.preprocessing_001"  # Módulo relativo a k3s.spark
+    module: "src.preprocess.preprocessing_001"  # Módulo relativo a k3s.spark
     function: "preprocess_spark"               # Función a llamar
     
     # Configuración de artefactos (scalers, encoders, etc.)

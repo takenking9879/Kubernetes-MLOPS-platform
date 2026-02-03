@@ -13,7 +13,7 @@ from starlette.requests import Request
 
 from ray.util.metrics import Counter, Histogram
 
-from k3s.kuberay.utils import create_logger
+from src.utils.logger import create_logger
 
 
 @dataclass(frozen=True)
@@ -91,7 +91,7 @@ class ModelAdapter(Protocol):
 
 class XGBoostAdapter:
     def __init__(self, model_path: str):
-        from k3s.kuberay.serving.modules.xgboost import XGBoostHandler
+        from serve.xgboost import XGBoostHandler
 
         self._handler = XGBoostHandler(model_path)
 
@@ -103,7 +103,7 @@ class XGBoostAdapter:
 
 class PyTorchAdapter:
     def __init__(self, model_path: str, *, input_dim: int, num_classes: int):
-        from k3s.kuberay.serving.modules.pytorch import PyTorchHandler
+        from serve.pytorch import PyTorchHandler
 
         self._handler = PyTorchHandler(model_path, input_dim=input_dim, num_classes=num_classes)
 

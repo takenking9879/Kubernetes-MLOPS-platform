@@ -1,4 +1,3 @@
-import json
 from typing import Dict, Tuple
 from pyspark.sql import DataFrame
 from pyspark.sql import functions as F

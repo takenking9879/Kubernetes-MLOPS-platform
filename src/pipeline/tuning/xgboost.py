@@ -17,8 +17,8 @@ from ray.train.xgboost import XGBoostTrainer
 from ray.air.integrations.mlflow import MLflowLoggerCallback
 from ray.tune.schedulers import ASHAScheduler, ResourceChangingScheduler
 
-from schemas.xgboost_params import SEARCH_SPACE_XGBOOST_PARAMS, XGBOOST_TUNE_SETTINGS
-from helpers.xgboost_utils import get_train_val_dmatrix, run_xgboost_train, RayTrainPeriodicReportCheckpointCallback
+from schemas.model.xgboost_params import SEARCH_SPACE_XGBOOST_PARAMS, XGBOOST_TUNE_SETTINGS
+from pipeline.utils.xgboost_utils import get_train_val_dmatrix, run_xgboost_train, RayTrainPeriodicReportCheckpointCallback
 
 logger = logging.getLogger(__name__)
 CHECKPOINT_FILENAME = "xgb_checkpoint.json"
