@@ -62,7 +62,7 @@ data:
           "type": "row"
         },
         {
-          "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
+          "datasource": { "type": "prometheus", "name": "Prometheus" },
           "fieldConfig": {
             "defaults": {
               "color": { "mode": "thresholds" },
@@ -86,18 +86,18 @@ data:
             "showThresholdLabels": false,
             "showThresholdMarkers": true
           },
-          "title": "Kafka Consumer Lag (Max)",
+          "title": "Kafka Topic End Offset (Max)",
           "type": "gauge",
           "targets": [
             {
-              "expr": "max(kafka_consumergroup_lag) or vector(0)",
-              "legendFormat": "Max Lag",
+              "expr": "max(kafka_topic_partition_current_offset{topic=~\".*\"}) or vector(0)",
+              "legendFormat": "Max End Offset",
               "refId": "A"
             }
           ]
         },
         {
-          "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
+          "datasource": { "type": "prometheus", "name": "Prometheus" },
           "fieldConfig": {
             "defaults": {
               "color": { "mode": "thresholds" },
@@ -132,7 +132,7 @@ data:
           ]
         },
         {
-          "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
+          "datasource": { "type": "prometheus", "name": "Prometheus" },
           "fieldConfig": {
             "defaults": {
               "color": { "mode": "thresholds" },
@@ -169,7 +169,7 @@ data:
           ]
         },
         {
-          "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
+          "datasource": { "type": "prometheus", "name": "Prometheus" },
           "fieldConfig": {
             "defaults": {
               "color": { "mode": "thresholds" },
@@ -195,11 +195,11 @@ data:
             "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
             "textMode": "auto"
           },
-          "title": "Ray Serve Success Rate %",
+          "title": "Ray Serve 2xx Success Rate %",
           "type": "stat",
           "targets": [
             {
-              "expr": "100 - (sum(rate(serve_deployment_error_counter[5m])) / sum(rate(serve_deployment_request_latency_ms_count[5m])) * 100) or vector(100)",
+              "expr": "100 * ((sum(rate(ray_serve_num_http_requests_total{application=\"inference\",route=\"/infer\",method=\"POST\",status_code=~\"2..\"}[5m])) or vector(0)) / clamp_min((sum(rate(ray_serve_num_http_requests_total{application=\"inference\",route=\"/infer\",method=\"POST\"}[5m])) or vector(0)), 1e-9))",
               "legendFormat": "Success %",
               "refId": "A"
             }
@@ -214,7 +214,7 @@ data:
           "type": "row"
         },
         {
-          "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
+          "datasource": { "type": "prometheus", "name": "Prometheus" },
           "fieldConfig": {
             "defaults": {
               "color": { "mode": "palette-classic" },
@@ -224,7 +224,7 @@ data:
                 "axisLabel": "Seconds",
                 "axisPlacement": "auto",
                 "barAlignment": 0,
-                "drawStyle": "bars",
+                "drawStyle": "line",
                 "fillOpacity": 80,
                 "gradientMode": "none",
                 "hideFrom": { "legend": false, "tooltip": false, "viz": false },
@@ -252,19 +252,19 @@ data:
           "type": "timeseries",
           "targets": [
             {
-              "expr": "latency_preprocess_seconds or vector(0)",
+              "expr": "avg(latency_preprocess_seconds) or vector(0)",
               "legendFormat": "Preprocess (Spark)",
               "refId": "A"
             },
             {
-              "expr": "latency_inference_seconds or vector(0)",
+              "expr": "avg(latency_inference_seconds) or vector(0)",
               "legendFormat": "Inference (Ray)",
               "refId": "B"
             }
           ]
         },
         {
-          "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
+          "datasource": { "type": "prometheus", "name": "Prometheus" },
           "fieldConfig": {
             "defaults": {
               "color": { "mode": "palette-classic" },
@@ -298,17 +298,17 @@ data:
             "legend": { "calcs": ["mean", "max"], "displayMode": "table", "placement": "bottom", "showLegend": true },
             "tooltip": { "mode": "multi", "sort": "none" }
           },
-          "title": "Ray Serve Internal Latency (Model Processing)",
+          "title": "Ray Serve HTTP Latency (route=/infer)",
           "type": "timeseries",
           "targets": [
             {
-              "expr": "histogram_quantile(0.50, sum(rate(serve_deployment_request_latency_ms_bucket[5m])) by (le, deployment))",
-              "legendFormat": "p50 - {{deployment}}",
+              "expr": "histogram_quantile(0.50, sum(rate(ray_serve_http_request_latency_ms_bucket{route=\"/infer\",method=\"POST\"}[5m])) by (le, status_code))",
+              "legendFormat": "p50 - {{status_code}}",
               "refId": "A"
             },
             {
-              "expr": "histogram_quantile(0.99, sum(rate(serve_deployment_request_latency_ms_bucket[5m])) by (le, deployment))",
-              "legendFormat": "p99 - {{deployment}}",
+              "expr": "histogram_quantile(0.99, sum(rate(ray_serve_http_request_latency_ms_bucket{route=\"/infer\",method=\"POST\"}[5m])) by (le, status_code))",
+              "legendFormat": "p99 - {{status_code}}",
               "refId": "B"
             }
           ]
@@ -322,7 +322,7 @@ data:
           "type": "row"
         },
         {
-          "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
+          "datasource": { "type": "prometheus", "name": "Prometheus" },
           "fieldConfig": {
             "defaults": {
               "color": { "mode": "palette-classic" },
@@ -356,23 +356,23 @@ data:
             "legend": { "calcs": ["mean", "max"], "displayMode": "table", "placement": "bottom", "showLegend": true },
             "tooltip": { "mode": "multi", "sort": "none" }
           },
-          "title": "Kafka Throughput (Messages In/Out)",
+          "title": "Kafka Throughput (Bytes In/Out)",
           "type": "timeseries",
           "targets": [
             {
-              "expr": "sum(rate(kafka_server_brokertopicmetrics_messagesin_total[5m])) by (topic)",
+              "expr": "sum(kafka_server_brokertopicmetrics_bytesinpersec_total) by (topic)",
               "legendFormat": "In - {{topic}}",
               "refId": "A"
             },
             {
-              "expr": "sum(rate(kafka_server_brokertopicmetrics_messagesout_total[5m])) by (topic)",
+              "expr": "sum(kafka_server_brokertopicmetrics_bytesoutpersec_total) by (topic)",
               "legendFormat": "Out - {{topic}}",
               "refId": "B"
             }
           ]
         },
         {
-          "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
+          "datasource": { "type": "prometheus", "name": "Prometheus" },
           "fieldConfig": {
             "defaults": {
               "color": { "mode": "thresholds" },
@@ -399,11 +399,11 @@ data:
             "showUnfilled": true,
             "valueMode": "color"
           },
-          "title": "Kafka Consumer Lag by Partition",
+          "title": "Kafka Topic End Offset by Partition",
           "type": "bargauge",
           "targets": [
             {
-              "expr": "kafka_consumergroup_lag{topic=~\".*\"}",
+              "expr": "kafka_topic_partition_current_offset{topic=~\".*\"}",
               "legendFormat": "{{topic}} - P{{partition}}",
               "refId": "A"
             }
@@ -418,7 +418,7 @@ data:
           "type": "row"
         },
         {
-          "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
+          "datasource": { "type": "prometheus", "name": "Prometheus" },
           "fieldConfig": {
             "defaults": {
               "color": { "mode": "palette-classic" },
@@ -463,7 +463,7 @@ data:
           ]
         },
         {
-          "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
+          "datasource": { "type": "prometheus", "name": "Prometheus" },
           "fieldConfig": {
             "defaults": {
               "color": { "mode": "palette-classic" },
@@ -508,7 +508,7 @@ data:
           ]
         },
         {
-          "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
+          "datasource": { "type": "prometheus", "name": "Prometheus" },
           "fieldConfig": {
             "defaults": {
               "color": { "mode": "palette-classic" },
@@ -636,7 +636,7 @@ data:
           "type": "timeseries",
           "targets": [
             {
-              "expr": "spark_batch_records_total or vector(0)",
+              "expr": "sum(spark_batch_records_total) or vector(0)",
               "legendFormat": "Records per batch",
               "refId": "A"
             }

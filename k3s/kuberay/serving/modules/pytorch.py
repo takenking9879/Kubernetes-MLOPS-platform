@@ -1,4 +1,5 @@
 import pickle
+import io
 import torch
 from k3s.kuberay.pytorch_models.models import NeuralNetwork
 
@@ -13,8 +14,31 @@ class PyTorchHandler:
     def _load_model(self, model_path, input_dim, num_classes):
         try:
             with open(model_path, "rb") as f:
-                state_dict = pickle.load(f)
+                obj = pickle.load(f)
+
+            # Supported payloads:
+            # 1) state_dict directly (OrderedDict[str, Tensor])
+            # 2) wrapper dict produced by training export: {"model_pt": <bytes>} where
+            #    bytes is a torch.save() payload (state_dict, module, or dict).
+            if isinstance(obj, dict) and "model_pt" in obj and isinstance(obj["model_pt"], (bytes, bytearray)):
+                loaded = torch.load(io.BytesIO(obj["model_pt"]), map_location="cpu")
+            else:
+                loaded = obj
+
             model = NeuralNetwork(input_dim=input_dim, num_classes=num_classes)
+
+            # torch.load() may return:
+            # - state_dict (dict of tensors)
+            # - a dict with keys like 'state_dict'/'model_state_dict'
+            # - a full nn.Module
+            if isinstance(loaded, torch.nn.Module):
+                return loaded
+
+            if isinstance(loaded, dict) and ("state_dict" in loaded or "model_state_dict" in loaded):
+                state_dict = loaded.get("state_dict") or loaded.get("model_state_dict")
+            else:
+                state_dict = loaded
+
             model.load_state_dict(state_dict)
             return model
         except Exception as e:

@@ -11,6 +11,7 @@ spec:
   accessModes:
     - ReadWriteOnce
   persistentVolumeReclaimPolicy: Retain
+  storageClassName: hostpath
   hostPath:
     path: /mnt/data/prometheus
     type: DirectoryOrCreate
@@ -26,6 +27,7 @@ spec:
   resources:
     requests:
       storage: 10Gi
+  storageClassName: hostpath
   volumeName: prometheus-pv
 ---
 apiVersion: v1
@@ -65,6 +67,13 @@ data:
       - job_name: 'kafka-brokers'
         static_configs:
           - targets: ['my-kafka-cluster-kafka-brokers.kafka.svc.cluster.local:9404']
+        scrape_interval: 15s
+
+      # ===== KAFKA EXPORTER (Consumer group lag, etc.) =====
+      - job_name: 'kafka-exporter'
+        static_configs:
+          - targets: ['my-kafka-cluster-kafka-exporter.kafka.svc.cluster.local:9404']
+        metrics_path: /metrics
         scrape_interval: 15s
 
       # ===== KUBE-STATE-METRICS =====
@@ -148,6 +157,8 @@ metadata:
     app: prometheus
 spec:
   replicas: 1
+  strategy:
+    type: Recreate
   selector:
     matchLabels:
       app: prometheus
