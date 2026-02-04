@@ -130,10 +130,27 @@ def train_func(config: Dict):
         print(f"[pytorch_utils] Worker using {cpus_per_worker} CPU thread(s) | "
               f"torch.get_num_threads()={torch.get_num_threads()}")
 
+    # Detect if we're inside a Ray Tune trial (hyperparameter tuning)
+    is_tuning = False
+    try:
+        import ray.tune as tune
+        tune.get_context().get_trial_id()
+        is_tuning = True
+    except Exception:
+        is_tuning = False
+
     # Start a Prometheus metrics server in the worker process (rank 0 only).
+    # DISABLED during tuning to avoid contaminating dashboards with trial metrics.
     # We scrape the Ray worker pods directly (not the K8s submitter Job).
     # IMPORTANT: Use the worker-specific registry to avoid metric name conflicts.
-    if _PROM_AVAILABLE and world_rank == 0 and os.getenv("PROMETHEUS_ENABLE_WORKER", "1") in ("1", "true", "True"):
+    should_start_prometheus = (
+        _PROM_AVAILABLE
+        and world_rank == 0
+        and not is_tuning  # ← NO iniciar servidor durante tuning
+        and os.getenv("PROMETHEUS_ENABLE_WORKER", "1") in ("1", "true", "True")
+    )
+    
+    if should_start_prometheus:
         try:
             port = int(os.getenv("PROMETHEUS_PORT", "8002"))
             # Pass the custom registry so start_http_server exposes ONLY worker metrics
@@ -142,6 +159,8 @@ def train_func(config: Dict):
         except Exception as e:
             # Best-effort: ignore if port is already in use.
             print(f"[pytorch_utils] Prometheus server start failed (likely already bound): {e}")
+    elif is_tuning:
+        print(f"[pytorch_utils] Skipping Prometheus server (tuning mode detected)")
 
     # Reporting cadence:
     # - For observability, default to reporting every epoch so Prometheus/Grafana
@@ -235,7 +254,8 @@ def train_func(config: Dict):
             continue
 
         # Prometheus: publish real-time epoch metrics from rank 0
-        if _PROM_AVAILABLE and world_rank == 0:
+        # DISABLED during tuning to avoid contaminating dashboards
+        if _PROM_AVAILABLE and world_rank == 0 and not is_tuning:
             try:
                 TRAIN_CURRENT_EPOCH.labels(framework="pytorch").set(epoch + 1)
             except Exception:

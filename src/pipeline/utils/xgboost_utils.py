@@ -57,15 +57,34 @@ def run_xgboost_train(
     num_boost_round: int,
     xgb_model=None,
 ):
+    # Detect if we're inside a Ray Tune trial (hyperparameter tuning)
+    is_tuning = False
+    try:
+        import ray.tune as tune
+        tune.get_context().get_trial_id()
+        is_tuning = True
+    except Exception:
+        is_tuning = False
+
     # Start Prometheus metrics server in the worker process (rank 0 only).
+    # DISABLED during tuning to avoid contaminating dashboards with trial metrics.
     world_rank = ray.train.get_context().get_world_rank()
-    if _PROM_AVAILABLE and world_rank == 0 and os.getenv("PROMETHEUS_ENABLE_WORKER", "1") in ("1", "true", "True"):
+    should_start_prometheus = (
+        _PROM_AVAILABLE
+        and world_rank == 0
+        and not is_tuning  # ← NO iniciar servidor durante tuning
+        and os.getenv("PROMETHEUS_ENABLE_WORKER", "1") in ("1", "true", "True")
+    )
+    
+    if should_start_prometheus:
         try:
             port = int(os.getenv("PROMETHEUS_PORT", "8002"))
             start_http_server(port, registry=_WORKER_REGISTRY)
             print(f"[xgboost_utils] ✓ Prometheus HTTP server started on port {port} (worker registry)")
         except Exception as e:
             print(f"[xgboost_utils] Prometheus server start failed (likely already bound): {e}")
+    elif is_tuning:
+        print(f"[xgboost_utils] Skipping Prometheus server (tuning mode detected)")
     
     return xgboost.train(
         params,
@@ -181,9 +200,19 @@ class RayTrainPeriodicReportCheckpointCallback(xgboost.callback.TrainingCallback
         # checkpoint report (Tune schedulers may require the metric every time).
         self._last_report_dict = dict(report_dict)
 
+        # Detect if we're inside a Ray Tune trial
+        is_tuning = False
+        try:
+            import ray.tune as tune
+            tune.get_context().get_trial_id()
+            is_tuning = True
+        except Exception:
+            is_tuning = False
+
         # Prometheus: publish real-time iteration metrics from rank 0
+        # DISABLED during tuning to avoid contaminating dashboards
         world_rank = ray.train.get_context().get_world_rank()
-        if _PROM_AVAILABLE and world_rank == 0:
+        if _PROM_AVAILABLE and world_rank == 0 and not is_tuning:
             try:
                 TRAIN_CURRENT_EPOCH.labels(framework="xgboost").set(it)
             except Exception:
