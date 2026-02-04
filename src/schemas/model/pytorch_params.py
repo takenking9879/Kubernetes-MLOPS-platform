@@ -27,7 +27,7 @@ PYTORCH_PARAMS: Dict[str, Any] = {
     # batch size
     "batch_size": 256,
     # Training
-    "max_epochs": 30,  # ← Usado cuando tune=False
+    "max_epochs": 50,  # ← Usado cuando tune=False
     "lr": 1e-3,
     "weight_decay": 0.0,
 }

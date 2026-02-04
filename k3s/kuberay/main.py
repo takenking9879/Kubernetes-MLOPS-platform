@@ -369,7 +369,7 @@ class KubeRayTraining(BaseUtils):
 
             # Allow Prometheus a small window to scrape the final metric values
             # before the RayJob tears down the head pod.
-            grace = int(os.getenv('PROMETHEUS_GRACE_SECONDS', '0'))
+            grace = int(os.getenv('PROMETHEUS_GRACE_SECONDS', '5'))
             if grace > 0:
                 self.logger.info(f"Sleeping {grace}s for Prometheus scrape grace period...")
                 time.sleep(grace)
