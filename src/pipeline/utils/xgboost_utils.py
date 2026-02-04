@@ -286,4 +286,20 @@ class RayTrainPeriodicReportCheckpointCallback(xgboost.callback.TrainingCallback
                 pass
 
         self._report(final_report, model, checkpoint=True)
+        
+        # Clear Prometheus metrics after training to avoid "stuck" values during grace period
+        world_rank = ray.train.get_context().get_world_rank()
+        if _PROM_AVAILABLE and not self.is_tuning and world_rank in (0, None):
+            try:
+                # Clear all metrics so they don't show flat lines during grace period
+                TRAIN_CURRENT_EPOCH.clear()
+                TRAIN_LOSS.clear()
+                TRAIN_ACCURACY.clear()
+                TRAIN_F1.clear()
+                TRAIN_PRECISION.clear()
+                TRAIN_RECALL.clear()
+                print("[xgboost_utils] Cleared Prometheus metrics after training")
+            except Exception as e:
+                print(f"[xgboost_utils] Failed to clear Prometheus metrics: {e}")
+        
         return model
