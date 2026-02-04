@@ -224,7 +224,9 @@ deploy_monitoring() {
   kubectl apply -f k3s/monitoring/node-exporter.yaml
 
   info "Applying Grafana"
-  kubectl apply -f k3s/monitoring/grafana/
+  kubectl apply -f k3s/monitoring/grafana/dashboards/
+  kubectl apply -f k3s/monitoring/grafana/grafana.yaml
+
 
   # Always restart to ensure configmaps are loaded (dashboards / scrape config changes).
   info "Restarting Prometheus and Grafana to reload configuration"
