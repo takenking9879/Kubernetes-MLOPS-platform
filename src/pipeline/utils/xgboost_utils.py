@@ -200,14 +200,17 @@ class RayTrainPeriodicReportCheckpointCallback(xgboost.callback.TrainingCallback
         if _PROM_AVAILABLE and world_rank == 0 and not self.is_tuning:
             try:
                 TRAIN_CURRENT_EPOCH.labels(framework="xgboost").set(it)
-            except Exception:
-                pass
+                print(f"[xgboost_utils] Exported epoch {it} to Prometheus")
+            except Exception as e:
+                print(f"[xgboost_utils] Failed to export epoch: {e}")
             # Export validation loss (mlogloss)
             if "validation-mlogloss" in report_dict:
                 try:
-                    TRAIN_LOSS.labels(framework="xgboost", split="val").set(float(report_dict["validation-mlogloss"]))
-                except Exception:
-                    pass
+                    loss_val = float(report_dict["validation-mlogloss"])
+                    TRAIN_LOSS.labels(framework="xgboost", split="val").set(loss_val)
+                    print(f"[xgboost_utils] Exported loss={loss_val} to Prometheus")
+                except Exception as e:
+                    print(f"[xgboost_utils] Failed to export loss: {e}")
 
         do_ckpt = (it % self.checkpoint_every == 0)
         if do_ckpt:
