@@ -124,6 +124,12 @@ class _PrometheusTrainCallbackImpl:
         self.framework = state.get("framework", "unknown")
         self._last_step = int(state.get("_last_step", 0) or 0)
 
+    def _unwrap_payload(self, payload: Any) -> Any:
+        """Normalize callback payloads across Ray AIR / Train / Tune paths."""
+        if isinstance(payload, dict) and isinstance(payload.get("metrics"), dict):
+            return payload.get("metrics")
+        return payload
+
     def _handle_metrics(self, results: Any) -> None:
         # Ray Train may pass either a single metrics dict (single-worker) OR a
         # list of dicts (one per worker). For distributed training we aggregate.
@@ -283,22 +289,27 @@ class _PrometheusTrainCallbackImpl:
 
     # Ray Train hook (UserCallback/TrainingCallback)
     def handle_result(self, results: Any, **kwargs: Any) -> None:
-        self._handle_metrics(results)
+        self._handle_metrics(self._unwrap_payload(results))
+
+    # Ray Train UserCallback hook (Ray 2.x)
+    def after_report(
+        self,
+        run_context: Any,
+        metrics: Dict[str, Any],
+        checkpoint: Any = None,
+        **kwargs: Any,
+    ) -> None:
+        # Ray passes the metrics dict directly here (per-epoch for TorchTrainer
+        # when the train loop calls ray.train.report()).
+        self._handle_metrics(self._unwrap_payload(metrics))
 
     # Ray AIR/Tune-style hook (AIR Callback)
     def on_trial_result(self, iteration: int, trials: Any, trial: Any, result: Any, **info: Any) -> None:
-        # Trainers may wrap reported metrics under a 'metrics' key.
-        payload = result
-        if isinstance(result, dict) and isinstance(result.get("metrics"), dict):
-            payload = result.get("metrics")
-        self._handle_metrics(payload)
+        self._handle_metrics(self._unwrap_payload(result))
 
     # Some AIR paths call a more generic on_result hook.
     def on_result(self, result: Any, **info: Any) -> None:  # pragma: no cover
-        payload = result
-        if isinstance(result, dict) and isinstance(result.get("metrics"), dict):
-            payload = result.get("metrics")
-        self._handle_metrics(payload)
+        self._handle_metrics(self._unwrap_payload(result))
 
 
 # Exported callback class with all compatible bases.
