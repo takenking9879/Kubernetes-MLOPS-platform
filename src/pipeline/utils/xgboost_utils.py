@@ -194,10 +194,10 @@ class RayTrainPeriodicReportCheckpointCallback(xgboost.callback.TrainingCallback
         # checkpoint report (Tune schedulers may require the metric every time).
         self._last_report_dict = dict(report_dict)
 
-        # Prometheus: publish real-time iteration metrics from rank 0
+        # Prometheus: publish real-time iteration metrics from ALL workers
+        # Each worker has its own registry, so no conflicts
         # DISABLED during tuning to avoid contaminating dashboards
-        world_rank = ray.train.get_context().get_world_rank()
-        if _PROM_AVAILABLE and world_rank == 0 and not self.is_tuning:
+        if _PROM_AVAILABLE and not self.is_tuning:
             try:
                 TRAIN_CURRENT_EPOCH.labels(framework="xgboost").set(it)
                 print(f"[xgboost_utils] Exported epoch {it} to Prometheus")

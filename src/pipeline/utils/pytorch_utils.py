@@ -247,9 +247,10 @@ def train_func(config: Dict):
         if not should_report:
             continue
 
-        # Prometheus: publish real-time epoch metrics from rank 0
+        # Prometheus: publish real-time epoch metrics from ALL workers
+        # Each worker has its own registry, so no conflicts
         # DISABLED during tuning to avoid contaminating dashboards
-        if _PROM_AVAILABLE and world_rank == 0 and not is_tuning:
+        if _PROM_AVAILABLE and not is_tuning:
             try:
                 TRAIN_CURRENT_EPOCH.labels(framework="pytorch").set(epoch + 1)
             except Exception:
