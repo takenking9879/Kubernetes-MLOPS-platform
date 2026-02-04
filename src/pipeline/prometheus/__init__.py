@@ -11,6 +11,8 @@ from .metrics import (
     TUNE_TRIALS_BY_STATUS,
     # Worker-side registries and metrics
     create_worker_registry,
+    # Helper functions
+    export_final_metrics,
 )
 from .tune import PrometheusTuneCallback
 
@@ -26,4 +28,6 @@ __all__ = [
     "PrometheusTuneCallback",
     # Worker utilities
     "create_worker_registry",
+    # Helpers
+    "export_final_metrics",
 ]

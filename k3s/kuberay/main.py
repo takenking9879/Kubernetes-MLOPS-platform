@@ -28,6 +28,7 @@ from src.pipeline.prometheus import (
     TUNE_BEST_METRIC,
     TUNE_TRIALS_BY_STATUS,
     PrometheusTuneCallback,
+    export_final_metrics,
 )
 # Training metrics (accuracy, loss, etc.) are now exported directly from worker
 # training loops in pytorch_utils.py/xgboost_utils.py, not via callbacks.
@@ -320,12 +321,13 @@ class KubeRayTraining(BaseUtils):
                 result, final_metrics = train_out, {}
             self.logger.info("Training completed successfully.")
             
-            # ===== PROMETHEUS METRICS: Disabled - using real-time worker metrics =====
-            # Performance metrics are now exported directly from the worker training loop
-            # in pytorch_utils.py/xgboost_utils.py, eliminating duplicate/disconnected points.
-            # The worker registry ensures metrics appear as continuous time series in Grafana.
-            
-            # Legacy final metrics export (commented out to avoid duplicate points):
+            # Export final metrics snapshot for gauge panels (best-effort)
+            if final_metrics:
+                try:
+                    export_final_metrics(framework=framework, metrics=final_metrics)
+                    self.logger.info("Final metrics exported to Prometheus")
+                except Exception as e:
+                    self.logger.warning(f"Could not export final metrics to Prometheus: {e}")
             # if getattr(prom_train_cb, '_last_step', 0) <= 0:
             #     ...epoch counter export...
             # if 'val_accuracy' in final_metrics:

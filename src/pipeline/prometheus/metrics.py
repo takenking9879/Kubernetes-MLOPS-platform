@@ -16,6 +16,13 @@ from prometheus_client import Counter, Gauge, CollectorRegistry
 TRAIN_FAILURES = Counter("train_failures_total", "Total training failures", ["framework", "error_type"])
 TRAIN_SPLIT_ROWS = Gauge("train_split_rows", "Dataset rows per split", ["framework", "split"])
 
+# Final training metrics (for gauge panels after training completes)
+TRAIN_LOSS = Gauge("train_loss", "Training loss", ["framework", "split"])
+TRAIN_ACCURACY = Gauge("train_accuracy", "Training accuracy", ["framework", "split"])
+TRAIN_F1 = Gauge("train_f1", "Training F1 score", ["framework", "split"])
+TRAIN_PRECISION = Gauge("train_precision", "Training precision", ["framework", "split"])
+TRAIN_RECALL = Gauge("train_recall", "Training recall", ["framework", "split"])
+
 # Tuning orchestration
 TUNE_TRIALS = Counter("tune_trials_total", "Total tuning trials", ["framework"])
 TUNE_TRIAL_STATUS = Gauge(
@@ -33,6 +40,43 @@ TUNE_TRIALS_BY_STATUS = Gauge(
     "Number of trials by status",
     ["framework", "status"],
 )
+
+
+# ----------------------
+# Helper functions
+# ----------------------
+def export_final_metrics(framework: str, metrics: dict) -> None:
+    """Export final training metrics to Prometheus after training completes.
+    
+    Provides stable snapshots for gauge panels while avoiding duplicates
+    during real-time training (which uses worker registries).
+    
+    Args:
+        framework: "pytorch" or "xgboost"
+        metrics: Dict with training metrics (val_loss, val_accuracy, etc.)
+    """
+    if not metrics:
+        return
+    
+    try:
+        # PyTorch metrics
+        if "val_loss" in metrics:
+            TRAIN_LOSS.labels(framework=framework, split="val").set(float(metrics["val_loss"]))
+        if "val_accuracy" in metrics:
+            TRAIN_ACCURACY.labels(framework=framework, split="val").set(float(metrics["val_accuracy"]))
+        if "val_f1_avg" in metrics:
+            TRAIN_F1.labels(framework=framework, split="val").set(float(metrics["val_f1_avg"]))
+        if "val_precision_avg" in metrics:
+            TRAIN_PRECISION.labels(framework=framework, split="val").set(float(metrics["val_precision_avg"]))
+        if "val_recall_avg" in metrics:
+            TRAIN_RECALL.labels(framework=framework, split="val").set(float(metrics["val_recall_avg"]))
+        
+        # XGBoost metrics (convert to common format)
+        if "validation-mlogloss" in metrics:
+            TRAIN_LOSS.labels(framework=framework, split="val").set(float(metrics["validation-mlogloss"]))
+            
+    except Exception as e:
+        print(f"[prometheus] Failed to export final metrics: {e}")
 
 
 # ----------------------
