@@ -137,6 +137,7 @@ class RayTrainPeriodicReportCheckpointCallback(xgboost.callback.TrainingCallback
 
         self._last_checkpoint_iter: Optional[int] = None
         self._last_report_dict: Dict[str, float] = {}
+        self._iteration_start_time: Optional[float] = None
 
     def _latest_metric(self, evals_log, dataset: str, metric: str):
         try:
@@ -194,8 +195,17 @@ class RayTrainPeriodicReportCheckpointCallback(xgboost.callback.TrainingCallback
             ray.train.report(report_dict)
 
     def after_iteration(self, model, epoch: int, evals_log) -> bool:
+        import time
         # XGBoost counts epochs from 0.
         it = epoch + 1
+        
+        # Track iteration duration
+        current_time = time.perf_counter()
+        iteration_duration = None
+        if self._iteration_start_time is not None:
+            iteration_duration = current_time - self._iteration_start_time
+        self._iteration_start_time = current_time
+        
         if it % self.report_every != 0:
             return False
 
@@ -218,6 +228,12 @@ class RayTrainPeriodicReportCheckpointCallback(xgboost.callback.TrainingCallback
                 TRAIN_CURRENT_EPOCH.labels(framework="xgboost").set(it)
             except Exception as e:
                 print(f"[xgboost_utils] Failed to export epoch: {e}")
+            # Export iteration duration
+            if iteration_duration is not None:
+                try:
+                    TRAIN_EPOCH_DURATION_LAST.labels(framework="xgboost").set(iteration_duration)
+                except Exception:
+                    pass
             # Export train loss (mlogloss) if available
             if "train-mlogloss" in report_dict:
                 try:
@@ -293,6 +309,7 @@ class RayTrainPeriodicReportCheckpointCallback(xgboost.callback.TrainingCallback
             try:
                 # Clear all metrics so they don't show flat lines during grace period
                 TRAIN_CURRENT_EPOCH.clear()
+                TRAIN_EPOCH_DURATION_LAST.clear()
                 TRAIN_LOSS.clear()
                 TRAIN_ACCURACY.clear()
                 TRAIN_F1.clear()
