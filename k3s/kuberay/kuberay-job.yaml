@@ -7,7 +7,7 @@ spec:
   entrypoint: python3 /home/ray/app/repo/k3s/kuberay/main.py
 
   shutdownAfterJobFinishes: true
-  ttlSecondsAfterFinished: 100
+  ttlSecondsAfterFinished: 600  # 10 minutes - allow Prometheus to scrape metrics
 
   runtimeEnvYAML: |
     env_vars:

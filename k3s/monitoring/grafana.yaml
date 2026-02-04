@@ -1494,7 +1494,7 @@ data:
             "type": "query",
             "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
             "refresh": 1,
-            "query": "label_values(train_current_epoch, framework)",
+            "query": "label_values(train_loss{split=\"val\"}, framework)",
             "includeAll": true,
             "multi": false,
             "allValue": ".*",

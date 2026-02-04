@@ -47,11 +47,21 @@ class KubeRayTraining(BaseUtils):
     def _start_prometheus_server(self):
         """Start Prometheus metrics HTTP server on port 8002."""
         port = int(os.getenv('PROMETHEUS_PORT', 8002))
+        print(f"[main.py] Attempting to start Prometheus server on port {port}...")
         try:
             start_http_server(port)
-            self.logger.info(f"Prometheus metrics server started on port {port}")
+            self.logger.info(f"✓ Prometheus metrics server started on port {port}")
+            print(f"[main.py] ✓ Prometheus HTTP server successfully started on port {port}")
+        except OSError as e:
+            if "Address already in use" in str(e):
+                self.logger.info(f"Prometheus server already running on port {port}")
+                print(f"[main.py] Prometheus server already running on port {port} (OK)")
+            else:
+                self.logger.warning(f"Could not start Prometheus server: {e}")
+                print(f"[main.py] ERROR starting Prometheus server: {e}")
         except Exception as e:
             self.logger.warning(f"Could not start Prometheus server: {e}")
+            print(f"[main.py] ERROR starting Prometheus server: {e}")
 
     def _check_minio_connection(self):
         try:
