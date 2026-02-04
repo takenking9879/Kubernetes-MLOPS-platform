@@ -1261,7 +1261,7 @@ data:
           "type": "stat",
           "targets": [
             {
-              "expr": "sum(max_over_time(tune_trials_total{framework=~\"$framework\"}[6h])) or vector(0)",
+              "expr": "sum(max_over_time(tune_trials_total{framework=~\"$framework\"}[3h])) or vector(0)",
               "legendFormat": "Trials",
               "refId": "A"
             }
@@ -1327,7 +1327,7 @@ data:
           "type": "stat",
           "targets": [
             {
-              "expr": "min by (metric) (min_over_time(tune_best_metric_value{framework=~\"$framework\"}[6h]))",
+              "expr": "min by (metric) (min_over_time(tune_best_metric_value{framework=~\"$framework\"}[3h]))",
               "legendFormat": "{{metric}}",
               "refId": "A"
             }
