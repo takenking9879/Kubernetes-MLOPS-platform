@@ -1327,7 +1327,7 @@ data:
           "type": "stat",
           "targets": [
             {
-              "expr": "max by (metric) (max_over_time(tune_best_metric_value{framework=~\"$framework\"}[6h])) or vector(0)",
+              "expr": "min by (metric) (min_over_time(tune_best_metric_value{framework=~\"$framework\"}[6h]))",
               "legendFormat": "{{metric}}",
               "refId": "A"
             }

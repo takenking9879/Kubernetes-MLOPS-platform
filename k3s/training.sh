@@ -48,7 +48,7 @@ log_info "Deploying Spark preprocessing job..."
 kubectl apply -f "${SCRIPT_DIR}/spark/spark-application.yaml"
 
 log_info "Waiting for Spark driver to be running..."
-TIMEOUT=120
+TIMEOUT=130
 ELAPSED=0
 while [ $ELAPSED -lt $TIMEOUT ]; do
     STATUS=$(kubectl get sparkapplication "$SPARK_APP_NAME" -n spark -o jsonpath='{.status.applicationState.state}' 2>/dev/null || echo "PENDING")

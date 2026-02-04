@@ -60,13 +60,15 @@ TUNE_TRIALS_BY_STATUS = Gauge(
 # Callback base classes
 # ----------------------
 
+_TrainingCallback: type
+
 try:
     # Ray 2.5x+ provides UserCallback.
-    from ray.train import UserCallback as _TrainingCallback
-except Exception:  # pragma: no cover
+    from ray.train import UserCallback as _TrainingCallback  # type: ignore
+except Exception:
     try:
         from ray.train.callbacks import TrainingCallback as _TrainingCallback  # type: ignore
-    except Exception:  # pragma: no cover
+    except Exception:
         _TrainingCallback = object  # type: ignore
 
 try:
@@ -90,7 +92,7 @@ class PrometheusTrainCallback(_TrainingCallback):
         self.framework = state.get("framework", "unknown")
         self._last_step = int(state.get("_last_step", 0) or 0)
 
-    def handle_result(self, results: Any, **kwargs: Any) -> None:  # Ray Train hook
+    def _handle_metrics(self, results: Any) -> None:
         # Ray Train may pass either a single metrics dict (single-worker) OR a
         # list of dicts (one per worker). For distributed training we aggregate.
         if results is None:
@@ -246,6 +248,18 @@ class PrometheusTrainCallback(_TrainingCallback):
                 TRAIN_RECALL.labels(framework=self.framework, split="val").set(float(metrics["val_recall_avg"]))
             except Exception:
                 pass
+
+    # Ray Train hook (UserCallback/TrainingCallback)
+    def handle_result(self, results: Any, **kwargs: Any) -> None:
+        self._handle_metrics(results)
+
+    # Ray AIR/Tune-style hook (AIR Callback)
+    def on_trial_result(self, iteration: int, trials: Any, trial: Any, result: Any, **info: Any) -> None:
+        # Trainers may wrap reported metrics under a 'metrics' key.
+        payload = result
+        if isinstance(result, dict) and isinstance(result.get("metrics"), dict):
+            payload = result.get("metrics")
+        self._handle_metrics(payload)
 
 
 class PrometheusTuneCallback(_TuneCallback):
