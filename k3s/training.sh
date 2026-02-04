@@ -79,26 +79,34 @@ deploy_spark_preprocessing() {
   log_info "Applying Spark preprocessing job"
   kubectl apply -f "${SCRIPT_DIR}/spark/spark-application.yaml"
 
-  log_info "Waiting for Spark driver to be running"
+  log_info "Waiting for SparkApplication to complete (ResourceReleased)..."
+  INTERVAL=10
   ELAPSED=0
-  while [ $ELAPSED -lt $SPARK_DRIVER_TIMEOUT ]; do
-    STATUS=$(kubectl get sparkapplication "$SPARK_APP_NAME" -n spark -o jsonpath='{.status.applicationState.state}' 2>/dev/null || echo "PENDING")
-    if [ "$STATUS" == "RUNNING" ] || [ "$STATUS" == "COMPLETED" ]; then
-      log_info "Spark driver status: $STATUS"
+  SPARK_STATE=""
+  while [ $ELAPSED -lt $SPARK_COMPLETION_TIMEOUT ]; do
+    SPARK_STATE=$(kubectl get sparkapplication "$SPARK_APP_NAME" -n spark -o jsonpath='{.status.currentState.currentStateSummary}' 2>/dev/null || echo "")
+    if [ "$SPARK_STATE" = "ResourceReleased" ] || [ "$SPARK_STATE" = "RESOURCE_RELEASED" ]; then
+      log_info "SparkApplication ${SPARK_APP_NAME} reached ResourceReleased"
       break
     fi
-    sleep 5
-    ELAPSED=$((ELAPSED + 5))
+    if [ "$SPARK_STATE" = "FAILED" ] || [ "$SPARK_STATE" = "Failed" ]; then
+      log_error "SparkApplication ${SPARK_APP_NAME} finished with failure: $SPARK_STATE"
+      exit 1
+    fi
+    sleep $INTERVAL
+    ELAPSED=$((ELAPSED + INTERVAL))
     echo -n "."
   done
   echo ""
 
-  if [ $ELAPSED -ge $SPARK_DRIVER_TIMEOUT ]; then
-    log_warn "Timeout waiting for Spark driver. Continuing anyway..."
+  if [ "$SPARK_STATE" = "ResourceReleased" ] || [ "$SPARK_STATE" = "RESOURCE_RELEASED" ]; then
+    log_info "Deleting SparkApplication ${SPARK_APP_NAME}..."
+    (kubectl delete sparkapp "$SPARK_APP_NAME" -n spark || kubectl delete sparkapplication "$SPARK_APP_NAME" -n spark) || true
+    ok "Spark preprocessing completed and cleaned up"
+  else
+    log_error "SparkApplication ${SPARK_APP_NAME} did not reach ResourceReleased within timeout (state=${SPARK_STATE})"
+    exit 1
   fi
-
-  sleep 10
-  ok "Spark preprocessing deployed"
 }
 
 # ============================================================
@@ -131,39 +139,6 @@ deploy_ray_training() {
 }
 
 # ============================================================
-# WAIT FOR SPARK TO COMPLETE (SEQUENTIAL EXECUTION)
-# ============================================================
-wait_for_spark_completion() {
-  sep
-  log_info "Waiting for SparkApplication ${SPARK_APP_NAME} to complete before starting training..."
-  
-  INTERVAL=10
-  ELAPSED=0
-  SPARK_STATE=""
-  while [ $ELAPSED -lt $SPARK_COMPLETION_TIMEOUT ]; do
-    SPARK_STATE=$(kubectl get sparkapplication "$SPARK_APP_NAME" -n spark -o jsonpath='{.status.applicationState.state}' 2>/dev/null || echo "")
-    if [ "$SPARK_STATE" = "ResourceReleased" ] || [ "$SPARK_STATE" = "RESOURCE_RELEASED" ]; then
-      log_info "SparkApplication ${SPARK_APP_NAME} reached ResourceReleased"
-      ok "Spark preprocessing completed successfully"
-      return 0
-    fi
-    if [ "$SPARK_STATE" = "FAILED" ] || [ "$SPARK_STATE" = "Failed" ]; then
-      log_error "SparkApplication ${SPARK_APP_NAME} finished with failure: $SPARK_STATE"
-      log_error "Cannot proceed to training. Exiting."
-      exit 1
-    fi
-    sleep $INTERVAL
-    ELAPSED=$((ELAPSED + INTERVAL))
-    echo -n "."
-  done
-  echo ""
-  
-  log_error "SparkApplication ${SPARK_APP_NAME} did not reach ResourceReleased within timeout (state=${SPARK_STATE})"
-  log_error "Cannot proceed to training. Exiting."
-  exit 1
-}
-
-# ============================================================
 # CLEANUP (OPTIONAL)
 # ============================================================
 cleanup_resources() {
@@ -173,37 +148,9 @@ cleanup_resources() {
   fi
 
   sep
-  log_info "ENABLE_DELETION=true — waiting for jobs to complete and cleaning up"
+  log_info "ENABLE_DELETION=true — cleaning up remaining resources"
 
-  # Cleanup Spark if it was deployed
-  if [ "$ENABLE_PREPROCESS" = "true" ]; then
-    log_info "Waiting for SparkApplication ${SPARK_APP_NAME} to finish..."
-    INTERVAL=10
-    ELAPSED=0
-    SPARK_STATE=""
-    while [ $ELAPSED -lt $SPARK_COMPLETION_TIMEOUT ]; do
-      SPARK_STATE=$(kubectl get sparkapplication "$SPARK_APP_NAME" -n spark -o jsonpath='{.status.applicationState.state}' 2>/dev/null || echo "")
-      if [ "$SPARK_STATE" = "ResourceReleased" ] || [ "$SPARK_STATE" = "RESOURCE_RELEASED" ]; then
-        log_info "SparkApplication ${SPARK_APP_NAME} reached ResourceReleased"
-        break
-      fi
-      if [ "$SPARK_STATE" = "FAILED" ] || [ "$SPARK_STATE" = "Failed" ]; then
-        log_warn "SparkApplication ${SPARK_APP_NAME} finished with failure: $SPARK_STATE"
-        break
-      fi
-      sleep $INTERVAL
-      ELAPSED=$((ELAPSED + INTERVAL))
-      echo -n "."
-    done
-    echo ""
-
-    if [ "$SPARK_STATE" = "ResourceReleased" ] || [ "$SPARK_STATE" = "RESOURCE_RELEASED" ] || [ "$SPARK_STATE" = "FAILED" ] || [ "$SPARK_STATE" = "Failed" ]; then
-      log_info "Deleting SparkApplication ${SPARK_APP_NAME}..."
-      (kubectl delete sparkapp "$SPARK_APP_NAME" -n spark || kubectl delete sparkapplication "$SPARK_APP_NAME" -n spark) || true
-    else
-      log_warn "SparkApplication ${SPARK_APP_NAME} did not reach ResourceReleased/Failed within timeout (state=${SPARK_STATE}). Skipping delete."
-    fi
-  fi
+  # Note: SparkApplication is already deleted in deploy_spark_preprocessing() if ENABLE_PREPROCESS=true
 
   # Cleanup Ray if it was deployed
   if [ "$ENABLE_TRAINING" = "true" ]; then
@@ -265,11 +212,6 @@ cleanup_resources() {
 
 if [ "$ENABLE_PREPROCESS" = "true" ]; then
   deploy_spark_preprocessing
-fi
-
-# If both preprocessing and training are enabled, wait for Spark to complete before starting Ray
-if [ "$ENABLE_PREPROCESS" = "true" ] && [ "$ENABLE_TRAINING" = "true" ]; then
-  wait_for_spark_completion
 fi
 
 if [ "$ENABLE_TRAINING" = "true" ]; then
