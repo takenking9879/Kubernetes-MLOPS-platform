@@ -44,7 +44,20 @@ data:
   mlops-pipeline.json: |
     {
       "annotations": {
-        "list": []
+        "list": [
+          {
+            "builtIn": 1,
+            "datasource": {
+              "type": "grafana",
+              "uid": "-- Grafana --"
+            },
+            "enable": true,
+            "hide": true,
+            "iconColor": "rgba(0, 211, 255, 1)",
+            "name": "Annotations & Alerts",
+            "type": "dashboard"
+          }
+        ]
       },
       "editable": true,
       "fiscalYearStartMonth": 0,
@@ -727,11 +740,25 @@ data:
     }
   mlops-training.json: |
     {
-      "annotations": { "list": [] },
+      "annotations": {
+        "list": [
+          {
+            "builtIn": 1,
+            "datasource": {
+              "type": "grafana",
+              "uid": "-- Grafana --"
+            },
+            "enable": true,
+            "hide": true,
+            "iconColor": "rgba(0, 211, 255, 1)",
+            "name": "Annotations & Alerts",
+            "type": "dashboard"
+          }
+        ]
+      },
       "editable": true,
       "fiscalYearStartMonth": 0,
       "graphTooltip": 1,
-      "id": null,
       "links": [],
       "liveNow": false,
       "panels": [
@@ -762,9 +789,11 @@ data:
             "justifyMode": "auto",
             "orientation": "auto",
             "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
-            "textMode": "auto"
+            "showPercentChange": false,
+            "textMode": "auto",
+            "wideLayout": true
           },
-          "pluginVersion": "10.2.0",
+          "pluginVersion": "10.4.1",
           "title": "Total Records Preprocessed",
           "type": "stat",
           "targets": [
@@ -794,9 +823,11 @@ data:
             "justifyMode": "auto",
             "orientation": "auto",
             "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
-            "textMode": "auto"
+            "showPercentChange": false,
+            "textMode": "auto",
+            "wideLayout": true
           },
-          "pluginVersion": "10.2.0",
+          "pluginVersion": "10.4.1",
           "title": "Total Dataset Runs (Splits)",
           "type": "stat",
           "targets": [
@@ -873,9 +904,11 @@ data:
             "justifyMode": "auto",
             "orientation": "auto",
             "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
-            "textMode": "auto"
+            "showPercentChange": false,
+            "textMode": "auto",
+            "wideLayout": true
           },
-          "pluginVersion": "10.2.0",
+          "pluginVersion": "10.4.1",
           "title": "Preprocessing Errors",
           "type": "stat",
           "targets": [
@@ -931,14 +964,17 @@ data:
           "id": 7,
           "options": {
             "displayMode": "lcd",
+            "maxVizHeight": 300,
             "minVizHeight": 10,
             "minVizWidth": 0,
+            "namePlacement": "auto",
             "orientation": "horizontal",
             "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
             "showUnfilled": true,
+            "sizing": "auto",
             "valueMode": "color"
           },
-          "pluginVersion": "10.2.0",
+          "pluginVersion": "10.4.1",
           "title": "Records by Dataset",
           "type": "bargauge",
           "targets": [
@@ -976,9 +1012,11 @@ data:
             "justifyMode": "auto",
             "orientation": "auto",
             "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
-            "textMode": "auto"
+            "showPercentChange": false,
+            "textMode": "auto",
+            "wideLayout": true
           },
-          "pluginVersion": "10.2.0",
+          "pluginVersion": "10.4.1",
           "title": "Total Epochs",
           "type": "stat",
           "targets": [
@@ -1008,9 +1046,11 @@ data:
             "justifyMode": "auto",
             "orientation": "auto",
             "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
-            "textMode": "auto"
+            "showPercentChange": false,
+            "textMode": "auto",
+            "wideLayout": true
           },
-          "pluginVersion": "10.2.0",
+          "pluginVersion": "10.4.1",
           "title": "Total Samples",
           "type": "stat",
           "targets": [
@@ -1040,9 +1080,11 @@ data:
             "justifyMode": "auto",
             "orientation": "auto",
             "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
-            "textMode": "auto"
+            "showPercentChange": false,
+            "textMode": "auto",
+            "wideLayout": true
           },
-          "pluginVersion": "10.2.0",
+          "pluginVersion": "10.4.1",
           "title": "Train Failures",
           "type": "stat",
           "targets": [
@@ -1068,12 +1110,15 @@ data:
           "gridPos": { "h": 4, "w": 6, "x": 12, "y": 13 },
           "id": 14,
           "options": {
+            "minVizHeight": 75,
+            "minVizWidth": 75,
             "orientation": "auto",
             "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
             "showThresholdLabels": false,
-            "showThresholdMarkers": true
+            "showThresholdMarkers": true,
+            "sizing": "auto"
           },
-          "pluginVersion": "10.2.0",
+          "pluginVersion": "10.4.1",
           "title": "Final Loss",
           "type": "gauge",
           "targets": [
@@ -1101,12 +1146,15 @@ data:
           "gridPos": { "h": 4, "w": 6, "x": 18, "y": 13 },
           "id": 15,
           "options": {
+            "minVizHeight": 75,
+            "minVizWidth": 75,
             "orientation": "auto",
             "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
             "showThresholdLabels": false,
-            "showThresholdMarkers": true
+            "showThresholdMarkers": true,
+            "sizing": "auto"
           },
-          "pluginVersion": "10.2.0",
+          "pluginVersion": "10.4.1",
           "title": "Final Accuracy",
           "type": "gauge",
           "targets": [
@@ -1282,7 +1330,7 @@ data:
         },
         {
           "collapsed": false,
-          "gridPos": { "h": 1, "w": 24, "x": 0, "y": 23 },
+          "gridPos": { "h": 1, "w": 24, "x": 0, "y": 31 },
           "id": 20,
           "panels": [],
           "title": "🔧 Tuning Metrics",
@@ -1299,7 +1347,7 @@ data:
             },
             "overrides": []
           },
-          "gridPos": { "h": 4, "w": 6, "x": 0, "y": 24 },
+          "gridPos": { "h": 4, "w": 6, "x": 0, "y": 32 },
           "id": 21,
           "options": {
             "colorMode": "value",
@@ -1307,9 +1355,11 @@ data:
             "justifyMode": "auto",
             "orientation": "auto",
             "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
-            "textMode": "auto"
+            "showPercentChange": false,
+            "textMode": "auto",
+            "wideLayout": true
           },
-          "pluginVersion": "10.2.0",
+          "pluginVersion": "10.4.1",
           "title": "Total Trials",
           "type": "stat",
           "targets": [
@@ -1331,18 +1381,21 @@ data:
             },
             "overrides": []
           },
-          "gridPos": { "h": 4, "w": 12, "x": 6, "y": 24 },
+          "gridPos": { "h": 4, "w": 12, "x": 6, "y": 32 },
           "id": 22,
           "options": {
             "displayMode": "lcd",
+            "maxVizHeight": 300,
             "minVizHeight": 10,
             "minVizWidth": 0,
+            "namePlacement": "auto",
             "orientation": "horizontal",
             "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
             "showUnfilled": true,
+            "sizing": "auto",
             "valueMode": "color"
           },
-          "pluginVersion": "10.2.0",
+          "pluginVersion": "10.4.1",
           "title": "Trials by Status",
           "type": "bargauge",
           "targets": [
@@ -1365,7 +1418,7 @@ data:
             },
             "overrides": []
           },
-          "gridPos": { "h": 4, "w": 6, "x": 18, "y": 24 },
+          "gridPos": { "h": 4, "w": 6, "x": 18, "y": 32 },
           "id": 23,
           "options": {
             "colorMode": "value",
@@ -1373,9 +1426,11 @@ data:
             "justifyMode": "auto",
             "orientation": "auto",
             "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
-            "textMode": "auto"
+            "showPercentChange": false,
+            "textMode": "auto",
+            "wideLayout": true
           },
-          "pluginVersion": "10.2.0",
+          "pluginVersion": "10.4.1",
           "title": "Best Tune Metric Value",
           "type": "stat",
           "targets": [
@@ -1388,7 +1443,7 @@ data:
         },
         {
           "collapsed": false,
-          "gridPos": { "h": 1, "w": 24, "x": 0, "y": 28 },
+          "gridPos": { "h": 1, "w": 24, "x": 0, "y": 36 },
           "id": 30,
           "panels": [],
           "title": "💻 Resources",
@@ -1424,7 +1479,7 @@ data:
             },
             "overrides": []
           },
-          "gridPos": { "h": 6, "w": 12, "x": 0, "y": 29 },
+          "gridPos": { "h": 6, "w": 12, "x": 0, "y": 37 },
           "id": 31,
           "options": {
             "legend": { "calcs": ["mean", "max"], "displayMode": "table", "placement": "bottom", "showLegend": true },
@@ -1471,7 +1526,7 @@ data:
             },
             "overrides": []
           },
-          "gridPos": { "h": 6, "w": 12, "x": 12, "y": 29 },
+          "gridPos": { "h": 6, "w": 12, "x": 12, "y": 37 },
           "id": 32,
           "options": {
             "legend": { "calcs": ["mean", "max"], "displayMode": "table", "placement": "bottom", "showLegend": true },
@@ -1518,7 +1573,7 @@ data:
             },
             "overrides": []
           },
-          "gridPos": { "h": 6, "w": 24, "x": 0, "y": 35 },
+          "gridPos": { "h": 6, "w": 24, "x": 0, "y": 43 },
           "id": 33,
           "options": {
             "legend": { "calcs": ["mean", "max"], "displayMode": "table", "placement": "right", "showLegend": true },
@@ -1536,26 +1591,38 @@ data:
           ]
         }
       ],
-      "refresh": "10s",
-      "schemaVersion": 38,
-      "style": "dark",
+      "refresh": "5s",
+      "schemaVersion": 39,
       "tags": ["mlops", "training", "spark", "ray", "tuning"],
       "templating": {
         "list": [
           {
-            "name": "framework",
-            "type": "query",
-            "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
-            "refresh": 1,
-            "query": "label_values(train_loss{split=\"val\"}, framework)",
+            "allValue": ".*",
+            "current": {
+              "selected": false,
+              "text": "All",
+              "value": "$__all"
+            },
+            "datasource": {
+              "type": "prometheus",
+              "uid": "PBFA97CFB590B2093"
+            },
+            "definition": "",
+            "hide": 0,
             "includeAll": true,
             "multi": false,
-            "allValue": ".*",
-            "current": { "selected": false, "text": "All", "value": ".*" }
+            "name": "framework",
+            "options": [],
+            "query": "label_values(train_loss{split=\"val\"}, framework)",
+            "refresh": 1,
+            "regex": "",
+            "skipUrlSync": false,
+            "sort": 0,
+            "type": "query"
           }
         ]
       },
-      "time": { "from": "now-1h", "to": "now" },
+      "time": { "from": "now-15m", "to": "now" },
       "timepicker": {},
       "timezone": "browser",
       "title": "MLOps Training Dashboard",
