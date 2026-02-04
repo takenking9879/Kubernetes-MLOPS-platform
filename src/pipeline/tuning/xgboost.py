@@ -142,6 +142,7 @@ def tune_model(
             "cpus_per_worker": cpus_per_worker,
             "num_boost_round": int(XGBOOST_TUNE_SETTINGS["num_boost_round"]),
             "xgboost_params": trial_config["xgboost_params"],
+            "is_tuning": True,  # ← Trial de tuning, deshabilitar Prometheus
         }
 
         try:

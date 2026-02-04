@@ -130,14 +130,8 @@ def train_func(config: Dict):
         print(f"[pytorch_utils] Worker using {cpus_per_worker} CPU thread(s) | "
               f"torch.get_num_threads()={torch.get_num_threads()}")
 
-    # Detect if we're inside a Ray Tune trial (hyperparameter tuning)
-    is_tuning = False
-    try:
-        import ray.tune as tune
-        tune.get_context().get_trial_id()
-        is_tuning = True
-    except Exception:
-        is_tuning = False
+    # Check if we're in tuning mode (passed explicitly via config)
+    is_tuning = config.get("is_tuning", False)
 
     # Start a Prometheus metrics server in the worker process (rank 0 only).
     # DISABLED during tuning to avoid contaminating dashboards with trial metrics.
@@ -160,7 +154,7 @@ def train_func(config: Dict):
             # Best-effort: ignore if port is already in use.
             print(f"[pytorch_utils] Prometheus server start failed (likely already bound): {e}")
     elif is_tuning:
-        print(f"[pytorch_utils] Skipping Prometheus server (tuning mode detected)")
+        print(f"[pytorch_utils] Skipping Prometheus server (tuning mode)")
 
     # Reporting cadence:
     # - For observability, default to reporting every epoch so Prometheus/Grafana

@@ -118,6 +118,7 @@ def tune_model(
             "input_dim": 14,
             "num_classes": int(num_classes),
             "cpus_per_worker": cpus_per_worker,
+            "is_tuning": True,  # ← Trial de tuning, deshabilitar Prometheus
         }
 
         # Ensure Ray Train persists checkpoints/metrics to shared storage.

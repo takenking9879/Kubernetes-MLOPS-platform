@@ -40,12 +40,14 @@ def train_func(config: Dict):
         dtrain=dtrain,
         dval=dval,
         num_boost_round=num_boost_round,
+        is_tuning=config.get("is_tuning", False),
         callbacks=[
             RayTrainPeriodicReportCheckpointCallback(
                 metrics=["validation-mlogloss", "validation-merror"],
                 report_every=5,
                 checkpoint_every=50,
                 filename="model.ubj",
+                is_tuning=config.get("is_tuning", False),
             )
         ],
     )
@@ -74,6 +76,7 @@ def train(
         "num_classes": int(num_classes),
         "xgboost_params": params,
         "cpus_per_worker": int(os.getenv("CPUS_PER_WORKER", 2)),
+        "is_tuning": False,  # ← Entrenamiento final, NO tuning
     }
 
     trainer = XGBoostTrainer(

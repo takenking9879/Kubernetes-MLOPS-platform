@@ -164,6 +164,7 @@ def train(
         "input_dim": 14,  # Ajustado a las columnas de preprocessing_001.py (3 cat + 11 num)
         "num_classes": int(num_classes),
         "cpus_per_worker": cpus_per_worker,
+        "is_tuning": False,  # ← Entrenamiento final, NO tuning
         }
 
     trainer = TorchTrainer(

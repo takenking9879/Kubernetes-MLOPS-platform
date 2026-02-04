@@ -298,13 +298,18 @@ class KubeRayTraining(BaseUtils):
             if framework == "xgboost":
                 if best_params is None:
                     best_params = dict(XGBOOST_PARAMS)
-                best_params['num_boost_round'] = XGBOOST_PARAMS['num_boost_round']
+                # Siempre asegurar que tenga num_boost_round (no está en SEARCH_SPACE)
+                best_params["num_boost_round"] = XGBOOST_PARAMS["num_boost_round"]
                 train_kwargs["xgboost_params"] = best_params
 
             # PyTorch specific tuned params
             if framework == "pytorch":
                 if best_params is None:
                     best_params = dict(PYTORCH_PARAMS)
+                else:
+                    # Si viene del tuning, asegurar que tenga max_epochs (no está en SEARCH_SPACE)
+                    if "max_epochs" not in best_params:
+                        best_params["max_epochs"] = PYTORCH_PARAMS["max_epochs"]
                 train_kwargs["pytorch_params"] = best_params
 
             # Metrics are exported directly from worker training loop (pytorch_utils.py)
