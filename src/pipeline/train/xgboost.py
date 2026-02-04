@@ -44,7 +44,7 @@ def train_func(config: Dict):
         callbacks=[
             RayTrainPeriodicReportCheckpointCallback(
                 metrics=["validation-mlogloss", "validation-merror", "train-mlogloss"],
-                report_every=1,  # Report every epoch for smooth Grafana visualization
+                report_every=int(os.getenv("REPORT_FREQUENCY", 5)),  # Report every epoch for smooth Grafana visualization
                 checkpoint_every=50,
                 filename="model.ubj",
                 is_tuning=config.get("is_tuning", False),

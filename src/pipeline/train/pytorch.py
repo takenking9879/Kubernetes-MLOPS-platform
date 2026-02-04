@@ -130,12 +130,6 @@ def _evaluate_on_dataset(
     return metrics
 
 # =========================
-# Model Definition
-# =========================
-# Train loop is shared from `pytorch_models.train_loop.train_func`
-
-
-# =========================
 # Trainer
 # =========================
 def train(
