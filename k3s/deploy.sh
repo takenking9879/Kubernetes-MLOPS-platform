@@ -215,7 +215,7 @@ deploy_monitoring() {
 
   # Apply all monitoring manifests
   info "Applying Prometheus"
-  kubectl apply -f k3s/monitoring/prometheus-stack.yaml
+  kubectl apply -f k3s/monitoring/prometheus/prometheus-stack.yaml
 
   info "Applying kube-state-metrics"
   kubectl apply -f k3s/monitoring/kube-state-metrics.yaml
