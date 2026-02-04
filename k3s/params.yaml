@@ -11,14 +11,14 @@ kuberay:
     target: "attack"
     num_classes: 6
     input_dim: 14
-    framework: "pytorch"  # "pytorch", "xgboost"
+    framework: "xgboost"  # "pytorch", "xgboost"
     seed: 42
     mlflow_tracking_uri: "http://my-mlflow"
     mlflow_experiment_name: "kuberay-attack-detection"
     mlflow_artifact_location: "s3://k8s-mlops-platform-bucket/mlflow-artifacts/" 
     
   serving:
-    framework: "pytorch"
+    framework: "xgboost"
     canary_probability: 0.0    
 
 spark:
