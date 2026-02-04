@@ -135,6 +135,9 @@ spec:
         rayStartParams: {}
 
         template:
+          metadata:
+            labels:
+              app: kuberay-training
           spec:
             affinity:
               podAntiAffinity:

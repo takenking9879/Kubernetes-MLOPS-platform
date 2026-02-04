@@ -11,6 +11,21 @@ from ray.train import Checkpoint
 import torch
 from torch import nn
 
+# Prometheus (optional; enabled by default for training observability)
+try:  # pragma: no cover
+    from prometheus_client import start_http_server
+
+    from pipeline.callbacks.prometheus import (
+        TRAIN_ACCURACY,
+        TRAIN_CURRENT_EPOCH,
+        TRAIN_EPOCH_DURATION_LAST,
+        TRAIN_LOSS,
+    )
+
+    _PROM_AVAILABLE = True
+except Exception:  # pragma: no cover
+    _PROM_AVAILABLE = False
+
 from models.pytorch import NeuralNetwork
 
 logger = logging.getLogger(__name__)
@@ -101,6 +116,16 @@ def train_func(config: Dict):
     if ray.train.get_context().get_world_rank() == 0:
         print(f"[pytorch_utils] Worker using {cpus_per_worker} CPU thread(s) | "
               f"torch.get_num_threads()={torch.get_num_threads()}")
+
+    # Start a Prometheus metrics server in the worker process.
+    # We scrape the Ray worker pods directly (not the K8s submitter Job).
+    if _PROM_AVAILABLE and os.getenv("PROMETHEUS_ENABLE_WORKER", "1") in ("1", "true", "True"):
+        try:
+            port = int(os.getenv("PROMETHEUS_PORT", "8002"))
+            start_http_server(port)
+        except Exception:
+            # Best-effort: ignore if port is already in use.
+            pass
 
     # Reporting cadence:
     # - For observability, default to reporting every epoch so Prometheus/Grafana
@@ -194,6 +219,31 @@ def train_func(config: Dict):
         should_report = ((epoch + 1) % report_every == 0) or (epoch == max_epochs - 1)
         if not should_report:
             continue
+
+        # Prometheus: publish real-time epoch metrics from rank 0.
+        # This bypasses Ray callback ambiguity across AIR/Train/driver processes.
+        if _PROM_AVAILABLE and world_rank in (0, None):
+            try:
+                TRAIN_CURRENT_EPOCH.labels(framework="pytorch").set(epoch + 1)
+            except Exception:
+                pass
+            try:
+                TRAIN_EPOCH_DURATION_LAST.labels(framework="pytorch").set(float(epoch_time_sec))
+            except Exception:
+                pass
+            try:
+                TRAIN_LOSS.labels(framework="pytorch", split="train").set(float(avg_train_loss))
+            except Exception:
+                pass
+            try:
+                TRAIN_LOSS.labels(framework="pytorch", split="val").set(float(avg_val_loss))
+            except Exception:
+                pass
+            if "val_accuracy" in metrics:
+                try:
+                    TRAIN_ACCURACY.labels(framework="pytorch", split="val").set(float(metrics["val_accuracy"]))
+                except Exception:
+                    pass
 
         should_checkpoint = ((epoch + 1) % checkpoint_every == 0) or (epoch == max_epochs - 1)
 
