@@ -301,5 +301,14 @@ def main():
 
     preprocessing.logger.info("Spark preprocessing completed successfully.")
 
+    # Optional: keep the driver alive briefly so Prometheus can scrape final metrics.
+    try:
+        grace = int(os.getenv('PROMETHEUS_GRACE_SECONDS', '0'))
+    except Exception:
+        grace = 0
+    if grace > 0:
+        preprocessing.logger.info(f"Sleeping {grace}s for Prometheus scrape grace period...")
+        time.sleep(grace)
+
 if __name__ == "__main__":
     main()

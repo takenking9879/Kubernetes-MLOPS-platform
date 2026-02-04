@@ -18,189 +18,27 @@ from src.schemas.model.xgboost_params import XGBOOST_PARAMS
 from src.pipeline.utils.mlflow_utils import log_training_run
 
 # ===== PROMETHEUS METRICS =====
-from prometheus_client import start_http_server, Counter, Gauge, Histogram
-
-# Training metrics
-TRAIN_EPOCHS = Counter('train_epochs_total', 'Total epochs completed', ['framework'])
-TRAIN_SAMPLES = Counter('train_samples_total', 'Total samples processed', ['framework', 'split'])
-TRAIN_LOSS = Gauge('train_loss', 'Current training loss', ['framework', 'split'])
-TRAIN_ACCURACY = Gauge('train_accuracy', 'Current accuracy metric', ['framework', 'split'])
-TRAIN_F1 = Gauge('train_f1', 'Current F1 score', ['framework', 'split'])
-TRAIN_PRECISION = Gauge('train_precision', 'Current precision', ['framework', 'split'])
-TRAIN_RECALL = Gauge('train_recall', 'Current recall', ['framework', 'split'])
-TRAIN_EPOCH_DURATION = Histogram('train_epoch_duration_seconds', 'Duration per epoch', ['framework'], buckets=[10, 30, 60, 120, 300, 600])
-TRAIN_FAILURES = Counter('train_failures_total', 'Total training failures', ['framework', 'error_type'])
-TRAIN_CURRENT_EPOCH = Gauge('train_current_epoch', 'Current epoch number', ['framework'])
-TRAIN_SPLIT_ROWS = Gauge('train_split_rows', 'Dataset rows per split', ['framework', 'split'])
-TRAIN_EPOCH_DURATION_LAST = Gauge('train_epoch_duration_last_seconds', 'Last reported epoch/iteration duration (seconds)', ['framework'])
-
-# Tuning metrics
-TUNE_TRIALS = Counter('tune_trials_total', 'Total tuning trials', ['framework'])
-TUNE_TRIAL_STATUS = Gauge('tune_trial_status', 'Trial status (1=running, 2=success, 3=failed)', ['framework', 'trial_id'])
-TUNE_BEST_METRIC = Gauge('tune_best_metric_value', 'Best metric value found', ['framework', 'metric'])
-TUNE_TRIALS_BY_STATUS = Gauge('tune_trials_by_status', 'Number of trials by status', ['framework', 'status'])
-
-
-try:
-    from ray.train import UserCallback as TrainingCallback
-except Exception:  # pragma: no cover
-    TrainingCallback = object  # type: ignore
-
-try:
-    from ray.tune import Callback as TuneCallback
-except Exception:  # pragma: no cover
-    TuneCallback = object  # type: ignore
-
-
-class PrometheusTrainCallback(TrainingCallback):
-    def __init__(self, *, framework: str):
-        self.framework = framework
-        self._last_step = 0
-
-    def handle_result(self, results, **kwargs):
-        metrics = results or {}
-        if not isinstance(metrics, dict):
-            return
-
-        # Determine step (epoch or iteration)
-        step = None
-        if 'epoch' in metrics:
-            try:
-                step = int(metrics['epoch']) + 1
-            except Exception:
-                step = None
-        elif 'training_iteration' in metrics:
-            try:
-                step = int(metrics['training_iteration'])
-            except Exception:
-                step = None
-
-        if step is not None and step > 0:
-            delta = step if self._last_step <= 0 else max(0, step - self._last_step)
-            if delta:
-                TRAIN_EPOCHS.labels(framework=self.framework).inc(delta)
-            TRAIN_CURRENT_EPOCH.labels(framework=self.framework).set(step)
-            self._last_step = max(self._last_step, step)
-
-        # Duration signals (prefer explicit epoch_time_sec)
-        duration = None
-        for k in ('epoch_time_sec', 'time_this_iter_s'):
-            if k in metrics:
-                try:
-                    duration = float(metrics[k])
-                except Exception:
-                    duration = None
-                break
-        if duration is not None and duration >= 0:
-            TRAIN_EPOCH_DURATION.labels(framework=self.framework).observe(duration)
-            TRAIN_EPOCH_DURATION_LAST.labels(framework=self.framework).set(duration)
-
-        # Loss metrics
-        if 'train_loss' in metrics:
-            try:
-                TRAIN_LOSS.labels(framework=self.framework, split='train').set(float(metrics['train_loss']))
-            except Exception:
-                pass
-        if 'val_loss' in metrics:
-            try:
-                TRAIN_LOSS.labels(framework=self.framework, split='val').set(float(metrics['val_loss']))
-            except Exception:
-                pass
-
-        # XGBoost periodic callback metrics
-        if 'validation-mlogloss' in metrics:
-            try:
-                TRAIN_LOSS.labels(framework=self.framework, split='val').set(float(metrics['validation-mlogloss']))
-            except Exception:
-                pass
-        if 'validation-merror' in metrics:
-            try:
-                merror = float(metrics['validation-merror'])
-                TRAIN_ACCURACY.labels(framework=self.framework, split='val').set(max(0.0, min(1.0, 1.0 - merror)))
-            except Exception:
-                pass
-
-        # Multiclass metrics emitted by PyTorch train loop (and possibly others)
-        if 'val_accuracy' in metrics:
-            try:
-                TRAIN_ACCURACY.labels(framework=self.framework, split='val').set(float(metrics['val_accuracy']))
-            except Exception:
-                pass
-        if 'val_f1_avg' in metrics:
-            try:
-                TRAIN_F1.labels(framework=self.framework, split='val').set(float(metrics['val_f1_avg']))
-            except Exception:
-                pass
-        if 'val_precision_avg' in metrics:
-            try:
-                TRAIN_PRECISION.labels(framework=self.framework, split='val').set(float(metrics['val_precision_avg']))
-            except Exception:
-                pass
-        if 'val_recall_avg' in metrics:
-            try:
-                TRAIN_RECALL.labels(framework=self.framework, split='val').set(float(metrics['val_recall_avg']))
-            except Exception:
-                pass
-
-
-class PrometheusTuneCallback(TuneCallback):
-    def __init__(self, *, framework: str, metric_name: str, mode: str = 'min'):
-        self.framework = framework
-        self.metric_name = metric_name
-        self.mode = mode
-        self._best = None
-        self._counts = {'running': 0, 'succeeded': 0, 'failed': 0}
-
-    def _publish_counts(self):
-        TUNE_TRIALS_BY_STATUS.labels(framework=self.framework, status='running').set(self._counts['running'])
-        TUNE_TRIALS_BY_STATUS.labels(framework=self.framework, status='succeeded').set(self._counts['succeeded'])
-        TUNE_TRIALS_BY_STATUS.labels(framework=self.framework, status='failed').set(self._counts['failed'])
-
-    def on_trial_start(self, iteration, trials, trial, **info):
-        TUNE_TRIALS.labels(framework=self.framework).inc(1)
-        try:
-            TUNE_TRIAL_STATUS.labels(framework=self.framework, trial_id=str(trial.trial_id)).set(1)
-        except Exception:
-            pass
-        self._counts['running'] += 1
-        self._publish_counts()
-
-    def on_trial_result(self, iteration, trials, trial, result, **info):
-        if not isinstance(result, dict):
-            return
-        if self.metric_name in result:
-            try:
-                val = float(result[self.metric_name])
-            except Exception:
-                return
-            improved = False
-            if self._best is None:
-                improved = True
-            elif self.mode == 'min' and val < self._best:
-                improved = True
-            elif self.mode == 'max' and val > self._best:
-                improved = True
-            if improved:
-                self._best = val
-                TUNE_BEST_METRIC.labels(framework=self.framework, metric=self.metric_name).set(val)
-
-    def on_trial_complete(self, iteration, trials, trial, **info):
-        try:
-            TUNE_TRIAL_STATUS.labels(framework=self.framework, trial_id=str(trial.trial_id)).set(2)
-        except Exception:
-            pass
-        self._counts['running'] = max(0, self._counts['running'] - 1)
-        self._counts['succeeded'] += 1
-        self._publish_counts()
-
-    def on_trial_error(self, iteration, trials, trial, **info):
-        try:
-            TUNE_TRIAL_STATUS.labels(framework=self.framework, trial_id=str(trial.trial_id)).set(3)
-        except Exception:
-            pass
-        self._counts['running'] = max(0, self._counts['running'] - 1)
-        self._counts['failed'] += 1
-        self._publish_counts()
+# Keep callbacks/metrics in an importable module so Ray Tune can pickle them.
+from prometheus_client import start_http_server
+from src.pipeline.callbacks.prometheus import (
+    TRAIN_EPOCHS,
+    TRAIN_LOSS,
+    TRAIN_ACCURACY,
+    TRAIN_F1,
+    TRAIN_PRECISION,
+    TRAIN_RECALL,
+    TRAIN_EPOCH_DURATION,
+    TRAIN_FAILURES,
+    TRAIN_CURRENT_EPOCH,
+    TRAIN_SPLIT_ROWS,
+    TRAIN_EPOCH_DURATION_LAST,
+    TUNE_TRIALS,
+    TUNE_TRIAL_STATUS,
+    TUNE_BEST_METRIC,
+    TUNE_TRIALS_BY_STATUS,
+    PrometheusTrainCallback,
+    PrometheusTuneCallback,
+)
 
 class KubeRayTraining(BaseUtils):
     def __init__(self, params_path: str, data_dir: str, output_dir: str):
@@ -539,6 +377,16 @@ class KubeRayTraining(BaseUtils):
                 )
                 
             self._log_final_to_mlflow(framework=framework, params=mlflow_payload, metrics=final_metrics)
+
+            # Allow Prometheus a small window to scrape the final metric values
+            # before the RayJob tears down the head pod.
+            try:
+                grace = int(os.getenv('PROMETHEUS_GRACE_SECONDS', '0'))
+            except Exception:
+                grace = 0
+            if grace > 0:
+                self.logger.info(f"Sleeping {grace}s for Prometheus scrape grace period...")
+                time.sleep(grace)
 
             return result
         except Exception as e:

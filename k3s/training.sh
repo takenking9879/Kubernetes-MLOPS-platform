@@ -23,6 +23,11 @@ log_error() { echo -e "${RED}[ERROR]${NC} $1"; }
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
+# Resource names (match manifests by default)
+ENABLE_DELETION=${ENABLE_DELETION:-true}
+SPARK_APP_NAME=${SPARK_APP_NAME:-spark-app}
+RAY_JOB_NAME=${RAY_JOB_NAME:-kuberay-job}
+
 # ------------------ Check prerequisites ------------------
 log_info "Checking prerequisites..."
 
@@ -46,7 +51,7 @@ log_info "Waiting for Spark driver to be running..."
 TIMEOUT=120
 ELAPSED=0
 while [ $ELAPSED -lt $TIMEOUT ]; do
-    STATUS=$(kubectl get sparkapplication spark-preprocess -n spark -o jsonpath='{.status.applicationState.state}' 2>/dev/null || echo "PENDING")
+    STATUS=$(kubectl get sparkapplication "$SPARK_APP_NAME" -n spark -o jsonpath='{.status.applicationState.state}' 2>/dev/null || echo "PENDING")
     if [ "$STATUS" == "RUNNING" ] || [ "$STATUS" == "COMPLETED" ]; then
         log_info "Spark driver status: $STATUS"
         break
@@ -60,6 +65,8 @@ echo ""
 if [ $ELAPSED -ge $TIMEOUT ]; then
     log_warn "Timeout waiting for Spark driver. Continuing anyway..."
 fi
+
+sleep 10  # brief wait to ensure service is up
 
 # ------------------ Deploy Ray Training ------------------
 log_info "Deploying Ray training head service..."
@@ -93,10 +100,6 @@ log_info "Validating metrics endpoints..."
 # If ENABLE_DELETION is true, wait for SparkApplication `spark-app`
 # to reach COMPLETED and then delete it, then wait for Ray job
 # `kuberay-job` to finish successfully and delete it.
-ENABLE_DELETION=${ENABLE_DELETION:-true}
-SPARK_APP_NAME=${SPARK_APP_NAME:-spark-app}
-RAY_JOB_NAME=${RAY_JOB_NAME:-kuberay-job}
-
 if [ "$ENABLE_DELETION" = "true" ]; then
     log_info "ENABLE_DELETION=true — will delete completed resources."
 
@@ -191,12 +194,12 @@ fi
 echo ""
 log_info "=== Deployment Summary ==="
 echo "  Spark Preprocessing:"
-echo "    - SparkApplication: spark-preprocess (namespace: spark)"
+echo "    - SparkApplication: ${SPARK_APP_NAME} (namespace: spark)"
 echo "    - Metrics Service:  spark-preprocess-driver-svc:8001"
 echo "    - Spark UI:         spark-preprocess-driver-svc:4040"
 echo ""
 echo "  Ray Training:"
-echo "    - RayJob:           kuberay-training-job (namespace: ray)"  
+echo "    - RayJob:           ${RAY_JOB_NAME} (namespace: ray)"  
 echo "    - Metrics Service:  kuberay-training-head-svc:8002"
 echo "    - Ray Dashboard:    kuberay-training-head-svc:8265"
 echo ""
