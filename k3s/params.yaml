@@ -6,12 +6,12 @@ kafka:
 kuberay:
   model:
     #num_data_blocks: 4  # Número de bloques para leer los datos con Ray Datasets, None =  default
-    tune: false
+    tune: true
     sample_fraction_for_tuning: 0.2 # Realiza un muestreo estratificado para acelerar el tuning
     target: "attack"
     num_classes: 6
     input_dim: 14
-    framework: "pytorch"
+    framework: "pytorch"  # "pytorch", "xgboost"
     seed: 42
     mlflow_tracking_uri: "http://my-mlflow"
     mlflow_experiment_name: "kuberay-attack-detection"
