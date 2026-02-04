@@ -36,7 +36,7 @@ spec:
       RAY_MATERIALIZE_DATASETS_TUNE: "1"
 
       # Keep the job alive briefly after finishing so Prometheus can scrape final metrics.
-      PROMETHEUS_GRACE_SECONDS: "10"
+      PROMETHEUS_GRACE_SECONDS: "600"
 
   rayClusterSpec:
     rayVersion: "2.52.0"

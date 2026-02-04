@@ -43,11 +43,12 @@ def train_func(config: Dict):
         is_tuning=config.get("is_tuning", False),
         callbacks=[
             RayTrainPeriodicReportCheckpointCallback(
-                metrics=["validation-mlogloss", "validation-merror"],
+                metrics=["validation-mlogloss", "validation-merror", "train-mlogloss"],
                 report_every=5,
                 checkpoint_every=50,
                 filename="model.ubj",
                 is_tuning=config.get("is_tuning", False),
+                dval=dval,  # Pass dval for accuracy/F1 computation
             )
         ],
     )

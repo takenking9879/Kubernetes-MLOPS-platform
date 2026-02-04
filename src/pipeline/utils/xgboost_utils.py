@@ -6,6 +6,9 @@ import xgboost
 from ray.train import Checkpoint
 from typing import Dict, Optional, List
 
+import numpy as np
+from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score
+
 # Prometheus (optional; enabled by default for training observability)
 try:  # pragma: no cover
     from prometheus_client import start_http_server
@@ -15,6 +18,10 @@ try:  # pragma: no cover
     TRAIN_CURRENT_EPOCH = _METRICS["current_epoch"]
     TRAIN_EPOCH_DURATION_LAST = _METRICS["epoch_duration"]
     TRAIN_LOSS = _METRICS["loss"]
+    TRAIN_ACCURACY = _METRICS["accuracy"]
+    TRAIN_F1 = _METRICS["f1"]
+    TRAIN_PRECISION = _METRICS["precision"]
+    TRAIN_RECALL = _METRICS["recall"]
 
     _PROM_AVAILABLE = True
 except Exception as e:  # pragma: no cover
@@ -23,6 +30,10 @@ except Exception as e:  # pragma: no cover
     TRAIN_CURRENT_EPOCH = None
     TRAIN_EPOCH_DURATION_LAST = None
     TRAIN_LOSS = None
+    TRAIN_ACCURACY = None
+    TRAIN_F1 = None
+    TRAIN_PRECISION = None
+    TRAIN_RECALL = None
     print(f"[xgboost_utils] Prometheus setup failed: {e}")
 
 def get_train_val_dmatrix(target: str) -> Tuple[xgboost.DMatrix, xgboost.DMatrix]:
@@ -82,7 +93,7 @@ def run_xgboost_train(
         params,
         dtrain=dtrain,
         num_boost_round=num_boost_round,
-        evals=[(dval, "validation")],
+        evals=[(dtrain, "train"), (dval, "validation")],
         verbose_eval=False,
         xgb_model=xgb_model,
         callbacks=callbacks,
@@ -109,11 +120,13 @@ class RayTrainPeriodicReportCheckpointCallback(xgboost.callback.TrainingCallback
         # Aquí aceptamos tanto `metric` como `metrics` por compatibilidad
         metrics: Optional[List[str]] = None,
         is_tuning: bool = False,
+        dval: xgboost.DMatrix = None,  # For computing accuracy/F1/etc.
     ):
         self.report_every = max(int(report_every), 1)
         self.checkpoint_every = max(int(checkpoint_every), 1)
         self.filename = filename
         self.is_tuning = is_tuning
+        self.dval = dval  # Store validation DMatrix for metric calculation
 
         # Normalizamos alias: metrics override metric if ambos provistos
         if metrics is not None:
@@ -194,23 +207,56 @@ class RayTrainPeriodicReportCheckpointCallback(xgboost.callback.TrainingCallback
         # checkpoint report (Tune schedulers may require the metric every time).
         self._last_report_dict = dict(report_dict)
 
-        # Prometheus: publish real-time iteration metrics from ALL workers
-        # Each worker has its own registry, so no conflicts
+        # Prometheus: publish real-time iteration metrics from RANK 0 ONLY
+        # to avoid duplicate lines in Grafana
         # DISABLED during tuning to avoid contaminating dashboards
-        if _PROM_AVAILABLE and not self.is_tuning:
+        world_rank = ray.train.get_context().get_world_rank()
+        should_export_prom = _PROM_AVAILABLE and not self.is_tuning and world_rank in (0, None)
+        
+        if should_export_prom:
             try:
                 TRAIN_CURRENT_EPOCH.labels(framework="xgboost").set(it)
-                print(f"[xgboost_utils] Exported epoch {it} to Prometheus")
             except Exception as e:
                 print(f"[xgboost_utils] Failed to export epoch: {e}")
+            # Export train loss (mlogloss) if available
+            if "train-mlogloss" in report_dict:
+                try:
+                    loss_train = float(report_dict["train-mlogloss"])
+                    TRAIN_LOSS.labels(framework="xgboost", split="train").set(loss_train)
+                except Exception:
+                    pass
             # Export validation loss (mlogloss)
             if "validation-mlogloss" in report_dict:
                 try:
                     loss_val = float(report_dict["validation-mlogloss"])
                     TRAIN_LOSS.labels(framework="xgboost", split="val").set(loss_val)
-                    print(f"[xgboost_utils] Exported loss={loss_val} to Prometheus")
+                except Exception:
+                    pass
+            
+            # Compute and export accuracy/precision/recall/F1 on validation set
+            if self.dval is not None:
+                try:
+                    y_true = self.dval.get_label().astype(int)
+                    y_pred_proba = model.predict(self.dval)
+                    # For multiclass, predict returns probabilities - take argmax
+                    if len(y_pred_proba.shape) > 1:
+                        y_pred = np.argmax(y_pred_proba, axis=1)
+                    else:
+                        y_pred = (y_pred_proba > 0.5).astype(int)
+                    
+                    acc = accuracy_score(y_true, y_pred)
+                    prec = precision_score(y_true, y_pred, average='macro', zero_division=0)
+                    rec = recall_score(y_true, y_pred, average='macro', zero_division=0)
+                    f1 = f1_score(y_true, y_pred, average='macro', zero_division=0)
+                    
+                    TRAIN_ACCURACY.labels(framework="xgboost", split="val").set(acc)
+                    TRAIN_PRECISION.labels(framework="xgboost", split="val").set(prec)
+                    TRAIN_RECALL.labels(framework="xgboost", split="val").set(rec)
+                    TRAIN_F1.labels(framework="xgboost", split="val").set(f1)
+                    
+                    print(f"[xgboost_utils] Epoch {it}: loss={loss_val:.4f}, acc={acc:.4f}, f1={f1:.4f}")
                 except Exception as e:
-                    print(f"[xgboost_utils] Failed to export loss: {e}")
+                    print(f"[xgboost_utils] Failed to compute classification metrics: {e}")
 
         do_ckpt = (it % self.checkpoint_every == 0)
         if do_ckpt:

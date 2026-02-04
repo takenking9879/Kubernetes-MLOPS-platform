@@ -247,10 +247,11 @@ def train_func(config: Dict):
         if not should_report:
             continue
 
-        # Prometheus: publish real-time epoch metrics from ALL workers
-        # Each worker has its own registry, so no conflicts
+        # Prometheus: publish real-time epoch metrics from RANK 0 ONLY
+        # to avoid duplicate lines in Grafana
         # DISABLED during tuning to avoid contaminating dashboards
-        if _PROM_AVAILABLE and not is_tuning:
+        should_export_prom = _PROM_AVAILABLE and not is_tuning and world_rank in (0, None)
+        if should_export_prom:
             try:
                 TRAIN_CURRENT_EPOCH.labels(framework="pytorch").set(epoch + 1)
             except Exception:
