@@ -102,11 +102,14 @@ def train_func(config: Dict):
         print(f"[pytorch_utils] Worker using {cpus_per_worker} CPU thread(s) | "
               f"torch.get_num_threads()={torch.get_num_threads()}")
 
-    # RayTrainReportCallback-like cadence:
-    # - Report metrics every 5 epochs (and always on the last epoch)
-    # - Save a checkpoint every 50 epochs (and always on the last epoch)
-    report_every = 5
-    checkpoint_every = 50
+    # Reporting cadence:
+    # - For observability, default to reporting every epoch so Prometheus/Grafana
+    #   can show curves evolving over time.
+    # - Keep checkpoints less frequent to avoid storage overhead.
+    report_every = int(os.getenv("RAY_TRAIN_REPORT_EVERY", config.get("report_every", 1)))
+    report_every = max(report_every, 1)
+    checkpoint_every = int(os.getenv("RAY_TRAIN_CHECKPOINT_EVERY", config.get("checkpoint_every", 50)))
+    checkpoint_every = max(checkpoint_every, 1)
 
     start_time = time.perf_counter()
     feature_cols = None

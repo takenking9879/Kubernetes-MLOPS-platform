@@ -45,7 +45,7 @@ spec:
     spark.kubernetes.driverEnv.PYTHONPATH: "/app:/app/repo:/app/repo/k3s:/opt/spark/work-dir:/opt/spark/work-dir/k3s"
     spark.kubernetes.executorEnv.PYTHONPATH: "/app:/app/repo:/app/repo/k3s:/opt/spark/work-dir:/opt/spark/work-dir/k3s"
     spark.kubernetes.driverEnv.PROMETHEUS_PORT: "8001"
-    spark.kubernetes.driverEnv.PROMETHEUS_GRACE_SECONDS: "30"
+    spark.kubernetes.driverEnv.PROMETHEUS_GRACE_SECONDS: "10"
 
     # ===== PROMETHEUS METRICS (Spark Native) =====
     spark.ui.prometheus.enabled: "true"

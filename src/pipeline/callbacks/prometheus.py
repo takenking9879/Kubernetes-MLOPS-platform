@@ -91,9 +91,77 @@ class PrometheusTrainCallback(_TrainingCallback):
         self._last_step = int(state.get("_last_step", 0) or 0)
 
     def handle_result(self, results: Any, **kwargs: Any) -> None:  # Ray Train hook
-        metrics = results or {}
-        if not isinstance(metrics, dict):
+        # Ray Train may pass either a single metrics dict (single-worker) OR a
+        # list of dicts (one per worker). For distributed training we aggregate.
+        if results is None:
             return
+
+        metrics_list: list[dict[str, Any]]
+        if isinstance(results, dict):
+            metrics_list = [results]
+        elif isinstance(results, (list, tuple)):
+            metrics_list = [r for r in results if isinstance(r, dict)]
+        else:
+            return
+
+        if not metrics_list:
+            return
+
+        def _to_float(v: Any) -> Optional[float]:
+            try:
+                return float(v)
+            except Exception:
+                return None
+
+        def _avg(key: str) -> Optional[float]:
+            vals: list[float] = []
+            for m in metrics_list:
+                if key in m:
+                    fv = _to_float(m.get(key))
+                    if fv is not None:
+                        vals.append(fv)
+            if not vals:
+                return None
+            return sum(vals) / float(len(vals))
+
+        def _max_int(keys: tuple[str, ...]) -> Optional[int]:
+            best: Optional[int] = None
+            for m in metrics_list:
+                for k in keys:
+                    if k in m:
+                        try:
+                            iv = int(m.get(k))
+                        except Exception:
+                            continue
+                        if best is None or iv > best:
+                            best = iv
+            return best
+
+        # Merge view used by the rest of the method.
+        metrics: dict[str, Any] = {}
+        # Prefer max step and average scalars.
+        epoch_max = _max_int(("epoch",))
+        if epoch_max is not None:
+            metrics["epoch"] = epoch_max
+        it_max = _max_int(("training_iteration",))
+        if it_max is not None:
+            metrics["training_iteration"] = it_max
+
+        for k in (
+            "epoch_time_sec",
+            "time_this_iter_s",
+            "train_loss",
+            "val_loss",
+            "validation-mlogloss",
+            "validation-merror",
+            "val_accuracy",
+            "val_f1_avg",
+            "val_precision_avg",
+            "val_recall_avg",
+        ):
+            av = _avg(k)
+            if av is not None:
+                metrics[k] = av
 
         # Determine step (epoch or iteration)
         step: Optional[int] = None

@@ -1078,7 +1078,7 @@ data:
           "type": "gauge",
           "targets": [
             {
-              "expr": "max(train_loss{framework=~\"$framework\",split=\"val\"}) or vector(0)",
+              "expr": "max(max_over_time(train_loss{framework=~\"$framework\",split=\"val\"}[6h])) or vector(0)",
               "legendFormat": "Loss",
               "refId": "A"
             }
@@ -1111,7 +1111,7 @@ data:
           "type": "gauge",
           "targets": [
             {
-              "expr": "max(train_accuracy{framework=~\"$framework\",split=\"val\"}) or vector(0)",
+              "expr": "max(max_over_time(train_accuracy{framework=~\"$framework\",split=\"val\"}[6h])) or vector(0)",
               "legendFormat": "Accuracy",
               "refId": "A"
             }
@@ -1323,12 +1323,12 @@ data:
             "textMode": "auto"
           },
           "pluginVersion": "10.2.0",
-          "title": "Best Metric Value",
+          "title": "Best Tune Metric Value",
           "type": "stat",
           "targets": [
             {
-              "expr": "max(max_over_time(tune_best_metric_value{framework=~\"$framework\"}[6h])) or vector(0)",
-              "legendFormat": "Best",
+              "expr": "max by (metric) (max_over_time(tune_best_metric_value{framework=~\"$framework\"}[6h])) or vector(0)",
+              "legendFormat": "{{metric}}",
               "refId": "A"
             }
           ]
