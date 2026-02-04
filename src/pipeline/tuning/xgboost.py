@@ -54,12 +54,14 @@ def train_func(config: Dict):
         dtrain=dtrain,
         dval=dval,
         num_boost_round=num_boost_round,
+        is_tuning=True,  # DISABLE Prometheus export during tuning
         callbacks=[
             RayTrainPeriodicReportCheckpointCallback(
                 metrics=["validation-mlogloss", "validation-merror"],
                 report_every=5,
                 checkpoint_every=50,
                 filename="model.ubj",
+                is_tuning=True,  # DISABLE Prometheus export during tuning
             ),
         ],
     )
