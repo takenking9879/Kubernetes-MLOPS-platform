@@ -60,16 +60,48 @@ TUNE_TRIALS_BY_STATUS = Gauge(
 # Callback base classes
 # ----------------------
 
-_TrainingCallback: type
+# Ray 2.52 uses Ray AIR under the hood for many trainers. Depending on where the
+# callback is wired (RunConfig vs Trainer internals), Ray may require:
+# - ray.air.callbacks.Callback (AIR)
+# - ray.train.UserCallback (Train)
+# - ray.train.callbacks.TrainingCallback (legacy)
+#
+# To keep real-time metrics working across these paths, we build our callback
+# class with *all* available bases.
 
-try:
-    # Ray 2.5x+ provides UserCallback.
-    from ray.train import UserCallback as _TrainingCallback  # type: ignore
-except Exception:
-    try:
-        from ray.train.callbacks import TrainingCallback as _TrainingCallback  # type: ignore
+def _get_train_callback_bases() -> tuple[type, ...]:
+    bases: list[type] = []
+
+    try:  # pragma: no cover
+        from ray.air.callbacks import Callback as AirCallback  # type: ignore
+
+        bases.append(AirCallback)
     except Exception:
-        _TrainingCallback = object  # type: ignore
+        pass
+
+    try:  # pragma: no cover
+        from ray.train import UserCallback as UserCallback  # type: ignore
+
+        bases.append(UserCallback)
+    except Exception:
+        pass
+
+    try:  # pragma: no cover
+        from ray.train.callbacks import TrainingCallback as TrainingCallback  # type: ignore
+
+        bases.append(TrainingCallback)
+    except Exception:
+        pass
+
+    # Deduplicate while preserving order.
+    seen: set[type] = set()
+    uniq: list[type] = []
+    for b in bases:
+        if b not in seen:
+            uniq.append(b)
+            seen.add(b)
+
+    return tuple(uniq) if uniq else (object,)
 
 try:
     from ray.tune import Callback as _TuneCallback
@@ -77,7 +109,7 @@ except Exception:  # pragma: no cover
     _TuneCallback = object  # type: ignore
 
 
-class PrometheusTrainCallback(_TrainingCallback):
+class _PrometheusTrainCallbackImpl:
     """Updates Prometheus gauges/counters from Ray Train results."""
 
     def __init__(self, *, framework: str):
@@ -260,6 +292,21 @@ class PrometheusTrainCallback(_TrainingCallback):
         if isinstance(result, dict) and isinstance(result.get("metrics"), dict):
             payload = result.get("metrics")
         self._handle_metrics(payload)
+
+    # Some AIR paths call a more generic on_result hook.
+    def on_result(self, result: Any, **info: Any) -> None:  # pragma: no cover
+        payload = result
+        if isinstance(result, dict) and isinstance(result.get("metrics"), dict):
+            payload = result.get("metrics")
+        self._handle_metrics(payload)
+
+
+# Exported callback class with all compatible bases.
+PrometheusTrainCallback = type(
+    "PrometheusTrainCallback",
+    _get_train_callback_bases(),
+    {"__module__": __name__, **dict(_PrometheusTrainCallbackImpl.__dict__)},
+)
 
 
 class PrometheusTuneCallback(_TuneCallback):
