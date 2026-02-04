@@ -6,6 +6,25 @@ import xgboost
 from ray.train import Checkpoint
 from typing import Dict, Optional, List
 
+# Prometheus (optional; enabled by default for training observability)
+try:  # pragma: no cover
+    from prometheus_client import start_http_server
+    from src.pipeline.prometheus import create_worker_registry
+
+    _WORKER_REGISTRY, _METRICS = create_worker_registry("xgboost")
+    TRAIN_CURRENT_EPOCH = _METRICS["current_epoch"]
+    TRAIN_EPOCH_DURATION_LAST = _METRICS["epoch_duration"]
+    TRAIN_LOSS = _METRICS["loss"]
+
+    _PROM_AVAILABLE = True
+except Exception as e:  # pragma: no cover
+    _PROM_AVAILABLE = False
+    _WORKER_REGISTRY = None
+    TRAIN_CURRENT_EPOCH = None
+    TRAIN_EPOCH_DURATION_LAST = None
+    TRAIN_LOSS = None
+    print(f"[xgboost_utils] Prometheus setup failed: {e}")
+
 def get_train_val_dmatrix(target: str) -> Tuple[xgboost.DMatrix, xgboost.DMatrix]:
     train_shard = ray.train.get_dataset_shard("train")
     val_shard = ray.train.get_dataset_shard("val")
@@ -38,6 +57,16 @@ def run_xgboost_train(
     num_boost_round: int,
     xgb_model=None,
 ):
+    # Start Prometheus metrics server in the worker process (rank 0 only).
+    world_rank = ray.train.get_context().get_world_rank()
+    if _PROM_AVAILABLE and world_rank == 0 and os.getenv("PROMETHEUS_ENABLE_WORKER", "1") in ("1", "true", "True"):
+        try:
+            port = int(os.getenv("PROMETHEUS_PORT", "8002"))
+            start_http_server(port, registry=_WORKER_REGISTRY)
+            print(f"[xgboost_utils] ✓ Prometheus HTTP server started on port {port} (worker registry)")
+        except Exception as e:
+            print(f"[xgboost_utils] Prometheus server start failed (likely already bound): {e}")
+    
     return xgboost.train(
         params,
         dtrain=dtrain,
@@ -151,6 +180,20 @@ class RayTrainPeriodicReportCheckpointCallback(xgboost.callback.TrainingCallback
         # Persist last metrics so `after_training` can attach them to the final
         # checkpoint report (Tune schedulers may require the metric every time).
         self._last_report_dict = dict(report_dict)
+
+        # Prometheus: publish real-time iteration metrics from rank 0
+        world_rank = ray.train.get_context().get_world_rank()
+        if _PROM_AVAILABLE and world_rank == 0:
+            try:
+                TRAIN_CURRENT_EPOCH.labels(framework="xgboost").set(it)
+            except Exception:
+                pass
+            # Export validation loss (mlogloss)
+            if "validation-mlogloss" in report_dict:
+                try:
+                    TRAIN_LOSS.labels(framework="xgboost", split="val").set(float(report_dict["validation-mlogloss"]))
+                except Exception:
+                    pass
 
         do_ckpt = (it % self.checkpoint_every == 0)
         if do_ckpt:

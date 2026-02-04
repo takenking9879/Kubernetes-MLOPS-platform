@@ -12,58 +12,18 @@ import torch
 from torch import nn
 
 # Prometheus (optional; enabled by default for training observability)
-# In Ray distributed training, each worker runs in a separate process/pod.
-# We create a SEPARATE CollectorRegistry for worker metrics to avoid conflicts
-# with the driver process metrics.
 try:  # pragma: no cover
-    from prometheus_client import start_http_server, Gauge, CollectorRegistry
+    from prometheus_client import start_http_server
+    from src.pipeline.prometheus import create_worker_registry
 
-    # Create a fresh registry for THIS worker process only
-    _WORKER_REGISTRY = CollectorRegistry(auto_describe=True)
-    
-    # Register metrics in the worker-specific registry
-    TRAIN_CURRENT_EPOCH = Gauge(
-        "train_current_epoch",
-        "Current epoch number",
-        ["framework"],
-        registry=_WORKER_REGISTRY
-    )
-    TRAIN_EPOCH_DURATION_LAST = Gauge(
-        "train_epoch_duration_last_seconds",
-        "Last reported epoch duration (seconds)",
-        ["framework"],
-        registry=_WORKER_REGISTRY
-    )
-    TRAIN_LOSS = Gauge(
-        "train_loss",
-        "Current training loss",
-        ["framework", "split"],
-        registry=_WORKER_REGISTRY
-    )
-    TRAIN_ACCURACY = Gauge(
-        "train_accuracy",
-        "Current accuracy metric",
-        ["framework", "split"],
-        registry=_WORKER_REGISTRY
-    )
-    TRAIN_F1 = Gauge(
-        "train_f1",
-        "Current F1 score",
-        ["framework", "split"],
-        registry=_WORKER_REGISTRY
-    )
-    TRAIN_PRECISION = Gauge(
-        "train_precision",
-        "Current precision",
-        ["framework", "split"],
-        registry=_WORKER_REGISTRY
-    )
-    TRAIN_RECALL = Gauge(
-        "train_recall",
-        "Current recall",
-        ["framework", "split"],
-        registry=_WORKER_REGISTRY
-    )
+    _WORKER_REGISTRY, _METRICS = create_worker_registry("pytorch")
+    TRAIN_CURRENT_EPOCH = _METRICS["current_epoch"]
+    TRAIN_EPOCH_DURATION_LAST = _METRICS["epoch_duration"]
+    TRAIN_LOSS = _METRICS["loss"]
+    TRAIN_ACCURACY = _METRICS["accuracy"]
+    TRAIN_F1 = _METRICS["f1"]
+    TRAIN_PRECISION = _METRICS["precision"]
+    TRAIN_RECALL = _METRICS["recall"]
 
     _PROM_AVAILABLE = True
 except Exception as e:  # pragma: no cover
@@ -274,8 +234,7 @@ def train_func(config: Dict):
         if not should_report:
             continue
 
-        # Prometheus: publish real-time epoch metrics from rank 0.
-        # This bypasses Ray callback ambiguity across AIR/Train/driver processes.
+        # Prometheus: publish real-time epoch metrics from rank 0
         if _PROM_AVAILABLE and world_rank == 0:
             try:
                 TRAIN_CURRENT_EPOCH.labels(framework="pytorch").set(epoch + 1)
@@ -317,9 +276,7 @@ def train_func(config: Dict):
 
         should_checkpoint = ((epoch + 1) % checkpoint_every == 0) or (epoch == max_epochs - 1)
 
-        # Mimic XGBoost RayTrainReportCallback semantics:
-        # - all ranks report metrics
-        # - only rank 0 attaches checkpoints to avoid duplicated uploads
+        # Checkpoint: only rank 0 uploads to avoid duplicates
         if should_checkpoint and world_rank in (0, None):
             base_model = model.module if hasattr(model, "module") else model
             with tempfile.TemporaryDirectory() as tmpdir:

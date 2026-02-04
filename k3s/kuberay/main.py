@@ -18,27 +18,19 @@ from src.schemas.model.xgboost_params import XGBOOST_PARAMS
 from src.pipeline.utils.mlflow_utils import log_training_run
 
 # ===== PROMETHEUS METRICS =====
-# Keep callbacks/metrics in an importable module so Ray Tune can pickle them.
+# Keep metrics in an importable module so Ray Tune can pickle them.
 from prometheus_client import start_http_server
-from src.pipeline.callbacks.prometheus import (
-    TRAIN_EPOCHS,
-    TRAIN_LOSS,
-    TRAIN_ACCURACY,
-    TRAIN_F1,
-    TRAIN_PRECISION,
-    TRAIN_RECALL,
-    TRAIN_EPOCH_DURATION,
+from src.pipeline.prometheus import (
     TRAIN_FAILURES,
-    TRAIN_CURRENT_EPOCH,
     TRAIN_SPLIT_ROWS,
-    TRAIN_EPOCH_DURATION_LAST,
     TUNE_TRIALS,
     TUNE_TRIAL_STATUS,
     TUNE_BEST_METRIC,
     TUNE_TRIALS_BY_STATUS,
-    PrometheusTrainCallback,
     PrometheusTuneCallback,
 )
+# Training metrics (accuracy, loss, etc.) are now exported directly from worker
+# training loops in pytorch_utils.py/xgboost_utils.py, not via callbacks.
 
 class KubeRayTraining(BaseUtils):
     def __init__(self, params_path: str, data_dir: str, output_dir: str):
@@ -313,20 +305,10 @@ class KubeRayTraining(BaseUtils):
             if framework == "pytorch":
                 if best_params is None:
                     best_params = dict(PYTORCH_PARAMS)
-                # Allow runtime override without changing code/images.
-                # Useful to keep the RayCluster alive long enough for Prometheus scrapes.
-                try:
-                    env_max_epochs = os.getenv("PYTORCH_MAX_EPOCHS")
-                    if env_max_epochs is not None and str(env_max_epochs).strip() != "":
-                        best_params["max_epochs"] = int(env_max_epochs)
-                    else:
-                        best_params["max_epochs"] = PYTORCH_PARAMS["max_epochs"]
-                except Exception:
-                    best_params["max_epochs"] = PYTORCH_PARAMS["max_epochs"]
                 train_kwargs["pytorch_params"] = best_params
 
-            prom_train_cb = PrometheusTrainCallback(framework=framework)
-            train_out = module.train(**train_kwargs, callbacks=[prom_train_cb])
+            # Metrics are exported directly from worker training loop (pytorch_utils.py)
+            train_out = module.train(**train_kwargs)
             if isinstance(train_out, tuple) and len(train_out) == 2:
                 result, final_metrics = train_out
             else:

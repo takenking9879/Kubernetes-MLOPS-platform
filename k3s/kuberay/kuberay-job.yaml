@@ -38,10 +38,6 @@ spec:
       # Keep the job alive briefly after finishing so Prometheus can scrape final metrics.
       PROMETHEUS_GRACE_SECONDS: "10"
 
-      # Debug/observability: run more epochs so Prometheus can scrape multiple points.
-      # You can lower this back to 10 once Grafana updates as expected.
-      PYTORCH_MAX_EPOCHS: "30"
-
   rayClusterSpec:
     rayVersion: "2.52.0"
     enableInTreeAutoscaling: false # true
@@ -127,9 +123,6 @@ spec:
           volumes:
             - name: job-files
               emptyDir: {}
-            - name: pytorch-utils-override
-              configMap:
-                name: pytorch-utils-override
 
     ########################
     # WORKERS
@@ -174,9 +167,7 @@ spec:
                 volumeMounts:
                   - name: job-files
                     mountPath: /home/ray/app
-                  - name: pytorch-utils-override
-                    mountPath: /home/ray/app/repo/src/pipeline/utils/pytorch_utils.py
-                    subPath: pytorch_utils.py
+
                 envFrom:
                   - secretRef:
                       name: env-secret
@@ -220,6 +211,3 @@ spec:
             volumes:
               - name: job-files
                 emptyDir: {}
-              - name: pytorch-utils-override
-                configMap:
-                  name: pytorch-utils-override
