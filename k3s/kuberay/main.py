@@ -333,36 +333,17 @@ class KubeRayTraining(BaseUtils):
                 result, final_metrics = train_out, {}
             self.logger.info("Training completed successfully.")
             
-            # ===== PROMETHEUS METRICS: Export final metrics (best-effort) =====
-            # If callbacks didn't fire (short jobs), export a meaningful total step once.
-            if getattr(prom_train_cb, '_last_step', 0) <= 0:
-                try:
-                    if framework == 'xgboost':
-                        epochs_total = int((best_params or {}).get('num_boost_round', XGBOOST_PARAMS.get('num_boost_round', 1)))
-                    else:
-                        epochs_total = int((best_params or {}).get('max_epochs', PYTORCH_PARAMS.get('max_epochs', 1)))
-                    if epochs_total > 0:
-                        TRAIN_EPOCHS.labels(framework=framework).inc(epochs_total)
-                        TRAIN_CURRENT_EPOCH.labels(framework=framework).set(epochs_total)
-                except Exception:
-                    pass
+            # ===== PROMETHEUS METRICS: Disabled - using real-time worker metrics =====
+            # Performance metrics are now exported directly from the worker training loop
+            # in pytorch_utils.py/xgboost_utils.py, eliminating duplicate/disconnected points.
+            # The worker registry ensures metrics appear as continuous time series in Grafana.
             
-            # Export performance metrics if available
-            if 'train_loss' in final_metrics:
-                TRAIN_LOSS.labels(framework=framework, split='train').set(float(final_metrics['train_loss']))
-            if 'val_loss' in final_metrics:
-                TRAIN_LOSS.labels(framework=framework, split='val').set(float(final_metrics['val_loss']))
-            if 'validation-mlogloss' in final_metrics:
-                TRAIN_LOSS.labels(framework=framework, split='val').set(float(final_metrics['validation-mlogloss']))
-
-            if 'val_accuracy' in final_metrics:
-                TRAIN_ACCURACY.labels(framework=framework, split='val').set(float(final_metrics['val_accuracy']))
-            if 'val_f1_avg' in final_metrics:
-                TRAIN_F1.labels(framework=framework, split='val').set(float(final_metrics['val_f1_avg']))
-            if 'val_precision_avg' in final_metrics:
-                TRAIN_PRECISION.labels(framework=framework, split='val').set(float(final_metrics['val_precision_avg']))
-            if 'val_recall_avg' in final_metrics:
-                TRAIN_RECALL.labels(framework=framework, split='val').set(float(final_metrics['val_recall_avg']))
+            # Legacy final metrics export (commented out to avoid duplicate points):
+            # if getattr(prom_train_cb, '_last_step', 0) <= 0:
+            #     ...epoch counter export...
+            # if 'val_accuracy' in final_metrics:
+            #     TRAIN_ACCURACY.labels(framework=framework, split='val').set(...)
+            # etc.
 
             # Guardar el modelo en S3 al finalizar
             self._save_model(result, framework)

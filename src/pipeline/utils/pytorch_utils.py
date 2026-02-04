@@ -12,19 +12,71 @@ import torch
 from torch import nn
 
 # Prometheus (optional; enabled by default for training observability)
+# In Ray distributed training, each worker runs in a separate process/pod.
+# We create a SEPARATE CollectorRegistry for worker metrics to avoid conflicts
+# with the driver process metrics.
 try:  # pragma: no cover
-    from prometheus_client import start_http_server
+    from prometheus_client import start_http_server, Gauge, CollectorRegistry
 
-    from pipeline.callbacks.prometheus import (
-        TRAIN_ACCURACY,
-        TRAIN_CURRENT_EPOCH,
-        TRAIN_EPOCH_DURATION_LAST,
-        TRAIN_LOSS,
+    # Create a fresh registry for THIS worker process only
+    _WORKER_REGISTRY = CollectorRegistry(auto_describe=True)
+    
+    # Register metrics in the worker-specific registry
+    TRAIN_CURRENT_EPOCH = Gauge(
+        "train_current_epoch",
+        "Current epoch number",
+        ["framework"],
+        registry=_WORKER_REGISTRY
+    )
+    TRAIN_EPOCH_DURATION_LAST = Gauge(
+        "train_epoch_duration_last_seconds",
+        "Last reported epoch duration (seconds)",
+        ["framework"],
+        registry=_WORKER_REGISTRY
+    )
+    TRAIN_LOSS = Gauge(
+        "train_loss",
+        "Current training loss",
+        ["framework", "split"],
+        registry=_WORKER_REGISTRY
+    )
+    TRAIN_ACCURACY = Gauge(
+        "train_accuracy",
+        "Current accuracy metric",
+        ["framework", "split"],
+        registry=_WORKER_REGISTRY
+    )
+    TRAIN_F1 = Gauge(
+        "train_f1",
+        "Current F1 score",
+        ["framework", "split"],
+        registry=_WORKER_REGISTRY
+    )
+    TRAIN_PRECISION = Gauge(
+        "train_precision",
+        "Current precision",
+        ["framework", "split"],
+        registry=_WORKER_REGISTRY
+    )
+    TRAIN_RECALL = Gauge(
+        "train_recall",
+        "Current recall",
+        ["framework", "split"],
+        registry=_WORKER_REGISTRY
     )
 
     _PROM_AVAILABLE = True
-except Exception:  # pragma: no cover
+except Exception as e:  # pragma: no cover
     _PROM_AVAILABLE = False
+    _WORKER_REGISTRY = None
+    TRAIN_CURRENT_EPOCH = None
+    TRAIN_EPOCH_DURATION_LAST = None
+    TRAIN_LOSS = None
+    TRAIN_ACCURACY = None
+    TRAIN_F1 = None
+    TRAIN_PRECISION = None
+    TRAIN_RECALL = None
+    print(f"[pytorch_utils] Prometheus setup failed: {e}")
 
 from models.pytorch import NeuralNetwork
 
@@ -113,19 +165,23 @@ def train_func(config: Dict):
     optimizer = torch.optim.Adam(model.parameters(), lr=lr, weight_decay=weight_decay)
 
     # Log actual CPU configuration for debugging
-    if ray.train.get_context().get_world_rank() == 0:
+    world_rank = ray.train.get_context().get_world_rank()
+    if world_rank == 0:
         print(f"[pytorch_utils] Worker using {cpus_per_worker} CPU thread(s) | "
               f"torch.get_num_threads()={torch.get_num_threads()}")
 
-    # Start a Prometheus metrics server in the worker process.
+    # Start a Prometheus metrics server in the worker process (rank 0 only).
     # We scrape the Ray worker pods directly (not the K8s submitter Job).
-    if _PROM_AVAILABLE and os.getenv("PROMETHEUS_ENABLE_WORKER", "1") in ("1", "true", "True"):
+    # IMPORTANT: Use the worker-specific registry to avoid metric name conflicts.
+    if _PROM_AVAILABLE and world_rank == 0 and os.getenv("PROMETHEUS_ENABLE_WORKER", "1") in ("1", "true", "True"):
         try:
             port = int(os.getenv("PROMETHEUS_PORT", "8002"))
-            start_http_server(port)
-        except Exception:
+            # Pass the custom registry so start_http_server exposes ONLY worker metrics
+            start_http_server(port, registry=_WORKER_REGISTRY)
+            print(f"[pytorch_utils] ✓ Prometheus HTTP server started on port {port} (worker registry)")
+        except Exception as e:
             # Best-effort: ignore if port is already in use.
-            pass
+            print(f"[pytorch_utils] Prometheus server start failed (likely already bound): {e}")
 
     # Reporting cadence:
     # - For observability, default to reporting every epoch so Prometheus/Grafana
@@ -214,15 +270,13 @@ def train_func(config: Dict):
             **metrics,
         }
 
-        world_rank = ray.train.get_context().get_world_rank()
-
         should_report = ((epoch + 1) % report_every == 0) or (epoch == max_epochs - 1)
         if not should_report:
             continue
 
         # Prometheus: publish real-time epoch metrics from rank 0.
         # This bypasses Ray callback ambiguity across AIR/Train/driver processes.
-        if _PROM_AVAILABLE and world_rank in (0, None):
+        if _PROM_AVAILABLE and world_rank == 0:
             try:
                 TRAIN_CURRENT_EPOCH.labels(framework="pytorch").set(epoch + 1)
             except Exception:
@@ -239,9 +293,25 @@ def train_func(config: Dict):
                 TRAIN_LOSS.labels(framework="pytorch", split="val").set(float(avg_val_loss))
             except Exception:
                 pass
+            # Export validation performance metrics
             if "val_accuracy" in metrics:
                 try:
                     TRAIN_ACCURACY.labels(framework="pytorch", split="val").set(float(metrics["val_accuracy"]))
+                except Exception:
+                    pass
+            if "val_f1_avg" in metrics:
+                try:
+                    TRAIN_F1.labels(framework="pytorch", split="val").set(float(metrics["val_f1_avg"]))
+                except Exception:
+                    pass
+            if "val_precision_avg" in metrics:
+                try:
+                    TRAIN_PRECISION.labels(framework="pytorch", split="val").set(float(metrics["val_precision_avg"]))
+                except Exception:
+                    pass
+            if "val_recall_avg" in metrics:
+                try:
+                    TRAIN_RECALL.labels(framework="pytorch", split="val").set(float(metrics["val_recall_avg"]))
                 except Exception:
                     pass
 
