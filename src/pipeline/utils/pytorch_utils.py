@@ -111,6 +111,7 @@ def train_func(config: Dict):
     start_time = time.perf_counter()
     feature_cols = None
     for epoch in range(max_epochs):
+        epoch_start = time.perf_counter()
         model.train()
         # prefetch_batches > 1 enables async data loading using background threads
         train_loader = train_shard.iter_torch_batches(
@@ -169,6 +170,8 @@ def train_func(config: Dict):
         logger.info(f"[pytorch] Worker train_time_sec={train_time_sec:.2f}")
 
         avg_val_loss = val_loss / max(val_batches, 1)
+
+        epoch_time_sec = time.perf_counter() - epoch_start
         
         # Medimos el tiempo que tarda en derivar precisión, recall, etc. de la matriz
         metrics_start = time.perf_counter()
@@ -177,6 +180,7 @@ def train_func(config: Dict):
 
         report = {
             "epoch": epoch,
+            "epoch_time_sec": epoch_time_sec,
             "train_loss": avg_train_loss,
             "val_loss": avg_val_loss,
             **metrics,

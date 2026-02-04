@@ -80,6 +80,7 @@ def tune_model(
     seed: int = 42,
     mlflow_tracking_uri: str | None = None,
     mlflow_experiment_name: str | None = None,
+    extra_callbacks: list | None = None,
 ):
     # Two-stage idea:
     num_workers = int(os.getenv("NUM_WORKERS_TUNE", os.getenv("NUM_WORKERS", 2)))
@@ -179,7 +180,7 @@ def tune_model(
     # (especially with MAX_CONCURRENT_TRIALS > 1).
     trainable = _trainable
 
-    callbacks = []
+    callbacks = list(extra_callbacks or [])
     if mlflow_tracking_uri and mlflow_experiment_name:
         callbacks.append(
             MLflowLoggerCallback(

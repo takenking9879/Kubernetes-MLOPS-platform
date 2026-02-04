@@ -17,6 +17,7 @@ PREPROCESS_BATCHES = Counter('preprocess_batches_total', 'Total batches preproce
 PREPROCESS_RECORDS_BY_CLASS = Counter('preprocess_records_by_class_total', 'Records per class', ['dataset', 'class'])
 PREPROCESS_RECORDS_LAST_BATCH = Gauge('preprocess_records_last_batch', 'Records in last batch by class', ['dataset', 'class'])
 PREPROCESS_BATCH_LATENCY = Histogram('preprocess_batch_latency_seconds', 'Batch preprocessing latency', ['dataset'], buckets=[1, 5, 10, 30, 60, 120, 300])
+PREPROCESS_BATCH_LATENCY_LAST = Gauge('preprocess_batch_latency_last_seconds', 'Last dataset preprocessing latency (seconds)', ['dataset'])
 PREPROCESS_ERRORS = Counter('preprocess_errors_total', 'Total preprocessing errors', ['dataset', 'error_type'])
 PREPROCESS_CURRENT_DATASET = Gauge('preprocess_current_dataset_progress', 'Current dataset being processed (0=idle, 1=train, 2=val, 3=test)')
 
@@ -43,6 +44,20 @@ class SparkPreprocessing(BaseUtils):
         try:
             start_http_server(port)
             self.logger.info(f"Prometheus metrics server started on port {port}")
+
+            # Pre-create expected labelsets so Grafana panels show train/val/test even if a split has 0 rows.
+            for split in ("train", "val", "test"):
+                PREPROCESS_RECORDS.labels(dataset=split).inc(0)
+                PREPROCESS_BATCHES.labels(dataset=split).inc(0)
+                PREPROCESS_BATCH_LATENCY_LAST.labels(dataset=split).set(0)
+
+                # Pre-create class labelsets (default 6 classes: 0..5)
+                try:
+                    num_classes = int(os.getenv("NUM_CLASSES", self.params.get('preprocessing', {}).get('num_classes', 6)))
+                except Exception:
+                    num_classes = 6
+                for c in range(max(num_classes, 1)):
+                    PREPROCESS_RECORDS_LAST_BATCH.labels(dataset=split, **{'class': str(c)}).set(0)
         except Exception as e:
             self.logger.warning(f"Could not start Prometheus server: {e}")
 
@@ -148,7 +163,16 @@ class SparkPreprocessing(BaseUtils):
             # ===== PROMETHEUS METRICS =====
             record_count = df_out.count()
             PREPROCESS_RECORDS.labels(dataset=dataset).inc(record_count)
+            # NOTE: This counts how many times the dataset split ran (not Spark partitions).
             PREPROCESS_BATCHES.labels(dataset=dataset).inc(1)
+
+            # Reset last-batch gauges to 0 for stable pie chart labels (0..num_classes-1)
+            try:
+                num_classes = int(os.getenv("NUM_CLASSES", self.params.get('preprocessing', {}).get('num_classes', 6)))
+            except Exception:
+                num_classes = 6
+            for c in range(max(num_classes, 1)):
+                PREPROCESS_RECORDS_LAST_BATCH.labels(dataset=dataset, **{'class': str(c)}).set(0)
             
             # Per-class distribution (if 'attack' column exists)
             target_col = self.params.get('preprocessing', {}).get('target', 'attack')
@@ -162,6 +186,7 @@ class SparkPreprocessing(BaseUtils):
             
             elapsed = time.time() - start_time
             PREPROCESS_BATCH_LATENCY.labels(dataset=dataset).observe(elapsed)
+            PREPROCESS_BATCH_LATENCY_LAST.labels(dataset=dataset).set(elapsed)
 
             self.logger.info(f"Preprocessing completed for {dataset} dataset. Writing output.")
             self.write_data(df_out, os.path.join(self.output_dir, f'{dataset}/'))

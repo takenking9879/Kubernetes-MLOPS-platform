@@ -6,7 +6,7 @@ import numpy as np
 import ray.train
 from ray.train.torch import TorchTrainer
 from torch import nn
-from typing import Any, Dict
+from typing import Any, Dict, List, Optional
 from schemas.model.pytorch_params import PYTORCH_PARAMS 
 from pipeline.utils.pytorch_utils import train_func
 from models.pytorch import NeuralNetwork
@@ -138,7 +138,17 @@ def _evaluate_on_dataset(
 # =========================
 # Trainer
 # =========================
-def train(train_dataset, val_dataset, test_dataset, target, storage_path, name, num_classes: int = 6, pytorch_params=None):
+def train(
+    train_dataset,
+    val_dataset,
+    test_dataset,
+    target,
+    storage_path,
+    name,
+    num_classes: int = 6,
+    pytorch_params=None,
+    callbacks: Optional[List[object]] = None,
+):
     scaling_config = ray.train.ScalingConfig(
         num_workers=int(os.getenv("NUM_WORKERS", 2)),
         resources_per_worker={"CPU": int(os.getenv("CPUS_PER_WORKER", 2))},
@@ -161,7 +171,11 @@ def train(train_dataset, val_dataset, test_dataset, target, storage_path, name, 
         train_loop_config=config,
         scaling_config=scaling_config,
         datasets={"train": train_dataset, "val": val_dataset},
-        run_config=ray.train.RunConfig(storage_path=storage_path, name=name),
+        run_config=ray.train.RunConfig(
+            storage_path=storage_path,
+            name=name,
+            callbacks=callbacks or None,
+        ),
         )
 
     start_time = time.perf_counter()

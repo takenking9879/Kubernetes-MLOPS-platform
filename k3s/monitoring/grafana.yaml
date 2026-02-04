@@ -769,7 +769,7 @@ data:
           "type": "stat",
           "targets": [
             {
-              "expr": "sum(preprocess_records_total) or vector(0)",
+              "expr": "sum(max_over_time(preprocess_records_total[6h])) or vector(0)",
               "legendFormat": "Records",
               "refId": "A"
             }
@@ -797,12 +797,12 @@ data:
             "textMode": "auto"
           },
           "pluginVersion": "10.2.0",
-          "title": "Total Batches Preprocessed",
+          "title": "Total Dataset Runs (Splits)",
           "type": "stat",
           "targets": [
             {
-              "expr": "sum(preprocess_batches_total) or vector(0)",
-              "legendFormat": "Batches",
+              "expr": "sum(max_over_time(preprocess_batches_total[6h])) or vector(0)",
+              "legendFormat": "Runs",
               "refId": "A"
             }
           ]
@@ -848,8 +848,8 @@ data:
           "type": "timeseries",
           "targets": [
             {
-              "expr": "rate(preprocess_batch_latency_seconds_sum[1m]) / rate(preprocess_batch_latency_seconds_count[1m])",
-              "legendFormat": "Avg Latency",
+              "expr": "preprocess_batch_latency_last_seconds",
+              "legendFormat": "{{dataset}} last",
               "refId": "A"
             }
           ]
@@ -880,7 +880,7 @@ data:
           "type": "stat",
           "targets": [
             {
-              "expr": "sum(preprocess_errors_total) or vector(0)",
+              "expr": "sum(max_over_time(preprocess_errors_total[6h])) or vector(0)",
               "legendFormat": "Errors",
               "refId": "A"
             }
@@ -910,8 +910,8 @@ data:
           "type": "piechart",
           "targets": [
             {
-              "expr": "sum by (label) (preprocess_records_by_class_total)",
-              "legendFormat": "{{label}}",
+              "expr": "sum by (class) (preprocess_records_last_batch{dataset=\"train\"})",
+              "legendFormat": "class {{class}}",
               "refId": "A"
             }
           ]
@@ -983,7 +983,7 @@ data:
           "type": "stat",
           "targets": [
             {
-              "expr": "sum(train_epochs_total) or vector(0)",
+              "expr": "sum(max_over_time(train_epochs_total{framework=~\"$framework\"}[6h])) or vector(0)",
               "legendFormat": "Epochs",
               "refId": "A"
             }
@@ -1015,8 +1015,8 @@ data:
           "type": "stat",
           "targets": [
             {
-              "expr": "sum(train_samples_total) or vector(0)",
-              "legendFormat": "Samples",
+              "expr": "sum(max_over_time(train_split_rows{framework=~\"$framework\",split=\"train\"}[6h])) or vector(0)",
+              "legendFormat": "Train rows",
               "refId": "A"
             }
           ]
@@ -1047,7 +1047,7 @@ data:
           "type": "stat",
           "targets": [
             {
-              "expr": "sum(train_failures_total) or vector(0)",
+              "expr": "sum(max_over_time(train_failures_total{framework=~\"$framework\"}[6h])) or vector(0)",
               "legendFormat": "Failures",
               "refId": "A"
             }
@@ -1078,7 +1078,7 @@ data:
           "type": "gauge",
           "targets": [
             {
-              "expr": "train_loss or vector(0)",
+              "expr": "max(train_loss{framework=~\"$framework\",split=\"val\"}) or vector(0)",
               "legendFormat": "Loss",
               "refId": "A"
             }
@@ -1111,7 +1111,7 @@ data:
           "type": "gauge",
           "targets": [
             {
-              "expr": "train_accuracy or vector(0)",
+              "expr": "max(train_accuracy{framework=~\"$framework\",split=\"val\"}) or vector(0)",
               "legendFormat": "Accuracy",
               "refId": "A"
             }
@@ -1159,22 +1159,22 @@ data:
           "type": "timeseries",
           "targets": [
             {
-              "expr": "train_accuracy",
+              "expr": "train_accuracy{framework=~\"$framework\",split=\"val\"}",
               "legendFormat": "Accuracy",
               "refId": "A"
             },
             {
-              "expr": "train_f1",
+              "expr": "train_f1{framework=~\"$framework\",split=\"val\"}",
               "legendFormat": "F1",
               "refId": "B"
             },
             {
-              "expr": "train_precision",
+              "expr": "train_precision{framework=~\"$framework\",split=\"val\"}",
               "legendFormat": "Precision",
               "refId": "C"
             },
             {
-              "expr": "train_recall",
+              "expr": "train_recall{framework=~\"$framework\",split=\"val\"}",
               "legendFormat": "Recall",
               "refId": "D"
             }
@@ -1221,8 +1221,8 @@ data:
           "type": "timeseries",
           "targets": [
             {
-              "expr": "train_epoch_duration_seconds",
-              "legendFormat": "Duration",
+              "expr": "train_epoch_duration_last_seconds{framework=~\"$framework\"}",
+              "legendFormat": "Last duration",
               "refId": "A"
             }
           ]
@@ -1261,7 +1261,7 @@ data:
           "type": "stat",
           "targets": [
             {
-              "expr": "sum(tune_trials_total) or vector(0)",
+              "expr": "sum(max_over_time(tune_trials_total{framework=~\"$framework\"}[6h])) or vector(0)",
               "legendFormat": "Trials",
               "refId": "A"
             }
@@ -1294,7 +1294,7 @@ data:
           "type": "bargauge",
           "targets": [
             {
-              "expr": "sum by (status) (tune_trial_status)",
+              "expr": "tune_trials_by_status{framework=~\"$framework\"}",
               "legendFormat": "{{status}}",
               "refId": "A"
             }
@@ -1327,7 +1327,7 @@ data:
           "type": "stat",
           "targets": [
             {
-              "expr": "tune_best_metric_value or vector(0)",
+              "expr": "max(max_over_time(tune_best_metric_value{framework=~\"$framework\"}[6h])) or vector(0)",
               "legendFormat": "Best",
               "refId": "A"
             }
@@ -1487,7 +1487,21 @@ data:
       "schemaVersion": 38,
       "style": "dark",
       "tags": ["mlops", "training", "spark", "ray", "tuning"],
-      "templating": { "list": [] },
+      "templating": {
+        "list": [
+          {
+            "name": "framework",
+            "type": "query",
+            "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
+            "refresh": 1,
+            "query": "label_values(train_current_epoch, framework)",
+            "includeAll": true,
+            "multi": false,
+            "allValue": ".*",
+            "current": { "selected": false, "text": "All", "value": ".*" }
+          }
+        ]
+      },
       "time": { "from": "now-1h", "to": "now" },
       "timepicker": {},
       "timezone": "browser",

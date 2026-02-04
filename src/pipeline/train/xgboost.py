@@ -4,7 +4,7 @@ XGBoost training module using Ray Train. It only supports RAM-based training."""
 import os
 import time
 import logging
-from typing import Any, Dict
+from typing import Any, Dict, List, Optional
 
 import ray.train
 from ray.train.xgboost import XGBoostTrainer
@@ -53,8 +53,17 @@ def train_func(config: Dict):
     logger.info(f"[xgboost] Worker train_time_sec={train_time_sec:.2f}")
     #Aqui termina el tiempo de entrenamiento
 
-# Main training function
-def train(train_dataset, val_dataset, test_dataset, target, storage_path, name, num_classes: int = 6, xgboost_params=None):
+def train(
+    train_dataset,
+    val_dataset,
+    test_dataset,
+    target,
+    storage_path,
+    name,
+    num_classes: int = 6,
+    xgboost_params=None,
+    callbacks: Optional[List[object]] = None,
+):
     scaling_config = ray.train.ScalingConfig(
         num_workers=int(os.getenv("NUM_WORKERS", 2)),
         resources_per_worker={"CPU": int(os.getenv("CPUS_PER_WORKER", 2))})
@@ -72,7 +81,11 @@ def train(train_dataset, val_dataset, test_dataset, target, storage_path, name, 
         train_loop_config=config, #Configuración del entrenamiento
         scaling_config=scaling_config, #Configuración de recursos
         datasets={"train": train_dataset, "val": val_dataset}, #Pasar datasets leidos
-        run_config=ray.train.RunConfig(storage_path=storage_path, name=name), #Donde guardar los resultados
+        run_config=ray.train.RunConfig(
+            storage_path=storage_path,
+            name=name,
+            callbacks=callbacks or None,
+        ), #Donde guardar los resultados
     )
 
     result = trainer.fit()

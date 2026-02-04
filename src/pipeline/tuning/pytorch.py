@@ -33,6 +33,7 @@ def tune_model(
     seed: int = 42,
     mlflow_tracking_uri: str | None = None,
     mlflow_experiment_name: str | None = None,
+    extra_callbacks: list | None = None,
 ):
     """
     config: dict con 'max_epochs' para ASHA
@@ -155,7 +156,7 @@ def tune_model(
     # Reserving them here can cause fragmentation and unschedulable placement groups.
     trainable = _trainable
 
-    callbacks = []
+    callbacks = list(extra_callbacks or [])
     if mlflow_tracking_uri and mlflow_experiment_name:
         callbacks.append(
             MLflowLoggerCallback(
