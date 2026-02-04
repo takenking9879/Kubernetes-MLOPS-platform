@@ -38,6 +38,10 @@ spec:
       # Keep the job alive briefly after finishing so Prometheus can scrape final metrics.
       PROMETHEUS_GRACE_SECONDS: "10"
 
+      # Debug/observability: run more epochs so Prometheus can scrape multiple points.
+      # You can lower this back to 10 once Grafana updates as expected.
+      PYTORCH_MAX_EPOCHS: "30"
+
   rayClusterSpec:
     rayVersion: "2.52.0"
     enableInTreeAutoscaling: false # true

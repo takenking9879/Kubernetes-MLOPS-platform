@@ -313,7 +313,16 @@ class KubeRayTraining(BaseUtils):
             if framework == "pytorch":
                 if best_params is None:
                     best_params = dict(PYTORCH_PARAMS)
-                best_params['max_epochs'] = PYTORCH_PARAMS['max_epochs']
+                # Allow runtime override without changing code/images.
+                # Useful to keep the RayCluster alive long enough for Prometheus scrapes.
+                try:
+                    env_max_epochs = os.getenv("PYTORCH_MAX_EPOCHS")
+                    if env_max_epochs is not None and str(env_max_epochs).strip() != "":
+                        best_params["max_epochs"] = int(env_max_epochs)
+                    else:
+                        best_params["max_epochs"] = PYTORCH_PARAMS["max_epochs"]
+                except Exception:
+                    best_params["max_epochs"] = PYTORCH_PARAMS["max_epochs"]
                 train_kwargs["pytorch_params"] = best_params
 
             prom_train_cb = PrometheusTrainCallback(framework=framework)
