@@ -58,12 +58,12 @@ def run_xgboost_train(
     xgb_model=None,
     is_tuning: bool = False,
 ):
-    # Start Prometheus metrics server in the worker process (rank 0 only).
+    # Start Prometheus metrics server in ALL worker processes.
+    # Each worker has its own registry, so no conflicts.
     # DISABLED during tuning to avoid contaminating dashboards with trial metrics.
     world_rank = ray.train.get_context().get_world_rank()
     should_start_prometheus = (
         _PROM_AVAILABLE
-        and world_rank == 0
         and not is_tuning  # ← NO iniciar servidor durante tuning
         and os.getenv("PROMETHEUS_ENABLE_WORKER", "1") in ("1", "true", "True")
     )

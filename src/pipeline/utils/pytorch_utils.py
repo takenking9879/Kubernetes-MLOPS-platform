@@ -133,13 +133,13 @@ def train_func(config: Dict):
     # Check if we're in tuning mode (passed explicitly via config)
     is_tuning = config.get("is_tuning", False)
 
-    # Start a Prometheus metrics server in the worker process (rank 0 only).
+    # Start a Prometheus metrics server in ALL worker processes.
+    # Each worker has its own registry, so no conflicts.
     # DISABLED during tuning to avoid contaminating dashboards with trial metrics.
     # We scrape the Ray worker pods directly (not the K8s submitter Job).
     # IMPORTANT: Use the worker-specific registry to avoid metric name conflicts.
     should_start_prometheus = (
         _PROM_AVAILABLE
-        and world_rank == 0
         and not is_tuning  # ← NO iniciar servidor durante tuning
         and os.getenv("PROMETHEUS_ENABLE_WORKER", "1") in ("1", "true", "True")
     )

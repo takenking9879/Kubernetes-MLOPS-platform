@@ -46,10 +46,10 @@ TUNE_TRIALS_BY_STATUS = Gauge(
 # Helper functions
 # ----------------------
 def export_final_metrics(framework: str, metrics: dict) -> None:
-    """Export final training metrics to Prometheus after training completes.
+    """Export final training metrics to Prometheus PushGateway.
     
-    Provides stable snapshots for gauge panels while avoiding duplicates
-    during real-time training (which uses worker registries).
+    Pushes metrics to PushGateway for persistence after ephemeral job pods terminate.
+    Also sets metrics in default registry for immediate scraping if pod is still alive.
     
     Args:
         framework: "pytorch" or "xgboost"
@@ -59,6 +59,7 @@ def export_final_metrics(framework: str, metrics: dict) -> None:
         return
     
     try:
+        # Set metrics in default registry (for immediate scraping if pod alive)
         # PyTorch metrics
         if "val_loss" in metrics:
             TRAIN_LOSS.labels(framework=framework, split="val").set(float(metrics["val_loss"]))
@@ -74,6 +75,21 @@ def export_final_metrics(framework: str, metrics: dict) -> None:
         # XGBoost metrics (convert to common format)
         if "validation-mlogloss" in metrics:
             TRAIN_LOSS.labels(framework=framework, split="val").set(float(metrics["validation-mlogloss"]))
+        
+        # Push to PushGateway for persistence
+        import os
+        pushgateway_url = os.getenv("PUSHGATEWAY_URL", "pushgateway.monitoring.svc.cluster.local:9091")
+        try:
+            from prometheus_client import push_to_gateway, CollectorRegistry, REGISTRY
+            push_to_gateway(
+                gateway=pushgateway_url,
+                job="ray-training-final",
+                registry=REGISTRY,
+                grouping_key={"framework": framework}
+            )
+            print(f"[prometheus] ✓ Final metrics pushed to PushGateway ({pushgateway_url})")
+        except Exception as push_error:
+            print(f"[prometheus] Warning: Could not push to PushGateway: {push_error}")
             
     except Exception as e:
         print(f"[prometheus] Failed to export final metrics: {e}")
