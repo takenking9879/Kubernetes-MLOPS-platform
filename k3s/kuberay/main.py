@@ -178,6 +178,7 @@ class KubeRayTraining(BaseUtils):
     def _load_schema_features(self) -> list:
         """Cuenta dinámicamente las columnas de entrada (features) en el dataset."""
         dsl_path = self.load_params().get('spark', {}).get('preprocessing',{}).get('dsl_path', '/app/repo/k3s/spark/preprocess/dsl_001.yaml')
+        dsl_path = os.path.join('/home/ray/', dsl_path.lstrip('/'))
         with open(dsl_path, 'r') as f:
             dsl = yaml.safe_load(f)
         final_features = dsl['pipeline']['final_features']

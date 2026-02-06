@@ -14,7 +14,7 @@ from starlette.requests import Request
 from ray.util.metrics import Counter, Histogram
 
 from src.utils.logger import create_logger
-
+from src.utils.baseclass import BaseUtils
 
 @dataclass(frozen=True)
 class ModelSpec:
@@ -115,13 +115,46 @@ class PyTorchAdapter:
 
 class ModelFactory:
     @staticmethod
+    def count_input_dim_from_dsl(params_path: Optional[str] = None) -> int:
+        """Count input dim (categorical + numerical) from DSL referenced in params.
+
+        This uses `BaseUtils.load_params()` so we don't duplicate YAML loading logic.
+        """
+        logger = create_logger("ModelFactory")
+        params_file = params_path or os.getenv("PARAMS_PATH", "/home/ray/app/repo/k3s/params.yaml")
+        utils = BaseUtils(logger, params_file)
+        try:
+            params = utils.load_params()
+            dsl_path = params.get('spark', {}).get('preprocessing', {}).get(
+                'dsl_path', '/app/repo/k3s/spark/preprocess/dsl_001.yaml'
+            )
+            # Resolve under /home/ray so relative paths used in cluster match container layout
+            dsl_path = os.path.join('/home/ray/', dsl_path.lstrip('/'))
+            with open(dsl_path, 'r') as f:
+                doc = yaml.safe_load(f)
+            final_features = doc.get('pipeline', {}).get('final_features', {})
+            categorical = final_features.get('categorical', []) or []
+            numerical = final_features.get('numerical', []) or []
+            return int(len(categorical) + len(numerical))
+        except Exception:
+            # Fallback to explicit input_dim in params or default 14
+            try:
+                cfg = params.get('kuberay', {}).get('model', {}) if 'params' in locals() else {}
+                return int(cfg.get('input_dim', 14))
+            except Exception:
+                return 14
+
+    @staticmethod
     def create_adapter(framework: str, *, model_path: str, params: Dict[str, Any] = None) -> ModelAdapter:
         fw = framework.strip().lower()
         if fw == "xgboost":
             return XGBoostAdapter(model_path)
         if fw == "pytorch":
             model_cfg = (params or {}).get("kuberay", {}).get("model", {})
-            input_dim = int(model_cfg.get("input_dim"))
+            if model_cfg.get('dsl_count_dim'):
+                input_dim = ModelFactory.count_input_dim_from_dsl()
+            else:
+                input_dim = int(model_cfg.get("input_dim", 14))
             num_classes = int(model_cfg.get("num_classes"))
             return PyTorchAdapter(model_path, input_dim=input_dim, num_classes=num_classes)
         raise ValueError(f"Unsupported MODEL_FRAMEWORK={framework!r}")
