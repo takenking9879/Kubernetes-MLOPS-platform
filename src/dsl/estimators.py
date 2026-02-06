@@ -5,7 +5,6 @@ All estimators in this module learn parameters from data during fit()
 and return FittedTransformer instances that can transform new data.
 """
 
-from numpy import dtype
 from pyspark.sql import DataFrame, SparkSession
 from pyspark.sql import functions as F
 from typing import Dict, Any, Tuple, List

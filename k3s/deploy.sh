@@ -7,9 +7,9 @@ set -euo pipefail
 # FLAGS (EDITA AQUÍ)
 # ============================================================
 ENABLE_REPO_DOWNLOAD=false
-ENABLE_KAFKA=false
+ENABLE_KAFKA=true
 ENABLE_RAY=true
-ENABLE_MLFLOW=true
+ENABLE_MLFLOW=false
 ENABLE_SPARK=true
 ENABLE_MONITORING=true
 
