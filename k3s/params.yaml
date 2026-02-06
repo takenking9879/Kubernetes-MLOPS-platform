@@ -22,6 +22,16 @@ kuberay:
     framework: "pytorch"
     canary_probability: 0.0    
 
+  # Optional per-deployment canary configuration. When present, `CanaryModel`
+  # will pick these values (overrides `kuberay.serving` / `kuberay.model`).
+  # Example: set `initial_replicas: 0` to keep canary inactive until you scale it.
+  canary:
+    framework: "pytorch"
+    model_key: "v1/models/model_canary.pkl"
+    canary_probability: 0.10
+    # initial_replicas controls whether a canary instance is started automatically
+    initial_replicas: 0
+
 spark:
   app_name: "spark-preprocessing"
   bucket: "k8s-mlops-platform-bucket" # dummy bucket name

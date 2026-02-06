@@ -16,13 +16,9 @@ spec:
         route_prefix: /infer
         deployments:
           - name: ModelRouter
-            user_config:
-              canary_probability: 0.0
             ray_actor_options:
               num_cpus: 0.1
           - name: StableModel
-            user_config:
-              framework: xgboost
             ray_actor_options:
               num_cpus: 1
             autoscaling_config:
@@ -33,8 +29,6 @@ spec:
               upscale_delay_s: 1
               downscale_delay_s: 30
           - name: CanaryModel
-            user_config:
-              framework: pytorch
             ray_actor_options:
               num_cpus: 1
             autoscaling_config:

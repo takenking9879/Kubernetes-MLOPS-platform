@@ -10,6 +10,11 @@ set -euo pipefail
 NS_RAY="ray"
 NS_SPARK="spark"
 
+# Toggle applying RayService updates from this script.
+# Default: false (do not modify RayService). Set to "true" to apply k3s/kuberay/serving/rayservice-model-serving.yaml
+ENABLE_INFERENCE_UPDATE=${ENABLE_INFERENCE_UPDATE:-false}
+
+
 sep() { echo; echo "============================================================"; echo; }
 info() { echo "👉 $*"; }
 ok() { echo "✅ $*"; }
@@ -81,6 +86,23 @@ sep
 info "Applying RayService (Ray Serve)"
 kubectl apply -f k3s/kuberay/serving/rayservice-model-serving.yaml
 ok "RayService applied"
+
+# If enabled, trigger a rollout (restart Ray head pods) to force re-sync/reload
+if [ "${ENABLE_INFERENCE_UPDATE,,}" = "true" ]; then
+  sep
+  info "ENABLE_INFERENCE_UPDATE=true → triggering rollout: restarting Ray head pod(s)"
+  # Delete head pod(s) so git-sync and Ray controller reinitialize with new config/code.
+  kubectl -n "$NS_RAY" get pods -l ray.io/node-type=head -o name 2>/dev/null | xargs -r kubectl -n "$NS_RAY" delete --wait=false || true
+
+  # Wait for a head pod to appear again
+  if ! wait_for_pod_selector "$NS_RAY" "ray.io/node-type=head" 180; then
+    echo "Timed out waiting for new Ray head pod after rollout" >&2
+    kubectl -n "$NS_RAY" get pods --show-labels >&2 || true
+    exit 1
+  fi
+
+  ok "Rollout triggered: new Ray head pod detected"
+fi
 
 sep
 info "Applying Spark driver Service (metrics + Spark UI metrics servlet)"

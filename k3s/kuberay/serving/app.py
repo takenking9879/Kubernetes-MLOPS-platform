@@ -192,22 +192,32 @@ class _ModelRuntime:
             tag_keys=("application", "variant", "framework"),
         )
 
-    def _load_from_config(self, config: Dict[str, Any]) -> None:
+    def _load_from_config(self, config: Dict[str, Any], overrides: Optional[Dict[str, Any]] = None) -> None:
+        """Load model configuration.
+
+        Priority order for framework/model_key:
+          1. overrides (explicit per-deployment, e.g. canary)
+          2. kuberay.serving in params.yaml
+          3. kuberay.model in params.yaml
+
+        This keeps params.yaml as source of truth but allows per-deployment
+        overrides defined under `kuberay.canary`.
+        """
         params = load_params()
         model_cfg = params.get("kuberay", {}).get("model", {})
         serving_cfg = params.get("kuberay", {}).get("serving", {})
-
+        overrides = overrides or {}
         bucket = os.getenv("S3_BUCKET_NAME", "k8s-mlops-platform-bucket")
-        
-        # Priority: Config > serving.framework > model.framework > ENV > default
-        framework = str(
-            config.get(
-                "framework", 
-                serving_cfg.get("framework", model_cfg.get("framework", "xgboost")
-                )
+
+        framework = overrides.get("framework") or serving_cfg.get("framework") or model_cfg.get("framework")
+        if not framework:
+            raise RuntimeError(
+                "Missing required configuration: kuberay.serving.framework or kuberay.model.framework in params.yaml"
             )
-        )
-        model_key = str(config.get("model_key", f"v1/models/model_{framework}.pkl"))
+
+        model_key = overrides.get("model_key") or serving_cfg.get("model_key") or model_cfg.get("model_key")
+        if not model_key:
+            model_key = f"v1/models/model_{framework}.pkl"
         self._spec = ModelSpec(framework=framework, model_key=model_key)
 
         self._store = S3Store(bucket=bucket)
@@ -279,7 +289,13 @@ class CanaryModel:
 
     def reconfigure(self, config: Dict[str, Any]) -> None:
         try:
-            self._rt._load_from_config(config)
+            params = load_params()
+            canary_cfg = params.get("kuberay", {}).get("canary", {})
+            # pass overrides so canary can use a different framework/model_key
+            if canary_cfg:
+                self._rt._load_from_config(config, overrides=canary_cfg)
+            else:
+                self._rt._load_from_config(config)
         except Exception as e:
             create_logger("CanaryModel").error("reconfigure failed: %s", str(e), exc_info=True)
             raise
@@ -316,9 +332,19 @@ class ModelRouter:
         payload = await request.json()
 
         use_canary = random.random() < self._canary_probability
-        handle = self._canary if use_canary else self._stable
-        # Delegate prediction to the chosen model deployment.
-        return await handle.predict.remote(payload)
+        # Prefer canary when selected, but gracefully fallback to stable if canary fails.
+        if use_canary and self._canary is not None:
+            try:
+                return await self._canary.predict.remote(payload)
+            except Exception as e:
+                self._logger.warning("Canary prediction failed, falling back to stable: %s", str(e))
+
+        # Stable is the safe fallback and should exist.
+        try:
+            return await self._stable.predict.remote(payload)
+        except Exception:
+            self._logger.exception("Stable model prediction failed")
+            raise
 
 
 # Serve application graph.
