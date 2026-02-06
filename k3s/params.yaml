@@ -47,7 +47,7 @@ spark:
   
   # ===== PREPROCESSING CONFIGURATION =====
   preprocessing:
-    dsl_path: "src/preprocess/dsl.yaml"         # Ruta al archivo DSL de transformaciones
+    dsl_path: "preprocess/dsl_001.yaml"         # Ruta al archivo DSL de transformaciones
     # Configuración de artefactos (scalers, encoders, etc.)
     artifacts:
       source: "s3"  # s3, local, minio
