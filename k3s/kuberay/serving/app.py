@@ -20,7 +20,6 @@ from src.utils.baseclass import BaseUtils
 class ModelSpec:
     framework: str
     model_key: str
-    artifacts_key: str
 
 
 def load_params() -> Dict[str, Any]:
@@ -204,20 +203,12 @@ class _ModelRuntime:
         framework = str(
             config.get(
                 "framework", 
-                serving_cfg.get(
-                    "framework", 
-                    model_cfg.get("framework", os.getenv("MODEL_FRAMEWORK", "xgboost"))
+                serving_cfg.get("framework", model_cfg.get("framework", "xgboost")
                 )
             )
         )
-        model_key = str(config.get("model_key", os.getenv("MODEL_KEY", f"v1/models/model_{framework}.pkl")))
-        artifacts_key = str(
-            config.get(
-                "artifacts_key",
-                os.getenv("ARTIFACTS_KEY", "v1/artifacts/pipeline_model.json"),
-            )
-        )
-        self._spec = ModelSpec(framework=framework, model_key=model_key, artifacts_key=artifacts_key)
+        model_key = str(config.get("model_key", f"v1/models/model_{framework}.pkl"))
+        self._spec = ModelSpec(framework=framework, model_key=model_key)
 
         self._store = S3Store(bucket=bucket)
         model_path = self._store.download_to_tmp(
