@@ -7,7 +7,7 @@ import os
 import importlib
 import pickle
 import subprocess
-import tempfile
+import yaml
 import time
 from urllib.parse import urlparse
 from typing import Dict, Any
@@ -35,6 +35,7 @@ class KubeRayTraining(BaseUtils):
         logger = create_logger('KubeRayTraining', 'kuberay_training.log')
         super().__init__(logger, params_path)
         self.params = self.load_params()['kuberay']['model']
+        self.schema = self._load_schema_features()
         self.data_dir = data_dir
         self.output_dir = output_dir
         
@@ -101,11 +102,12 @@ class KubeRayTraining(BaseUtils):
         try:
             cols = set(ds.schema().names)
 
-            SchemaRegistry.get_schema('schema_preprocessed')  # Ensure schema is registered
+            if not self.schema:
+                self.schema = SchemaRegistry.get_schema('schema_preprocessed')  # Ensure schema is registered
 
             expected = {
                 self.params.get('target', 'attack'),
-                *SchemaRegistry.get_schema('schema_preprocessed')
+                *self.schema
             }
             
             missing = expected - cols
@@ -173,14 +175,18 @@ class KubeRayTraining(BaseUtils):
         except Exception as e:
             self.logger.error(f"Error en el export del modelo (S3 direct): {str(e)}", exc_info=True)
     
-    def count_input_dim(self) -> int:
+    def _load_schema_features(self) -> list:
         """Cuenta dinámicamente las columnas de entrada (features) en el dataset."""
-        dsl = self.load_params().get('spark', {}).get('preprocessing',{}).get('dsl_path', '/app/repo/k3s/spark/preprocess/dsl_001.yaml')
+        dsl_path = self.load_params().get('spark', {}).get('preprocessing',{}).get('dsl_path', '/app/repo/k3s/spark/preprocess/dsl_001.yaml')
+        with open(dsl_path, 'r') as f:
+            dsl = yaml.safe_load(f)
         final_features = dsl['pipeline']['final_features']
 
-        categorical = len(final_features.get("categorical", []))
-        numerical = len(final_features.get("numerical", []))
+        categorical = final_features.get("categorical", [])
+        numerical = final_features.get("numerical", [])
 
+        self.input_dim = len(categorical) + len(numerical)
+        self.logger.info(f"Input dimension calculated from DSL: {self.input_dim} features.")
         return categorical + numerical
 
     def _log_final_to_mlflow(self, *, framework: str, params: Dict[str, Any], metrics: Dict[str, Any]) -> None:
@@ -250,7 +256,7 @@ class KubeRayTraining(BaseUtils):
             self.logger.info(f"Starting training using framework: {framework}")
             best_params = None
             num_classes = int(self.params.get("num_classes", 2))
-            input_dim = self.count_input_dim() if self.params.get("dsl_count_dim", True) else int(self.params.get("input_dim", 14))
+            input_dim = self.input_dim if self.params.get("dsl_count_dim", True) else int(self.params.get("input_dim", 14))
             mlflow_tracking_uri = self.params.get("mlflow_tracking_uri")
             mlflow_experiment_name = self.params.get("mlflow_experiment_name")
             if self.params.get('tune', False):
