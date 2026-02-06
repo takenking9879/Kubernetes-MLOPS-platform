@@ -29,7 +29,7 @@ class SparkPreprocessing(BaseUtils):
         self.data_dir = data_dir
         self.output_dir = output_dir
         self._load_artifacts_config()
-        self.schema = get_schema(self.params.get('schema').get('schema_full'))
+        self.schema = get_schema(self.params.get('schemas').get('full_schema'))
         self.s3 = None
         self.spark = self._create_spark_session()
         self.pipeline_path = self.params['preprocessing'].get('dsl_path')
