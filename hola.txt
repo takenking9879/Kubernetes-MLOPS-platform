@@ -1,54 +1,12 @@
-_load_scaler en main.py tiene que cambiar de spark para añadir custom
-
-_save_scaler_artifact()
-
-Cambiar preprocess() actual
-
-
-En inferencia
-
-preprocess
-
-_load_preprocessing_config
-
-
-Checar dashboards en la de clases (ya se modifico pero quien sabe que tan real es)
-
-
-
-Eliminar
-
-# Reset last-batch gauges to 0 for stable pie chart labels (0..num_classes-1)
-            try:
-                num_classes = int(os.getenv("NUM_CLASSES", self.params.get('preprocessing', {}).get('num_classes', 6)))
-            except Exception:
-                num_classes = 6
-            for c in range(max(num_classes, 1)):
-                PREPROCESS_RECORDS_LAST_BATCH.labels(dataset=dataset, **{'class': str(c)}).set(0)
-
-
-# Core Spark ML
-from pyspark.ml import Pipeline, PipelineModel
-
-# Categorical features
-from pyspark.ml.feature import (
-    StringIndexer,
-    OneHotEncoder,
-    HashingTF
-)
-
-# Numerical features
-from pyspark.ml.feature import (
-    Imputer,
-    StandardScaler,
-    MinMaxScaler
-)
-
-# Bucketing / discretization
-from pyspark.ml.feature import (
-    Bucketizer,
-    QuantileDiscretizer
-)
-
-# Feature assembly
-from pyspark.ml.feature import VectorAssembler ###NO USAR ESTE PORQUE ES PARA SPARK ML, NO QUIERO PERDER COLUMNAS
+2026-02-06 13:27:27.884 | WARNING: Using incubator modules: jdk.incubator.vector
+2026-02-06 13:27:29.520 | Files local:///app/repo/k3s/spark/main.py from /app/.worktrees/3f44d0ddef6fad7caa79d29220ebeefcaf0a5768/k3s/spark/main.py to /opt/spark/work-dir/main.py
+2026-02-06 13:27:29.650 | 26/02/06 19:27:29 WARN NativeCodeLoader: Unable to load native-hadoop library for your platform... using builtin-java classes where applicable
+2026-02-06 13:27:30.794 | Traceback (most recent call last):
+2026-02-06 13:27:30.794 |   File "/app/repo/k3s/spark/main.py", line 8, in <module>
+2026-02-06 13:27:30.794 |     from src.dsl import Pipeline, PipelineModel
+2026-02-06 13:27:30.794 |   File "/app/repo/src/dsl/__init__.py", line 39, in <module>
+2026-02-06 13:27:30.794 |     from .stage_registry import StageRegistry
+2026-02-06 13:27:30.794 | ModuleNotFoundError: No module named 'src.dsl.stage_registry'
+2026-02-06 13:27:30.864 | 26/02/06 19:27:30 INFO ShutdownHookManager: Shutdown hook called
+2026-02-06 13:27:30.865 | 26/02/06 19:27:30 INFO ShutdownHookManager: Deleting directory /tmp/localPyFiles-482d717e-18bd-4031-a972-2432fe8371e9
+2026-02-06 13:27:30.868 | 26/02/06 19:27:30 INFO ShutdownHookManager: Deleting directory /tmp/spark-d6a59b7c-30f4-4dd4-9ca7-ccc7b58270a7

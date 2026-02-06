@@ -36,7 +36,7 @@ from .pipeline import (
     PipelineModel
 )
 
-from .stage_registry import StageRegistry
+from .state_registry import StageRegistry
 
 from .transformers import (
     CastTransformer,
