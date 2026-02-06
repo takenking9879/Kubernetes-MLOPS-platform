@@ -198,7 +198,7 @@ class SparkPreprocessing(BaseUtils):
     def _load_artifacts_config(self):
         try:
             """Carga configuración de artifacts desde params."""
-            artifacts_config = self.params.get('artifacts')
+            artifacts_config = self.params.get('preprocessing').get('artifacts')
             
             # Configuración de artifacts
             self.artifacts_source = artifacts_config.get('source', 's3')

@@ -1,12 +1,25 @@
-2026-02-06 13:32:52.395 | WARNING: Using incubator modules: jdk.incubator.vector
-2026-02-06 13:32:53.640 | Files local:///app/repo/k3s/spark/main.py from /app/.worktrees/e21147e21b59a08eb6973ec9f703234d1948d17a/k3s/spark/main.py to /opt/spark/work-dir/main.py
-2026-02-06 13:32:53.722 | 26/02/06 19:32:53 WARN NativeCodeLoader: Unable to load native-hadoop library for your platform... using builtin-java classes where applicable
-2026-02-06 13:32:54.544 | Traceback (most recent call last):
-2026-02-06 13:32:54.544 |   File "/app/repo/k3s/spark/main.py", line 10, in <module>
-2026-02-06 13:32:54.544 |     from src.schemas.spark.schema_registry import get_schema
-2026-02-06 13:32:54.544 |   File "/app/repo/src/schemas/spark/schema_registry.py", line 7, in <module>
-2026-02-06 13:32:54.544 |     import schemas
-2026-02-06 13:32:54.544 | ModuleNotFoundError: No module named 'schemas'
-2026-02-06 13:32:54.599 | 26/02/06 19:32:54 INFO ShutdownHookManager: Shutdown hook called
-2026-02-06 13:32:54.601 | 26/02/06 19:32:54 INFO ShutdownHookManager: Deleting directory /tmp/localPyFiles-c3f92594-6566-4cdb-b627-bb3f2d7afdf4
-2026-02-06 13:32:54.604 | 26/02/06 19:32:54 INFO ShutdownHookManager: Deleting directory /tmp/spark-2dbc2057-920b-4fe4-9a3e-7c1b72fa698d
+2026-02-06 13:37:48.129 | WARNING: Using incubator modules: jdk.incubator.vector
+2026-02-06 13:37:49.272 | Files local:///app/repo/k3s/spark/main.py from /app/.worktrees/c6cada131e37f83742a9db6c06bcb0c55f171da0/k3s/spark/main.py to /opt/spark/work-dir/main.py
+2026-02-06 13:37:49.355 | 26/02/06 19:37:49 WARN NativeCodeLoader: Unable to load native-hadoop library for your platform... using builtin-java classes where applicable
+2026-02-06 13:37:50.200 | 2026-02-06 19:37:50,199 - SparkPreprocessing - DEBUG - Parameters retrieved from /app/repo/k3s/params.yaml
+2026-02-06 13:37:50.200 | 2026-02-06 19:37:50,199 - SparkPreprocessing - ERROR - Failed loading artifacts config: 'NoneType' object has no attribute 'get'
+2026-02-06 13:37:50.200 | Traceback (most recent call last):
+2026-02-06 13:37:50.200 |   File "/app/repo/k3s/spark/main.py", line 204, in _load_artifacts_config
+2026-02-06 13:37:50.200 |     self.artifacts_source = artifacts_config.get('source', 's3')
+2026-02-06 13:37:50.200 |                             ^^^^^^^^^^^^^^^^^^^^
+2026-02-06 13:37:50.200 | AttributeError: 'NoneType' object has no attribute 'get'
+2026-02-06 13:37:50.200 | Traceback (most recent call last):
+2026-02-06 13:37:50.200 |   File "/app/repo/k3s/spark/main.py", line 322, in <module>
+2026-02-06 13:37:50.200 |     main()
+2026-02-06 13:37:50.200 |   File "/app/repo/k3s/spark/main.py", line 294, in main
+2026-02-06 13:37:50.200 |     preprocessing = SparkPreprocessing(
+2026-02-06 13:37:50.200 |                     ^^^^^^^^^^^^^^^^^^^
+2026-02-06 13:37:50.200 |   File "/app/repo/k3s/spark/main.py", line 31, in __init__
+2026-02-06 13:37:50.200 |     self._load_artifacts_config()
+2026-02-06 13:37:50.201 |   File "/app/repo/k3s/spark/main.py", line 204, in _load_artifacts_config
+2026-02-06 13:37:50.201 |     self.artifacts_source = artifacts_config.get('source', 's3')
+2026-02-06 13:37:50.201 |                             ^^^^^^^^^^^^^^^^^^^^
+2026-02-06 13:37:50.201 | AttributeError: 'NoneType' object has no attribute 'get'
+2026-02-06 13:37:50.255 | 26/02/06 19:37:50 INFO ShutdownHookManager: Shutdown hook called
+2026-02-06 13:37:50.256 | 26/02/06 19:37:50 INFO ShutdownHookManager: Deleting directory /tmp/localPyFiles-addce599-e666-4c13-ad15-df0b3260b6bf
+2026-02-06 13:37:50.259 | 26/02/06 19:37:50 INFO ShutdownHookManager: Deleting directory /tmp/spark-5b7b3a92-dd6c-45c1-8f57-1b4ecaaf8109
