@@ -625,7 +625,7 @@ class KafkaSparkInference(BaseUtils):
             self.logger.info(f"📤 Output topic: {self.kafka_output_topic}")
             self.logger.info(f"⚙️  Schema: {self.input_schema_name} → {self.output_schema_name}")
             self.logger.info(f"🔄 Converter: {self.converter_name}")
-            self.logger.info(f"🧮 Preprocessing: {self.preprocessing_module_path}")
+            self.logger.info(f"🧮 Preprocessing using Spark Custom Pipeline")
             self.logger.info("⏳ Waiting for termination...")
             
             # Esperar terminación

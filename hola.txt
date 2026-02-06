@@ -1,18 +1,143 @@
-2026-02-06 15:38:59.114 | WARNING: Using incubator modules: jdk.incubator.vector
-2026-02-06 15:39:00.986 | Files local:///app/repo/k3s/spark/inference/kafka_main.py from /app/.worktrees/cf84ea88978e0aacd43747788a7890af598e3a90/k3s/spark/inference/kafka_main.py to /opt/spark/work-dir/kafka_main.py
-2026-02-06 15:39:01.105 | 26/02/06 21:39:01 WARN NativeCodeLoader: Unable to load native-hadoop library for your platform... using builtin-java classes where applicable
-2026-02-06 15:39:02.060 | Traceback (most recent call last):
-2026-02-06 15:39:02.060 |   File "/app/repo/k3s/spark/inference/kafka_main.py", line 10, in <module>
-2026-02-06 15:39:02.060 |     from src.dsl import PipelineModel
-2026-02-06 15:39:02.060 |   File "/app/repo/src/dsl/__init__.py", line 33, in <module>
-2026-02-06 15:39:02.060 |     from .pipeline import (
-2026-02-06 15:39:02.060 |   File "/app/repo/src/dsl/pipeline.py", line 13, in <module>
-2026-02-06 15:39:02.060 |     from .state_registry import StageRegistry
-2026-02-06 15:39:02.060 |   File "/app/repo/src/dsl/state_registry.py", line 22, in <module>
-2026-02-06 15:39:02.060 |     from .estimators import (
-2026-02-06 15:39:02.060 |   File "/app/repo/src/dsl/estimators.py", line 8, in <module>
-2026-02-06 15:39:02.060 |     from numpy import dtype
-2026-02-06 15:39:02.060 | ModuleNotFoundError: No module named 'numpy'
-2026-02-06 15:39:02.090 | 26/02/06 21:39:02 INFO ShutdownHookManager: Shutdown hook called
-2026-02-06 15:39:02.091 | 26/02/06 21:39:02 INFO ShutdownHookManager: Deleting directory /tmp/spark-d1ea6b61-c105-438c-be36-365e66b13b1d
-2026-02-06 15:39:02.094 | 26/02/06 21:39:02 INFO ShutdownHookManager: Deleting directory /tmp/localPyFiles-b5baf131-39ac-47e6-ac47-ad9288b6063b
+2026-02-06 15:41:56.241 | WARNING: Using incubator modules: jdk.incubator.vector
+2026-02-06 15:41:57.536 | Files local:///app/repo/k3s/spark/inference/kafka_main.py from /app/.worktrees/a4d67ebfa6f9e5afaf8ab0f5aba5c7fe9d576b80/k3s/spark/inference/kafka_main.py to /opt/spark/work-dir/kafka_main.py
+2026-02-06 15:41:57.613 | 26/02/06 21:41:57 WARN NativeCodeLoader: Unable to load native-hadoop library for your platform... using builtin-java classes where applicable
+2026-02-06 15:41:58.774 | 2026-02-06 21:41:58,773 - kafka_spark_inference - DEBUG - Parameters retrieved from /app/repo/k3s/params.yaml
+2026-02-06 15:41:58.775 | 2026-02-06 21:41:58,775 - kafka_spark_inference - INFO - ✅ Prometheus metrics server started on port 8000
+2026-02-06 15:41:58.775 | 2026-02-06 21:41:58,775 - kafka_spark_inference - INFO - ✅ Kafka config: topic-traffic → topic-prediction
+2026-02-06 15:41:58.775 | 2026-02-06 21:41:58,775 - kafka_spark_inference - INFO - ✅ Schemas loaded: input=kafka_schema_features, output=prediction_schema
+2026-02-06 15:41:58.775 | 2026-02-06 21:41:58,775 - kafka_spark_inference - INFO - ✅ Converter configured: kafka_to_schema_features
+2026-02-06 15:41:58.775 | 2026-02-06 21:41:58,775 - kafka_spark_inference - INFO - ✅ Artifacts configured: archives=['config.json', 'stages.json'] from s3
+2026-02-06 15:41:58.775 | 2026-02-06 21:41:58,775 - kafka_spark_inference - INFO - ✅ Prediction: ray_serve at http://model-serving-serve-svc.ray.svc.cluster.local:8000/infer
+2026-02-06 15:41:58.775 | 2026-02-06 21:41:58,775 - kafka_spark_inference - INFO - ✅ Output: format=json
+2026-02-06 15:41:58.775 | 2026-02-06 21:41:58,775 - kafka_spark_inference - INFO - ✅ Checkpoint: s3a://k8s-mlops-platform-bucket/checkpoints/kafka-spark-inference
+2026-02-06 15:41:58.775 | 2026-02-06 21:41:58,775 - kafka_spark_inference - INFO - Checking Kafka connection: host.docker.internal:9094
+2026-02-06 15:41:59.011 | %3|1770414119.010|FAIL|rdkafka#consumer-1| [thrd:sasl_plaintext://host.docker.internal:9094/bootstrap]: sasl_plaintext://host.docker.internal:9094/bootstrap: Failed to connect to broker at [fdc4:f303:9324::254]:9094: Network is unreachable (after 218ms in state CONNECT)
+2026-02-06 15:42:00.095 | 2026-02-06 21:42:00,095 - kafka_spark_inference - INFO - ✅ Kafka connected: 2 topics available
+2026-02-06 15:42:00.878 | 2026-02-06 21:42:00,878 - kafka_spark_inference - INFO - ✅ S3 connected: 2 buckets
+2026-02-06 15:42:01.699 | 2026-02-06 21:42:01,699 - kafka_spark_inference - INFO - Pipeline artifact downloaded from S3 and loaded
+2026-02-06 15:42:01.699 | 2026-02-06 21:42:01,699 - kafka_spark_inference - INFO - ✅ Converter function loaded: kafka_to_schema_features
+2026-02-06 15:42:01.699 | 2026-02-06 21:42:01,699 - kafka_spark_inference - INFO - Creating SparkSession with Kafka and S3 support
+2026-02-06 15:42:01.850 | Using Spark's default log4j profile: org/apache/spark/log4j2-defaults.properties
+2026-02-06 15:42:01.855 | 26/02/06 21:42:01 INFO SparkContext: Running Spark version 4.0.1
+2026-02-06 15:42:01.859 | 26/02/06 21:42:01 INFO SparkContext: OS info Linux, 6.6.87.2-microsoft-standard-WSL2, amd64
+2026-02-06 15:42:01.860 | 26/02/06 21:42:01 INFO SparkContext: Java version 17.0.17
+2026-02-06 15:42:01.886 | 26/02/06 21:42:01 INFO ResourceUtils: ==============================================================
+2026-02-06 15:42:01.886 | 26/02/06 21:42:01 INFO ResourceUtils: No custom resources configured for spark.driver.
+2026-02-06 15:42:01.886 | 26/02/06 21:42:01 INFO ResourceUtils: ==============================================================
+2026-02-06 15:42:01.887 | 26/02/06 21:42:01 INFO SparkContext: Submitted application: spark-preprocessing
+2026-02-06 15:42:01.917 | 26/02/06 21:42:01 INFO ResourceProfile: Default ResourceProfile created, executor resources: Map(cores -> name: cores, amount: 2, script: , vendor: , memory -> name: memory, amount: 512, script: , vendor: , offHeap -> name: offHeap, amount: 0, script: , vendor: ), task resources: Map(cpus -> name: cpus, amount: 1.0)
+2026-02-06 15:42:01.921 | 26/02/06 21:42:01 INFO ResourceProfile: Limiting resource is cpus at 2 tasks per executor
+2026-02-06 15:42:01.922 | 26/02/06 21:42:01 INFO ResourceProfileManager: Added ResourceProfile id: 0
+2026-02-06 15:42:01.973 | 26/02/06 21:42:01 INFO SecurityManager: Changing view acls to: spark
+2026-02-06 15:42:01.975 | 26/02/06 21:42:01 INFO SecurityManager: Changing modify acls to: spark
+2026-02-06 15:42:01.975 | 26/02/06 21:42:01 INFO SecurityManager: Changing view acls groups to: spark
+2026-02-06 15:42:01.976 | 26/02/06 21:42:01 INFO SecurityManager: Changing modify acls groups to: spark
+2026-02-06 15:42:01.979 | 26/02/06 21:42:01 INFO SecurityManager: SecurityManager: authentication disabled; ui acls disabled; users with view permissions: spark groups with view permissions: EMPTY; users with modify permissions: spark; groups with modify permissions: EMPTY; RPC SSL disabled
+2026-02-06 15:42:02.239 | 26/02/06 21:42:02 INFO Utils: Successfully started service 'sparkDriver' on port 7078.
+2026-02-06 15:42:02.282 | 26/02/06 21:42:02 INFO SparkEnv: Registering MapOutputTracker
+2026-02-06 15:42:02.295 | 26/02/06 21:42:02 INFO SparkEnv: Registering BlockManagerMaster
+2026-02-06 15:42:02.312 | 26/02/06 21:42:02 INFO BlockManagerMasterEndpoint: Using org.apache.spark.storage.DefaultTopologyMapper for getting topology information
+2026-02-06 15:42:02.313 | 26/02/06 21:42:02 INFO BlockManagerMasterEndpoint: BlockManagerMasterEndpoint up
+2026-02-06 15:42:02.316 | 26/02/06 21:42:02 INFO SparkEnv: Registering BlockManagerMasterHeartbeat
+2026-02-06 15:42:02.342 | 26/02/06 21:42:02 INFO DiskBlockManager: Created local directory at /var/data/spark-38bba925-57f5-497d-9de5-610b70cbeef3/blockmgr-3e2ff0c9-fc5c-484a-a50b-f7685c008a23
+2026-02-06 15:42:02.377 | 26/02/06 21:42:02 INFO SparkEnv: Registering OutputCommitCoordinator
+2026-02-06 15:42:02.568 | 26/02/06 21:42:02 INFO JettyUtils: Start Jetty 0.0.0.0:4040 for SparkUI
+2026-02-06 15:42:02.674 | 26/02/06 21:42:02 INFO Utils: Successfully started service 'SparkUI' on port 4040.
+2026-02-06 15:42:02.706 | 26/02/06 21:42:02 WARN SparkContext: File with 'local' scheme local:/app/repo/k3s/spark/inference/kafka_main.py is not supported to add to file server, since it is already available on every node.
+2026-02-06 15:42:02.731 | 26/02/06 21:42:02 INFO SecurityManager: Changing view acls to: spark
+2026-02-06 15:42:02.731 | 26/02/06 21:42:02 INFO SecurityManager: Changing modify acls to: spark
+2026-02-06 15:42:02.731 | 26/02/06 21:42:02 INFO SecurityManager: Changing view acls groups to: spark
+2026-02-06 15:42:02.732 | 26/02/06 21:42:02 INFO SecurityManager: Changing modify acls groups to: spark
+2026-02-06 15:42:02.732 | 26/02/06 21:42:02 INFO SecurityManager: SecurityManager: authentication disabled; ui acls disabled; users with view permissions: spark groups with view permissions: EMPTY; users with modify permissions: spark; groups with modify permissions: EMPTY; RPC SSL disabled
+2026-02-06 15:42:02.792 | 26/02/06 21:42:02 INFO SparkKubernetesClientFactory: Auto-configuring K8S client using current context from users K8S config file
+2026-02-06 15:42:04.139 | 26/02/06 21:42:04 WARN Utils: spark.executor.instances less than spark.dynamicAllocation.minExecutors is invalid, ignoring its setting, please update your configs.
+2026-02-06 15:42:04.146 | 26/02/06 21:42:04 INFO Utils: Using initial executors = 2, max of spark.dynamicAllocation.initialExecutors,spark.dynamicAllocation.minExecutors and spark.executor.instances
+2026-02-06 15:42:04.340 | 26/02/06 21:42:04 INFO ExecutorPodsAllocator: Going to request 2 executors from Kubernetes for ResourceProfile Id: 0, target: 2, known: 0, sharedSlotFromPendingPods: 2147483647.
+2026-02-06 15:42:04.395 | 26/02/06 21:42:04 INFO KubernetesClientUtils: Spark configuration files loaded from Some(/opt/spark/conf) : spark.kubernetes.namespace
+2026-02-06 15:42:04.654 | 26/02/06 21:42:04 INFO ExecutorPodsAllocator: Found 0 reusable PVCs from 0 PVCs
+2026-02-06 15:42:04.684 | 26/02/06 21:42:04 INFO KubernetesClientUtils: Spark configuration files loaded from Some(/opt/spark/conf) : spark.kubernetes.namespace
+2026-02-06 15:42:04.695 | 26/02/06 21:42:04 INFO BasicExecutorFeatureStep: Decommissioning not enabled, skipping shutdown script
+2026-02-06 15:42:04.704 | 26/02/06 21:42:04 INFO Utils: Successfully started service 'org.apache.spark.network.netty.NettyBlockTransferService' on port 7079.
+2026-02-06 15:42:04.709 | 26/02/06 21:42:04 INFO NettyBlockTransferService: Server created on spark-kafka-app-0-driver-svc.spark.svc 10.1.9.242:7079
+2026-02-06 15:42:04.712 | 26/02/06 21:42:04 INFO BlockManager: Using org.apache.spark.storage.RandomBlockReplicationPolicy for block replication policy
+2026-02-06 15:42:04.738 | 26/02/06 21:42:04 INFO BlockManagerMaster: Registering BlockManager BlockManagerId(driver, spark-kafka-app-0-driver-svc.spark.svc, 7079, None)
+2026-02-06 15:42:04.747 | 26/02/06 21:42:04 INFO BlockManagerMasterEndpoint: Registering block manager spark-kafka-app-0-driver-svc.spark.svc:7079 with 117.0 MiB RAM, BlockManagerId(driver, spark-kafka-app-0-driver-svc.spark.svc, 7079, None)
+2026-02-06 15:42:04.750 | 26/02/06 21:42:04 INFO BlockManagerMaster: Registered BlockManager BlockManagerId(driver, spark-kafka-app-0-driver-svc.spark.svc, 7079, None)
+2026-02-06 15:42:04.752 | 26/02/06 21:42:04 INFO BlockManager: Initialized BlockManager: BlockManagerId(driver, spark-kafka-app-0-driver-svc.spark.svc, 7079, None)
+2026-02-06 15:42:04.776 | 26/02/06 21:42:04 WARN Utils: spark.executor.instances less than spark.dynamicAllocation.minExecutors is invalid, ignoring its setting, please update your configs.
+2026-02-06 15:42:04.777 | 26/02/06 21:42:04 INFO Utils: Using initial executors = 2, max of spark.dynamicAllocation.initialExecutors,spark.dynamicAllocation.minExecutors and spark.executor.instances
+2026-02-06 15:42:04.778 | 26/02/06 21:42:04 INFO ExecutorAllocationManager: Dynamic allocation is enabled without a shuffle service.
+2026-02-06 15:42:04.784 | 26/02/06 21:42:04 INFO KubernetesClientUtils: Spark configuration files loaded from Some(/opt/spark/conf) : spark.kubernetes.namespace
+2026-02-06 15:42:04.787 | 26/02/06 21:42:04 INFO BasicExecutorFeatureStep: Decommissioning not enabled, skipping shutdown script
+2026-02-06 15:42:13.524 | 26/02/06 21:42:13 INFO KubernetesClusterSchedulerBackend$KubernetesDriverEndpoint: Registered executor NettyRpcEndpointRef(spark-client://Executor) (10.1.9.245:43820) with ID 1, ResourceProfileId 0
+2026-02-06 15:42:13.526 | 26/02/06 21:42:13 INFO KubernetesClusterSchedulerBackend$KubernetesDriverEndpoint: Registered executor NettyRpcEndpointRef(spark-client://Executor) (10.1.9.246:48190) with ID 2, ResourceProfileId 0
+2026-02-06 15:42:13.529 | 26/02/06 21:42:13 INFO KubernetesClusterSchedulerBackend: SchedulerBackend is ready for scheduling beginning after reached minRegisteredResourcesRatio: 0.8
+2026-02-06 15:42:13.529 | 26/02/06 21:42:13 INFO ExecutorMonitor: New executor 1 has registered (new total is 1)
+2026-02-06 15:42:13.529 | 26/02/06 21:42:13 INFO ExecutorMonitor: New executor 2 has registered (new total is 2)
+2026-02-06 15:42:13.666 | 26/02/06 21:42:13 INFO BlockManagerMasterEndpoint: Registering block manager 10.1.9.245:43517 with 117.0 MiB RAM, BlockManagerId(1, 10.1.9.245, 43517, None)
+2026-02-06 15:42:13.668 | 26/02/06 21:42:13 INFO BlockManagerMasterEndpoint: Registering block manager 10.1.9.246:39177 with 117.0 MiB RAM, BlockManagerId(2, 10.1.9.246, 39177, None)
+2026-02-06 15:42:15.893 | 2026-02-06 21:42:15,893 - kafka_spark_inference - INFO - ✅ SparkSession created
+2026-02-06 15:42:15.893 | 2026-02-06 21:42:15,893 - kafka_spark_inference - INFO - 🚀 Starting Generic Kafka-Spark Inference Pipeline
+2026-02-06 15:42:15.893 | 2026-02-06 21:42:15,893 - kafka_spark_inference - INFO - Reading from Kafka: topic-traffic
+2026-02-06 15:42:15.986 | 26/02/06 21:42:15 INFO SharedState: Setting hive.metastore.warehouse.dir ('null') to the value of spark.sql.warehouse.dir.
+2026-02-06 15:42:15.995 | 26/02/06 21:42:15 INFO SharedState: Warehouse path is 'file:/opt/spark/work-dir/spark-warehouse'.
+2026-02-06 15:42:17.210 | 2026-02-06 21:42:17,210 - kafka_spark_inference - INFO - ✅ Kafka stream configured with explicit schema
+2026-02-06 15:42:17.365 | 26/02/06 21:42:17 INFO StateStoreCoordinatorRef: Registered StateStoreCoordinator endpoint
+2026-02-06 15:42:17.540 | 26/02/06 21:42:17 WARN MetricsConfig: Cannot locate configuration: tried hadoop-metrics2-s3a-file-system.properties,hadoop-metrics2.properties
+2026-02-06 15:42:17.550 | 26/02/06 21:42:17 INFO MetricsSystemImpl: Scheduled Metric snapshot period at 10 second(s).
+2026-02-06 15:42:17.550 | 26/02/06 21:42:17 INFO MetricsSystemImpl: s3a-file-system metrics system started
+2026-02-06 15:42:19.395 | 26/02/06 21:42:19 INFO ResolveWriteToStream: Checkpoint root s3a://k8s-mlops-platform-bucket/checkpoints/kafka-spark-inference resolved to s3a://k8s-mlops-platform-bucket/checkpoints/kafka-spark-inference.
+2026-02-06 15:42:19.982 | 26/02/06 21:42:19 INFO deprecation: org.apache.hadoop.shaded.io.bytes.per.checksum is deprecated. Instead, use dfs.bytes-per-checksum
+2026-02-06 15:42:20.866 | 26/02/06 21:42:20 INFO CheckpointFileManager: Writing atomically to s3a://k8s-mlops-platform-bucket/checkpoints/kafka-spark-inference/metadata using temp file s3a://k8s-mlops-platform-bucket/checkpoints/kafka-spark-inference/.metadata.706955d3-c4fd-4d94-9573-c7568fee6066.tmp
+2026-02-06 15:42:23.051 | 26/02/06 21:42:23 INFO CheckpointFileManager: Renamed temp file s3a://k8s-mlops-platform-bucket/checkpoints/kafka-spark-inference/.metadata.706955d3-c4fd-4d94-9573-c7568fee6066.tmp to s3a://k8s-mlops-platform-bucket/checkpoints/kafka-spark-inference/metadata
+2026-02-06 15:42:24.963 | 26/02/06 21:42:24 INFO MicroBatchExecution: Starting [id = 966294ad-aa32-49d9-a1a8-58bb4ce9cbce, runId = bedcf7fe-a653-41a4-b037-876922c7227e]. Use s3a://k8s-mlops-platform-bucket/checkpoints/kafka-spark-inference to store the query checkpoint.
+2026-02-06 15:42:24.977 | 2026-02-06 21:42:24,976 - kafka_spark_inference - INFO - ✅ Streaming query started
+2026-02-06 15:42:24.977 | 2026-02-06 21:42:24,977 - kafka_spark_inference - INFO - 📍 Checkpoint: s3a://k8s-mlops-platform-bucket/checkpoints/kafka-spark-inference
+2026-02-06 15:42:24.977 | 2026-02-06 21:42:24,977 - kafka_spark_inference - INFO - 📥 Input topic: topic-traffic
+2026-02-06 15:42:24.977 | 2026-02-06 21:42:24,977 - kafka_spark_inference - INFO - 📤 Output topic: topic-prediction
+2026-02-06 15:42:24.977 | 2026-02-06 21:42:24,977 - kafka_spark_inference - INFO - ⚙️  Schema: kafka_schema_features → prediction_schema
+2026-02-06 15:42:24.977 | 2026-02-06 21:42:24,977 - kafka_spark_inference - INFO - 🔄 Converter: kafka_to_schema_features
+2026-02-06 15:42:24.979 | 2026-02-06 21:42:24,977 - kafka_spark_inference - ERROR - ❌ Pipeline failed: 'KafkaSparkInference' object has no attribute 'preprocessing_module_path'
+2026-02-06 15:42:24.979 | Traceback (most recent call last):
+2026-02-06 15:42:24.979 |   File "/app/repo/k3s/spark/inference/kafka_main.py", line 628, in run_inference
+2026-02-06 15:42:24.979 |     self.logger.info(f"🧮 Preprocessing: {self.preprocessing_module_path}")
+2026-02-06 15:42:24.979 |                                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-02-06 15:42:24.979 | AttributeError: 'KafkaSparkInference' object has no attribute 'preprocessing_module_path'
+2026-02-06 15:42:24.979 | Traceback (most recent call last):
+2026-02-06 15:42:24.979 |   File "/app/repo/k3s/spark/inference/kafka_main.py", line 646, in <module>
+2026-02-06 15:42:24.980 |     main()
+2026-02-06 15:42:24.980 |   File "/app/repo/k3s/spark/inference/kafka_main.py", line 643, in main
+2026-02-06 15:42:24.980 |     pipeline.run_inference()
+2026-02-06 15:42:24.980 |   File "/app/repo/k3s/spark/inference/kafka_main.py", line 628, in run_inference
+2026-02-06 15:42:24.980 |     self.logger.info(f"🧮 Preprocessing: {self.preprocessing_module_path}")
+2026-02-06 15:42:24.980 |                                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-02-06 15:42:24.981 | AttributeError: 'KafkaSparkInference' object has no attribute 'preprocessing_module_path'
+2026-02-06 15:42:24.990 | 26/02/06 21:42:24 INFO MicroBatchExecution: Reading table [org.apache.spark.sql.kafka010.KafkaSourceProvider$KafkaTable@55c8ebd2] from DataSourceV2 named 'kafka' [org.apache.spark.sql.kafka010.KafkaSourceProvider@100a3e1c]
+2026-02-06 15:42:25.046 | 26/02/06 21:42:25 INFO MicroBatchExecution: Finish initializing with logical plan:
+2026-02-06 15:42:25.046 | ~WriteToMicroBatchDataSourceV1 ForeachBatchSink, 966294ad-aa32-49d9-a1a8-58bb4ce9cbce, [checkpointLocation=s3a://k8s-mlops-platform-bucket/checkpoints/kafka-spark-inference], Append
+2026-02-06 15:42:25.046 | +- ~Project [data#15.timestamp AS timestamp#16, data#15.event_id AS event_id#17, data#15.properties AS properties#18]
+2026-02-06 15:42:25.046 |    +- ~Project [from_json(StructField(timestamp,StringType,true), StructField(event_id,StringType,true), StructField(properties,StructType(StructField(src_port,LongType,true),StructField(dst_port,LongType,true),StructField(protocol,StringType,true),StructField(packet_count,LongType,true),StructField(conn_state,StringType,true),StructField(bytes_transferred,DoubleType,true)),true), value#14, Some(Etc/UTC), false) AS data#15]
+2026-02-06 15:42:25.046 |       +- ~Project [cast(value#8 as string) AS value#14]
+2026-02-06 15:42:25.046 |          +- ~StreamingDataSourceV2ScanRelation[key#7, value#8, topic#9, partition#10, offset#11L, timestamp#12, timestampType#13] KafkaTable
+2026-02-06 15:42:25.046 | 
+2026-02-06 15:42:25.115 | 26/02/06 21:42:25 INFO SparkContext: SparkContext is stopping with exitCode 0 from stop at SparkSubmit.scala:1036.
+2026-02-06 15:42:25.130 | 26/02/06 21:42:25 INFO SparkUI: Stopped Spark web UI at http://spark-kafka-app-0-driver-svc.spark.svc:4040
+2026-02-06 15:42:25.134 | 26/02/06 21:42:25 INFO KubernetesClusterSchedulerBackend: Shutting down all executors
+2026-02-06 15:42:25.135 | 26/02/06 21:42:25 INFO KubernetesClusterSchedulerBackend$KubernetesDriverEndpoint: Asking each executor to shut down
+2026-02-06 15:42:25.143 | 26/02/06 21:42:25 INFO ExecutorPodsWatchSnapshotSource: Kubernetes client has been closed.
+2026-02-06 15:42:25.317 | 26/02/06 21:42:25 INFO MapOutputTrackerMasterEndpoint: MapOutputTrackerMasterEndpoint stopped!
+2026-02-06 15:42:25.337 | 26/02/06 21:42:25 INFO MemoryStore: MemoryStore started with capacity 117.0 MiB
+2026-02-06 15:42:25.338 | 26/02/06 21:42:25 INFO MemoryStore: MemoryStore cleared
+2026-02-06 15:42:25.339 | 26/02/06 21:42:25 INFO BlockManager: BlockManager stopped
+2026-02-06 15:42:25.344 | 26/02/06 21:42:25 INFO BlockManagerMaster: BlockManagerMaster stopped
+2026-02-06 15:42:25.346 | 26/02/06 21:42:25 INFO OutputCommitCoordinator$OutputCommitCoordinatorEndpoint: OutputCommitCoordinator stopped!
+2026-02-06 15:42:25.355 | 26/02/06 21:42:25 INFO SparkContext: Successfully stopped SparkContext
+2026-02-06 15:42:25.357 | 26/02/06 21:42:25 INFO ShutdownHookManager: Shutdown hook called
+2026-02-06 15:42:25.358 | 26/02/06 21:42:25 INFO ShutdownHookManager: Deleting directory /tmp/spark-22f8f3a9-b774-459e-a5e4-905efc1f8c21
+2026-02-06 15:42:25.361 | 26/02/06 21:42:25 INFO ShutdownHookManager: Deleting directory /var/data/spark-38bba925-57f5-497d-9de5-610b70cbeef3/spark-2e6e6251-454b-40bd-b8b0-bfaf2a3339a2/pyspark-66498aed-b242-4787-b1ad-78a6214b1575
+2026-02-06 15:42:25.365 | 26/02/06 21:42:25 INFO ShutdownHookManager: Deleting directory /tmp/spark-c6d187e0-50ac-4dd7-b480-4de5779013e5
+2026-02-06 15:42:25.368 | 26/02/06 21:42:25 INFO ShutdownHookManager: Deleting directory /tmp/artifacts-d14d1328-b1b9-4799-837e-96ed8ef758f0
+2026-02-06 15:42:25.372 | 26/02/06 21:42:25 INFO ShutdownHookManager: Deleting directory /tmp/spark-223912b6-a5bf-4af1-b7d6-cbae15df9a91
+2026-02-06 15:42:25.375 | 26/02/06 21:42:25 INFO ShutdownHookManager: Deleting directory /tmp/spark-350118ad-38b1-474d-8cc9-0a98bdfa95d3
+2026-02-06 15:42:25.379 | 26/02/06 21:42:25 INFO ShutdownHookManager: Deleting directory /var/data/spark-38bba925-57f5-497d-9de5-610b70cbeef3/spark-2e6e6251-454b-40bd-b8b0-bfaf2a3339a2
+2026-02-06 15:42:25.383 | 26/02/06 21:42:25 INFO ShutdownHookManager: Deleting directory /tmp/localPyFiles-6570dbd2-0fb3-49f4-96f1-091c870fc9a2
