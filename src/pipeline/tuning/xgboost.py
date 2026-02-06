@@ -77,6 +77,7 @@ def tune_model(
     target,
     storage_path,
     name,
+    input_dim: int = 14,  # Solo para mantener consistencia con otros entrenamientos
     num_classes: int = 6,
     sample_fraction: float | None = None,
     seed: int = 42,

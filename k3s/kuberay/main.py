@@ -16,17 +16,14 @@ from ray.train.xgboost import RayTrainReportCallback
 from src.schemas.model.pytorch_params import PYTORCH_PARAMS
 from src.schemas.model.xgboost_params import XGBOOST_PARAMS
 from src.pipeline.utils.mlflow_utils import log_training_run
+from src.schemas.spark.schema_registry import SchemaRegistry
 
 # ===== PROMETHEUS METRICS =====
 # Keep metrics in an importable module so Ray Tune can pickle them.
 from prometheus_client import start_http_server
-from src.pipeline.prometheus import (
+from src.prometheus import (
     TRAIN_FAILURES,
     TRAIN_SPLIT_ROWS,
-    TUNE_TRIALS,
-    TUNE_TRIAL_STATUS,
-    TUNE_BEST_METRIC,
-    TUNE_TRIALS_BY_STATUS,
     PrometheusTuneCallback,
     export_final_metrics,
 )
@@ -103,13 +100,12 @@ class KubeRayTraining(BaseUtils):
         """Validates dataset schema against Spark preprocessing contract."""
         try:
             cols = set(ds.schema().names)
+
+            SchemaRegistry.get_schema('schema_preprocessed')  # Ensure schema is registered
+
             expected = {
                 self.params.get('target', 'attack'),
-                'protocol_idx', 'conn_state_idx', 'protocol_conn_idx',
-                'src_port_norm', 'dst_port_norm', 'packet_count_norm',
-                'bytes_transferred_norm', 'bytes_log_norm', 'packet_log_norm',
-                'hour_norm', 'dayofweek_norm', 'is_weekend_norm',
-                'hour_sin_norm', 'hour_cos_norm'
+                *SchemaRegistry.get_schema('schema_preprocessed')
             }
             
             missing = expected - cols
@@ -176,6 +172,16 @@ class KubeRayTraining(BaseUtils):
                 
         except Exception as e:
             self.logger.error(f"Error en el export del modelo (S3 direct): {str(e)}", exc_info=True)
+    
+    def count_input_dim(self) -> int:
+        """Cuenta dinámicamente las columnas de entrada (features) en el dataset."""
+        dsl = self.load_params().get('spark', {}).get('preprocessing',{}).get('dsl_path', 'src/preprocess/dsl.yaml')
+        final_features = dsl['pipeline']['final_features']
+
+        categorical = len(final_features.get("categorical", []))
+        numerical = len(final_features.get("numerical", []))
+
+        return categorical + numerical
 
     def _log_final_to_mlflow(self, *, framework: str, params: Dict[str, Any], metrics: Dict[str, Any]) -> None:
         # Senior Optimization: Encapsulated MLflow logic into a helper utility.
@@ -244,6 +250,7 @@ class KubeRayTraining(BaseUtils):
             self.logger.info(f"Starting training using framework: {framework}")
             best_params = None
             num_classes = int(self.params.get("num_classes", 2))
+            input_dim = self.count_input_dim() if self.params.get("dsl_count_dim", True) else int(self.params.get("input_dim", 14))
             mlflow_tracking_uri = self.params.get("mlflow_tracking_uri")
             mlflow_experiment_name = self.params.get("mlflow_experiment_name")
             if self.params.get('tune', False):
@@ -260,7 +267,15 @@ class KubeRayTraining(BaseUtils):
                 
                 tuner = importlib.import_module('src.pipeline.tuning.'+ framework)
 
-                tune_metric = 'validation-mlogloss' if framework == 'xgboost' else 'val_loss'
+                if framework == 'xgboost':
+                    tune_metric = 'validation-mlogloss'
+                elif framework == 'pytorch':
+                    tune_metric = 'val_loss'
+                else:
+                    tune_metric = 'accuracy'
+
+                ######### ESTO ESTA MEDIO HARDCODEADO ############
+
                 tune_mode = 'min'
                 prom_tune_cb = PrometheusTuneCallback(framework=framework, metric_name=tune_metric, mode=tune_mode)
 
@@ -272,6 +287,7 @@ class KubeRayTraining(BaseUtils):
                     seed=int(self.params.get('seed', 42)),
                     storage_path=self.output_dir,
                     name=self.params.get('name', framework) + "_tune",
+                    input_dim=input_dim,
                     num_classes=num_classes,
                     mlflow_tracking_uri=mlflow_tracking_uri,
                     mlflow_experiment_name=mlflow_experiment_name,
@@ -302,6 +318,7 @@ class KubeRayTraining(BaseUtils):
                 "storage_path": self.output_dir,
                 "name": self.params.get('name', framework),
                 "target": self.params.get('target', 'attack'),
+                "input_dim": input_dim,
                 "num_classes": num_classes,
             }
 

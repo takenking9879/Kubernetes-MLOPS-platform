@@ -28,6 +28,7 @@ def tune_model(
     target,
     storage_path,
     name,
+    input_dim: int = 14,
     num_classes: int = 6,
     sample_fraction: float | None = None,
     seed: int = 42,
@@ -115,7 +116,7 @@ def tune_model(
         train_loop_config = {
             "target": target,
             "pytorch_params": trial_config["pytorch_params"],
-            "input_dim": 14,
+            "input_dim": int(input_dim),  # Ajustado a las columnas de preprocessing_001.py (3 cat + 11 num)
             "num_classes": int(num_classes),
             "cpus_per_worker": cpus_per_worker,
             "is_tuning": True,  # ← Trial de tuning, deshabilitar Prometheus

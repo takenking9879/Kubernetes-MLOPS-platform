@@ -44,8 +44,8 @@ def train_func(config: Dict):
         callbacks=[
             RayTrainPeriodicReportCheckpointCallback(
                 metrics=["validation-mlogloss", "validation-merror", "train-mlogloss"],
-                report_every=int(os.getenv("REPORT_FREQUENCY", 5)),  # Report every epoch for smooth Grafana visualization
-                checkpoint_every=50,
+                report_every=int(os.getenv("REPORT_FREQUENCY", "5")),  # Report every epoch for smooth Grafana visualization
+                checkpoint_every=int(os.getenv("RAY_TRAIN_CHECKPOINT_EVERY", "50")), # Checkpoint less frequently to save storage
                 filename="model.ubj",
                 is_tuning=config.get("is_tuning", False),
                 dval=dval,  # Pass dval for accuracy/F1 computation
@@ -63,6 +63,7 @@ def train(
     target,
     storage_path,
     name,
+    input_dim: int = 14,  # Solo para mantener consistencia con otros entrenamientos
     num_classes: int = 6,
     xgboost_params=None,
     callbacks: Optional[List[object]] = None,
@@ -70,7 +71,7 @@ def train(
     scaling_config = ray.train.ScalingConfig(
         num_workers=int(os.getenv("NUM_WORKERS", 2)),
         resources_per_worker={"CPU": int(os.getenv("CPUS_PER_WORKER", 2))})
-    
+
     params = xgboost_params if xgboost_params is not None else XGBOOST_PARAMS
     config = {
         "target": target,

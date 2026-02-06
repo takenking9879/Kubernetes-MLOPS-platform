@@ -12,7 +12,7 @@ from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_sc
 # Prometheus (optional; enabled by default for training observability)
 try:  # pragma: no cover
     from prometheus_client import start_http_server
-    from src.pipeline.prometheus import create_worker_registry
+    from src.prometheus import create_worker_registry
 
     _WORKER_REGISTRY, _METRICS = create_worker_registry("xgboost")
     TRAIN_CURRENT_EPOCH = _METRICS["current_epoch"]

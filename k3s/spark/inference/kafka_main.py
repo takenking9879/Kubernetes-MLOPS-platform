@@ -6,14 +6,11 @@ Refactorizado desde KafkaSparkInference para soportar múltiples datasets y mode
 """
 import os
 import time
-import threading
 from typing import Dict, Optional, Iterator, List, Any
-import json
-import importlib
+from src.dsl import PipelineModel
 from confluent_kafka import Consumer, KafkaException
 from pyspark.sql import SparkSession, Row, DataFrame
 from pyspark.sql.functions import from_json, col, to_json, struct
-from pyspark import SparkContext, AccumulatorParam
 import boto3
 import requests
 from src.utils.baseclass import BaseUtils
@@ -22,28 +19,17 @@ from src.schemas.spark.schema_registry import get_schema
 from src.converters.spark_kafka_helper import get_converter
 
 # ===== PROMETHEUS METRICS =====
-from prometheus_client import start_http_server, Gauge, Counter, Summary
-
-# Custom metrics for MLOps observability
-LATENCY_PREPROCESS = Gauge('latency_preprocess_seconds', 'Time spent in Spark preprocessing per batch')
-LATENCY_INFERENCE = Gauge('latency_inference_seconds', 'Time spent calling Ray Serve per batch')
-LATENCY_TOTAL_BATCH = Gauge('latency_total_batch_seconds', 'Total roundtrip time Kafka->Spark->Ray->Kafka per batch')
-BATCH_RECORDS_TOTAL = Gauge('spark_batch_records_total', 'Number of records processed in the last batch')
-BATCH_ERRORS_TOTAL = Counter('spark_batch_errors_total', 'Total number of batch processing errors')
-INFERENCE_LATENCY_SUMMARY = Summary('inference_latency_summary_seconds', 'Summary of inference latencies')
-
-# Predictions distribution (attack classes)
-PREDICTIONS_BY_CLASS_TOTAL = Counter(
-    'spark_predictions_by_class_total',
-    'Total number of predictions produced, labeled by class',
-    ['class'],
+from prometheus_client import start_http_server
+from src.prometheus import (
+    LATENCY_PREPROCESS,
+    LATENCY_INFERENCE,
+    LATENCY_TOTAL_BATCH,
+    BATCH_RECORDS_TOTAL,
+    BATCH_ERRORS_TOTAL,
+    INFERENCE_LATENCY_SUMMARY,
+    PREDICTIONS_BY_CLASS_TOTAL,
+    PREDICTIONS_BY_CLASS_LAST_BATCH,
 )
-PREDICTIONS_BY_CLASS_LAST_BATCH = Gauge(
-    'spark_predictions_by_class_last_batch',
-    'Number of predictions in the most recent micro-batch, labeled by class',
-    ['class'],
-)
-
 
 # ===== FUNCIÓN STANDALONE PARA PREDICCIONES =====
 
@@ -137,7 +123,6 @@ class KafkaSparkInference(BaseUtils):
         logger = create_logger('kafka_spark_inference', 'kafka_spark_inference.log')
         super().__init__(logger, params_path)
         self.params = self.load_params()['spark']
-        
         # ===== START PROMETHEUS METRICS SERVER =====
         self._start_prometheus_server()
         
@@ -145,14 +130,14 @@ class KafkaSparkInference(BaseUtils):
         self._load_kafka_config()
         self._load_schema_config()
         self._load_converter_config()
-        self._load_preprocessing_config()
+        self._load_artifacts_config()
         self._load_prediction_config()
         self._load_output_config()
         self._load_checkpoint_config()
         
         # Estado interno
         self.s3 = None
-        self.preprocessing_artifacts = None
+        self.artifacts = None
         self.preprocessing_function = None
         self.converter_function = None
         
@@ -165,9 +150,8 @@ class KafkaSparkInference(BaseUtils):
             self._check_minio_connection()
         
         # Cargar módulos y funciones
-        self._load_preprocessing_module()
+        self.pipeline = self.load_pipeline_artifact()
         self._load_converter_function()
-        
         # Crear Spark session
         self.spark = self._create_spark_session()
     
@@ -183,35 +167,17 @@ class KafkaSparkInference(BaseUtils):
             self.logger.warning(f"⚠️ Could not start Prometheus server: {e}")
     
     # ===== CONFIGURATION LOADERS =====
-    
     def _load_kafka_config(self):
-        """Carga configuración de Kafka desde params."""
-        kafka_config = self.params.get('kafka', {})
-        
+        """Carga configuración de Kafka desde params."""        
         # Usar env vars con fallback a params.yaml
-        self.kafka_bootstrap_servers = os.getenv(
-            'KAFKA_BOOTSTRAP_SERVERS',
-            kafka_config.get('bootstrap_servers', 'localhost:9092')
-        )
-        self.kafka_input_topic = os.getenv(
-            'KAFKA_TOPIC',
-            kafka_config.get('input_topic', 'topic-traffic')
-        )
-        self.kafka_output_topic = os.getenv(
-            'KAFKA_TOPIC_OUTPUT',
-            kafka_config.get('output_topic', 'topic-prediction')
-        )
-        
+        self.kafka_bootstrap_servers = os.getenv('KAFKA_BOOTSTRAP_SERVERS')
+        self.kafka_input_topic = os.getenv('KAFKA_TOPIC')
+        self.kafka_output_topic = os.getenv('KAFKA_TOPIC_OUTPUT')        
         self.kafka_username = os.getenv('KAFKA_USERNAME')
         self.kafka_password = os.getenv('KAFKA_PASSWORD')
-        self.kafka_sasl_mechanism = os.getenv(
-            'KAFKA_SASL_MECHANISM',
-            os.getenv('KAFKA_SASLMECHANISM', kafka_config.get('sasl_mechanism', 'SCRAM-SHA-512'))
-        )
-        self.kafka_security_protocol = os.getenv(
-            'KAFKA_SECURITY_PROTOCOL',
-            kafka_config.get('security_protocol', 'SASL_PLAINTEXT')
-        )
+
+        self.kafka_sasl_mechanism = os.getenv('KAFKA_SASL_MECHANISM','SCRAM-SHA-512')
+        self.kafka_security_protocol = os.getenv('KAFKA_SECURITY_PROTOCOL', 'SASL_PLAINTEXT')
         
         self.kafka_sasl_jaas_config = (
             f'org.apache.kafka.common.security.scram.ScramLoginModule required '
@@ -219,7 +185,7 @@ class KafkaSparkInference(BaseUtils):
         )
         
         # Streaming options
-        streaming_config = kafka_config.get('streaming', {})
+        streaming_config = self.params.get('streaming', {})
         self.max_offsets_per_trigger = streaming_config.get('max_offsets_per_trigger', 10000)
         self.processing_time = streaming_config.get('processing_time', '10 seconds')
         self.starting_offsets = streaming_config.get('starting_offsets', 'latest')
@@ -251,23 +217,20 @@ class KafkaSparkInference(BaseUtils):
         self.converter_name = converter_config.get('kafka_to_features', 'kafka_to_schema_features')
         self.logger.info(f"✅ Converter configured: {self.converter_name}")
     
-    def _load_preprocessing_config(self):
-        """Carga configuración de preprocesamiento desde params."""
-        # Soportar tanto params.preprocessing como params.pipeline (backward compatibility)
-        preproc_config = self.params.get('preprocessing', {})
-        self.preprocessing_module_path = preproc_config.get('module', 'preprocessing.preprocessing_001')
-        self.preprocessing_function_name = preproc_config.get('function', 'preprocess_spark')
-        artifacts_config = preproc_config.get('artifacts', {})
-        
-        # Configuración de artifacts
-        self.artifacts_enabled = artifacts_config.get('enabled', True)
-        self.artifacts_source = artifacts_config.get('source', 's3')
-        self.artifacts_bucket = artifacts_config.get('bucket', 'k8s-mlops-platform-bucket')
-        self.artifacts_key = artifacts_config.get('key', 'v1/artifacts/pipeline_model.json')
-        self.artifacts_cache_local = artifacts_config.get('cache_local', True)
-        self.artifacts_local_path = artifacts_config.get('local_cache_path', '/tmp/pipeline_model.json')
-        
-        self.logger.info(f"✅ Preprocessing: {self.preprocessing_module_path}.{self.preprocessing_function_name}")
+    def _load_artifacts_config(self):
+        try:
+            """Carga configuración de artifacts desde params."""
+            artifacts_config = self.params.get('artifacts', {})
+            
+            # Configuración de artifacts
+            self.artifacts_source = artifacts_config.get('source', 's3')
+            self.artifacts_bucket = artifacts_config.get('bucket', 'k8s-mlops-platform-bucket')
+            self.artifacts_key = artifacts_config.get('key', 'v1/artifacts')
+            self.artifacts_list = artifacts_config.get('archives', ['config.json', 'stages.json'])
+            self.logger.info(f"✅ Artifacts configured: archives={self.artifacts_list} from {self.artifacts_source}")
+        except Exception as e:
+            self.logger.error('Failed loading artifacts config: %s', str(e), exc_info=True)
+            raise
     
     def _load_prediction_config(self):
         """Carga configuración de predicción desde params."""
@@ -282,8 +245,8 @@ class KafkaSparkInference(BaseUtils):
                 'RAY_SERVE_URL',
                 ray_config.get('url', 'http://model-serving-serve-svc.ray.svc.cluster.local:8000/infer')
             )
-            self.ray_batch_size = int(os.getenv('RAY_BATCH_SIZE', str(ray_config.get('batch_size', 100))))
-            self.ray_timeout = int(os.getenv('RAY_REQUEST_TIMEOUT', str(ray_config.get('timeout', 30))))
+            self.ray_batch_size = int(ray_config.get('batch_size', 100))
+            self.ray_timeout = int(ray_config.get('timeout', 30))
             self.ray_max_retries = ray_config.get('max_retries', 3)
             self.ray_payload_format = ray_config.get('request_payload_format', 'list')
             self.ray_pred_key = ray_config.get('prediction_key', 'predictions')
@@ -315,21 +278,6 @@ class KafkaSparkInference(BaseUtils):
         self.logger.info(f"✅ Checkpoint: {self.checkpoint_location}")
     
     # ===== MODULE LOADERS =====
-    
-    def _load_preprocessing_module(self):
-        """Carga dinámicamente el módulo de preprocesamiento."""
-        try:
-            module_path = 'k3s.spark.' + self.preprocessing_module_path
-            self.logger.info(f"Loading preprocessing module: {module_path}")
-            
-            module = importlib.import_module(module_path)
-            self.preprocessing_function = getattr(module, self.preprocessing_function_name)
-            
-            self.logger.info("✅ Preprocessing module loaded")
-        except Exception as e:
-            self.logger.error(f"Failed to load preprocessing module: {e}")
-            raise
-    
     def _load_converter_function(self):
         """Carga dinámicamente la función conversora."""
         try:
@@ -424,62 +372,28 @@ class KafkaSparkInference(BaseUtils):
             raise
     
     # ===== ARTIFACT LOADING =====
-    
-    def load_artifacts(self) -> Dict:
-        """Carga artefactos de preprocesamiento (scalers, encoders, etc.)."""
-        if not self.artifacts_enabled:
-            self.logger.info("Artifacts disabled in config")
-            return {}
-        
-        if self.preprocessing_artifacts is not None:
-            self.logger.info("Using cached artifacts")
-            return self.preprocessing_artifacts
-        
+    def load_pipeline_artifact(self):
+        """Carga el PipelineModel desde local; si no existe, lo descarga de S3."""
         try:
-            if self.artifacts_source == 's3':
-                return self._load_artifacts_from_s3()
-            elif self.artifacts_source == 'local':
-                return self._load_artifacts_from_local()
-            else:
-                raise ValueError(f"Unknown artifact source: {self.artifacts_source}")
-                
-        except Exception as e:
-            self.logger.error(f"Failed to load artifacts: {e}")
-            raise
-    
-    def _load_artifacts_from_s3(self) -> Dict:
-        """Carga artefactos desde S3."""
-        try:
-            self.logger.info(f"Loading artifacts from S3: {self.artifacts_bucket}/{self.artifacts_key}")
-            
+
+            tmpdir = os.path.join("/tmp", "pipeline_model")
             if self.s3 is None:
                 self._check_minio_connection()
-            
-            local_path = self.artifacts_local_path if self.artifacts_cache_local else "/tmp/pipeline_artifacts_temp.json"
-            
-            self.s3.download_file(self.artifacts_bucket, self.artifacts_key, local_path)
-            
-            with open(local_path, 'r') as f:
-                self.preprocessing_artifacts = json.load(f)
-            
-            self.logger.info("✅ Artifacts loaded from S3")
-            return self.preprocessing_artifacts
-            
-        except Exception as e:
-            self.logger.error(f"Failed to load artifacts from S3: {e}")
-            raise
-    
-    def _load_artifacts_from_local(self) -> Dict:
-        """Carga artefactos desde filesystem local."""
-        try:
-            with open(self.artifacts_local_path, 'r') as f:
-                self.preprocessing_artifacts = json.load(f)
-            
-            self.logger.info(f"✅ Artifacts loaded from local: {self.artifacts_local_path}")
-            return self.preprocessing_artifacts
-            
-        except Exception as e:
-            self.logger.error(f"Failed to load artifacts from local: {e}")
+
+            os.makedirs(tmpdir, exist_ok=True)
+
+            for i in self.artifacts_list:
+                self.s3.download_file(
+                    self.artifacts_bucket,
+                    os.path.join(self.artifacts_key, i),
+                    os.path.join(tmpdir, i)
+                )
+
+            pipeline = PipelineModel.load(tmpdir)
+            self.logger.info("Pipeline artifact downloaded from S3 and loaded")
+            return pipeline
+        except Exception:
+            self.logger.error("Failed loading pipeline artifact", exc_info=True)
             raise
     
     # ===== PIPELINE STEPS =====
@@ -529,12 +443,8 @@ class KafkaSparkInference(BaseUtils):
     def preprocess(self, df: DataFrame) -> DataFrame:
         """Aplica preprocesamiento usando función configurada."""
         try:
-            df_preprocessed, _ = self.preprocessing_function(
-                df,
-                model=self.preprocessing_artifacts,
-                train=False
-            )
-            return df_preprocessed
+            df_processed = self.pipeline.transform(df)
+            return self.pipeline.select_features(df_processed)
         except Exception as e:
             self.logger.error(f"Preprocessing failed: {e}")
             raise
@@ -615,7 +525,7 @@ class KafkaSparkInference(BaseUtils):
                     .collect()
                 )
                 counts_by_cls = {int(r["cls"]): int(r["count"]) for r in rows if r["cls"] is not None}
-                for cls in range(6):
+                for cls in range(self.params.get('num_classes', 2)):
                     cnt = counts_by_cls.get(cls, 0)
                     PREDICTIONS_BY_CLASS_LAST_BATCH.labels(str(cls)).set(cnt)
                     if cnt:
@@ -695,9 +605,6 @@ class KafkaSparkInference(BaseUtils):
         try:
             self.logger.info("🚀 Starting Generic Kafka-Spark Inference Pipeline")
             
-            # Cargar artefactos antes de empezar streaming
-            self.preprocessing_artifacts = self.load_artifacts()
-            
             # Leer stream de Kafka
             df_stream = self.read_from_kafka()
             
@@ -728,15 +635,12 @@ class KafkaSparkInference(BaseUtils):
             self.logger.error(f"❌ Pipeline failed: {e}", exc_info=True)
             raise
 
-
 # ===== ENTRY POINT =====
-
 def main():
     """Punto de entrada de la aplicación."""
     params_path = '/app/repo/k3s/params.yaml'
     pipeline = KafkaSparkInference(params_path=params_path)
     pipeline.run_inference()
-
 
 if __name__ == "__main__":
     main()

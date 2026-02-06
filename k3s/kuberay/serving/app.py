@@ -121,8 +121,8 @@ class ModelFactory:
             return XGBoostAdapter(model_path)
         if fw == "pytorch":
             model_cfg = (params or {}).get("kuberay", {}).get("model", {})
-            input_dim = int(model_cfg.get("input_dim", os.getenv("PYTORCH_INPUT_DIM", "14")))
-            num_classes = int(model_cfg.get("num_classes", os.getenv("PYTORCH_NUM_CLASSES", "6")))
+            input_dim = int(model_cfg.get("input_dim"))
+            num_classes = int(model_cfg.get("num_classes"))
             return PyTorchAdapter(model_path, input_dim=input_dim, num_classes=num_classes)
         raise ValueError(f"Unsupported MODEL_FRAMEWORK={framework!r}")
 

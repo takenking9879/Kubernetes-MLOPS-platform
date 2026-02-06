@@ -14,7 +14,7 @@ from torch import nn
 # Prometheus (optional; enabled by default for training observability)
 try:  # pragma: no cover
     from prometheus_client import start_http_server
-    from src.pipeline.prometheus import create_worker_registry
+    from src.prometheus import create_worker_registry
 
     _WORKER_REGISTRY, _METRICS = create_worker_registry("pytorch")
     TRAIN_CURRENT_EPOCH = _METRICS["current_epoch"]
@@ -117,8 +117,8 @@ def train_func(config: Dict):
     val_shard = ray.train.get_dataset_shard("val")
 
     model = NeuralNetwork(
-        input_dim=config.get("input_dim", 28 * 28),
-        num_classes=config.get("num_classes", 10),
+        input_dim=config.get("input_dim", 14),
+        num_classes=config.get("num_classes", 6),
     )
     model = ray.train.torch.prepare_model(model)
     loss_fn = nn.CrossEntropyLoss()
@@ -160,9 +160,9 @@ def train_func(config: Dict):
     # - For observability, default to reporting every epoch so Prometheus/Grafana
     #   can show curves evolving over time.
     # - Keep checkpoints less frequent to avoid storage overhead.
-    report_every = int(os.getenv("REPORT_FREQUENCY", config.get("report_every", 5)))
+    report_every = int(os.getenv("REPORT_FREQUENCY", "5"))
     report_every = max(report_every, 1)
-    checkpoint_every = int(os.getenv("RAY_TRAIN_CHECKPOINT_EVERY", config.get("checkpoint_every", 50)))
+    checkpoint_every = int(os.getenv("RAY_TRAIN_CHECKPOINT_EVERY", "50"))
     checkpoint_every = max(checkpoint_every, 1)
 
     start_time = time.perf_counter()

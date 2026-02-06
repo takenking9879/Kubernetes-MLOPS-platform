@@ -4,36 +4,36 @@ import boto3
 import os
 import time
 from pyspark.sql import SparkSession
-import importlib
 from pyspark.sql.types import StructType
-import json
-
+from src.dsl import Pipeline, PipelineModel
+import tempfile
+from src.schemas.spark.schema_registry import get_schema
 # ===== PROMETHEUS METRICS =====
-from prometheus_client import start_http_server, Counter, Gauge, Histogram
-
-# Preprocessing metrics
-PREPROCESS_RECORDS = Counter('preprocess_records_total', 'Total records preprocessed', ['dataset'])
-PREPROCESS_BATCHES = Counter('preprocess_batches_total', 'Total batches preprocessed', ['dataset'])
-PREPROCESS_RECORDS_BY_CLASS = Counter('preprocess_records_by_class_total', 'Records per class', ['dataset', 'class'])
-PREPROCESS_RECORDS_LAST_BATCH = Gauge('preprocess_records_last_batch', 'Records in last batch by class', ['dataset', 'class'])
-PREPROCESS_BATCH_LATENCY = Histogram('preprocess_batch_latency_seconds', 'Batch preprocessing latency', ['dataset'], buckets=[1, 5, 10, 30, 60, 120, 300])
-PREPROCESS_BATCH_LATENCY_LAST = Gauge('preprocess_batch_latency_last_seconds', 'Last dataset preprocessing latency (seconds)', ['dataset'])
-PREPROCESS_ERRORS = Counter('preprocess_errors_total', 'Total preprocessing errors', ['dataset', 'error_type'])
-PREPROCESS_CURRENT_DATASET = Gauge('preprocess_current_dataset_progress', 'Current dataset being processed (0=idle, 1=train, 2=val, 3=test)')
-
+from prometheus_client import start_http_server
+from src.prometheus import (
+    PREPROCESS_RECORDS,
+    PREPROCESS_BATCHES,
+    PREPROCESS_RECORDS_BY_CLASS,
+    PREPROCESS_RECORDS_LAST_BATCH,
+    PREPROCESS_BATCH_LATENCY,
+    PREPROCESS_BATCH_LATENCY_LAST,
+    PREPROCESS_ERRORS,
+    PREPROCESS_CURRENT_DATASET
+)
 
 class SparkPreprocessing(BaseUtils):
-    def __init__(self, schema: StructType,  params_path: str, data_dir: str, output_dir: str, artifacts_dir: str):
+    def __init__(self, params_path: str, data_dir: str, output_dir: str, artifacts_dir: str):
         logger = create_logger('SparkPreprocessing', 'spark_preprocessing.log')
         super().__init__(logger, params_path)
         self.params = self.load_params()['spark']
         self.data_dir = data_dir
         self.output_dir = output_dir
-        self.artifacts_dir = artifacts_dir
-        self.schema = schema
+        self._load_artifacts_config()
+        self.schema = get_schema(self.params.get('schema').get('schema_full'))
         self.s3 = None
         self.spark = self._create_spark_session()
-        self.scaler = None
+        self.pipeline_path = self.params['preprocessing'].get('dsl_path')
+        self.pipeline = None
         
         # Start Prometheus metrics server
         self._start_prometheus_server()
@@ -51,11 +51,8 @@ class SparkPreprocessing(BaseUtils):
                 PREPROCESS_BATCHES.labels(dataset=split).inc(0)
                 PREPROCESS_BATCH_LATENCY_LAST.labels(dataset=split).set(0)
 
-                # Pre-create class labelsets (default 6 classes: 0..5)
-                try:
-                    num_classes = int(os.getenv("NUM_CLASSES", self.params.get('preprocessing', {}).get('num_classes', 6)))
-                except Exception:
-                    num_classes = 6
+                # Pre-create class labelsets (default 2 classes: 0..1)
+                num_classes = self.params.get('num_classes', 2)
                 for c in range(max(num_classes, 1)):
                     PREPROCESS_RECORDS_LAST_BATCH.labels(dataset=split, **{'class': str(c)}).set(0)
         except Exception as e:
@@ -145,20 +142,20 @@ class SparkPreprocessing(BaseUtils):
             if dataset not in ['train', 'val', 'test']:
                 raise ValueError("dataset must be one of ['train', 'val', 'test']")
 
-            pipeline_module = self.params['preprocessing']['module']
-            self.logger.info(f"Loading feature pipeline: {pipeline_module}")
-            module = importlib.import_module(pipeline_module)
+            self.logger.info(f"Loading feature pipeline from: {self.pipeline_path}")
 
             if dataset == 'train':
                 df = self.load_data(os.path.join(self.data_dir, f'{dataset}/'))
-                df_out, pipeline_model = module.preprocess_spark(df, model=self.scaler, train=True)
-                self.scaler = pipeline_model
-                self._save_scaler_artifact()
+                base_pipeline = Pipeline.from_yaml(self.pipeline_path)
+                self.pipeline = base_pipeline.fit(df)
+                self._save_pipeline_artifact()
             else:
                 df = self.load_data(os.path.join(self.data_dir, f'{dataset}/'))
-                if self.scaler is None:
-                    self.scaler = self.load_scaler_artifact()
-                df_out, _ = module.preprocess_spark(df, model=self.scaler, train=False)
+                if self.pipeline is None:
+                    self.load_pipeline_artifact()
+
+            df_processed = self.pipeline.transform(df)
+            df_out = self.pipeline.select_features(df_processed)
 
             # ===== PROMETHEUS METRICS =====
             record_count = df_out.count()
@@ -167,15 +164,13 @@ class SparkPreprocessing(BaseUtils):
             PREPROCESS_BATCHES.labels(dataset=dataset).inc(1)
 
             # Reset last-batch gauges to 0 for stable pie chart labels (0..num_classes-1)
-            try:
-                num_classes = int(os.getenv("NUM_CLASSES", self.params.get('preprocessing', {}).get('num_classes', 6)))
-            except Exception:
-                num_classes = 6
+            num_classes = self.params.get('num_classes', 2)
+
             for c in range(max(num_classes, 1)):
                 PREPROCESS_RECORDS_LAST_BATCH.labels(dataset=dataset, **{'class': str(c)}).set(0)
             
             # Per-class distribution (if 'attack' column exists)
-            target_col = self.params.get('preprocessing', {}).get('target', 'attack')
+            target_col = self.params.get('target', 'attack')
             if target_col in df_out.columns:
                 class_counts = df_out.groupBy(target_col).count().collect()
                 for row in class_counts:
@@ -200,36 +195,53 @@ class SparkPreprocessing(BaseUtils):
             self.logger.error('Preprocess failed to complete: %s', str(e), exc_info=True)
             raise
 
-    def _save_scaler_artifact(self):
-        """Spark guarda modelos directamente en S3A."""
+    def _load_artifacts_config(self):
         try:
-            s3a_path = self._to_s3a_path(self.artifacts_dir)
-            model_path = os.path.join(s3a_path, 'pipeline_model')
+            """Carga configuración de artifacts desde params."""
+            artifacts_config = self.params.get('artifacts')
             
-            with open("/tmp/pipeline_model.json", "w") as f:
-                json.dump(self.scaler, f)
-
-            self.s3.upload_file(
-                "/tmp/pipeline_model.json",
-                Bucket="k8s-mlops-platform-bucket",
-                Key="v1/artifacts/pipeline_model.json"
-            )
-            self.logger.info(f'PipelineModel saved to {model_path}')
+            # Configuración de artifacts
+            self.artifacts_source = artifacts_config.get('source', 's3')
+            self.artifacts_bucket = artifacts_config.get('bucket', 'k8s-mlops-platform-bucket')
+            self.artifacts_key = artifacts_config.get('key', 'v1/artifacts')
+            self.artifacts_list = artifacts_config.get('archives', ['config.json', 'stages.json'])
+            self.logger.info(f"✅ Artifacts configured: archives={self.artifacts_list} from {self.artifacts_source}")
         except Exception as e:
-            self.logger.error('Failed saving model to S3', exc_info=True)
+            self.logger.error('Failed loading artifacts config: %s', str(e), exc_info=True)
             raise
 
-    def load_scaler_artifact(self):
-        """Carga el pipeline primero desde local; si no existe, lo baja de S3."""
+    def _save_pipeline_artifact(self):
+        """Guardar PipelineModel usando su método save() y subir los artefactos a S3."""
         try:
-            local_path = "/tmp/pipeline_model.json"
 
-            # 1️⃣ Si existe en local, úsalo
-            if os.path.exists(local_path):
+            # Crear un directorio temporal para que PipelineModel.save lo escriba ahí
+            tmpdir = tempfile.mkdtemp(prefix="pipeline_model")
+            # Usar el método save() del pipeline (espera una ruta local)
+            self.pipeline.save(tmpdir)
+
+            for i in self.artifacts_list:
+                self.s3.upload_file(
+                    os.path.join(tmpdir, i),
+                    Bucket=self.artifacts_bucket,
+                    Key=os.path.join(self.artifacts_key, i)
+                )
+
+            self.logger.info(f'PipelineModel saved to {tmpdir} and uploaded to S3 {self.artifacts_bucket}/{self.artifacts_key}')
+        except Exception:
+            self.logger.error('Failed saving pipeline model to S3', exc_info=True)
+            raise
+
+    def load_pipeline_artifact(self):
+        """Carga el PipelineModel desde local; si no existe, lo descarga de S3."""
+        try:
+
+            tmpdir = os.path.join("/tmp", "pipeline_model")
+
+            # 1️⃣ Si existe en local, cargarlo
+            if os.path.exists(os.path.join(tmpdir, self.artifacts_list[0])):
                 self.logger.info("Loading pipeline artifact from local cache")
-                with open(local_path, "r") as f:
-                    self.scaler = json.load(f)
-                return self.scaler
+                self.pipeline = PipelineModel.load(tmpdir)
+                return self.pipeline
 
             # 2️⃣ Si no existe, descargar desde S3
             self.logger.info("Local pipeline not found. Downloading from S3")
@@ -237,19 +249,18 @@ class SparkPreprocessing(BaseUtils):
             if self.s3 is None:
                 self._check_minio_connection()
 
-            self.s3.download_file(
-                "k8s-mlops-platform-bucket",
-                "v1/artifacts/pipeline_model.json",
-                local_path
-            )
+            os.makedirs(tmpdir, exist_ok=True)
 
-            with open(local_path, "r") as f:
-                self.scaler = json.load(f)
+            for i in self.artifacts_list:
+                self.s3.download_file(
+                    self.artifacts_bucket,
+                    os.path.join(self.artifacts_key, i),
+                    os.path.join(tmpdir, i)
+                )
 
+            self.pipeline = PipelineModel.load(tmpdir)
             self.logger.info("Pipeline artifact downloaded from S3 and loaded")
-            return self.scaler
-
-        except Exception as e:
+        except Exception:
             self.logger.error("Failed loading pipeline artifact", exc_info=True)
             raise
     
@@ -275,15 +286,12 @@ class SparkPreprocessing(BaseUtils):
             raise
 
 
-def main(): 
-    from src.schemas.spark.schemas import schema_full as schema
-    
+def main():     
     data_dir = "s3a://k8s-mlops-platform-bucket/v1/raw/" #Para Spark
     output_dir = "s3a://k8s-mlops-platform-bucket/v1/processed/" #Para Spark
     artifacts_dir = "s3a://k8s-mlops-platform-bucket/v1/artifacts/"
 
     preprocessing = SparkPreprocessing(
-        schema=schema,
         params_path="/app/repo/k3s/params.yaml",
         data_dir=data_dir,
         output_dir=output_dir,
