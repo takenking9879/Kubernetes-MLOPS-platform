@@ -10,28 +10,28 @@ pipeline:
     - type: "cast_transformer"
       name: "timestamp_parser"
       inputs: ["timestamp"]
-      output: "timestamp_ts"
+      outputs: "timestamp_ts"
       params:
         target_type: "timestamp"
     
     - type: "temporal_extractor"
       name: "hour_extractor"
       inputs: ["timestamp_ts"]
-      output: "hour"
+      outputs: "hour"
       params:
         component: "hour"
     
     - type: "temporal_extractor"
       name: "dayofweek_extractor"
       inputs: ["timestamp_ts"]
-      output: "dayofweek_raw"
+      outputs: "dayofweek_raw"
       params:
         component: "dayofweek"
     
     - type: "arithmetic_transformer"
       name: "dayofweek_adjuster"
       inputs: ["dayofweek_raw"]
-      output: "dayofweek"
+      outputs: "dayofweek"
       params:
         operation: "subtract"
         value: 1
@@ -42,7 +42,7 @@ pipeline:
     - type: "conditional_transformer"
       name: "weekend_flag"
       inputs: ["dayofweek"]
-      output: "is_weekend"
+      outputs: "is_weekend"
       params:
         condition: "isin"
         values: [5, 6]
@@ -55,7 +55,7 @@ pipeline:
     - type: "cyclic_transformer"
       name: "hour_cyclic_sin"
       inputs: ["hour"]
-      output: "hour_sin"
+      outputs: "hour_sin"
       params:
         function: "sin"
         period: 24.0
@@ -63,7 +63,7 @@ pipeline:
     - type: "cyclic_transformer"
       name: "hour_cyclic_cos"
       inputs: ["hour"]
-      output: "hour_cos"
+      outputs: "hour_cos"
       params:
         function: "cos"
         period: 24.0
@@ -74,14 +74,14 @@ pipeline:
     - type: "log_transformer"
       name: "bytes_log"
       inputs: ["bytes_transferred"]
-      output: "bytes_log"
+      outputs: "bytes_log"
       params:
         log_type: "log1p"
     
     - type: "log_transformer"
       name: "packet_log"
       inputs: ["packet_count"]
-      output: "packet_log"
+      outputs: "packet_log"
       params:
         log_type: "log1p"
     
@@ -91,7 +91,7 @@ pipeline:
     - type: "concat_transformer"
       name: "protocol_conn_concat"
       inputs: ["protocol", "conn_state"]
-      output: "protocol_conn"
+      outputs: "protocol_conn"
       params:
         separator: "_"
     
@@ -101,21 +101,21 @@ pipeline:
     - type: "string_indexer"
       name: "protocol_encoder"
       inputs: ["protocol"]
-      output: "protocol_idx"
+      outputs: "protocol_idx"
       params:
         handle_invalid: "keep"  # -1 for unknowns
     
     - type: "string_indexer"
       name: "conn_state_encoder"
       inputs: ["conn_state"]
-      output: "conn_state_idx"
+      outputs: "conn_state_idx"
       params:
         handle_invalid: "keep"
     
     - type: "string_indexer"
       name: "protocol_conn_encoder"
       inputs: ["protocol_conn"]
-      output: "protocol_conn_idx"
+      outputs: "protocol_conn_idx"
       params:
         handle_invalid: "keep"
     
