@@ -175,7 +175,7 @@ class KubeRayTraining(BaseUtils):
     
     def count_input_dim(self) -> int:
         """Cuenta dinámicamente las columnas de entrada (features) en el dataset."""
-        dsl = self.load_params().get('spark', {}).get('preprocessing',{}).get('dsl_path', 'src/preprocess/dsl.yaml')
+        dsl = self.load_params().get('spark', {}).get('preprocessing',{}).get('dsl_path', 'app/repo/k3s/spark/preprocess/dsl_001.yaml')
         final_features = dsl['pipeline']['final_features']
 
         categorical = len(final_features.get("categorical", []))
