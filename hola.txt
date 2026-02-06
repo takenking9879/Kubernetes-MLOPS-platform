@@ -1,33 +1,37 @@
-2026-02-06 14:18:13.477 | 2026-02-06 12:18:13,477	INFO cli.py:41 -- Job submission server address: http://kuberay-job-xcqkw-head-svc.ray.svc.cluster.local:8265
-2026-02-06 14:18:13.857 | 2026-02-06 12:18:13,857	SUCC cli.py:65 -- ----------------------------------------------
-2026-02-06 14:18:13.857 | 2026-02-06 12:18:13,857	SUCC cli.py:66 -- Job 'kuberay-job-qnzrc' submitted successfully
-2026-02-06 14:18:13.857 | 2026-02-06 12:18:13,857	SUCC cli.py:67 -- ----------------------------------------------
-2026-02-06 14:18:13.857 | 2026-02-06 12:18:13,857	INFO cli.py:291 -- Next steps
-2026-02-06 14:18:13.857 | 2026-02-06 12:18:13,857	INFO cli.py:292 -- Query the logs of the job:
-2026-02-06 14:18:13.857 | 2026-02-06 12:18:13,857	INFO cli.py:294 -- ray job logs kuberay-job-qnzrc
-2026-02-06 14:18:13.858 | 2026-02-06 12:18:13,857	INFO cli.py:296 -- Query the status of the job:
-2026-02-06 14:18:13.858 | 2026-02-06 12:18:13,857	INFO cli.py:298 -- ray job status kuberay-job-qnzrc
-2026-02-06 14:18:13.858 | 2026-02-06 12:18:13,858	INFO cli.py:300 -- Request the job to be stopped:
-2026-02-06 14:18:13.858 | 2026-02-06 12:18:13,858	INFO cli.py:302 -- ray job stop kuberay-job-qnzrc
-2026-02-06 14:18:15.558 | 2026-02-06 12:18:15,558	INFO cli.py:41 -- Job submission server address: http://kuberay-job-xcqkw-head-svc.ray.svc.cluster.local:8265
-2026-02-06 14:18:17.576 | 2026-02-06 12:18:13,569	INFO job_manager.py:568 -- Runtime env is setting up.
-2026-02-06 14:18:17.576 | Running entrypoint for job kuberay-job-qnzrc: python3 /home/ray/app/repo/k3s/kuberay/main.py
-2026-02-06 14:18:23.915 | Traceback (most recent call last):
-2026-02-06 14:18:23.915 |   File "/home/ray/app/repo/k3s/kuberay/main.py", line 19, in <module>
-2026-02-06 14:18:23.915 |     from src.schemas.spark.schema_registry import SchemaRegistry
-2026-02-06 14:18:23.915 |   File "/home/ray/app/repo/src/schemas/spark/schema_registry.py", line 6, in <module>
-2026-02-06 14:18:23.915 |     from pyspark.sql.types import StructType
-2026-02-06 14:18:23.915 | ModuleNotFoundError: No module named 'pyspark'
-2026-02-06 14:18:26.937 | 2026-02-06 12:18:26,937	ERR cli.py:73 -- ------------------------------
-2026-02-06 14:18:26.937 | 2026-02-06 12:18:26,937	ERR cli.py:74 -- Job 'kuberay-job-qnzrc' failed
-2026-02-06 14:18:26.937 | 2026-02-06 12:18:26,937	ERR cli.py:75 -- ------------------------------
-2026-02-06 14:18:26.937 | 2026-02-06 12:18:26,937	INFO cli.py:88 -- Status message: Job entrypoint command failed with exit code 1, last available logs (truncated to 20,000 chars):
-2026-02-06 14:18:26.937 | 2026-02-06 12:18:13,569	INFO job_manager.py:568 -- Runtime env is setting up.
-2026-02-06 14:18:26.937 | Running entrypoint for job kuberay-job-qnzrc: python3 /home/ray/app/repo/k3s/kuberay/main.py
-2026-02-06 14:18:26.937 | Traceback (most recent call last):
-2026-02-06 14:18:26.937 |   File "/home/ray/app/repo/k3s/kuberay/main.py", line 19, in <module>
-2026-02-06 14:18:26.937 |     from src.schemas.spark.schema_registry import SchemaRegistry
-2026-02-06 14:18:26.937 |   File "/home/ray/app/repo/src/schemas/spark/schema_registry.py", line 6, in <module>
-2026-02-06 14:18:26.937 |     from pyspark.sql.types import StructType
-2026-02-06 14:18:26.937 | ModuleNotFoundError: No module named 'pyspark'
-2026-02-06 14:18:26.937 | 
+2026-02-06 14:31:31.726 | 2026-02-06 12:31:31,726	INFO cli.py:41 -- Job submission server address: http://kuberay-job-hns4w-head-svc.ray.svc.cluster.local:8265
+2026-02-06 14:31:32.057 | 2026-02-06 12:31:32,057	SUCC cli.py:65 -- ----------------------------------------------
+2026-02-06 14:31:32.057 | 2026-02-06 12:31:32,057	SUCC cli.py:66 -- Job 'kuberay-job-mj8wk' submitted successfully
+2026-02-06 14:31:32.057 | 2026-02-06 12:31:32,057	SUCC cli.py:67 -- ----------------------------------------------
+2026-02-06 14:31:32.057 | 2026-02-06 12:31:32,057	INFO cli.py:291 -- Next steps
+2026-02-06 14:31:32.057 | 2026-02-06 12:31:32,057	INFO cli.py:292 -- Query the logs of the job:
+2026-02-06 14:31:32.057 | 2026-02-06 12:31:32,057	INFO cli.py:294 -- ray job logs kuberay-job-mj8wk
+2026-02-06 14:31:32.057 | 2026-02-06 12:31:32,057	INFO cli.py:296 -- Query the status of the job:
+2026-02-06 14:31:32.057 | 2026-02-06 12:31:32,057	INFO cli.py:298 -- ray job status kuberay-job-mj8wk
+2026-02-06 14:31:32.057 | 2026-02-06 12:31:32,057	INFO cli.py:300 -- Request the job to be stopped:
+2026-02-06 14:31:32.057 | 2026-02-06 12:31:32,057	INFO cli.py:302 -- ray job stop kuberay-job-mj8wk
+2026-02-06 14:31:33.638 | 2026-02-06 12:31:33,637	INFO cli.py:41 -- Job submission server address: http://kuberay-job-hns4w-head-svc.ray.svc.cluster.local:8265
+2026-02-06 14:31:35.654 | 2026-02-06 12:31:31,790	INFO job_manager.py:568 -- Runtime env is setting up.
+2026-02-06 14:31:35.654 | Running entrypoint for job kuberay-job-mj8wk: python3 /home/ray/app/repo/k3s/kuberay/main.py
+2026-02-06 14:31:40.662 | Traceback (most recent call last):
+2026-02-06 14:31:40.662 |   File "/home/ray/app/repo/k3s/kuberay/main.py", line 19, in <module>
+2026-02-06 14:31:40.662 |     from src.schemas.spark.schema_registry import SchemaRegistry
+2026-02-06 14:31:40.662 |   File "/home/ray/app/repo/src/schemas/spark/schema_registry.py", line 14, in <module>
+2026-02-06 14:31:40.662 |     from . import schemas
+2026-02-06 14:31:40.662 |   File "/home/ray/app/repo/src/schemas/spark/schemas.py", line 1, in <module>
+2026-02-06 14:31:40.662 |     from pyspark.sql.types import StructType, StructField, LongType, DoubleType, StringType
+2026-02-06 14:31:40.662 | ModuleNotFoundError: No module named 'pyspark'
+2026-02-06 14:31:43.676 | 2026-02-06 12:31:43,675	ERR cli.py:73 -- ------------------------------
+2026-02-06 14:31:43.676 | 2026-02-06 12:31:43,675	ERR cli.py:74 -- Job 'kuberay-job-mj8wk' failed
+2026-02-06 14:31:43.676 | 2026-02-06 12:31:43,675	ERR cli.py:75 -- ------------------------------
+2026-02-06 14:31:43.676 | 2026-02-06 12:31:43,675	INFO cli.py:88 -- Status message: Job entrypoint command failed with exit code 1, last available logs (truncated to 20,000 chars):
+2026-02-06 14:31:43.676 | 2026-02-06 12:31:31,790	INFO job_manager.py:568 -- Runtime env is setting up.
+2026-02-06 14:31:43.676 | Running entrypoint for job kuberay-job-mj8wk: python3 /home/ray/app/repo/k3s/kuberay/main.py
+2026-02-06 14:31:43.676 | Traceback (most recent call last):
+2026-02-06 14:31:43.676 |   File "/home/ray/app/repo/k3s/kuberay/main.py", line 19, in <module>
+2026-02-06 14:31:43.676 |     from src.schemas.spark.schema_registry import SchemaRegistry
+2026-02-06 14:31:43.676 |   File "/home/ray/app/repo/src/schemas/spark/schema_registry.py", line 14, in <module>
+2026-02-06 14:31:43.676 |     from . import schemas
+2026-02-06 14:31:43.676 |   File "/home/ray/app/repo/src/schemas/spark/schemas.py", line 1, in <module>
+2026-02-06 14:31:43.676 |     from pyspark.sql.types import StructType, StructField, LongType, DoubleType, StringType
+2026-02-06 14:31:43.676 | ModuleNotFoundError: No module named 'pyspark'
+2026-02-06 14:31:43.676 | 
