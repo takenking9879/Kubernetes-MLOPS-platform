@@ -4,7 +4,7 @@ Permite referenciar schemas desde params.yaml sin hardcodear imports.
 """
 from typing import Dict
 from pyspark.sql.types import StructType
-import schemas
+from . import schemas
 
 
 class SchemaRegistry:

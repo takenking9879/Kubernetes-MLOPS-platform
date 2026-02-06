@@ -1,12 +1,12 @@
-2026-02-06 13:27:27.884 | WARNING: Using incubator modules: jdk.incubator.vector
-2026-02-06 13:27:29.520 | Files local:///app/repo/k3s/spark/main.py from /app/.worktrees/3f44d0ddef6fad7caa79d29220ebeefcaf0a5768/k3s/spark/main.py to /opt/spark/work-dir/main.py
-2026-02-06 13:27:29.650 | 26/02/06 19:27:29 WARN NativeCodeLoader: Unable to load native-hadoop library for your platform... using builtin-java classes where applicable
-2026-02-06 13:27:30.794 | Traceback (most recent call last):
-2026-02-06 13:27:30.794 |   File "/app/repo/k3s/spark/main.py", line 8, in <module>
-2026-02-06 13:27:30.794 |     from src.dsl import Pipeline, PipelineModel
-2026-02-06 13:27:30.794 |   File "/app/repo/src/dsl/__init__.py", line 39, in <module>
-2026-02-06 13:27:30.794 |     from .stage_registry import StageRegistry
-2026-02-06 13:27:30.794 | ModuleNotFoundError: No module named 'src.dsl.stage_registry'
-2026-02-06 13:27:30.864 | 26/02/06 19:27:30 INFO ShutdownHookManager: Shutdown hook called
-2026-02-06 13:27:30.865 | 26/02/06 19:27:30 INFO ShutdownHookManager: Deleting directory /tmp/localPyFiles-482d717e-18bd-4031-a972-2432fe8371e9
-2026-02-06 13:27:30.868 | 26/02/06 19:27:30 INFO ShutdownHookManager: Deleting directory /tmp/spark-d6a59b7c-30f4-4dd4-9ca7-ccc7b58270a7
+2026-02-06 13:32:52.395 | WARNING: Using incubator modules: jdk.incubator.vector
+2026-02-06 13:32:53.640 | Files local:///app/repo/k3s/spark/main.py from /app/.worktrees/e21147e21b59a08eb6973ec9f703234d1948d17a/k3s/spark/main.py to /opt/spark/work-dir/main.py
+2026-02-06 13:32:53.722 | 26/02/06 19:32:53 WARN NativeCodeLoader: Unable to load native-hadoop library for your platform... using builtin-java classes where applicable
+2026-02-06 13:32:54.544 | Traceback (most recent call last):
+2026-02-06 13:32:54.544 |   File "/app/repo/k3s/spark/main.py", line 10, in <module>
+2026-02-06 13:32:54.544 |     from src.schemas.spark.schema_registry import get_schema
+2026-02-06 13:32:54.544 |   File "/app/repo/src/schemas/spark/schema_registry.py", line 7, in <module>
+2026-02-06 13:32:54.544 |     import schemas
+2026-02-06 13:32:54.544 | ModuleNotFoundError: No module named 'schemas'
+2026-02-06 13:32:54.599 | 26/02/06 19:32:54 INFO ShutdownHookManager: Shutdown hook called
+2026-02-06 13:32:54.601 | 26/02/06 19:32:54 INFO ShutdownHookManager: Deleting directory /tmp/localPyFiles-c3f92594-6566-4cdb-b627-bb3f2d7afdf4
+2026-02-06 13:32:54.604 | 26/02/06 19:32:54 INFO ShutdownHookManager: Deleting directory /tmp/spark-2dbc2057-920b-4fe4-9a3e-7c1b72fa698d
