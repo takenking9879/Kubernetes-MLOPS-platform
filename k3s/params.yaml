@@ -20,6 +20,8 @@ kuberay:
     
   serving:
     framework: "pytorch"
+    # Model key used by Serve (should point to an existing object in S3/MinIO)
+    model_key: "v1/models/model_pytorch.pkl"
     canary_probability: 0.0    
 
   # Optional per-deployment canary configuration. When present, `CanaryModel`
