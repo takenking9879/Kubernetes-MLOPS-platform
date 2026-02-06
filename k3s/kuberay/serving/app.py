@@ -266,6 +266,12 @@ class _ModelRuntime:
 class StableModel:
     def __init__(self):
         self._rt = _ModelRuntime(name="StableModel", variant="stable")
+        try:
+            # Ensure the model is loaded on startup even if reconfigure isn't invoked.
+            self._rt._load_from_config({})
+        except Exception as e:
+            create_logger("StableModel").error("initial load failed: %s", str(e), exc_info=True)
+            raise
 
     def reconfigure(self, config: Dict[str, Any]) -> None:
         try:
@@ -286,6 +292,16 @@ class StableModel:
 class CanaryModel:
     def __init__(self):
         self._rt = _ModelRuntime(name="CanaryModel", variant="canary")
+        try:
+            params = load_params()
+            canary_cfg = params.get("kuberay", {}).get("canary", {})
+            if canary_cfg:
+                self._rt._load_from_config({}, overrides=canary_cfg)
+            else:
+                self._rt._load_from_config({})
+        except Exception as e:
+            create_logger("CanaryModel").error("initial load failed: %s", str(e), exc_info=True)
+            raise
 
     def reconfigure(self, config: Dict[str, Any]) -> None:
         try:

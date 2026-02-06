@@ -18,9 +18,11 @@ spec:
           - name: ModelRouter
             ray_actor_options:
               num_cpus: 0.1
+            user_config: {}
           - name: StableModel
             ray_actor_options:
               num_cpus: 1
+            user_config: {}
             autoscaling_config:
               min_replicas: 1
               initial_replicas: 1
@@ -31,6 +33,7 @@ spec:
           - name: CanaryModel
             ray_actor_options:
               num_cpus: 1
+            user_config: {}
             autoscaling_config:
               min_replicas: 0
               initial_replicas: 0
