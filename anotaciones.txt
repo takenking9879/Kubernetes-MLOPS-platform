@@ -21,3 +21,4 @@ Significa que para entrenar cada modelo va a usar un worker con 8 CPUs
 
 
 
+curl -i -X POST http://serving.localhost/infer -H 'Content-Type: application/json' -d '{"data":[[0,0,0,0,0,0,0,0,0,0,0,0,0,0]]}'

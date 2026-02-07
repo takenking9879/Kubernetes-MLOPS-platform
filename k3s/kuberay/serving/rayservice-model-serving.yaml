@@ -73,7 +73,7 @@ spec:
                     name: env-secret
               env:
                 - name: PYTHONPATH
-                  value: /home/ray/app/repo
+                  value: /home/ray/app/repo:/home/ray/app/repo/src
               resources:
                 requests:
                   cpu: "500m"
@@ -132,7 +132,7 @@ spec:
                       name: env-secret
                 env:
                   - name: PYTHONPATH
-                    value: /home/ray/app/repo
+                    value: /home/ray/app/repo:/home/ray/app/repo/src
                 resources:
                   requests:
                     cpu: "1"
