@@ -175,4 +175,5 @@ pipeline:
     target:
       - "attack"
     metadata:
+      - "timestamp"
       - "event_id"

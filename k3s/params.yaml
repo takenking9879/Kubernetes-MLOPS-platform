@@ -3,6 +3,22 @@ kafka:
   security_protocol: 'SASL_PLAINTEXT'
   sasl_mechanism: 'SCRAM-SHA-512'
 
+# ============================================================================
+# SPLITS CONFIGURATION - Rangos de fechas para train/val/test
+# ============================================================================
+splits:
+  train:
+    start: "2024-01-01 00:00:00"
+    end: "2024-06-30 23:59:59"
+  
+  val:
+    start: "2024-07-01 00:00:00"
+    end: "2024-08-31 23:59:59"
+  
+  test:
+    start: "2024-09-01 00:00:00"
+    end: "2024-10-31 23:59:59"
+
 kuberay:
   model:
     #num_data_blocks: 4  # Número de bloques para leer los datos con Ray Datasets, None =  default
@@ -68,6 +84,10 @@ spark:
       archives:
         - "config.json"
         - "stages.json"
+    # Opciones para la tabla procesada
+    processed:
+      # Especificar particionado Iceberg, por ejemplo: "days(timestamp)", "months(timestamp)", "hours(timestamp)"
+      partition: "days(timestamp)"
   
   # ===== PREDICTION CONFIGURATION =====
   prediction:
@@ -116,3 +136,27 @@ spark:
     starting_offsets: "latest"
     fail_on_data_loss: false
 
+# ============================================================================
+# ICEBERG TABLES CONFIGURATION
+# ============================================================================
+iceberg_tables:
+  # Tabla de raw data
+  raw:
+    catalog: "iceberg"
+    namespace: "raw"
+    table: "network_traffic_raw"
+    full_name: "iceberg.raw.network_traffic_raw"
+  
+  # Tabla de metadata
+  metadata:
+    catalog: "iceberg"
+    namespace: "metadata"
+    table: "preprocessing_artifacts"
+    full_name: "iceberg.metadata.preprocessing_artifacts"
+  
+  # Namespace para tablas procesadas
+  processed:
+    catalog: "iceberg"
+    namespace: "processed"
+    # Las tablas procesadas se crearán dinámicamente con formato:
+    # iceberg.processed.{artifact_set_id}

@@ -71,5 +71,10 @@ RUN wget -P /opt/spark/jars/ https://repo1.maven.org/maven2/org/apache/hadoop/ha
     && wget -P /opt/spark/jars/ https://repo1.maven.org/maven2/software/amazon/awssdk/json-utils/2.41.8/json-utils-2.41.8.jar \
     && wget -P /opt/spark/jars/ https://repo1.maven.org/maven2/software/amazon/awssdk/third-party-jackson-core/2.41.8/third-party-jackson-core-2.41.8.jar \
     && wget -P /opt/spark/jars/ https://repo1.maven.org/maven2/software/amazon/awssdk/arns/2.41.8/arns-2.41.8.jar
-    
+
+# Iceberg runtime y extensiones para Spark 4.x
+RUN wget -P /opt/spark/jars/ https://repo.maven.apache.org/maven2/org/apache/iceberg/iceberg-spark-runtime-4.0_2.13/1.10.1/iceberg-spark-runtime-4.0_2.13-1.10.1.jar \
+    && wget -P /opt/spark/jars/ https://repo1.maven.org/maven2/org/apache/iceberg/iceberg-aws-bundle/1.10.1/iceberg-aws-bundle-1.10.1.jar \
+    && wget -P /opt/spark/jars/ https://repo1.maven.org/maven2/org/apache/iceberg/iceberg-spark-extensions-4.0_2.13/1.10.1/iceberg-spark-extensions-4.0_2.13-1.10.1.jar
+
 USER spark

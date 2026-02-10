@@ -24,7 +24,7 @@ spec:
     spark.executor.cores: "6"
 
     # General Spark configs
-    spark.kubernetes.container.image: k3s-spark-cluster:latest
+    spark.kubernetes.container.image: k3s-spark-cluster-ingestion:latest
     spark.speculation.interval: "30"
     spark.kubernetes.authenticate.driver.serviceAccountName: "spark"
 
@@ -62,7 +62,7 @@ spec:
       spec:
         containers:
           - name: spark-kubernetes-driver
-            image: k3s-spark-cluster:latest
+            image: k3s-spark-cluster-ingestion:latest
             #command: ["sh", "-c"]
             #args: ["echo 'DEBUG MODE'; sleep infinity"]
             volumeMounts:
@@ -111,7 +111,7 @@ spec:
       spec:
         containers:
           - name: spark-kubernetes-executor
-            image: k3s-spark-cluster:latest
+            image: k3s-spark-cluster-ingestion:latest
             volumeMounts:
               - name: app-files
                 mountPath: /app
