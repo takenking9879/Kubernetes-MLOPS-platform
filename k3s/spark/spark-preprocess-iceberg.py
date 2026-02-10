@@ -606,7 +606,7 @@ def main():
     
     raw_table = os.getenv("RAW_TABLE", "iceberg.raw.network_traffic_raw")
     metadata_table = os.getenv("METADATA_TABLE", "iceberg.metadata.preprocessing_artifacts")
-    dsl_path = os.getenv("DSL_PATH", "/app/repo/dsl/dsl_001.yaml")
+    dsl_path = os.getenv("DSL_PATH", "/app/repo/k3s/spark/preprocess/dsl_001.yaml")
     params_path = os.getenv("PARAMS_PATH", "/app/repo/k3s/params.yaml")
     
     # Generar artifact_set_id si no se provee

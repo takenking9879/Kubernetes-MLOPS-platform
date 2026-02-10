@@ -1,143 +1,227 @@
-2026-02-06 15:41:56.241 | WARNING: Using incubator modules: jdk.incubator.vector
-2026-02-06 15:41:57.536 | Files local:///app/repo/k3s/spark/inference/kafka_main.py from /app/.worktrees/a4d67ebfa6f9e5afaf8ab0f5aba5c7fe9d576b80/k3s/spark/inference/kafka_main.py to /opt/spark/work-dir/kafka_main.py
-2026-02-06 15:41:57.613 | 26/02/06 21:41:57 WARN NativeCodeLoader: Unable to load native-hadoop library for your platform... using builtin-java classes where applicable
-2026-02-06 15:41:58.774 | 2026-02-06 21:41:58,773 - kafka_spark_inference - DEBUG - Parameters retrieved from /app/repo/k3s/params.yaml
-2026-02-06 15:41:58.775 | 2026-02-06 21:41:58,775 - kafka_spark_inference - INFO - ✅ Prometheus metrics server started on port 8000
-2026-02-06 15:41:58.775 | 2026-02-06 21:41:58,775 - kafka_spark_inference - INFO - ✅ Kafka config: topic-traffic → topic-prediction
-2026-02-06 15:41:58.775 | 2026-02-06 21:41:58,775 - kafka_spark_inference - INFO - ✅ Schemas loaded: input=kafka_schema_features, output=prediction_schema
-2026-02-06 15:41:58.775 | 2026-02-06 21:41:58,775 - kafka_spark_inference - INFO - ✅ Converter configured: kafka_to_schema_features
-2026-02-06 15:41:58.775 | 2026-02-06 21:41:58,775 - kafka_spark_inference - INFO - ✅ Artifacts configured: archives=['config.json', 'stages.json'] from s3
-2026-02-06 15:41:58.775 | 2026-02-06 21:41:58,775 - kafka_spark_inference - INFO - ✅ Prediction: ray_serve at http://model-serving-serve-svc.ray.svc.cluster.local:8000/infer
-2026-02-06 15:41:58.775 | 2026-02-06 21:41:58,775 - kafka_spark_inference - INFO - ✅ Output: format=json
-2026-02-06 15:41:58.775 | 2026-02-06 21:41:58,775 - kafka_spark_inference - INFO - ✅ Checkpoint: s3a://k8s-mlops-platform-bucket/checkpoints/kafka-spark-inference
-2026-02-06 15:41:58.775 | 2026-02-06 21:41:58,775 - kafka_spark_inference - INFO - Checking Kafka connection: host.docker.internal:9094
-2026-02-06 15:41:59.011 | %3|1770414119.010|FAIL|rdkafka#consumer-1| [thrd:sasl_plaintext://host.docker.internal:9094/bootstrap]: sasl_plaintext://host.docker.internal:9094/bootstrap: Failed to connect to broker at [fdc4:f303:9324::254]:9094: Network is unreachable (after 218ms in state CONNECT)
-2026-02-06 15:42:00.095 | 2026-02-06 21:42:00,095 - kafka_spark_inference - INFO - ✅ Kafka connected: 2 topics available
-2026-02-06 15:42:00.878 | 2026-02-06 21:42:00,878 - kafka_spark_inference - INFO - ✅ S3 connected: 2 buckets
-2026-02-06 15:42:01.699 | 2026-02-06 21:42:01,699 - kafka_spark_inference - INFO - Pipeline artifact downloaded from S3 and loaded
-2026-02-06 15:42:01.699 | 2026-02-06 21:42:01,699 - kafka_spark_inference - INFO - ✅ Converter function loaded: kafka_to_schema_features
-2026-02-06 15:42:01.699 | 2026-02-06 21:42:01,699 - kafka_spark_inference - INFO - Creating SparkSession with Kafka and S3 support
-2026-02-06 15:42:01.850 | Using Spark's default log4j profile: org/apache/spark/log4j2-defaults.properties
-2026-02-06 15:42:01.855 | 26/02/06 21:42:01 INFO SparkContext: Running Spark version 4.0.1
-2026-02-06 15:42:01.859 | 26/02/06 21:42:01 INFO SparkContext: OS info Linux, 6.6.87.2-microsoft-standard-WSL2, amd64
-2026-02-06 15:42:01.860 | 26/02/06 21:42:01 INFO SparkContext: Java version 17.0.17
-2026-02-06 15:42:01.886 | 26/02/06 21:42:01 INFO ResourceUtils: ==============================================================
-2026-02-06 15:42:01.886 | 26/02/06 21:42:01 INFO ResourceUtils: No custom resources configured for spark.driver.
-2026-02-06 15:42:01.886 | 26/02/06 21:42:01 INFO ResourceUtils: ==============================================================
-2026-02-06 15:42:01.887 | 26/02/06 21:42:01 INFO SparkContext: Submitted application: spark-preprocessing
-2026-02-06 15:42:01.917 | 26/02/06 21:42:01 INFO ResourceProfile: Default ResourceProfile created, executor resources: Map(cores -> name: cores, amount: 2, script: , vendor: , memory -> name: memory, amount: 512, script: , vendor: , offHeap -> name: offHeap, amount: 0, script: , vendor: ), task resources: Map(cpus -> name: cpus, amount: 1.0)
-2026-02-06 15:42:01.921 | 26/02/06 21:42:01 INFO ResourceProfile: Limiting resource is cpus at 2 tasks per executor
-2026-02-06 15:42:01.922 | 26/02/06 21:42:01 INFO ResourceProfileManager: Added ResourceProfile id: 0
-2026-02-06 15:42:01.973 | 26/02/06 21:42:01 INFO SecurityManager: Changing view acls to: spark
-2026-02-06 15:42:01.975 | 26/02/06 21:42:01 INFO SecurityManager: Changing modify acls to: spark
-2026-02-06 15:42:01.975 | 26/02/06 21:42:01 INFO SecurityManager: Changing view acls groups to: spark
-2026-02-06 15:42:01.976 | 26/02/06 21:42:01 INFO SecurityManager: Changing modify acls groups to: spark
-2026-02-06 15:42:01.979 | 26/02/06 21:42:01 INFO SecurityManager: SecurityManager: authentication disabled; ui acls disabled; users with view permissions: spark groups with view permissions: EMPTY; users with modify permissions: spark; groups with modify permissions: EMPTY; RPC SSL disabled
-2026-02-06 15:42:02.239 | 26/02/06 21:42:02 INFO Utils: Successfully started service 'sparkDriver' on port 7078.
-2026-02-06 15:42:02.282 | 26/02/06 21:42:02 INFO SparkEnv: Registering MapOutputTracker
-2026-02-06 15:42:02.295 | 26/02/06 21:42:02 INFO SparkEnv: Registering BlockManagerMaster
-2026-02-06 15:42:02.312 | 26/02/06 21:42:02 INFO BlockManagerMasterEndpoint: Using org.apache.spark.storage.DefaultTopologyMapper for getting topology information
-2026-02-06 15:42:02.313 | 26/02/06 21:42:02 INFO BlockManagerMasterEndpoint: BlockManagerMasterEndpoint up
-2026-02-06 15:42:02.316 | 26/02/06 21:42:02 INFO SparkEnv: Registering BlockManagerMasterHeartbeat
-2026-02-06 15:42:02.342 | 26/02/06 21:42:02 INFO DiskBlockManager: Created local directory at /var/data/spark-38bba925-57f5-497d-9de5-610b70cbeef3/blockmgr-3e2ff0c9-fc5c-484a-a50b-f7685c008a23
-2026-02-06 15:42:02.377 | 26/02/06 21:42:02 INFO SparkEnv: Registering OutputCommitCoordinator
-2026-02-06 15:42:02.568 | 26/02/06 21:42:02 INFO JettyUtils: Start Jetty 0.0.0.0:4040 for SparkUI
-2026-02-06 15:42:02.674 | 26/02/06 21:42:02 INFO Utils: Successfully started service 'SparkUI' on port 4040.
-2026-02-06 15:42:02.706 | 26/02/06 21:42:02 WARN SparkContext: File with 'local' scheme local:/app/repo/k3s/spark/inference/kafka_main.py is not supported to add to file server, since it is already available on every node.
-2026-02-06 15:42:02.731 | 26/02/06 21:42:02 INFO SecurityManager: Changing view acls to: spark
-2026-02-06 15:42:02.731 | 26/02/06 21:42:02 INFO SecurityManager: Changing modify acls to: spark
-2026-02-06 15:42:02.731 | 26/02/06 21:42:02 INFO SecurityManager: Changing view acls groups to: spark
-2026-02-06 15:42:02.732 | 26/02/06 21:42:02 INFO SecurityManager: Changing modify acls groups to: spark
-2026-02-06 15:42:02.732 | 26/02/06 21:42:02 INFO SecurityManager: SecurityManager: authentication disabled; ui acls disabled; users with view permissions: spark groups with view permissions: EMPTY; users with modify permissions: spark; groups with modify permissions: EMPTY; RPC SSL disabled
-2026-02-06 15:42:02.792 | 26/02/06 21:42:02 INFO SparkKubernetesClientFactory: Auto-configuring K8S client using current context from users K8S config file
-2026-02-06 15:42:04.139 | 26/02/06 21:42:04 WARN Utils: spark.executor.instances less than spark.dynamicAllocation.minExecutors is invalid, ignoring its setting, please update your configs.
-2026-02-06 15:42:04.146 | 26/02/06 21:42:04 INFO Utils: Using initial executors = 2, max of spark.dynamicAllocation.initialExecutors,spark.dynamicAllocation.minExecutors and spark.executor.instances
-2026-02-06 15:42:04.340 | 26/02/06 21:42:04 INFO ExecutorPodsAllocator: Going to request 2 executors from Kubernetes for ResourceProfile Id: 0, target: 2, known: 0, sharedSlotFromPendingPods: 2147483647.
-2026-02-06 15:42:04.395 | 26/02/06 21:42:04 INFO KubernetesClientUtils: Spark configuration files loaded from Some(/opt/spark/conf) : spark.kubernetes.namespace
-2026-02-06 15:42:04.654 | 26/02/06 21:42:04 INFO ExecutorPodsAllocator: Found 0 reusable PVCs from 0 PVCs
-2026-02-06 15:42:04.684 | 26/02/06 21:42:04 INFO KubernetesClientUtils: Spark configuration files loaded from Some(/opt/spark/conf) : spark.kubernetes.namespace
-2026-02-06 15:42:04.695 | 26/02/06 21:42:04 INFO BasicExecutorFeatureStep: Decommissioning not enabled, skipping shutdown script
-2026-02-06 15:42:04.704 | 26/02/06 21:42:04 INFO Utils: Successfully started service 'org.apache.spark.network.netty.NettyBlockTransferService' on port 7079.
-2026-02-06 15:42:04.709 | 26/02/06 21:42:04 INFO NettyBlockTransferService: Server created on spark-kafka-app-0-driver-svc.spark.svc 10.1.9.242:7079
-2026-02-06 15:42:04.712 | 26/02/06 21:42:04 INFO BlockManager: Using org.apache.spark.storage.RandomBlockReplicationPolicy for block replication policy
-2026-02-06 15:42:04.738 | 26/02/06 21:42:04 INFO BlockManagerMaster: Registering BlockManager BlockManagerId(driver, spark-kafka-app-0-driver-svc.spark.svc, 7079, None)
-2026-02-06 15:42:04.747 | 26/02/06 21:42:04 INFO BlockManagerMasterEndpoint: Registering block manager spark-kafka-app-0-driver-svc.spark.svc:7079 with 117.0 MiB RAM, BlockManagerId(driver, spark-kafka-app-0-driver-svc.spark.svc, 7079, None)
-2026-02-06 15:42:04.750 | 26/02/06 21:42:04 INFO BlockManagerMaster: Registered BlockManager BlockManagerId(driver, spark-kafka-app-0-driver-svc.spark.svc, 7079, None)
-2026-02-06 15:42:04.752 | 26/02/06 21:42:04 INFO BlockManager: Initialized BlockManager: BlockManagerId(driver, spark-kafka-app-0-driver-svc.spark.svc, 7079, None)
-2026-02-06 15:42:04.776 | 26/02/06 21:42:04 WARN Utils: spark.executor.instances less than spark.dynamicAllocation.minExecutors is invalid, ignoring its setting, please update your configs.
-2026-02-06 15:42:04.777 | 26/02/06 21:42:04 INFO Utils: Using initial executors = 2, max of spark.dynamicAllocation.initialExecutors,spark.dynamicAllocation.minExecutors and spark.executor.instances
-2026-02-06 15:42:04.778 | 26/02/06 21:42:04 INFO ExecutorAllocationManager: Dynamic allocation is enabled without a shuffle service.
-2026-02-06 15:42:04.784 | 26/02/06 21:42:04 INFO KubernetesClientUtils: Spark configuration files loaded from Some(/opt/spark/conf) : spark.kubernetes.namespace
-2026-02-06 15:42:04.787 | 26/02/06 21:42:04 INFO BasicExecutorFeatureStep: Decommissioning not enabled, skipping shutdown script
-2026-02-06 15:42:13.524 | 26/02/06 21:42:13 INFO KubernetesClusterSchedulerBackend$KubernetesDriverEndpoint: Registered executor NettyRpcEndpointRef(spark-client://Executor) (10.1.9.245:43820) with ID 1, ResourceProfileId 0
-2026-02-06 15:42:13.526 | 26/02/06 21:42:13 INFO KubernetesClusterSchedulerBackend$KubernetesDriverEndpoint: Registered executor NettyRpcEndpointRef(spark-client://Executor) (10.1.9.246:48190) with ID 2, ResourceProfileId 0
-2026-02-06 15:42:13.529 | 26/02/06 21:42:13 INFO KubernetesClusterSchedulerBackend: SchedulerBackend is ready for scheduling beginning after reached minRegisteredResourcesRatio: 0.8
-2026-02-06 15:42:13.529 | 26/02/06 21:42:13 INFO ExecutorMonitor: New executor 1 has registered (new total is 1)
-2026-02-06 15:42:13.529 | 26/02/06 21:42:13 INFO ExecutorMonitor: New executor 2 has registered (new total is 2)
-2026-02-06 15:42:13.666 | 26/02/06 21:42:13 INFO BlockManagerMasterEndpoint: Registering block manager 10.1.9.245:43517 with 117.0 MiB RAM, BlockManagerId(1, 10.1.9.245, 43517, None)
-2026-02-06 15:42:13.668 | 26/02/06 21:42:13 INFO BlockManagerMasterEndpoint: Registering block manager 10.1.9.246:39177 with 117.0 MiB RAM, BlockManagerId(2, 10.1.9.246, 39177, None)
-2026-02-06 15:42:15.893 | 2026-02-06 21:42:15,893 - kafka_spark_inference - INFO - ✅ SparkSession created
-2026-02-06 15:42:15.893 | 2026-02-06 21:42:15,893 - kafka_spark_inference - INFO - 🚀 Starting Generic Kafka-Spark Inference Pipeline
-2026-02-06 15:42:15.893 | 2026-02-06 21:42:15,893 - kafka_spark_inference - INFO - Reading from Kafka: topic-traffic
-2026-02-06 15:42:15.986 | 26/02/06 21:42:15 INFO SharedState: Setting hive.metastore.warehouse.dir ('null') to the value of spark.sql.warehouse.dir.
-2026-02-06 15:42:15.995 | 26/02/06 21:42:15 INFO SharedState: Warehouse path is 'file:/opt/spark/work-dir/spark-warehouse'.
-2026-02-06 15:42:17.210 | 2026-02-06 21:42:17,210 - kafka_spark_inference - INFO - ✅ Kafka stream configured with explicit schema
-2026-02-06 15:42:17.365 | 26/02/06 21:42:17 INFO StateStoreCoordinatorRef: Registered StateStoreCoordinator endpoint
-2026-02-06 15:42:17.540 | 26/02/06 21:42:17 WARN MetricsConfig: Cannot locate configuration: tried hadoop-metrics2-s3a-file-system.properties,hadoop-metrics2.properties
-2026-02-06 15:42:17.550 | 26/02/06 21:42:17 INFO MetricsSystemImpl: Scheduled Metric snapshot period at 10 second(s).
-2026-02-06 15:42:17.550 | 26/02/06 21:42:17 INFO MetricsSystemImpl: s3a-file-system metrics system started
-2026-02-06 15:42:19.395 | 26/02/06 21:42:19 INFO ResolveWriteToStream: Checkpoint root s3a://k8s-mlops-platform-bucket/checkpoints/kafka-spark-inference resolved to s3a://k8s-mlops-platform-bucket/checkpoints/kafka-spark-inference.
-2026-02-06 15:42:19.982 | 26/02/06 21:42:19 INFO deprecation: org.apache.hadoop.shaded.io.bytes.per.checksum is deprecated. Instead, use dfs.bytes-per-checksum
-2026-02-06 15:42:20.866 | 26/02/06 21:42:20 INFO CheckpointFileManager: Writing atomically to s3a://k8s-mlops-platform-bucket/checkpoints/kafka-spark-inference/metadata using temp file s3a://k8s-mlops-platform-bucket/checkpoints/kafka-spark-inference/.metadata.706955d3-c4fd-4d94-9573-c7568fee6066.tmp
-2026-02-06 15:42:23.051 | 26/02/06 21:42:23 INFO CheckpointFileManager: Renamed temp file s3a://k8s-mlops-platform-bucket/checkpoints/kafka-spark-inference/.metadata.706955d3-c4fd-4d94-9573-c7568fee6066.tmp to s3a://k8s-mlops-platform-bucket/checkpoints/kafka-spark-inference/metadata
-2026-02-06 15:42:24.963 | 26/02/06 21:42:24 INFO MicroBatchExecution: Starting [id = 966294ad-aa32-49d9-a1a8-58bb4ce9cbce, runId = bedcf7fe-a653-41a4-b037-876922c7227e]. Use s3a://k8s-mlops-platform-bucket/checkpoints/kafka-spark-inference to store the query checkpoint.
-2026-02-06 15:42:24.977 | 2026-02-06 21:42:24,976 - kafka_spark_inference - INFO - ✅ Streaming query started
-2026-02-06 15:42:24.977 | 2026-02-06 21:42:24,977 - kafka_spark_inference - INFO - 📍 Checkpoint: s3a://k8s-mlops-platform-bucket/checkpoints/kafka-spark-inference
-2026-02-06 15:42:24.977 | 2026-02-06 21:42:24,977 - kafka_spark_inference - INFO - 📥 Input topic: topic-traffic
-2026-02-06 15:42:24.977 | 2026-02-06 21:42:24,977 - kafka_spark_inference - INFO - 📤 Output topic: topic-prediction
-2026-02-06 15:42:24.977 | 2026-02-06 21:42:24,977 - kafka_spark_inference - INFO - ⚙️  Schema: kafka_schema_features → prediction_schema
-2026-02-06 15:42:24.977 | 2026-02-06 21:42:24,977 - kafka_spark_inference - INFO - 🔄 Converter: kafka_to_schema_features
-2026-02-06 15:42:24.979 | 2026-02-06 21:42:24,977 - kafka_spark_inference - ERROR - ❌ Pipeline failed: 'KafkaSparkInference' object has no attribute 'preprocessing_module_path'
-2026-02-06 15:42:24.979 | Traceback (most recent call last):
-2026-02-06 15:42:24.979 |   File "/app/repo/k3s/spark/inference/kafka_main.py", line 628, in run_inference
-2026-02-06 15:42:24.979 |     self.logger.info(f"🧮 Preprocessing: {self.preprocessing_module_path}")
-2026-02-06 15:42:24.979 |                                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-2026-02-06 15:42:24.979 | AttributeError: 'KafkaSparkInference' object has no attribute 'preprocessing_module_path'
-2026-02-06 15:42:24.979 | Traceback (most recent call last):
-2026-02-06 15:42:24.979 |   File "/app/repo/k3s/spark/inference/kafka_main.py", line 646, in <module>
-2026-02-06 15:42:24.980 |     main()
-2026-02-06 15:42:24.980 |   File "/app/repo/k3s/spark/inference/kafka_main.py", line 643, in main
-2026-02-06 15:42:24.980 |     pipeline.run_inference()
-2026-02-06 15:42:24.980 |   File "/app/repo/k3s/spark/inference/kafka_main.py", line 628, in run_inference
-2026-02-06 15:42:24.980 |     self.logger.info(f"🧮 Preprocessing: {self.preprocessing_module_path}")
-2026-02-06 15:42:24.980 |                                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-2026-02-06 15:42:24.981 | AttributeError: 'KafkaSparkInference' object has no attribute 'preprocessing_module_path'
-2026-02-06 15:42:24.990 | 26/02/06 21:42:24 INFO MicroBatchExecution: Reading table [org.apache.spark.sql.kafka010.KafkaSourceProvider$KafkaTable@55c8ebd2] from DataSourceV2 named 'kafka' [org.apache.spark.sql.kafka010.KafkaSourceProvider@100a3e1c]
-2026-02-06 15:42:25.046 | 26/02/06 21:42:25 INFO MicroBatchExecution: Finish initializing with logical plan:
-2026-02-06 15:42:25.046 | ~WriteToMicroBatchDataSourceV1 ForeachBatchSink, 966294ad-aa32-49d9-a1a8-58bb4ce9cbce, [checkpointLocation=s3a://k8s-mlops-platform-bucket/checkpoints/kafka-spark-inference], Append
-2026-02-06 15:42:25.046 | +- ~Project [data#15.timestamp AS timestamp#16, data#15.event_id AS event_id#17, data#15.properties AS properties#18]
-2026-02-06 15:42:25.046 |    +- ~Project [from_json(StructField(timestamp,StringType,true), StructField(event_id,StringType,true), StructField(properties,StructType(StructField(src_port,LongType,true),StructField(dst_port,LongType,true),StructField(protocol,StringType,true),StructField(packet_count,LongType,true),StructField(conn_state,StringType,true),StructField(bytes_transferred,DoubleType,true)),true), value#14, Some(Etc/UTC), false) AS data#15]
-2026-02-06 15:42:25.046 |       +- ~Project [cast(value#8 as string) AS value#14]
-2026-02-06 15:42:25.046 |          +- ~StreamingDataSourceV2ScanRelation[key#7, value#8, topic#9, partition#10, offset#11L, timestamp#12, timestampType#13] KafkaTable
-2026-02-06 15:42:25.046 | 
-2026-02-06 15:42:25.115 | 26/02/06 21:42:25 INFO SparkContext: SparkContext is stopping with exitCode 0 from stop at SparkSubmit.scala:1036.
-2026-02-06 15:42:25.130 | 26/02/06 21:42:25 INFO SparkUI: Stopped Spark web UI at http://spark-kafka-app-0-driver-svc.spark.svc:4040
-2026-02-06 15:42:25.134 | 26/02/06 21:42:25 INFO KubernetesClusterSchedulerBackend: Shutting down all executors
-2026-02-06 15:42:25.135 | 26/02/06 21:42:25 INFO KubernetesClusterSchedulerBackend$KubernetesDriverEndpoint: Asking each executor to shut down
-2026-02-06 15:42:25.143 | 26/02/06 21:42:25 INFO ExecutorPodsWatchSnapshotSource: Kubernetes client has been closed.
-2026-02-06 15:42:25.317 | 26/02/06 21:42:25 INFO MapOutputTrackerMasterEndpoint: MapOutputTrackerMasterEndpoint stopped!
-2026-02-06 15:42:25.337 | 26/02/06 21:42:25 INFO MemoryStore: MemoryStore started with capacity 117.0 MiB
-2026-02-06 15:42:25.338 | 26/02/06 21:42:25 INFO MemoryStore: MemoryStore cleared
-2026-02-06 15:42:25.339 | 26/02/06 21:42:25 INFO BlockManager: BlockManager stopped
-2026-02-06 15:42:25.344 | 26/02/06 21:42:25 INFO BlockManagerMaster: BlockManagerMaster stopped
-2026-02-06 15:42:25.346 | 26/02/06 21:42:25 INFO OutputCommitCoordinator$OutputCommitCoordinatorEndpoint: OutputCommitCoordinator stopped!
-2026-02-06 15:42:25.355 | 26/02/06 21:42:25 INFO SparkContext: Successfully stopped SparkContext
-2026-02-06 15:42:25.357 | 26/02/06 21:42:25 INFO ShutdownHookManager: Shutdown hook called
-2026-02-06 15:42:25.358 | 26/02/06 21:42:25 INFO ShutdownHookManager: Deleting directory /tmp/spark-22f8f3a9-b774-459e-a5e4-905efc1f8c21
-2026-02-06 15:42:25.361 | 26/02/06 21:42:25 INFO ShutdownHookManager: Deleting directory /var/data/spark-38bba925-57f5-497d-9de5-610b70cbeef3/spark-2e6e6251-454b-40bd-b8b0-bfaf2a3339a2/pyspark-66498aed-b242-4787-b1ad-78a6214b1575
-2026-02-06 15:42:25.365 | 26/02/06 21:42:25 INFO ShutdownHookManager: Deleting directory /tmp/spark-c6d187e0-50ac-4dd7-b480-4de5779013e5
-2026-02-06 15:42:25.368 | 26/02/06 21:42:25 INFO ShutdownHookManager: Deleting directory /tmp/artifacts-d14d1328-b1b9-4799-837e-96ed8ef758f0
-2026-02-06 15:42:25.372 | 26/02/06 21:42:25 INFO ShutdownHookManager: Deleting directory /tmp/spark-223912b6-a5bf-4af1-b7d6-cbae15df9a91
-2026-02-06 15:42:25.375 | 26/02/06 21:42:25 INFO ShutdownHookManager: Deleting directory /tmp/spark-350118ad-38b1-474d-8cc9-0a98bdfa95d3
-2026-02-06 15:42:25.379 | 26/02/06 21:42:25 INFO ShutdownHookManager: Deleting directory /var/data/spark-38bba925-57f5-497d-9de5-610b70cbeef3/spark-2e6e6251-454b-40bd-b8b0-bfaf2a3339a2
-2026-02-06 15:42:25.383 | 26/02/06 21:42:25 INFO ShutdownHookManager: Deleting directory /tmp/localPyFiles-6570dbd2-0fb3-49f4-96f1-091c870fc9a2
+2026-02-10 16:43:51.027 | WARNING: Using incubator modules: jdk.incubator.vector
+2026-02-10 16:43:52.272 | Files local:///app/repo/k3s/spark/spark-preprocess-iceberg.py from /app/.worktrees/fc32e8649f0666210549c6bc4f585daf8f6321c0/k3s/spark/spark-preprocess-iceberg.py to /opt/spark/work-dir/spark-preprocess-iceberg.py
+2026-02-10 16:43:52.351 | 26/02/10 22:43:52 WARN NativeCodeLoader: Unable to load native-hadoop library for your platform... using builtin-java classes where applicable
+2026-02-10 16:43:53.173 | 2026-02-10 22:43:53,172 - SparkPreprocessIceberg - DEBUG - Parameters retrieved from /app/repo/k3s/params.yaml
+2026-02-10 16:43:53.557 | 2026-02-10 22:43:53,556 - SparkPreprocessIceberg - INFO - S3 connection verified. Buckets: ['frontend-crm-bucket', 'k8s-mlops-platform-bucket']
+2026-02-10 16:43:53.946 | Using Spark's default log4j profile: org/apache/spark/log4j2-defaults.properties
+2026-02-10 16:43:53.950 | 26/02/10 22:43:53 INFO SparkContext: Running Spark version 4.0.1
+2026-02-10 16:43:53.951 | 26/02/10 22:43:53 INFO SparkContext: OS info Linux, 6.6.87.2-microsoft-standard-WSL2, amd64
+2026-02-10 16:43:53.951 | 26/02/10 22:43:53 INFO SparkContext: Java version 17.0.17
+2026-02-10 16:43:53.972 | 26/02/10 22:43:53 INFO ResourceUtils: ==============================================================
+2026-02-10 16:43:53.973 | 26/02/10 22:43:53 INFO ResourceUtils: No custom resources configured for spark.driver.
+2026-02-10 16:43:53.973 | 26/02/10 22:43:53 INFO ResourceUtils: ==============================================================
+2026-02-10 16:43:53.975 | 26/02/10 22:43:53 INFO SparkContext: Submitted application: spark-preprocessing
+2026-02-10 16:43:53.998 | 26/02/10 22:43:53 INFO ResourceProfile: Default ResourceProfile created, executor resources: Map(cores -> name: cores, amount: 6, script: , vendor: , memory -> name: memory, amount: 4096, script: , vendor: , offHeap -> name: offHeap, amount: 0, script: , vendor: ), task resources: Map(cpus -> name: cpus, amount: 1.0)
+2026-02-10 16:43:54.002 | 26/02/10 22:43:54 INFO ResourceProfile: Limiting resource is cpus at 6 tasks per executor
+2026-02-10 16:43:54.004 | 26/02/10 22:43:54 INFO ResourceProfileManager: Added ResourceProfile id: 0
+2026-02-10 16:43:54.052 | 26/02/10 22:43:54 INFO SecurityManager: Changing view acls to: spark
+2026-02-10 16:43:54.053 | 26/02/10 22:43:54 INFO SecurityManager: Changing modify acls to: spark
+2026-02-10 16:43:54.054 | 26/02/10 22:43:54 INFO SecurityManager: Changing view acls groups to: spark
+2026-02-10 16:43:54.054 | 26/02/10 22:43:54 INFO SecurityManager: Changing modify acls groups to: spark
+2026-02-10 16:43:54.057 | 26/02/10 22:43:54 INFO SecurityManager: SecurityManager: authentication disabled; ui acls disabled; users with view permissions: spark groups with view permissions: EMPTY; users with modify permissions: spark; groups with modify permissions: EMPTY; RPC SSL disabled
+2026-02-10 16:43:54.229 | 26/02/10 22:43:54 INFO Utils: Successfully started service 'sparkDriver' on port 7078.
+2026-02-10 16:43:54.255 | 26/02/10 22:43:54 INFO SparkEnv: Registering MapOutputTracker
+2026-02-10 16:43:54.266 | 26/02/10 22:43:54 INFO SparkEnv: Registering BlockManagerMaster
+2026-02-10 16:43:54.279 | 26/02/10 22:43:54 INFO BlockManagerMasterEndpoint: Using org.apache.spark.storage.DefaultTopologyMapper for getting topology information
+2026-02-10 16:43:54.279 | 26/02/10 22:43:54 INFO BlockManagerMasterEndpoint: BlockManagerMasterEndpoint up
+2026-02-10 16:43:54.283 | 26/02/10 22:43:54 INFO SparkEnv: Registering BlockManagerMasterHeartbeat
+2026-02-10 16:43:54.299 | 26/02/10 22:43:54 INFO DiskBlockManager: Created local directory at /var/data/spark-a41210a0-d72a-44a1-af38-b90ff9dd71a6/blockmgr-9be2935a-ca22-4e63-82dc-2a59a0ede43b
+2026-02-10 16:43:54.320 | 26/02/10 22:43:54 INFO SparkEnv: Registering OutputCommitCoordinator
+2026-02-10 16:43:54.424 | 26/02/10 22:43:54 INFO JettyUtils: Start Jetty 0.0.0.0:4040 for SparkUI
+2026-02-10 16:43:54.491 | 26/02/10 22:43:54 INFO Utils: Successfully started service 'SparkUI' on port 4040.
+2026-02-10 16:43:54.524 | 26/02/10 22:43:54 WARN SparkContext: File with 'local' scheme local:/app/repo/k3s/spark/spark-preprocess-iceberg.py is not supported to add to file server, since it is already available on every node.
+2026-02-10 16:43:54.541 | 26/02/10 22:43:54 INFO SecurityManager: Changing view acls to: spark
+2026-02-10 16:43:54.541 | 26/02/10 22:43:54 INFO SecurityManager: Changing modify acls to: spark
+2026-02-10 16:43:54.541 | 26/02/10 22:43:54 INFO SecurityManager: Changing view acls groups to: spark
+2026-02-10 16:43:54.542 | 26/02/10 22:43:54 INFO SecurityManager: Changing modify acls groups to: spark
+2026-02-10 16:43:54.542 | 26/02/10 22:43:54 INFO SecurityManager: SecurityManager: authentication disabled; ui acls disabled; users with view permissions: spark groups with view permissions: EMPTY; users with modify permissions: spark; groups with modify permissions: EMPTY; RPC SSL disabled
+2026-02-10 16:43:54.592 | 26/02/10 22:43:54 INFO SparkKubernetesClientFactory: Auto-configuring K8S client using current context from users K8S config file
+2026-02-10 16:43:55.732 | 26/02/10 22:43:55 INFO ExecutorPodsAllocator: Going to request 2 executors from Kubernetes for ResourceProfile Id: 0, target: 2, known: 0, sharedSlotFromPendingPods: 2147483647.
+2026-02-10 16:43:55.780 | 26/02/10 22:43:55 INFO KubernetesClientUtils: Spark configuration files loaded from Some(/opt/spark/conf) : spark.kubernetes.namespace
+2026-02-10 16:43:55.951 | 26/02/10 22:43:55 INFO ExecutorPodsAllocator: Found 0 reusable PVCs from 0 PVCs
+2026-02-10 16:43:55.999 | 26/02/10 22:43:55 INFO KubernetesClientUtils: Spark configuration files loaded from Some(/opt/spark/conf) : spark.kubernetes.namespace
+2026-02-10 16:43:55.999 | 26/02/10 22:43:55 INFO Utils: Successfully started service 'org.apache.spark.network.netty.NettyBlockTransferService' on port 7079.
+2026-02-10 16:43:56.003 | 26/02/10 22:43:56 INFO NettyBlockTransferService: Server created on spark-app-0-driver-svc.spark.svc 10.1.10.98:7079
+2026-02-10 16:43:56.005 | 26/02/10 22:43:56 INFO BlockManager: Using org.apache.spark.storage.RandomBlockReplicationPolicy for block replication policy
+2026-02-10 16:43:56.008 | 26/02/10 22:43:56 INFO BasicExecutorFeatureStep: Decommissioning not enabled, skipping shutdown script
+2026-02-10 16:43:56.019 | 26/02/10 22:43:56 INFO BlockManagerMaster: Registering BlockManager BlockManagerId(driver, spark-app-0-driver-svc.spark.svc, 7079, None)
+2026-02-10 16:43:56.025 | 26/02/10 22:43:56 INFO BlockManagerMasterEndpoint: Registering block manager spark-app-0-driver-svc.spark.svc:7079 with 1048.8 MiB RAM, BlockManagerId(driver, spark-app-0-driver-svc.spark.svc, 7079, None)
+2026-02-10 16:43:56.028 | 26/02/10 22:43:56 INFO BlockManagerMaster: Registered BlockManager BlockManagerId(driver, spark-app-0-driver-svc.spark.svc, 7079, None)
+2026-02-10 16:43:56.029 | 26/02/10 22:43:56 INFO BlockManager: Initialized BlockManager: BlockManagerId(driver, spark-app-0-driver-svc.spark.svc, 7079, None)
+2026-02-10 16:43:56.087 | 26/02/10 22:43:56 INFO KubernetesClientUtils: Spark configuration files loaded from Some(/opt/spark/conf) : spark.kubernetes.namespace
+2026-02-10 16:43:56.088 | 26/02/10 22:43:56 INFO BasicExecutorFeatureStep: Decommissioning not enabled, skipping shutdown script
+2026-02-10 16:44:01.095 | 26/02/10 22:44:01 INFO KubernetesClusterSchedulerBackend$KubernetesDriverEndpoint: Registered executor NettyRpcEndpointRef(spark-client://Executor) (10.1.10.99:40428) with ID 1, ResourceProfileId 0
+2026-02-10 16:44:01.203 | 26/02/10 22:44:01 INFO BlockManagerMasterEndpoint: Registering block manager 10.1.10.99:43397 with 2.2 GiB RAM, BlockManagerId(1, 10.1.10.99, 43397, None)
+2026-02-10 16:44:25.683 | 26/02/10 22:44:25 INFO KubernetesClusterSchedulerBackend: SchedulerBackend is ready for scheduling beginning after waiting maxRegisteredResourcesWaitingTime: 30000.0(ms)
+2026-02-10 16:44:27.625 | 2026-02-10 22:44:27,625 - SparkPreprocessIceberg - INFO - SparkSession created with Iceberg catalog at s3a://k8s-mlops-platform-bucket/warehouse
+2026-02-10 16:44:27.625 | 2026-02-10 22:44:27,625 - SparkPreprocessIceberg - INFO - Artifacts config: bucket=k8s-mlops-platform-bucket, prefix=pipelines
+2026-02-10 16:44:27.717 | 26/02/10 22:44:27 INFO SharedState: Setting hive.metastore.warehouse.dir ('null') to the value of spark.sql.warehouse.dir.
+2026-02-10 16:44:27.726 | 26/02/10 22:44:27 INFO SharedState: Warehouse path is 'file:/opt/spark/work-dir/spark-warehouse'.
+2026-02-10 16:44:28.690 | 26/02/10 22:44:28 WARN MetricsConfig: Cannot locate configuration: tried hadoop-metrics2-s3a-file-system.properties,hadoop-metrics2.properties
+2026-02-10 16:44:28.700 | 26/02/10 22:44:28 INFO MetricsSystemImpl: Scheduled Metric snapshot period at 10 second(s).
+2026-02-10 16:44:28.700 | 26/02/10 22:44:28 INFO MetricsSystemImpl: s3a-file-system metrics system started
+2026-02-10 16:44:29.342 | 26/02/10 22:44:29 INFO CatalogUtil: Loading custom FileIO implementation: org.apache.iceberg.hadoop.HadoopFileIO
+2026-02-10 16:44:32.036 | 26/02/10 22:44:32 INFO BaseMetastoreCatalog: Table loaded by catalog: iceberg.raw.network_traffic_raw.snapshots
+2026-02-10 16:44:32.982 | 26/02/10 22:44:32 INFO BaseMetastoreCatalog: Table loaded by catalog: iceberg.raw.network_traffic_raw
+2026-02-10 16:44:33.687 | 26/02/10 22:44:33 INFO V2ScanRelationPushDown: 
+2026-02-10 16:44:33.688 | Output: committed_at#0, snapshot_id#1L
+2026-02-10 16:44:33.688 |            
+2026-02-10 16:44:33.869 | 26/02/10 22:44:33 INFO SparkPartitioningAwareScan: Reporting UnknownPartitioning with 1 partition(s) for table iceberg.raw.network_traffic_raw.snapshots
+2026-02-10 16:44:34.033 | 26/02/10 22:44:34 INFO MemoryStore: MemoryStore started with capacity 1048.8 MiB
+2026-02-10 16:44:34.055 | 26/02/10 22:44:34 INFO MemoryStore: Block broadcast_0 stored as values in memory (estimated size 32.0 KiB, free 1048.8 MiB)
+2026-02-10 16:44:34.102 | 26/02/10 22:44:34 INFO MemoryStore: Block broadcast_0_piece0 stored as bytes in memory (estimated size 35.0 KiB, free 1048.7 MiB)
+2026-02-10 16:44:34.108 | 26/02/10 22:44:34 INFO SparkContext: Created broadcast 0 from collect at /app/repo/k3s/spark/spark-preprocess-iceberg.py:131
+2026-02-10 16:44:34.138 | 26/02/10 22:44:34 INFO MemoryStore: Block broadcast_1 stored as values in memory (estimated size 32.0 KiB, free 1048.7 MiB)
+2026-02-10 16:44:34.142 | 26/02/10 22:44:34 INFO MemoryStore: Block broadcast_1_piece0 stored as bytes in memory (estimated size 35.1 KiB, free 1048.7 MiB)
+2026-02-10 16:44:34.144 | 26/02/10 22:44:34 INFO SparkContext: Created broadcast 1 from collect at /app/repo/k3s/spark/spark-preprocess-iceberg.py:131
+2026-02-10 16:44:34.457 | 26/02/10 22:44:34 INFO CodeGenerator: Code generated in 165.147755 ms
+2026-02-10 16:44:34.517 | 26/02/10 22:44:34 INFO CodeGenerator: Code generated in 13.251578 ms
+2026-02-10 16:44:34.636 | 26/02/10 22:44:34 INFO SparkContext: Starting job: collect at /app/repo/k3s/spark/spark-preprocess-iceberg.py:131
+2026-02-10 16:44:34.647 | 26/02/10 22:44:34 INFO DAGScheduler: Got job 0 (collect at /app/repo/k3s/spark/spark-preprocess-iceberg.py:131) with 1 output partitions
+2026-02-10 16:44:34.649 | 26/02/10 22:44:34 INFO DAGScheduler: Final stage: ResultStage 0 (collect at /app/repo/k3s/spark/spark-preprocess-iceberg.py:131)
+2026-02-10 16:44:34.650 | 26/02/10 22:44:34 INFO DAGScheduler: Parents of final stage: List()
+2026-02-10 16:44:34.651 | 26/02/10 22:44:34 INFO DAGScheduler: Missing parents: List()
+2026-02-10 16:44:34.656 | 26/02/10 22:44:34 INFO DAGScheduler: Submitting ResultStage 0 (MapPartitionsRDD[4] at collect at /app/repo/k3s/spark/spark-preprocess-iceberg.py:131), which has no missing parents
+2026-02-10 16:44:34.674 | 26/02/10 22:44:34 INFO MemoryStore: Block broadcast_2 stored as values in memory (estimated size 13.8 KiB, free 1048.7 MiB)
+2026-02-10 16:44:34.676 | 26/02/10 22:44:34 INFO MemoryStore: Block broadcast_2_piece0 stored as bytes in memory (estimated size 5.9 KiB, free 1048.6 MiB)
+2026-02-10 16:44:34.677 | 26/02/10 22:44:34 INFO SparkContext: Created broadcast 2 from broadcast at DAGScheduler.scala:1676
+2026-02-10 16:44:34.692 | 26/02/10 22:44:34 INFO DAGScheduler: Submitting 1 missing tasks from ResultStage 0 (MapPartitionsRDD[4] at collect at /app/repo/k3s/spark/spark-preprocess-iceberg.py:131) (first 15 tasks are for partitions Vector(0))
+2026-02-10 16:44:34.703 | 26/02/10 22:44:34 INFO TaskSchedulerImpl: Adding task set 0.0 with 1 tasks resource profile 0
+2026-02-10 16:44:34.747 | 26/02/10 22:44:34 INFO TaskSetManager: Starting task 0.0 in stage 0.0 (TID 0) (10.1.10.99,executor 1, partition 0, PROCESS_LOCAL, 14756 bytes) 
+2026-02-10 16:44:35.798 | 26/02/10 22:44:35 INFO TaskSetManager: Finished task 0.0 in stage 0.0 (TID 0) in 1078 ms on 10.1.10.99 (executor 1) (1/1)
+2026-02-10 16:44:35.801 | 26/02/10 22:44:35 INFO TaskSchedulerImpl: Removed TaskSet 0.0 whose tasks have all completed, from pool 
+2026-02-10 16:44:35.805 | 26/02/10 22:44:35 INFO DAGScheduler: ResultStage 0 (collect at /app/repo/k3s/spark/spark-preprocess-iceberg.py:131) finished in 1135 ms
+2026-02-10 16:44:35.807 | 26/02/10 22:44:35 INFO DAGScheduler: Job 0 is finished. Cancelling potential speculative or zombie tasks for this job
+2026-02-10 16:44:35.809 | 26/02/10 22:44:35 INFO TaskSchedulerImpl: Canceling stage 0
+2026-02-10 16:44:35.810 | 26/02/10 22:44:35 INFO TaskSchedulerImpl: Killing all running tasks in stage 0: Stage finished
+2026-02-10 16:44:35.812 | 26/02/10 22:44:35 INFO DAGScheduler: Job 0 finished: collect at /app/repo/k3s/spark/spark-preprocess-iceberg.py:131, took 1175.309249 ms
+2026-02-10 16:44:35.831 | 26/02/10 22:44:35 INFO CodeGenerator: Code generated in 11.603072 ms
+2026-02-10 16:44:35.851 | 2026-02-10 22:44:35,850 - SparkPreprocessIceberg - INFO - Raw table snapshot: 998511801533581604
+2026-02-10 16:44:38.088 | 2026-02-10 22:44:38,088 - SparkPreprocessIceberg - INFO - Creating metadata table: iceberg.metadata.preprocessing_artifacts
+2026-02-10 16:44:39.633 | 26/02/10 22:44:39 INFO BaseMetastoreCatalog: Table properties set at catalog level through catalog properties: {}
+2026-02-10 16:44:40.359 | 26/02/10 22:44:40 INFO BaseMetastoreCatalog: Table properties enforced at catalog level through catalog properties: {}
+2026-02-10 16:44:41.482 | 26/02/10 22:44:41 INFO HadoopTableOperations: Committed a new metadata file s3a://k8s-mlops-platform-bucket/warehouse/metadata/preprocessing_artifacts/metadata/v1.metadata.json
+2026-02-10 16:44:43.562 | 2026-02-10 22:44:43,562 - SparkPreprocessIceberg - INFO - Metadata table created: iceberg.metadata.preprocessing_artifacts
+2026-02-10 16:44:43.562 | 2026-02-10 22:44:43,562 - SparkPreprocessIceberg - INFO - ============================================================
+2026-02-10 16:44:43.562 | 2026-02-10 22:44:43,562 - SparkPreprocessIceberg - INFO - Processing TRAIN split
+2026-02-10 16:44:43.562 | 2026-02-10 22:44:43,562 - SparkPreprocessIceberg - INFO - ============================================================
+2026-02-10 16:44:43.562 | 2026-02-10 22:44:43,562 - SparkPreprocessIceberg - INFO - Loading raw data: 2024-01-01 00:00:00 to 2024-06-30 23:59:59
+2026-02-10 16:44:43.788 | 26/02/10 22:44:43 INFO V2ScanRelationPushDown: 
+2026-02-10 16:44:43.788 | Pushing operators to iceberg.raw.network_traffic_raw
+2026-02-10 16:44:43.788 | Pushed Filters: timestamp IS NOT NULL, timestamp >= 1704067200000000, timestamp <= 1719791999000000
+2026-02-10 16:44:43.788 | Post-Scan Filters: isnotnull(timestamp#19),(timestamp#19 >= 2024-01-01 00:00:00),(timestamp#19 <= 2024-06-30 23:59:59)
+2026-02-10 16:44:43.788 |            
+2026-02-10 16:44:43.797 | 26/02/10 22:44:43 INFO V2ScanRelationPushDown: 
+2026-02-10 16:44:43.798 | Output: timestamp#19
+2026-02-10 16:44:43.798 |            
+2026-02-10 16:44:43.808 | 26/02/10 22:44:43 INFO SnapshotScan: Scanning table iceberg.raw.network_traffic_raw snapshot 998511801533581604 created at 2026-02-10T05:02:05.810+00:00 with filter ((timestamp IS NOT NULL AND timestamp >= (16-digit-int)) AND timestamp <= (16-digit-int))
+2026-02-10 16:44:44.244 | 26/02/10 22:44:44 INFO BaseDistributedDataScan: Planning file tasks locally for table iceberg.raw.network_traffic_raw
+2026-02-10 16:44:44.489 | 26/02/10 22:44:44 INFO SparkPartitioningAwareScan: Reporting UnknownPartitioning with 1 partition(s) for table iceberg.raw.network_traffic_raw
+2026-02-10 16:44:44.544 | 26/02/10 22:44:44 INFO MemoryStore: Block broadcast_3 stored as values in memory (estimated size 32.0 KiB, free 1048.6 MiB)
+2026-02-10 16:44:44.547 | 26/02/10 22:44:44 INFO MemoryStore: Block broadcast_3_piece0 stored as bytes in memory (estimated size 34.9 KiB, free 1048.6 MiB)
+2026-02-10 16:44:44.548 | 26/02/10 22:44:44 INFO SparkContext: Created broadcast 3 from broadcast at SparkBatch.java:87
+2026-02-10 16:44:44.577 | 26/02/10 22:44:44 INFO MemoryStore: Block broadcast_4 stored as values in memory (estimated size 32.0 KiB, free 1048.6 MiB)
+2026-02-10 16:44:44.580 | 26/02/10 22:44:44 INFO MemoryStore: Block broadcast_4_piece0 stored as bytes in memory (estimated size 34.9 KiB, free 1048.5 MiB)
+2026-02-10 16:44:44.581 | 26/02/10 22:44:44 INFO SparkContext: Created broadcast 4 from broadcast at SparkBatch.java:87
+2026-02-10 16:44:44.679 | 26/02/10 22:44:44 INFO CodeGenerator: Code generated in 18.909888 ms
+2026-02-10 16:44:44.707 | 26/02/10 22:44:44 INFO DAGScheduler: Registering RDD 8 ($anonfun$withThreadLocalCaptured$2 at CompletableFuture.java:1768) as input to shuffle 0
+2026-02-10 16:44:44.711 | 26/02/10 22:44:44 INFO DAGScheduler: Got map stage job 1 ($anonfun$withThreadLocalCaptured$2 at CompletableFuture.java:1768) with 1 output partitions
+2026-02-10 16:44:44.712 | 26/02/10 22:44:44 INFO DAGScheduler: Final stage: ShuffleMapStage 1 ($anonfun$withThreadLocalCaptured$2 at CompletableFuture.java:1768)
+2026-02-10 16:44:44.712 | 26/02/10 22:44:44 INFO DAGScheduler: Parents of final stage: List()
+2026-02-10 16:44:44.713 | 26/02/10 22:44:44 INFO DAGScheduler: Missing parents: List()
+2026-02-10 16:44:44.715 | 26/02/10 22:44:44 INFO DAGScheduler: Submitting ShuffleMapStage 1 (MapPartitionsRDD[8] at $anonfun$withThreadLocalCaptured$2 at CompletableFuture.java:1768), which has no missing parents
+2026-02-10 16:44:44.725 | 26/02/10 22:44:44 INFO MemoryStore: Block broadcast_5 stored as values in memory (estimated size 16.7 KiB, free 1048.5 MiB)
+2026-02-10 16:44:44.733 | 26/02/10 22:44:44 INFO MemoryStore: Block broadcast_5_piece0 stored as bytes in memory (estimated size 7.0 KiB, free 1048.5 MiB)
+2026-02-10 16:44:44.734 | 26/02/10 22:44:44 INFO SparkContext: Created broadcast 5 from broadcast at DAGScheduler.scala:1676
+2026-02-10 16:44:44.736 | 26/02/10 22:44:44 INFO DAGScheduler: Submitting 1 missing tasks from ShuffleMapStage 1 (MapPartitionsRDD[8] at $anonfun$withThreadLocalCaptured$2 at CompletableFuture.java:1768) (first 15 tasks are for partitions Vector(0))
+2026-02-10 16:44:44.736 | 26/02/10 22:44:44 INFO TaskSchedulerImpl: Adding task set 1.0 with 1 tasks resource profile 0
+2026-02-10 16:44:44.742 | 26/02/10 22:44:44 INFO TaskSetManager: Starting task 0.0 in stage 1.0 (TID 1) (10.1.10.99,executor 1, partition 0, PROCESS_LOCAL, 15440 bytes) 
+2026-02-10 16:44:47.500 | 26/02/10 22:44:47 INFO TaskSetManager: Finished task 0.0 in stage 1.0 (TID 1) in 2762 ms on 10.1.10.99 (executor 1) (1/1)
+2026-02-10 16:44:47.500 | 26/02/10 22:44:47 INFO TaskSchedulerImpl: Removed TaskSet 1.0 whose tasks have all completed, from pool 
+2026-02-10 16:44:47.502 | 26/02/10 22:44:47 INFO DAGScheduler: ShuffleMapStage 1 ($anonfun$withThreadLocalCaptured$2 at CompletableFuture.java:1768) finished in 2785 ms
+2026-02-10 16:44:47.503 | 26/02/10 22:44:47 INFO DAGScheduler: looking for newly runnable stages
+2026-02-10 16:44:47.503 | 26/02/10 22:44:47 INFO DAGScheduler: running: HashSet()
+2026-02-10 16:44:47.503 | 26/02/10 22:44:47 INFO DAGScheduler: waiting: HashSet()
+2026-02-10 16:44:47.504 | 26/02/10 22:44:47 INFO DAGScheduler: failed: HashSet()
+2026-02-10 16:44:47.560 | 26/02/10 22:44:47 INFO CodeGenerator: Code generated in 14.479893 ms
+2026-02-10 16:44:47.584 | 26/02/10 22:44:47 INFO SparkContext: Starting job: $anonfun$withThreadLocalCaptured$2 at CompletableFuture.java:1768
+2026-02-10 16:44:47.585 | 26/02/10 22:44:47 INFO DAGScheduler: Got job 2 ($anonfun$withThreadLocalCaptured$2 at CompletableFuture.java:1768) with 1 output partitions
+2026-02-10 16:44:47.585 | 26/02/10 22:44:47 INFO DAGScheduler: Final stage: ResultStage 3 ($anonfun$withThreadLocalCaptured$2 at CompletableFuture.java:1768)
+2026-02-10 16:44:47.586 | 26/02/10 22:44:47 INFO DAGScheduler: Parents of final stage: List(ShuffleMapStage 2)
+2026-02-10 16:44:47.586 | 26/02/10 22:44:47 INFO DAGScheduler: Missing parents: List()
+2026-02-10 16:44:47.586 | 26/02/10 22:44:47 INFO DAGScheduler: Submitting ResultStage 3 (MapPartitionsRDD[12] at $anonfun$withThreadLocalCaptured$2 at CompletableFuture.java:1768), which has no missing parents
+2026-02-10 16:44:47.591 | 26/02/10 22:44:47 INFO MemoryStore: Block broadcast_6 stored as values in memory (estimated size 15.2 KiB, free 1048.5 MiB)
+2026-02-10 16:44:47.598 | 26/02/10 22:44:47 INFO MemoryStore: Block broadcast_6_piece0 stored as bytes in memory (estimated size 6.8 KiB, free 1048.5 MiB)
+2026-02-10 16:44:47.599 | 26/02/10 22:44:47 INFO SparkContext: Created broadcast 6 from broadcast at DAGScheduler.scala:1676
+2026-02-10 16:44:47.600 | 26/02/10 22:44:47 INFO DAGScheduler: Submitting 1 missing tasks from ResultStage 3 (MapPartitionsRDD[12] at $anonfun$withThreadLocalCaptured$2 at CompletableFuture.java:1768) (first 15 tasks are for partitions Vector(0))
+2026-02-10 16:44:47.600 | 26/02/10 22:44:47 INFO TaskSchedulerImpl: Adding task set 3.0 with 1 tasks resource profile 0
+2026-02-10 16:44:47.602 | 26/02/10 22:44:47 INFO TaskSetManager: Starting task 0.0 in stage 3.0 (TID 2) (10.1.10.99,executor 1, partition 0, PROCESS_LOCAL, 9623 bytes) 
+2026-02-10 16:44:47.650 | 26/02/10 22:44:47 INFO MapOutputTrackerMasterEndpoint: Asked to send map output locations for shuffle 0 to 10.1.10.99:40428
+2026-02-10 16:44:47.741 | 26/02/10 22:44:47 INFO TaskSetManager: Finished task 0.0 in stage 3.0 (TID 2) in 139 ms on 10.1.10.99 (executor 1) (1/1)
+2026-02-10 16:44:47.741 | 26/02/10 22:44:47 INFO TaskSchedulerImpl: Removed TaskSet 3.0 whose tasks have all completed, from pool 
+2026-02-10 16:44:47.742 | 26/02/10 22:44:47 INFO DAGScheduler: ResultStage 3 ($anonfun$withThreadLocalCaptured$2 at CompletableFuture.java:1768) finished in 153 ms
+2026-02-10 16:44:47.742 | 26/02/10 22:44:47 INFO DAGScheduler: Job 2 is finished. Cancelling potential speculative or zombie tasks for this job
+2026-02-10 16:44:47.743 | 26/02/10 22:44:47 INFO TaskSchedulerImpl: Canceling stage 3
+2026-02-10 16:44:47.743 | 26/02/10 22:44:47 INFO TaskSchedulerImpl: Killing all running tasks in stage 3: Stage finished
+2026-02-10 16:44:47.743 | 26/02/10 22:44:47 INFO DAGScheduler: Job 2 finished: $anonfun$withThreadLocalCaptured$2 at CompletableFuture.java:1768, took 159.360353 ms
+2026-02-10 16:44:47.752 | 2026-02-10 22:44:47,752 - SparkPreprocessIceberg - INFO - Loaded sample presence=0 for range 2024-01-01 00:00:00 to 2024-06-30 23:59:59
+2026-02-10 16:44:47.752 | 2026-02-10 22:44:47,752 - SparkPreprocessIceberg - INFO - Fitting pipeline from DSL: /app/repo/dsl/dsl_001.yaml
+2026-02-10 16:44:47.753 | 2026-02-10 22:44:47,752 - SparkPreprocessIceberg - ERROR - Failed fitting pipeline: [Errno 2] No such file or directory: '/app/repo/dsl/dsl_001.yaml'
+2026-02-10 16:44:47.753 | Traceback (most recent call last):
+2026-02-10 16:44:47.753 |   File "/app/repo/k3s/spark/spark-preprocess-iceberg.py", line 290, in fit_pipeline
+2026-02-10 16:44:47.753 |     base_pipeline = Pipeline.from_yaml(dsl_path)
+2026-02-10 16:44:47.753 |                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-02-10 16:44:47.753 |   File "/app/repo/src/dsl/pipeline.py", line 52, in from_yaml
+2026-02-10 16:44:47.753 |     with open(yaml_path, 'r') as f:
+2026-02-10 16:44:47.753 |          ^^^^^^^^^^^^^^^^^^^^
+2026-02-10 16:44:47.753 | FileNotFoundError: [Errno 2] No such file or directory: '/app/repo/dsl/dsl_001.yaml'
+2026-02-10 16:44:47.753 | 2026-02-10 22:44:47,753 - SparkPreprocessIceberg - ERROR - Preprocessing pipeline failed: [Errno 2] No such file or directory: '/app/repo/dsl/dsl_001.yaml'
+2026-02-10 16:44:47.753 | Traceback (most recent call last):
+2026-02-10 16:44:47.753 |   File "/app/repo/k3s/spark/spark-preprocess-iceberg.py", line 543, in run_preprocessing_pipeline
+2026-02-10 16:44:47.753 |     pipeline_hash = self.fit_pipeline(df_train, dsl_path)
+2026-02-10 16:44:47.753 |                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-02-10 16:44:47.753 |   File "/app/repo/k3s/spark/spark-preprocess-iceberg.py", line 290, in fit_pipeline
+2026-02-10 16:44:47.753 |     base_pipeline = Pipeline.from_yaml(dsl_path)
+2026-02-10 16:44:47.753 |                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-02-10 16:44:47.753 |   File "/app/repo/src/dsl/pipeline.py", line 52, in from_yaml
+2026-02-10 16:44:47.753 |     with open(yaml_path, 'r') as f:
+2026-02-10 16:44:47.753 |          ^^^^^^^^^^^^^^^^^^^^
+2026-02-10 16:44:47.753 | FileNotFoundError: [Errno 2] No such file or directory: '/app/repo/dsl/dsl_001.yaml'
+2026-02-10 16:44:47.753 | Traceback (most recent call last):
+2026-02-10 16:44:47.753 |   File "/app/repo/k3s/spark/spark-preprocess-iceberg.py", line 634, in <module>
+2026-02-10 16:44:47.753 |     main()
+2026-02-10 16:44:47.753 |   File "/app/repo/k3s/spark/spark-preprocess-iceberg.py", line 627, in main
+2026-02-10 16:44:47.754 |     job.run_preprocessing_pipeline(
+2026-02-10 16:44:47.754 |   File "/app/repo/k3s/spark/spark-preprocess-iceberg.py", line 543, in run_preprocessing_pipeline
+2026-02-10 16:44:47.754 |     pipeline_hash = self.fit_pipeline(df_train, dsl_path)
+2026-02-10 16:44:47.754 |                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-02-10 16:44:47.754 |   File "/app/repo/k3s/spark/spark-preprocess-iceberg.py", line 290, in fit_pipeline
+2026-02-10 16:44:47.754 |     base_pipeline = Pipeline.from_yaml(dsl_path)
+2026-02-10 16:44:47.754 |                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-02-10 16:44:47.754 |   File "/app/repo/src/dsl/pipeline.py", line 52, in from_yaml
+2026-02-10 16:44:47.754 |     with open(yaml_path, 'r') as f:
+2026-02-10 16:44:47.754 |          ^^^^^^^^^^^^^^^^^^^^
+2026-02-10 16:44:47.754 | FileNotFoundError: [Errno 2] No such file or directory: '/app/repo/dsl/dsl_001.yaml'
+2026-02-10 16:44:47.881 | 26/02/10 22:44:47 INFO SparkContext: SparkContext is stopping with exitCode 0 from stop at SparkSubmit.scala:1036.
+2026-02-10 16:44:47.893 | 26/02/10 22:44:47 INFO SparkUI: Stopped Spark web UI at http://spark-app-0-driver-svc.spark.svc:4040
+2026-02-10 16:44:47.895 | 26/02/10 22:44:47 INFO KubernetesClusterSchedulerBackend: Shutting down all executors
+2026-02-10 16:44:47.896 | 26/02/10 22:44:47 INFO KubernetesClusterSchedulerBackend$KubernetesDriverEndpoint: Asking each executor to shut down
+2026-02-10 16:44:47.901 | 26/02/10 22:44:47 INFO ExecutorPodsWatchSnapshotSource: Kubernetes client has been closed.
+2026-02-10 16:44:48.042 | 26/02/10 22:44:48 INFO MapOutputTrackerMasterEndpoint: MapOutputTrackerMasterEndpoint stopped!
+2026-02-10 16:44:48.062 | 26/02/10 22:44:48 INFO MemoryStore: MemoryStore cleared
+2026-02-10 16:44:48.062 | 26/02/10 22:44:48 INFO BlockManager: BlockManager stopped
+2026-02-10 16:44:48.064 | 26/02/10 22:44:48 INFO BlockManagerMaster: BlockManagerMaster stopped
+2026-02-10 16:44:48.067 | 26/02/10 22:44:48 INFO OutputCommitCoordinator$OutputCommitCoordinatorEndpoint: OutputCommitCoordinator stopped!
+2026-02-10 16:44:48.077 | 26/02/10 22:44:48 INFO SparkContext: Successfully stopped SparkContext
+2026-02-10 16:44:48.081 | 26/02/10 22:44:48 INFO ShutdownHookManager: Shutdown hook called
+2026-02-10 16:44:48.081 | 26/02/10 22:44:48 INFO ShutdownHookManager: Deleting directory /var/data/spark-a41210a0-d72a-44a1-af38-b90ff9dd71a6/spark-822e27cd-2b90-4e80-bd30-f44716aca6f5
+2026-02-10 16:44:48.084 | 26/02/10 22:44:48 INFO ShutdownHookManager: Deleting directory /tmp/localPyFiles-c9a82b2f-d9c1-43c9-b14e-31aecf95a83d
+2026-02-10 16:44:48.087 | 26/02/10 22:44:48 INFO ShutdownHookManager: Deleting directory /tmp/spark-b510a0ea-f658-4c97-a62b-977ae54b21b0
+2026-02-10 16:44:48.090 | 26/02/10 22:44:48 INFO ShutdownHookManager: Deleting directory /var/data/spark-a41210a0-d72a-44a1-af38-b90ff9dd71a6/spark-822e27cd-2b90-4e80-bd30-f44716aca6f5/pyspark-e30e4110-c979-42be-981c-61f350197b3b
+2026-02-10 16:44:48.093 | 26/02/10 22:44:48 INFO ShutdownHookManager: Deleting directory /tmp/artifacts-c25b8cd9-835a-4990-b561-d3891ce1a62f
+2026-02-10 16:44:48.096 | 26/02/10 22:44:48 INFO ShutdownHookManager: Deleting directory /tmp/spark-ff7741cd-7d62-4f12-ac46-bf61690cb175
+2026-02-10 16:44:48.100 | 26/02/10 22:44:48 INFO ShutdownHookManager: Deleting directory /tmp/spark-a2c73630-a66f-458d-8e1c-7ff9f7d92b1a
+2026-02-10 16:44:48.102 | 26/02/10 22:44:48 INFO ShutdownHookManager: Deleting directory /tmp/spark-b0f3af68-3061-47db-8a1c-6d7eb6f1d0d1
+2026-02-10 16:44:48.110 | 26/02/10 22:44:48 INFO MetricsSystemImpl: Stopping s3a-file-system metrics system...
+2026-02-10 16:44:48.111 | 26/02/10 22:44:48 INFO MetricsSystemImpl: s3a-file-system metrics system stopped.
+2026-02-10 16:44:48.111 | 26/02/10 22:44:48 INFO MetricsSystemImpl: s3a-file-system metrics system shutdown complete.

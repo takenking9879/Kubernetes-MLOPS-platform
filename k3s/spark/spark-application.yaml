@@ -4,7 +4,7 @@ metadata:
   name: spark-app
   namespace: spark
 spec:
-  pyFiles: "local:///app/repo/k3s/spark/main.py"
+  pyFiles: "local:///app/repo/k3s/spark/spark-preprocess-iceberg.py"
   # For Python apps the operator will use the provided file; do not use top-level "image" field
 
   runtimeVersions:
