@@ -1,0 +1,56 @@
+executor: "LocalExecutor"
+
+images:
+  airflow:
+    repository: apache/airflow
+    tag: 3.1.3
+    pullPolicy: IfNotPresent
+
+fernetKey: VnBXNmNoRE1HU3dIUTR3MFlBM3NlWHV0UUtwQTdoSmk=
+webserverSecretKey: 9d13b9cf8abdd54558e84d7d26e6423b
+
+# PostgreSQL integrado
+postgresql:
+  image:
+    tag: "latest"
+
+dags:
+  gitSync:
+    enabled: true
+    repo: "https://github.com/takenking9879/Kubernetes-MLOPS-platform"
+    branch: "main"
+    subPath: "k3s/airflow/dags"
+  persistence:
+    enabled: false
+
+
+#workers:
+  #replicas: 1
+
+dagProcessor:
+  replicas: 1
+
+scheduler:
+  replicas: 1
+
+triggerer:
+  replicas: 1
+
+statsd:
+  enabled: false
+# ==========================================================
+# ESTRUCTURA SOLICITADA: extraEnv directamente bajo el componente
+# (Esto podría causar el error anterior, pero es la estructura pedida)
+# ==========================================================
+extraEnv: |
+  - name: AWS_ACCESS_KEY_ID
+    valueFrom:
+      secretKeyRef:
+        name: env-secret
+        key: AWS_ACCESS_KEY_ID
+
+  - name: AWS_SECRET_ACCESS_KEY
+    valueFrom:
+      secretKeyRef:
+        name: env-secret
+        key: AWS_SECRET_ACCESS_KEY

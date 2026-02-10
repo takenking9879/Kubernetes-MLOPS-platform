@@ -1,0 +1,13 @@
+helm repo add apache-airflow https://airflow.apache.org/
+
+kubectl create namespace airflow
+
+kubectl create secret generic env-secret \
+  -n airflow \
+  --from-env-file=.env
+
+helm install my-airflow apache-airflow/airflow -n airflow -f k3s/airflow/airflow_values.yaml
+
+#Borrar archivos residuales que no borra el uninstall
+helm uninstall my-airflow -n airflow
+kubectl delete secret my-airflow-broker-url my-airflow-fernet-key my-airflow-redis-password -n airflow

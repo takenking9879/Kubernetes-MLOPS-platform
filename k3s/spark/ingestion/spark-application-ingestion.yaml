@@ -1,0 +1,156 @@
+apiVersion: spark.apache.org/v1
+kind: SparkApplication
+metadata:
+  name: spark-ingestion
+  namespace: spark
+spec:
+  pyFiles: "local:///app/repo/k3s/spark/ingestion/ingestion_main.py"
+  # For Python apps the operator will use the provided file; do not use top-level "image" field
+
+  runtimeVersions:
+    sparkVersion: "4.0.1"
+  applicationTolerations:
+    instanceConfig:
+      initExecutors: 2
+      minExecutors: 2
+      maxExecutors: 4
+
+  # Spark confs (S3A + Kubernetes image reference via spark.kubernetes.container.image)
+  sparkConf:
+    # Resource allocation
+    spark.driver.memory: "2048m"
+    spark.driver.cores: "1"
+    spark.executor.memory: "4096m"
+    spark.executor.cores: "6"
+
+    # General Spark configs
+    spark.kubernetes.container.image: k3s-spark-cluster-ingestion:latest
+    spark.speculation.interval: "30"
+    spark.kubernetes.authenticate.driver.serviceAccountName: "spark"
+
+    #Iceberg configurations
+    # Habilitar Iceberg SQL extensions
+    spark.sql.extensions: org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions
+
+    # Configurar catálogo Iceberg (Hadoop catalog que guarda metadata en S3)
+    spark.sql.catalog.iceberg: org.apache.iceberg.spark.SparkCatalog
+    spark.sql.catalog.iceberg.type: hadoop
+    spark.sql.catalog.iceberg.warehouse: s3a://k8s-mlops-platform-bucket/warehouse
+
+
+    # S3A configurations
+    spark.hadoop.fs.s3a.impl: org.apache.hadoop.fs.s3a.S3AFileSystem
+    spark.hadoop.fs.s3a.aws.credentials.provider: com.amazonaws.auth.DefaultAWSCredentialsProviderChain
+    spark.hadoop.fs.s3a.endpoint: s3.us-east-2.amazonaws.com
+    spark.hadoop.fs.s3a.aws.region: us-east-2
+    spark.hadoop.fs.s3a.fast.upload: "true"
+    #spark.hadoop.fs.s3a.multipart.size: "104857600"
+    spark.hadoop.fs.s3a.connection.maximum: "100"
+    spark.hadoop.fs.s3a.path.style.access: "true"
+    #spark.hadoop.fs.s3a.multipart.purge.age: "86400"
+    #spark.hadoop.fs.s3a.threads.keepalivetime: "60"
+    #spark.hadoop.fs.s3a.connection.establish.timeout: "5000"
+
+    #PYTHON PATH
+    spark.kubernetes.driverEnv.PYTHONPATH: "/app:/app/repo:/app/repo/k3s:/opt/spark/work-dir:/opt/spark/work-dir/k3s"
+    spark.kubernetes.executorEnv.PYTHONPATH: "/app:/app/repo:/app/repo/k3s:/opt/spark/work-dir:/opt/spark/work-dir/k3s"
+    spark.kubernetes.driverEnv.PROMETHEUS_PORT: "8001"
+    spark.kubernetes.driverEnv.PROMETHEUS_GRACE_SECONDS: "10"
+
+  # shared volumes for git-sync checkout
+  driverSpec:
+
+    podTemplateSpec:
+      metadata:
+        labels:
+          app: spark-ingestion
+      spec:
+        containers:
+          - name: spark-kubernetes-driver
+            image: k3s-spark-cluster-ingestion:latest
+            #command: ["sh", "-c"]
+            #args: ["echo 'DEBUG MODE'; sleep infinity"]
+            volumeMounts:
+              - name: app-files
+                mountPath: /app
+            envFrom:
+              - secretRef:
+                  name: env-secret
+        initContainers:
+          - name: git-sync
+            image: registry.k8s.io/git-sync/git-sync:v4.1.0
+
+            resources:
+              requests:
+                cpu: 100m
+                memory: 128Mi
+              limits:
+                cpu: 200m
+                memory: 256Mi
+
+            env:
+              - name: GITSYNC_REPO
+                value: "https://github.com/takenking9879/Kubernetes-MLOPS-platform"
+              - name: GIT_SYNC_BRANCH
+                value: "main"
+              - name: GIT_SYNC_ROOT
+                value: "/git"
+              - name: GIT_SYNC_DEST
+                value: "repo"
+              - name: GIT_SYNC_WAIT
+                value: "30"
+              - name: GITSYNC_ONE_TIME
+                value: "true"
+            volumeMounts:
+              - name: app-files
+                mountPath: /git
+        volumes:
+          - name: app-files
+            emptyDir: {}
+
+  executorSpec:
+    podTemplateSpec:
+      metadata:
+        labels:
+          app: spark-ingestion
+      spec:
+        containers:
+          - name: spark-kubernetes-executor
+            image: k3s-spark-cluster-ingestion:latest
+            volumeMounts:
+              - name: app-files
+                mountPath: /app
+            envFrom:
+              - secretRef:
+                  name: env-secret
+        initContainers:
+          - name: git-sync
+            image: registry.k8s.io/git-sync/git-sync:v4.1.0
+
+            resources:
+              requests:
+                cpu: 100m
+                memory: 128Mi
+              limits:
+                cpu: 200m
+                memory: 256Mi
+
+            env:
+              - name: GITSYNC_REPO
+                value: "https://github.com/takenking9879/Kubernetes-MLOPS-platform"
+              - name: GIT_SYNC_BRANCH
+                value: "main"
+              - name: GIT_SYNC_ROOT
+                value: "/git"
+              - name: GIT_SYNC_DEST
+                value: "repo"
+              - name: GIT_SYNC_WAIT
+                value: "30"
+              - name: GITSYNC_ONE_TIME
+                value: "true"
+            volumeMounts:
+              - name: app-files
+                mountPath: /git
+        volumes:
+          - name: app-files
+            emptyDir: {}

@@ -22,3 +22,11 @@ Significa que para entrenar cada modelo va a usar un worker con 8 CPUs
 
 
 curl -i -X POST http://serving.localhost/infer -H 'Content-Type: application/json' -d '{"data":[[0,0,0,0,0,0,0,0,0,0,0,0,0,0]]}'
+
+
+Añadir Iceberg:
+https://repo.maven.apache.org/maven2/org/apache/iceberg/iceberg-spark-runtime-4.0_2.13/1.10.1/iceberg-spark-runtime-4.0_2.13-1.10.1.jar
+
+https://repo1.maven.org/maven2/org/apache/iceberg/iceberg-aws-bundle/1.10.1/iceberg-aws-bundle-1.10.1.jar
+
+https://repo1.maven.org/maven2/org/apache/iceberg/iceberg-spark-extensions-4.0_2.13/1.10.1/iceberg-spark-extensions-4.0_2.13-1.10.1.jar
