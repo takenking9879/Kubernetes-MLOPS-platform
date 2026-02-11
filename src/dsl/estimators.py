@@ -71,11 +71,18 @@ class StringIndexerFittedTransformer(FittedTransformer):
         mapping = self.learned_params["mapping"]
         handle_invalid = self.params.get("handle_invalid", "keep")
         
-        # Create a Spark map expression
-        mapping_expr = F.create_map(
-            *[F.lit(x) for kv in mapping.items() for x in kv]
-        )
-        
+        # If mapping is empty (e.g., fitted on an empty DF), handle gracefully
+        if not mapping:
+            raise ValueError("StringIndexerFittedTransformer has empty mapping. Cannot transform data.")
+
+        # Create a Spark map expression from the learned mapping
+        mapping_items = []
+        for k, v in mapping.items():
+            mapping_items.append(F.lit(k))
+            mapping_items.append(F.lit(v))
+
+        mapping_expr = F.create_map(*mapping_items)
+
         # Apply mapping, use -1 for unknowns if handle_invalid='keep'
         if handle_invalid == "keep":
             return df.withColumn(
@@ -90,7 +97,10 @@ class StringIndexerFittedTransformer(FittedTransformer):
                 mapping_expr[F.col(input_col)]
             )
         elif handle_invalid == "error":
-            # This would require validation - for now, just apply mapping
+            # Raise if unknown values encountered during transform
+            unknown_check = F.when(mapping_expr[F.col(input_col)].isNull(), F.lit(True)).otherwise(F.lit(False))
+            if df.filter(unknown_check).limit(1).count() > 0:
+                raise ValueError(f"Unknown category found in column '{input_col}' while handle_invalid='error'")
             return df.withColumn(
                 output_col,
                 mapping_expr[F.col(input_col)]

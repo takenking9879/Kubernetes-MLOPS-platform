@@ -1,227 +1,247 @@
-2026-02-10 16:43:51.027 | WARNING: Using incubator modules: jdk.incubator.vector
-2026-02-10 16:43:52.272 | Files local:///app/repo/k3s/spark/spark-preprocess-iceberg.py from /app/.worktrees/fc32e8649f0666210549c6bc4f585daf8f6321c0/k3s/spark/spark-preprocess-iceberg.py to /opt/spark/work-dir/spark-preprocess-iceberg.py
-2026-02-10 16:43:52.351 | 26/02/10 22:43:52 WARN NativeCodeLoader: Unable to load native-hadoop library for your platform... using builtin-java classes where applicable
-2026-02-10 16:43:53.173 | 2026-02-10 22:43:53,172 - SparkPreprocessIceberg - DEBUG - Parameters retrieved from /app/repo/k3s/params.yaml
-2026-02-10 16:43:53.557 | 2026-02-10 22:43:53,556 - SparkPreprocessIceberg - INFO - S3 connection verified. Buckets: ['frontend-crm-bucket', 'k8s-mlops-platform-bucket']
-2026-02-10 16:43:53.946 | Using Spark's default log4j profile: org/apache/spark/log4j2-defaults.properties
-2026-02-10 16:43:53.950 | 26/02/10 22:43:53 INFO SparkContext: Running Spark version 4.0.1
-2026-02-10 16:43:53.951 | 26/02/10 22:43:53 INFO SparkContext: OS info Linux, 6.6.87.2-microsoft-standard-WSL2, amd64
-2026-02-10 16:43:53.951 | 26/02/10 22:43:53 INFO SparkContext: Java version 17.0.17
-2026-02-10 16:43:53.972 | 26/02/10 22:43:53 INFO ResourceUtils: ==============================================================
-2026-02-10 16:43:53.973 | 26/02/10 22:43:53 INFO ResourceUtils: No custom resources configured for spark.driver.
-2026-02-10 16:43:53.973 | 26/02/10 22:43:53 INFO ResourceUtils: ==============================================================
-2026-02-10 16:43:53.975 | 26/02/10 22:43:53 INFO SparkContext: Submitted application: spark-preprocessing
-2026-02-10 16:43:53.998 | 26/02/10 22:43:53 INFO ResourceProfile: Default ResourceProfile created, executor resources: Map(cores -> name: cores, amount: 6, script: , vendor: , memory -> name: memory, amount: 4096, script: , vendor: , offHeap -> name: offHeap, amount: 0, script: , vendor: ), task resources: Map(cpus -> name: cpus, amount: 1.0)
-2026-02-10 16:43:54.002 | 26/02/10 22:43:54 INFO ResourceProfile: Limiting resource is cpus at 6 tasks per executor
-2026-02-10 16:43:54.004 | 26/02/10 22:43:54 INFO ResourceProfileManager: Added ResourceProfile id: 0
-2026-02-10 16:43:54.052 | 26/02/10 22:43:54 INFO SecurityManager: Changing view acls to: spark
-2026-02-10 16:43:54.053 | 26/02/10 22:43:54 INFO SecurityManager: Changing modify acls to: spark
-2026-02-10 16:43:54.054 | 26/02/10 22:43:54 INFO SecurityManager: Changing view acls groups to: spark
-2026-02-10 16:43:54.054 | 26/02/10 22:43:54 INFO SecurityManager: Changing modify acls groups to: spark
-2026-02-10 16:43:54.057 | 26/02/10 22:43:54 INFO SecurityManager: SecurityManager: authentication disabled; ui acls disabled; users with view permissions: spark groups with view permissions: EMPTY; users with modify permissions: spark; groups with modify permissions: EMPTY; RPC SSL disabled
-2026-02-10 16:43:54.229 | 26/02/10 22:43:54 INFO Utils: Successfully started service 'sparkDriver' on port 7078.
-2026-02-10 16:43:54.255 | 26/02/10 22:43:54 INFO SparkEnv: Registering MapOutputTracker
-2026-02-10 16:43:54.266 | 26/02/10 22:43:54 INFO SparkEnv: Registering BlockManagerMaster
-2026-02-10 16:43:54.279 | 26/02/10 22:43:54 INFO BlockManagerMasterEndpoint: Using org.apache.spark.storage.DefaultTopologyMapper for getting topology information
-2026-02-10 16:43:54.279 | 26/02/10 22:43:54 INFO BlockManagerMasterEndpoint: BlockManagerMasterEndpoint up
-2026-02-10 16:43:54.283 | 26/02/10 22:43:54 INFO SparkEnv: Registering BlockManagerMasterHeartbeat
-2026-02-10 16:43:54.299 | 26/02/10 22:43:54 INFO DiskBlockManager: Created local directory at /var/data/spark-a41210a0-d72a-44a1-af38-b90ff9dd71a6/blockmgr-9be2935a-ca22-4e63-82dc-2a59a0ede43b
-2026-02-10 16:43:54.320 | 26/02/10 22:43:54 INFO SparkEnv: Registering OutputCommitCoordinator
-2026-02-10 16:43:54.424 | 26/02/10 22:43:54 INFO JettyUtils: Start Jetty 0.0.0.0:4040 for SparkUI
-2026-02-10 16:43:54.491 | 26/02/10 22:43:54 INFO Utils: Successfully started service 'SparkUI' on port 4040.
-2026-02-10 16:43:54.524 | 26/02/10 22:43:54 WARN SparkContext: File with 'local' scheme local:/app/repo/k3s/spark/spark-preprocess-iceberg.py is not supported to add to file server, since it is already available on every node.
-2026-02-10 16:43:54.541 | 26/02/10 22:43:54 INFO SecurityManager: Changing view acls to: spark
-2026-02-10 16:43:54.541 | 26/02/10 22:43:54 INFO SecurityManager: Changing modify acls to: spark
-2026-02-10 16:43:54.541 | 26/02/10 22:43:54 INFO SecurityManager: Changing view acls groups to: spark
-2026-02-10 16:43:54.542 | 26/02/10 22:43:54 INFO SecurityManager: Changing modify acls groups to: spark
-2026-02-10 16:43:54.542 | 26/02/10 22:43:54 INFO SecurityManager: SecurityManager: authentication disabled; ui acls disabled; users with view permissions: spark groups with view permissions: EMPTY; users with modify permissions: spark; groups with modify permissions: EMPTY; RPC SSL disabled
-2026-02-10 16:43:54.592 | 26/02/10 22:43:54 INFO SparkKubernetesClientFactory: Auto-configuring K8S client using current context from users K8S config file
-2026-02-10 16:43:55.732 | 26/02/10 22:43:55 INFO ExecutorPodsAllocator: Going to request 2 executors from Kubernetes for ResourceProfile Id: 0, target: 2, known: 0, sharedSlotFromPendingPods: 2147483647.
-2026-02-10 16:43:55.780 | 26/02/10 22:43:55 INFO KubernetesClientUtils: Spark configuration files loaded from Some(/opt/spark/conf) : spark.kubernetes.namespace
-2026-02-10 16:43:55.951 | 26/02/10 22:43:55 INFO ExecutorPodsAllocator: Found 0 reusable PVCs from 0 PVCs
-2026-02-10 16:43:55.999 | 26/02/10 22:43:55 INFO KubernetesClientUtils: Spark configuration files loaded from Some(/opt/spark/conf) : spark.kubernetes.namespace
-2026-02-10 16:43:55.999 | 26/02/10 22:43:55 INFO Utils: Successfully started service 'org.apache.spark.network.netty.NettyBlockTransferService' on port 7079.
-2026-02-10 16:43:56.003 | 26/02/10 22:43:56 INFO NettyBlockTransferService: Server created on spark-app-0-driver-svc.spark.svc 10.1.10.98:7079
-2026-02-10 16:43:56.005 | 26/02/10 22:43:56 INFO BlockManager: Using org.apache.spark.storage.RandomBlockReplicationPolicy for block replication policy
-2026-02-10 16:43:56.008 | 26/02/10 22:43:56 INFO BasicExecutorFeatureStep: Decommissioning not enabled, skipping shutdown script
-2026-02-10 16:43:56.019 | 26/02/10 22:43:56 INFO BlockManagerMaster: Registering BlockManager BlockManagerId(driver, spark-app-0-driver-svc.spark.svc, 7079, None)
-2026-02-10 16:43:56.025 | 26/02/10 22:43:56 INFO BlockManagerMasterEndpoint: Registering block manager spark-app-0-driver-svc.spark.svc:7079 with 1048.8 MiB RAM, BlockManagerId(driver, spark-app-0-driver-svc.spark.svc, 7079, None)
-2026-02-10 16:43:56.028 | 26/02/10 22:43:56 INFO BlockManagerMaster: Registered BlockManager BlockManagerId(driver, spark-app-0-driver-svc.spark.svc, 7079, None)
-2026-02-10 16:43:56.029 | 26/02/10 22:43:56 INFO BlockManager: Initialized BlockManager: BlockManagerId(driver, spark-app-0-driver-svc.spark.svc, 7079, None)
-2026-02-10 16:43:56.087 | 26/02/10 22:43:56 INFO KubernetesClientUtils: Spark configuration files loaded from Some(/opt/spark/conf) : spark.kubernetes.namespace
-2026-02-10 16:43:56.088 | 26/02/10 22:43:56 INFO BasicExecutorFeatureStep: Decommissioning not enabled, skipping shutdown script
-2026-02-10 16:44:01.095 | 26/02/10 22:44:01 INFO KubernetesClusterSchedulerBackend$KubernetesDriverEndpoint: Registered executor NettyRpcEndpointRef(spark-client://Executor) (10.1.10.99:40428) with ID 1, ResourceProfileId 0
-2026-02-10 16:44:01.203 | 26/02/10 22:44:01 INFO BlockManagerMasterEndpoint: Registering block manager 10.1.10.99:43397 with 2.2 GiB RAM, BlockManagerId(1, 10.1.10.99, 43397, None)
-2026-02-10 16:44:25.683 | 26/02/10 22:44:25 INFO KubernetesClusterSchedulerBackend: SchedulerBackend is ready for scheduling beginning after waiting maxRegisteredResourcesWaitingTime: 30000.0(ms)
-2026-02-10 16:44:27.625 | 2026-02-10 22:44:27,625 - SparkPreprocessIceberg - INFO - SparkSession created with Iceberg catalog at s3a://k8s-mlops-platform-bucket/warehouse
-2026-02-10 16:44:27.625 | 2026-02-10 22:44:27,625 - SparkPreprocessIceberg - INFO - Artifacts config: bucket=k8s-mlops-platform-bucket, prefix=pipelines
-2026-02-10 16:44:27.717 | 26/02/10 22:44:27 INFO SharedState: Setting hive.metastore.warehouse.dir ('null') to the value of spark.sql.warehouse.dir.
-2026-02-10 16:44:27.726 | 26/02/10 22:44:27 INFO SharedState: Warehouse path is 'file:/opt/spark/work-dir/spark-warehouse'.
-2026-02-10 16:44:28.690 | 26/02/10 22:44:28 WARN MetricsConfig: Cannot locate configuration: tried hadoop-metrics2-s3a-file-system.properties,hadoop-metrics2.properties
-2026-02-10 16:44:28.700 | 26/02/10 22:44:28 INFO MetricsSystemImpl: Scheduled Metric snapshot period at 10 second(s).
-2026-02-10 16:44:28.700 | 26/02/10 22:44:28 INFO MetricsSystemImpl: s3a-file-system metrics system started
-2026-02-10 16:44:29.342 | 26/02/10 22:44:29 INFO CatalogUtil: Loading custom FileIO implementation: org.apache.iceberg.hadoop.HadoopFileIO
-2026-02-10 16:44:32.036 | 26/02/10 22:44:32 INFO BaseMetastoreCatalog: Table loaded by catalog: iceberg.raw.network_traffic_raw.snapshots
-2026-02-10 16:44:32.982 | 26/02/10 22:44:32 INFO BaseMetastoreCatalog: Table loaded by catalog: iceberg.raw.network_traffic_raw
-2026-02-10 16:44:33.687 | 26/02/10 22:44:33 INFO V2ScanRelationPushDown: 
-2026-02-10 16:44:33.688 | Output: committed_at#0, snapshot_id#1L
-2026-02-10 16:44:33.688 |            
-2026-02-10 16:44:33.869 | 26/02/10 22:44:33 INFO SparkPartitioningAwareScan: Reporting UnknownPartitioning with 1 partition(s) for table iceberg.raw.network_traffic_raw.snapshots
-2026-02-10 16:44:34.033 | 26/02/10 22:44:34 INFO MemoryStore: MemoryStore started with capacity 1048.8 MiB
-2026-02-10 16:44:34.055 | 26/02/10 22:44:34 INFO MemoryStore: Block broadcast_0 stored as values in memory (estimated size 32.0 KiB, free 1048.8 MiB)
-2026-02-10 16:44:34.102 | 26/02/10 22:44:34 INFO MemoryStore: Block broadcast_0_piece0 stored as bytes in memory (estimated size 35.0 KiB, free 1048.7 MiB)
-2026-02-10 16:44:34.108 | 26/02/10 22:44:34 INFO SparkContext: Created broadcast 0 from collect at /app/repo/k3s/spark/spark-preprocess-iceberg.py:131
-2026-02-10 16:44:34.138 | 26/02/10 22:44:34 INFO MemoryStore: Block broadcast_1 stored as values in memory (estimated size 32.0 KiB, free 1048.7 MiB)
-2026-02-10 16:44:34.142 | 26/02/10 22:44:34 INFO MemoryStore: Block broadcast_1_piece0 stored as bytes in memory (estimated size 35.1 KiB, free 1048.7 MiB)
-2026-02-10 16:44:34.144 | 26/02/10 22:44:34 INFO SparkContext: Created broadcast 1 from collect at /app/repo/k3s/spark/spark-preprocess-iceberg.py:131
-2026-02-10 16:44:34.457 | 26/02/10 22:44:34 INFO CodeGenerator: Code generated in 165.147755 ms
-2026-02-10 16:44:34.517 | 26/02/10 22:44:34 INFO CodeGenerator: Code generated in 13.251578 ms
-2026-02-10 16:44:34.636 | 26/02/10 22:44:34 INFO SparkContext: Starting job: collect at /app/repo/k3s/spark/spark-preprocess-iceberg.py:131
-2026-02-10 16:44:34.647 | 26/02/10 22:44:34 INFO DAGScheduler: Got job 0 (collect at /app/repo/k3s/spark/spark-preprocess-iceberg.py:131) with 1 output partitions
-2026-02-10 16:44:34.649 | 26/02/10 22:44:34 INFO DAGScheduler: Final stage: ResultStage 0 (collect at /app/repo/k3s/spark/spark-preprocess-iceberg.py:131)
-2026-02-10 16:44:34.650 | 26/02/10 22:44:34 INFO DAGScheduler: Parents of final stage: List()
-2026-02-10 16:44:34.651 | 26/02/10 22:44:34 INFO DAGScheduler: Missing parents: List()
-2026-02-10 16:44:34.656 | 26/02/10 22:44:34 INFO DAGScheduler: Submitting ResultStage 0 (MapPartitionsRDD[4] at collect at /app/repo/k3s/spark/spark-preprocess-iceberg.py:131), which has no missing parents
-2026-02-10 16:44:34.674 | 26/02/10 22:44:34 INFO MemoryStore: Block broadcast_2 stored as values in memory (estimated size 13.8 KiB, free 1048.7 MiB)
-2026-02-10 16:44:34.676 | 26/02/10 22:44:34 INFO MemoryStore: Block broadcast_2_piece0 stored as bytes in memory (estimated size 5.9 KiB, free 1048.6 MiB)
-2026-02-10 16:44:34.677 | 26/02/10 22:44:34 INFO SparkContext: Created broadcast 2 from broadcast at DAGScheduler.scala:1676
-2026-02-10 16:44:34.692 | 26/02/10 22:44:34 INFO DAGScheduler: Submitting 1 missing tasks from ResultStage 0 (MapPartitionsRDD[4] at collect at /app/repo/k3s/spark/spark-preprocess-iceberg.py:131) (first 15 tasks are for partitions Vector(0))
-2026-02-10 16:44:34.703 | 26/02/10 22:44:34 INFO TaskSchedulerImpl: Adding task set 0.0 with 1 tasks resource profile 0
-2026-02-10 16:44:34.747 | 26/02/10 22:44:34 INFO TaskSetManager: Starting task 0.0 in stage 0.0 (TID 0) (10.1.10.99,executor 1, partition 0, PROCESS_LOCAL, 14756 bytes) 
-2026-02-10 16:44:35.798 | 26/02/10 22:44:35 INFO TaskSetManager: Finished task 0.0 in stage 0.0 (TID 0) in 1078 ms on 10.1.10.99 (executor 1) (1/1)
-2026-02-10 16:44:35.801 | 26/02/10 22:44:35 INFO TaskSchedulerImpl: Removed TaskSet 0.0 whose tasks have all completed, from pool 
-2026-02-10 16:44:35.805 | 26/02/10 22:44:35 INFO DAGScheduler: ResultStage 0 (collect at /app/repo/k3s/spark/spark-preprocess-iceberg.py:131) finished in 1135 ms
-2026-02-10 16:44:35.807 | 26/02/10 22:44:35 INFO DAGScheduler: Job 0 is finished. Cancelling potential speculative or zombie tasks for this job
-2026-02-10 16:44:35.809 | 26/02/10 22:44:35 INFO TaskSchedulerImpl: Canceling stage 0
-2026-02-10 16:44:35.810 | 26/02/10 22:44:35 INFO TaskSchedulerImpl: Killing all running tasks in stage 0: Stage finished
-2026-02-10 16:44:35.812 | 26/02/10 22:44:35 INFO DAGScheduler: Job 0 finished: collect at /app/repo/k3s/spark/spark-preprocess-iceberg.py:131, took 1175.309249 ms
-2026-02-10 16:44:35.831 | 26/02/10 22:44:35 INFO CodeGenerator: Code generated in 11.603072 ms
-2026-02-10 16:44:35.851 | 2026-02-10 22:44:35,850 - SparkPreprocessIceberg - INFO - Raw table snapshot: 998511801533581604
-2026-02-10 16:44:38.088 | 2026-02-10 22:44:38,088 - SparkPreprocessIceberg - INFO - Creating metadata table: iceberg.metadata.preprocessing_artifacts
-2026-02-10 16:44:39.633 | 26/02/10 22:44:39 INFO BaseMetastoreCatalog: Table properties set at catalog level through catalog properties: {}
-2026-02-10 16:44:40.359 | 26/02/10 22:44:40 INFO BaseMetastoreCatalog: Table properties enforced at catalog level through catalog properties: {}
-2026-02-10 16:44:41.482 | 26/02/10 22:44:41 INFO HadoopTableOperations: Committed a new metadata file s3a://k8s-mlops-platform-bucket/warehouse/metadata/preprocessing_artifacts/metadata/v1.metadata.json
-2026-02-10 16:44:43.562 | 2026-02-10 22:44:43,562 - SparkPreprocessIceberg - INFO - Metadata table created: iceberg.metadata.preprocessing_artifacts
-2026-02-10 16:44:43.562 | 2026-02-10 22:44:43,562 - SparkPreprocessIceberg - INFO - ============================================================
-2026-02-10 16:44:43.562 | 2026-02-10 22:44:43,562 - SparkPreprocessIceberg - INFO - Processing TRAIN split
-2026-02-10 16:44:43.562 | 2026-02-10 22:44:43,562 - SparkPreprocessIceberg - INFO - ============================================================
-2026-02-10 16:44:43.562 | 2026-02-10 22:44:43,562 - SparkPreprocessIceberg - INFO - Loading raw data: 2024-01-01 00:00:00 to 2024-06-30 23:59:59
-2026-02-10 16:44:43.788 | 26/02/10 22:44:43 INFO V2ScanRelationPushDown: 
-2026-02-10 16:44:43.788 | Pushing operators to iceberg.raw.network_traffic_raw
-2026-02-10 16:44:43.788 | Pushed Filters: timestamp IS NOT NULL, timestamp >= 1704067200000000, timestamp <= 1719791999000000
-2026-02-10 16:44:43.788 | Post-Scan Filters: isnotnull(timestamp#19),(timestamp#19 >= 2024-01-01 00:00:00),(timestamp#19 <= 2024-06-30 23:59:59)
-2026-02-10 16:44:43.788 |            
-2026-02-10 16:44:43.797 | 26/02/10 22:44:43 INFO V2ScanRelationPushDown: 
-2026-02-10 16:44:43.798 | Output: timestamp#19
-2026-02-10 16:44:43.798 |            
-2026-02-10 16:44:43.808 | 26/02/10 22:44:43 INFO SnapshotScan: Scanning table iceberg.raw.network_traffic_raw snapshot 998511801533581604 created at 2026-02-10T05:02:05.810+00:00 with filter ((timestamp IS NOT NULL AND timestamp >= (16-digit-int)) AND timestamp <= (16-digit-int))
-2026-02-10 16:44:44.244 | 26/02/10 22:44:44 INFO BaseDistributedDataScan: Planning file tasks locally for table iceberg.raw.network_traffic_raw
-2026-02-10 16:44:44.489 | 26/02/10 22:44:44 INFO SparkPartitioningAwareScan: Reporting UnknownPartitioning with 1 partition(s) for table iceberg.raw.network_traffic_raw
-2026-02-10 16:44:44.544 | 26/02/10 22:44:44 INFO MemoryStore: Block broadcast_3 stored as values in memory (estimated size 32.0 KiB, free 1048.6 MiB)
-2026-02-10 16:44:44.547 | 26/02/10 22:44:44 INFO MemoryStore: Block broadcast_3_piece0 stored as bytes in memory (estimated size 34.9 KiB, free 1048.6 MiB)
-2026-02-10 16:44:44.548 | 26/02/10 22:44:44 INFO SparkContext: Created broadcast 3 from broadcast at SparkBatch.java:87
-2026-02-10 16:44:44.577 | 26/02/10 22:44:44 INFO MemoryStore: Block broadcast_4 stored as values in memory (estimated size 32.0 KiB, free 1048.6 MiB)
-2026-02-10 16:44:44.580 | 26/02/10 22:44:44 INFO MemoryStore: Block broadcast_4_piece0 stored as bytes in memory (estimated size 34.9 KiB, free 1048.5 MiB)
-2026-02-10 16:44:44.581 | 26/02/10 22:44:44 INFO SparkContext: Created broadcast 4 from broadcast at SparkBatch.java:87
-2026-02-10 16:44:44.679 | 26/02/10 22:44:44 INFO CodeGenerator: Code generated in 18.909888 ms
-2026-02-10 16:44:44.707 | 26/02/10 22:44:44 INFO DAGScheduler: Registering RDD 8 ($anonfun$withThreadLocalCaptured$2 at CompletableFuture.java:1768) as input to shuffle 0
-2026-02-10 16:44:44.711 | 26/02/10 22:44:44 INFO DAGScheduler: Got map stage job 1 ($anonfun$withThreadLocalCaptured$2 at CompletableFuture.java:1768) with 1 output partitions
-2026-02-10 16:44:44.712 | 26/02/10 22:44:44 INFO DAGScheduler: Final stage: ShuffleMapStage 1 ($anonfun$withThreadLocalCaptured$2 at CompletableFuture.java:1768)
-2026-02-10 16:44:44.712 | 26/02/10 22:44:44 INFO DAGScheduler: Parents of final stage: List()
-2026-02-10 16:44:44.713 | 26/02/10 22:44:44 INFO DAGScheduler: Missing parents: List()
-2026-02-10 16:44:44.715 | 26/02/10 22:44:44 INFO DAGScheduler: Submitting ShuffleMapStage 1 (MapPartitionsRDD[8] at $anonfun$withThreadLocalCaptured$2 at CompletableFuture.java:1768), which has no missing parents
-2026-02-10 16:44:44.725 | 26/02/10 22:44:44 INFO MemoryStore: Block broadcast_5 stored as values in memory (estimated size 16.7 KiB, free 1048.5 MiB)
-2026-02-10 16:44:44.733 | 26/02/10 22:44:44 INFO MemoryStore: Block broadcast_5_piece0 stored as bytes in memory (estimated size 7.0 KiB, free 1048.5 MiB)
-2026-02-10 16:44:44.734 | 26/02/10 22:44:44 INFO SparkContext: Created broadcast 5 from broadcast at DAGScheduler.scala:1676
-2026-02-10 16:44:44.736 | 26/02/10 22:44:44 INFO DAGScheduler: Submitting 1 missing tasks from ShuffleMapStage 1 (MapPartitionsRDD[8] at $anonfun$withThreadLocalCaptured$2 at CompletableFuture.java:1768) (first 15 tasks are for partitions Vector(0))
-2026-02-10 16:44:44.736 | 26/02/10 22:44:44 INFO TaskSchedulerImpl: Adding task set 1.0 with 1 tasks resource profile 0
-2026-02-10 16:44:44.742 | 26/02/10 22:44:44 INFO TaskSetManager: Starting task 0.0 in stage 1.0 (TID 1) (10.1.10.99,executor 1, partition 0, PROCESS_LOCAL, 15440 bytes) 
-2026-02-10 16:44:47.500 | 26/02/10 22:44:47 INFO TaskSetManager: Finished task 0.0 in stage 1.0 (TID 1) in 2762 ms on 10.1.10.99 (executor 1) (1/1)
-2026-02-10 16:44:47.500 | 26/02/10 22:44:47 INFO TaskSchedulerImpl: Removed TaskSet 1.0 whose tasks have all completed, from pool 
-2026-02-10 16:44:47.502 | 26/02/10 22:44:47 INFO DAGScheduler: ShuffleMapStage 1 ($anonfun$withThreadLocalCaptured$2 at CompletableFuture.java:1768) finished in 2785 ms
-2026-02-10 16:44:47.503 | 26/02/10 22:44:47 INFO DAGScheduler: looking for newly runnable stages
-2026-02-10 16:44:47.503 | 26/02/10 22:44:47 INFO DAGScheduler: running: HashSet()
-2026-02-10 16:44:47.503 | 26/02/10 22:44:47 INFO DAGScheduler: waiting: HashSet()
-2026-02-10 16:44:47.504 | 26/02/10 22:44:47 INFO DAGScheduler: failed: HashSet()
-2026-02-10 16:44:47.560 | 26/02/10 22:44:47 INFO CodeGenerator: Code generated in 14.479893 ms
-2026-02-10 16:44:47.584 | 26/02/10 22:44:47 INFO SparkContext: Starting job: $anonfun$withThreadLocalCaptured$2 at CompletableFuture.java:1768
-2026-02-10 16:44:47.585 | 26/02/10 22:44:47 INFO DAGScheduler: Got job 2 ($anonfun$withThreadLocalCaptured$2 at CompletableFuture.java:1768) with 1 output partitions
-2026-02-10 16:44:47.585 | 26/02/10 22:44:47 INFO DAGScheduler: Final stage: ResultStage 3 ($anonfun$withThreadLocalCaptured$2 at CompletableFuture.java:1768)
-2026-02-10 16:44:47.586 | 26/02/10 22:44:47 INFO DAGScheduler: Parents of final stage: List(ShuffleMapStage 2)
-2026-02-10 16:44:47.586 | 26/02/10 22:44:47 INFO DAGScheduler: Missing parents: List()
-2026-02-10 16:44:47.586 | 26/02/10 22:44:47 INFO DAGScheduler: Submitting ResultStage 3 (MapPartitionsRDD[12] at $anonfun$withThreadLocalCaptured$2 at CompletableFuture.java:1768), which has no missing parents
-2026-02-10 16:44:47.591 | 26/02/10 22:44:47 INFO MemoryStore: Block broadcast_6 stored as values in memory (estimated size 15.2 KiB, free 1048.5 MiB)
-2026-02-10 16:44:47.598 | 26/02/10 22:44:47 INFO MemoryStore: Block broadcast_6_piece0 stored as bytes in memory (estimated size 6.8 KiB, free 1048.5 MiB)
-2026-02-10 16:44:47.599 | 26/02/10 22:44:47 INFO SparkContext: Created broadcast 6 from broadcast at DAGScheduler.scala:1676
-2026-02-10 16:44:47.600 | 26/02/10 22:44:47 INFO DAGScheduler: Submitting 1 missing tasks from ResultStage 3 (MapPartitionsRDD[12] at $anonfun$withThreadLocalCaptured$2 at CompletableFuture.java:1768) (first 15 tasks are for partitions Vector(0))
-2026-02-10 16:44:47.600 | 26/02/10 22:44:47 INFO TaskSchedulerImpl: Adding task set 3.0 with 1 tasks resource profile 0
-2026-02-10 16:44:47.602 | 26/02/10 22:44:47 INFO TaskSetManager: Starting task 0.0 in stage 3.0 (TID 2) (10.1.10.99,executor 1, partition 0, PROCESS_LOCAL, 9623 bytes) 
-2026-02-10 16:44:47.650 | 26/02/10 22:44:47 INFO MapOutputTrackerMasterEndpoint: Asked to send map output locations for shuffle 0 to 10.1.10.99:40428
-2026-02-10 16:44:47.741 | 26/02/10 22:44:47 INFO TaskSetManager: Finished task 0.0 in stage 3.0 (TID 2) in 139 ms on 10.1.10.99 (executor 1) (1/1)
-2026-02-10 16:44:47.741 | 26/02/10 22:44:47 INFO TaskSchedulerImpl: Removed TaskSet 3.0 whose tasks have all completed, from pool 
-2026-02-10 16:44:47.742 | 26/02/10 22:44:47 INFO DAGScheduler: ResultStage 3 ($anonfun$withThreadLocalCaptured$2 at CompletableFuture.java:1768) finished in 153 ms
-2026-02-10 16:44:47.742 | 26/02/10 22:44:47 INFO DAGScheduler: Job 2 is finished. Cancelling potential speculative or zombie tasks for this job
-2026-02-10 16:44:47.743 | 26/02/10 22:44:47 INFO TaskSchedulerImpl: Canceling stage 3
-2026-02-10 16:44:47.743 | 26/02/10 22:44:47 INFO TaskSchedulerImpl: Killing all running tasks in stage 3: Stage finished
-2026-02-10 16:44:47.743 | 26/02/10 22:44:47 INFO DAGScheduler: Job 2 finished: $anonfun$withThreadLocalCaptured$2 at CompletableFuture.java:1768, took 159.360353 ms
-2026-02-10 16:44:47.752 | 2026-02-10 22:44:47,752 - SparkPreprocessIceberg - INFO - Loaded sample presence=0 for range 2024-01-01 00:00:00 to 2024-06-30 23:59:59
-2026-02-10 16:44:47.752 | 2026-02-10 22:44:47,752 - SparkPreprocessIceberg - INFO - Fitting pipeline from DSL: /app/repo/dsl/dsl_001.yaml
-2026-02-10 16:44:47.753 | 2026-02-10 22:44:47,752 - SparkPreprocessIceberg - ERROR - Failed fitting pipeline: [Errno 2] No such file or directory: '/app/repo/dsl/dsl_001.yaml'
-2026-02-10 16:44:47.753 | Traceback (most recent call last):
-2026-02-10 16:44:47.753 |   File "/app/repo/k3s/spark/spark-preprocess-iceberg.py", line 290, in fit_pipeline
-2026-02-10 16:44:47.753 |     base_pipeline = Pipeline.from_yaml(dsl_path)
-2026-02-10 16:44:47.753 |                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-2026-02-10 16:44:47.753 |   File "/app/repo/src/dsl/pipeline.py", line 52, in from_yaml
-2026-02-10 16:44:47.753 |     with open(yaml_path, 'r') as f:
-2026-02-10 16:44:47.753 |          ^^^^^^^^^^^^^^^^^^^^
-2026-02-10 16:44:47.753 | FileNotFoundError: [Errno 2] No such file or directory: '/app/repo/dsl/dsl_001.yaml'
-2026-02-10 16:44:47.753 | 2026-02-10 22:44:47,753 - SparkPreprocessIceberg - ERROR - Preprocessing pipeline failed: [Errno 2] No such file or directory: '/app/repo/dsl/dsl_001.yaml'
-2026-02-10 16:44:47.753 | Traceback (most recent call last):
-2026-02-10 16:44:47.753 |   File "/app/repo/k3s/spark/spark-preprocess-iceberg.py", line 543, in run_preprocessing_pipeline
-2026-02-10 16:44:47.753 |     pipeline_hash = self.fit_pipeline(df_train, dsl_path)
-2026-02-10 16:44:47.753 |                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-2026-02-10 16:44:47.753 |   File "/app/repo/k3s/spark/spark-preprocess-iceberg.py", line 290, in fit_pipeline
-2026-02-10 16:44:47.753 |     base_pipeline = Pipeline.from_yaml(dsl_path)
-2026-02-10 16:44:47.753 |                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-2026-02-10 16:44:47.753 |   File "/app/repo/src/dsl/pipeline.py", line 52, in from_yaml
-2026-02-10 16:44:47.753 |     with open(yaml_path, 'r') as f:
-2026-02-10 16:44:47.753 |          ^^^^^^^^^^^^^^^^^^^^
-2026-02-10 16:44:47.753 | FileNotFoundError: [Errno 2] No such file or directory: '/app/repo/dsl/dsl_001.yaml'
-2026-02-10 16:44:47.753 | Traceback (most recent call last):
-2026-02-10 16:44:47.753 |   File "/app/repo/k3s/spark/spark-preprocess-iceberg.py", line 634, in <module>
-2026-02-10 16:44:47.753 |     main()
-2026-02-10 16:44:47.753 |   File "/app/repo/k3s/spark/spark-preprocess-iceberg.py", line 627, in main
-2026-02-10 16:44:47.754 |     job.run_preprocessing_pipeline(
-2026-02-10 16:44:47.754 |   File "/app/repo/k3s/spark/spark-preprocess-iceberg.py", line 543, in run_preprocessing_pipeline
-2026-02-10 16:44:47.754 |     pipeline_hash = self.fit_pipeline(df_train, dsl_path)
-2026-02-10 16:44:47.754 |                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-2026-02-10 16:44:47.754 |   File "/app/repo/k3s/spark/spark-preprocess-iceberg.py", line 290, in fit_pipeline
-2026-02-10 16:44:47.754 |     base_pipeline = Pipeline.from_yaml(dsl_path)
-2026-02-10 16:44:47.754 |                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-2026-02-10 16:44:47.754 |   File "/app/repo/src/dsl/pipeline.py", line 52, in from_yaml
-2026-02-10 16:44:47.754 |     with open(yaml_path, 'r') as f:
-2026-02-10 16:44:47.754 |          ^^^^^^^^^^^^^^^^^^^^
-2026-02-10 16:44:47.754 | FileNotFoundError: [Errno 2] No such file or directory: '/app/repo/dsl/dsl_001.yaml'
-2026-02-10 16:44:47.881 | 26/02/10 22:44:47 INFO SparkContext: SparkContext is stopping with exitCode 0 from stop at SparkSubmit.scala:1036.
-2026-02-10 16:44:47.893 | 26/02/10 22:44:47 INFO SparkUI: Stopped Spark web UI at http://spark-app-0-driver-svc.spark.svc:4040
-2026-02-10 16:44:47.895 | 26/02/10 22:44:47 INFO KubernetesClusterSchedulerBackend: Shutting down all executors
-2026-02-10 16:44:47.896 | 26/02/10 22:44:47 INFO KubernetesClusterSchedulerBackend$KubernetesDriverEndpoint: Asking each executor to shut down
-2026-02-10 16:44:47.901 | 26/02/10 22:44:47 INFO ExecutorPodsWatchSnapshotSource: Kubernetes client has been closed.
-2026-02-10 16:44:48.042 | 26/02/10 22:44:48 INFO MapOutputTrackerMasterEndpoint: MapOutputTrackerMasterEndpoint stopped!
-2026-02-10 16:44:48.062 | 26/02/10 22:44:48 INFO MemoryStore: MemoryStore cleared
-2026-02-10 16:44:48.062 | 26/02/10 22:44:48 INFO BlockManager: BlockManager stopped
-2026-02-10 16:44:48.064 | 26/02/10 22:44:48 INFO BlockManagerMaster: BlockManagerMaster stopped
-2026-02-10 16:44:48.067 | 26/02/10 22:44:48 INFO OutputCommitCoordinator$OutputCommitCoordinatorEndpoint: OutputCommitCoordinator stopped!
-2026-02-10 16:44:48.077 | 26/02/10 22:44:48 INFO SparkContext: Successfully stopped SparkContext
-2026-02-10 16:44:48.081 | 26/02/10 22:44:48 INFO ShutdownHookManager: Shutdown hook called
-2026-02-10 16:44:48.081 | 26/02/10 22:44:48 INFO ShutdownHookManager: Deleting directory /var/data/spark-a41210a0-d72a-44a1-af38-b90ff9dd71a6/spark-822e27cd-2b90-4e80-bd30-f44716aca6f5
-2026-02-10 16:44:48.084 | 26/02/10 22:44:48 INFO ShutdownHookManager: Deleting directory /tmp/localPyFiles-c9a82b2f-d9c1-43c9-b14e-31aecf95a83d
-2026-02-10 16:44:48.087 | 26/02/10 22:44:48 INFO ShutdownHookManager: Deleting directory /tmp/spark-b510a0ea-f658-4c97-a62b-977ae54b21b0
-2026-02-10 16:44:48.090 | 26/02/10 22:44:48 INFO ShutdownHookManager: Deleting directory /var/data/spark-a41210a0-d72a-44a1-af38-b90ff9dd71a6/spark-822e27cd-2b90-4e80-bd30-f44716aca6f5/pyspark-e30e4110-c979-42be-981c-61f350197b3b
-2026-02-10 16:44:48.093 | 26/02/10 22:44:48 INFO ShutdownHookManager: Deleting directory /tmp/artifacts-c25b8cd9-835a-4990-b561-d3891ce1a62f
-2026-02-10 16:44:48.096 | 26/02/10 22:44:48 INFO ShutdownHookManager: Deleting directory /tmp/spark-ff7741cd-7d62-4f12-ac46-bf61690cb175
-2026-02-10 16:44:48.100 | 26/02/10 22:44:48 INFO ShutdownHookManager: Deleting directory /tmp/spark-a2c73630-a66f-458d-8e1c-7ff9f7d92b1a
-2026-02-10 16:44:48.102 | 26/02/10 22:44:48 INFO ShutdownHookManager: Deleting directory /tmp/spark-b0f3af68-3061-47db-8a1c-6d7eb6f1d0d1
-2026-02-10 16:44:48.110 | 26/02/10 22:44:48 INFO MetricsSystemImpl: Stopping s3a-file-system metrics system...
-2026-02-10 16:44:48.111 | 26/02/10 22:44:48 INFO MetricsSystemImpl: s3a-file-system metrics system stopped.
-2026-02-10 16:44:48.111 | 26/02/10 22:44:48 INFO MetricsSystemImpl: s3a-file-system metrics system shutdown complete.
+2026-02-10 16:50:12.425 | 26/02/10 22:50:12 INFO TaskSchedulerImpl: Killing all running tasks in stage 6: Stage finished
+2026-02-10 16:50:12.425 | 26/02/10 22:50:12 INFO DAGScheduler: Job 4 finished: $anonfun$withThreadLocalCaptured$2 at CompletableFuture.java:1768, took 83.046926 ms
+2026-02-10 16:50:12.432 | [Pipeline] Input DataFrame shape: 0 rows
+2026-02-10 16:50:12.432 | 
+2026-02-10 16:50:12.432 | [Stage 1/14] timestamp_parser (cast_transformer)
+2026-02-10 16:50:12.432 |   -> Transformer (deterministic)
+2026-02-10 16:50:12.462 |   -> Output columns: ['src_port', 'dst_port', 'protocol', 'packet_count', 'conn_state', 'bytes_transferred', 'timestamp', 'attack', 'timestamp_ts']
+2026-02-10 16:50:12.462 | 
+2026-02-10 16:50:12.462 | [Stage 2/14] hour_extractor (temporal_extractor)
+2026-02-10 16:50:12.462 |   -> Transformer (deterministic)
+2026-02-10 16:50:12.476 |   -> Output columns: ['src_port', 'dst_port', 'protocol', 'packet_count', 'conn_state', 'bytes_transferred', 'timestamp', 'attack', 'timestamp_ts', 'hour']
+2026-02-10 16:50:12.476 | 
+2026-02-10 16:50:12.476 | [Stage 3/14] dayofweek_extractor (temporal_extractor)
+2026-02-10 16:50:12.476 |   -> Transformer (deterministic)
+2026-02-10 16:50:12.493 |   -> Output columns: ['src_port', 'dst_port', 'protocol', 'packet_count', 'conn_state', 'bytes_transferred', 'timestamp', 'attack', 'timestamp_ts', 'hour']...
+2026-02-10 16:50:12.493 | 
+2026-02-10 16:50:12.493 | [Stage 4/14] dayofweek_adjuster (arithmetic_transformer)
+2026-02-10 16:50:12.493 |   -> Transformer (deterministic)
+2026-02-10 16:50:12.515 |   -> Output columns: ['src_port', 'dst_port', 'protocol', 'packet_count', 'conn_state', 'bytes_transferred', 'timestamp', 'attack', 'timestamp_ts', 'hour']...
+2026-02-10 16:50:12.515 | 
+2026-02-10 16:50:12.515 | [Stage 5/14] weekend_flag (conditional_transformer)
+2026-02-10 16:50:12.515 |   -> Transformer (deterministic)
+2026-02-10 16:50:12.548 |   -> Output columns: ['src_port', 'dst_port', 'protocol', 'packet_count', 'conn_state', 'bytes_transferred', 'timestamp', 'attack', 'timestamp_ts', 'hour']...
+2026-02-10 16:50:12.548 | 
+2026-02-10 16:50:12.548 | [Stage 6/14] hour_cyclic_sin (cyclic_transformer)
+2026-02-10 16:50:12.548 |   -> Transformer (deterministic)
+2026-02-10 16:50:12.581 |   -> Output columns: ['src_port', 'dst_port', 'protocol', 'packet_count', 'conn_state', 'bytes_transferred', 'timestamp', 'attack', 'timestamp_ts', 'hour']...
+2026-02-10 16:50:12.581 | 
+2026-02-10 16:50:12.581 | [Stage 7/14] hour_cyclic_cos (cyclic_transformer)
+2026-02-10 16:50:12.581 |   -> Transformer (deterministic)
+2026-02-10 16:50:12.606 |   -> Output columns: ['src_port', 'dst_port', 'protocol', 'packet_count', 'conn_state', 'bytes_transferred', 'timestamp', 'attack', 'timestamp_ts', 'hour']...
+2026-02-10 16:50:12.606 | 
+2026-02-10 16:50:12.606 | [Stage 8/14] bytes_log (log_transformer)
+2026-02-10 16:50:12.606 |   -> Transformer (deterministic)
+2026-02-10 16:50:12.620 |   -> Output columns: ['src_port', 'dst_port', 'protocol', 'packet_count', 'conn_state', 'bytes_transferred', 'timestamp', 'attack', 'timestamp_ts', 'hour']...
+2026-02-10 16:50:12.621 | 
+2026-02-10 16:50:12.621 | [Stage 9/14] packet_log (log_transformer)
+2026-02-10 16:50:12.621 |   -> Transformer (deterministic)
+2026-02-10 16:50:12.637 |   -> Output columns: ['src_port', 'dst_port', 'protocol', 'packet_count', 'conn_state', 'bytes_transferred', 'timestamp', 'attack', 'timestamp_ts', 'hour']...
+2026-02-10 16:50:12.637 | 
+2026-02-10 16:50:12.637 | [Stage 10/14] protocol_conn_concat (concat_transformer)
+2026-02-10 16:50:12.637 |   -> Transformer (deterministic)
+2026-02-10 16:50:12.656 |   -> Output columns: ['src_port', 'dst_port', 'protocol', 'packet_count', 'conn_state', 'bytes_transferred', 'timestamp', 'attack', 'timestamp_ts', 'hour']...
+2026-02-10 16:50:12.656 | 
+2026-02-10 16:50:12.656 | [Stage 11/14] protocol_encoder (string_indexer)
+2026-02-10 16:50:12.656 |   -> Estimator (learning from data)
+2026-02-10 16:50:12.691 | 26/02/10 22:50:12 INFO V2ScanRelationPushDown: 
+2026-02-10 16:50:12.692 | Pushing operators to iceberg.raw.network_traffic_raw
+2026-02-10 16:50:12.692 | Pushed Filters: timestamp IS NOT NULL, timestamp >= 1704067200000000, timestamp <= 1719791999000000
+2026-02-10 16:50:12.692 | Post-Scan Filters: isnotnull(timestamp#31),(timestamp#31 >= 2024-01-01 00:00:00),(timestamp#31 <= 2024-06-30 23:59:59)
+2026-02-10 16:50:12.692 |            
+2026-02-10 16:50:12.694 | 26/02/10 22:50:12 INFO V2ScanRelationPushDown: 
+2026-02-10 16:50:12.694 | Output: protocol#27, timestamp#31
+2026-02-10 16:50:12.694 |            
+2026-02-10 16:50:12.695 | 26/02/10 22:50:12 INFO SnapshotScan: Scanning table iceberg.raw.network_traffic_raw snapshot 998511801533581604 created at 2026-02-10T05:02:05.810+00:00 with filter ((timestamp IS NOT NULL AND timestamp >= (16-digit-int)) AND timestamp <= (16-digit-int))
+2026-02-10 16:50:12.695 | 26/02/10 22:50:12 INFO BaseDistributedDataScan: Planning file tasks locally for table iceberg.raw.network_traffic_raw
+2026-02-10 16:50:12.889 | 26/02/10 22:50:12 INFO SparkPartitioningAwareScan: Reporting UnknownPartitioning with 1 partition(s) for table iceberg.raw.network_traffic_raw
+2026-02-10 16:50:12.896 | 26/02/10 22:50:12 INFO MemoryStore: Block broadcast_11 stored as values in memory (estimated size 32.0 KiB, free 1048.5 MiB)
+2026-02-10 16:50:12.903 | 26/02/10 22:50:12 INFO MemoryStore: Block broadcast_11_piece0 stored as bytes in memory (estimated size 34.9 KiB, free 1048.5 MiB)
+2026-02-10 16:50:12.905 | 26/02/10 22:50:12 INFO SparkContext: Created broadcast 11 from broadcast at SparkBatch.java:87
+2026-02-10 16:50:12.910 | 26/02/10 22:50:12 INFO MemoryStore: Block broadcast_12 stored as values in memory (estimated size 32.0 KiB, free 1048.5 MiB)
+2026-02-10 16:50:12.918 | 26/02/10 22:50:12 INFO MemoryStore: Block broadcast_12_piece0 stored as bytes in memory (estimated size 34.9 KiB, free 1048.5 MiB)
+2026-02-10 16:50:12.919 | 26/02/10 22:50:12 INFO SparkContext: Created broadcast 12 from broadcast at SparkBatch.java:87
+2026-02-10 16:50:13.013 | 26/02/10 22:50:13 INFO CodeGenerator: Code generated in 47.273949 ms
+2026-02-10 16:50:13.037 | 26/02/10 22:50:13 INFO DAGScheduler: Registering RDD 23 ($anonfun$withThreadLocalCaptured$2 at CompletableFuture.java:1768) as input to shuffle 2
+2026-02-10 16:50:13.037 | 26/02/10 22:50:13 INFO DAGScheduler: Got map stage job 5 ($anonfun$withThreadLocalCaptured$2 at CompletableFuture.java:1768) with 1 output partitions
+2026-02-10 16:50:13.037 | 26/02/10 22:50:13 INFO DAGScheduler: Final stage: ShuffleMapStage 7 ($anonfun$withThreadLocalCaptured$2 at CompletableFuture.java:1768)
+2026-02-10 16:50:13.037 | 26/02/10 22:50:13 INFO DAGScheduler: Parents of final stage: List()
+2026-02-10 16:50:13.037 | 26/02/10 22:50:13 INFO DAGScheduler: Missing parents: List()
+2026-02-10 16:50:13.038 | 26/02/10 22:50:13 INFO DAGScheduler: Submitting ShuffleMapStage 7 (MapPartitionsRDD[23] at $anonfun$withThreadLocalCaptured$2 at CompletableFuture.java:1768), which has no missing parents
+2026-02-10 16:50:13.044 | 26/02/10 22:50:13 INFO MemoryStore: Block broadcast_13 stored as values in memory (estimated size 34.4 KiB, free 1048.5 MiB)
+2026-02-10 16:50:13.051 | 26/02/10 22:50:13 INFO MemoryStore: Block broadcast_13_piece0 stored as bytes in memory (estimated size 14.5 KiB, free 1048.5 MiB)
+2026-02-10 16:50:13.053 | 26/02/10 22:50:13 INFO SparkContext: Created broadcast 13 from broadcast at DAGScheduler.scala:1676
+2026-02-10 16:50:13.054 | 26/02/10 22:50:13 INFO DAGScheduler: Submitting 1 missing tasks from ShuffleMapStage 7 (MapPartitionsRDD[23] at $anonfun$withThreadLocalCaptured$2 at CompletableFuture.java:1768) (first 15 tasks are for partitions Vector(0))
+2026-02-10 16:50:13.054 | 26/02/10 22:50:13 INFO TaskSchedulerImpl: Adding task set 7.0 with 1 tasks resource profile 0
+2026-02-10 16:50:13.056 | 26/02/10 22:50:13 INFO TaskSetManager: Starting task 0.0 in stage 7.0 (TID 5) (10.1.10.105,executor 1, partition 0, PROCESS_LOCAL, 15500 bytes) 
+2026-02-10 16:50:13.807 | 26/02/10 22:50:13 INFO TaskSetManager: Finished task 0.0 in stage 7.0 (TID 5) in 751 ms on 10.1.10.105 (executor 1) (1/1)
+2026-02-10 16:50:13.807 | 26/02/10 22:50:13 INFO TaskSchedulerImpl: Removed TaskSet 7.0 whose tasks have all completed, from pool 
+2026-02-10 16:50:13.808 | 26/02/10 22:50:13 INFO DAGScheduler: ShuffleMapStage 7 ($anonfun$withThreadLocalCaptured$2 at CompletableFuture.java:1768) finished in 770 ms
+2026-02-10 16:50:13.808 | 26/02/10 22:50:13 INFO DAGScheduler: looking for newly runnable stages
+2026-02-10 16:50:13.808 | 26/02/10 22:50:13 INFO DAGScheduler: running: HashSet()
+2026-02-10 16:50:13.808 | 26/02/10 22:50:13 INFO DAGScheduler: waiting: HashSet()
+2026-02-10 16:50:13.808 | 26/02/10 22:50:13 INFO DAGScheduler: failed: HashSet()
+2026-02-10 16:50:13.860 | 26/02/10 22:50:13 INFO SparkContext: Starting job: collect at /app/repo/src/dsl/estimators.py:39
+2026-02-10 16:50:13.860 | 26/02/10 22:50:13 INFO DAGScheduler: Job 6 finished: collect at /app/repo/src/dsl/estimators.py:39, took 0.19369 ms
+2026-02-10 16:50:13.863 |   -> Learned parameters
+2026-02-10 16:50:14.018 | {"ts": "2026-02-10 22:50:13.972", "level": "ERROR", "logger": "DataFrameQueryContextLogger", "msg": "[DATATYPE_MISMATCH.UNEXPECTED_INPUT_TYPE] Cannot resolve \"map()[protocol]\" due to data type mismatch: The second parameter requires the \"VOID\" type, however \"protocol\" has the type \"STRING\". SQLSTATE: 42K09", "context": {"file": "/app/repo/src/dsl/estimators.py", "line": "83", "fragment": "__getitem__", "errorClass": "DATATYPE_MISMATCH.UNEXPECTED_INPUT_TYPE"}, "exception": {"class": "Py4JJavaError", "msg": "An error occurred while calling o191.withColumn.\n: org.apache.spark.sql.AnalysisException: [DATATYPE_MISMATCH.UNEXPECTED_INPUT_TYPE] Cannot resolve \"map()[protocol]\" due to data type mismatch: The second parameter requires the \"VOID\" type, however \"protocol\" has the type \"STRING\". SQLSTATE: 42K09;\n'Project [src_port#25L, dst_port#26L, protocol#27, packet_count#28L, conn_state#29, bytes_transferred#30, timestamp#31, attack#32L, timestamp_ts#64, hour#65, dayofweek_raw#66, dayofweek#67, is_weekend#68, hour_sin#69, hour_cos#70, bytes_log#71, packet_log#72, protocol_conn#73, 'coalesce(map()[protocol#27], -1) AS protocol_idx#76]\n+- Project [src_port#25L, dst_port#26L, protocol#27, packet_count#28L, conn_state#29, bytes_transferred#30, timestamp#31, attack#32L, timestamp_ts#64, hour#65, dayofweek_raw#66, dayofweek#67, is_weekend#68, hour_sin#69, hour_cos#70, bytes_log#71, packet_log#72, concat_ws(_, protocol#27, conn_state#29) AS protocol_conn#73]\n   +- Project [src_port#25L, dst_port#26L, protocol#27, packet_count#28L, conn_state#29, bytes_transferred#30, timestamp#31, attack#32L, timestamp_ts#64, hour#65, dayofweek_raw#66, dayofweek#67, is_weekend#68, hour_sin#69, hour_cos#70, bytes_log#71, LOG1P(cast(packet_count#28L as double)) AS packet_log#72]\n      +- Project [src_port#25L, dst_port#26L, protocol#27, packet_count#28L, conn_state#29, bytes_transferred#30, timestamp#31, attack#32L, timestamp_ts#64, hour#65, dayofweek_raw#66, dayofweek#67, is_weekend#68, hour_sin#69, hour_cos#70, LOG1P(bytes_transferred#30) AS bytes_log#71]\n         +- Project [src_port#25L, dst_port#26L, protocol#27, packet_count#28L, conn_state#29, bytes_transferred#30, timestamp#31, attack#32L, timestamp_ts#64, hour#65, dayofweek_raw#66, dayofweek#67, is_weekend#68, hour_sin#69, COS(((cast(hour#65 as double) * 6.283185307179586) / 24.0)) AS hour_cos#70]\n            +- Project [src_port#25L, dst_port#26L, protocol#27, packet_count#28L, conn_state#29, bytes_transferred#30, timestamp#31, attack#32L, timestamp_ts#64, hour#65, dayofweek_raw#66, dayofweek#67, is_weekend#68, SIN(((cast(hour#65 as double) * 6.283185307179586) / 24.0)) AS hour_sin#69]\n               +- Project [src_port#25L, dst_port#26L, protocol#27, packet_count#28L, conn_state#29, bytes_transferred#30, timestamp#31, attack#32L, timestamp_ts#64, hour#65, dayofweek_raw#66, dayofweek#67, CASE WHEN dayofweek#67 IN (5,6) THEN 1 ELSE 0 END AS is_weekend#68]\n                  +- Project [src_port#25L, dst_port#26L, protocol#27, packet_count#28L, conn_state#29, bytes_transferred#30, timestamp#31, attack#32L, timestamp_ts#64, hour#65, dayofweek_raw#66, (dayofweek_raw#66 - 1) AS dayofweek#67]\n                     +- Project [src_port#25L, dst_port#26L, protocol#27, packet_count#28L, conn_state#29, bytes_transferred#30, timestamp#31, attack#32L, timestamp_ts#64, hour#65, dayofweek(cast(timestamp_ts#64 as date)) AS dayofweek_raw#66]\n                        +- Project [src_port#25L, dst_port#26L, protocol#27, packet_count#28L, conn_state#29, bytes_transferred#30, timestamp#31, attack#32L, timestamp_ts#64, hour(timestamp_ts#64, Some(Etc/UTC)) AS hour#65]\n                           +- Project [src_port#25L, dst_port#26L, protocol#27, packet_count#28L, conn_state#29, bytes_transferred#30, timestamp#31, attack#32L, cast(timestamp#31 as timestamp) AS timestamp_ts#64]\n                              +- Filter ((timestamp#31 >= to_timestamp(2024-01-01 00:00:00, None, TimestampType, Some(Etc/UTC), true)) AND (timestamp#31 <= to_timestamp(2024-06-30 23:59:59, None, TimestampType, Some(Etc/UTC), true)))\n                                 +- SubqueryAlias iceberg.raw.network_traffic_raw\n                                    +- RelationV2[src_port#25L, dst_port#26L, protocol#27, packet_count#28L, conn_state#29, bytes_transferred#30, timestamp#31, attack#32L] iceberg.raw.network_traffic_raw iceberg.raw.network_traffic_raw\n\n\tat org.apache.spark.sql.catalyst.analysis.package$AnalysisErrorAt.dataTypeMismatch(package.scala:77)\n\tat org.apache.spark.sql.catalyst.analysis.package$AnalysisErrorAt.dataTypeMismatch(package.scala:70)\n\tat org.apache.spark.sql.catalyst.analysis.CheckAnalysis.$anonfun$checkAnalysis0$7(CheckAnalysis.scala:420)\n\tat org.apache.spark.sql.catalyst.analysis.CheckAnalysis.$anonfun$checkAnalysis0$7$adapted(CheckAnalysis.scala:402)\n\tat org.apache.spark.sql.catalyst.trees.TreeNode.foreachUp(TreeNode.scala:252)\n\tat org.apache.spark.sql.catalyst.trees.TreeNode.$anonfun$foreachUp$1(TreeNode.scala:251)\n\tat org.apache.spark.sql.catalyst.trees.TreeNode.$anonfun$foreachUp$1$adapted(TreeNode.scala:251)\n\tat scala.collection.immutable.Vector.foreach(Vector.scala:2125)\n\tat org.apache.spark.sql.catalyst.trees.TreeNode.foreachUp(TreeNode.scala:251)\n\tat org.apache.spark.sql.catalyst.trees.TreeNode.$anonfun$foreachUp$1(TreeNode.scala:251)\n\tat org.apache.spark.sql.catalyst.trees.TreeNode.$anonfun$foreachUp$1$adapted(TreeNode.scala:251)\n\tat scala.collection.immutable.Vector.foreach(Vector.scala:2125)\n\tat org.apache.spark.sql.catalyst.trees.TreeNode.foreachUp(TreeNode.scala:251)\n\tat org.apache.spark.sql.catalyst.analysis.CheckAnalysis.$anonfun$checkAnalysis0$6(CheckAnalysis.scala:402)\n\tat org.apache.spark.sql.catalyst.analysis.CheckAnalysis.$anonfun$checkAnalysis0$6$adapted(CheckAnalysis.scala:402)\n\tat scala.collection.immutable.List.foreach(List.scala:334)\n\tat org.apache.spark.sql.catalyst.analysis.CheckAnalysis.$anonfun$checkAnalysis0$2(CheckAnalysis.scala:402)\n\tat org.apache.spark.sql.catalyst.analysis.CheckAnalysis.$anonfun$checkAnalysis0$2$adapted(CheckAnalysis.scala:284)\n\tat org.apache.spark.sql.catalyst.trees.TreeNode.foreachUp(TreeNode.scala:252)\n\tat org.apache.spark.sql.catalyst.analysis.CheckAnalysis.checkAnalysis0(CheckAnalysis.scala:284)\n\tat org.apache.spark.sql.catalyst.analysis.CheckAnalysis.checkAnalysis0$(CheckAnalysis.scala:255)\n\tat org.apache.spark.sql.catalyst.analysis.Analyzer.checkAnalysis0(Analyzer.scala:299)\n\tat org.apache.spark.sql.catalyst.analysis.CheckAnalysis.checkAnalysis(CheckAnalysis.scala:244)\n\tat org.apache.spark.sql.catalyst.analysis.CheckAnalysis.checkAnalysis$(CheckAnalysis.scala:231)\n\tat org.apache.spark.sql.catalyst.analysis.Analyzer.checkAnalysis(Analyzer.scala:299)\n\tat org.apache.spark.sql.catalyst.analysis.resolver.HybridAnalyzer.$anonfun$resolveInFixedPoint$1(HybridAnalyzer.scala:192)\n\tat scala.runtime.java8.JFunction0$mcV$sp.apply(JFunction0$mcV$sp.scala:18)\n\tat org.apache.spark.sql.catalyst.QueryPlanningTracker$.withTracker(QueryPlanningTracker.scala:89)\n\tat org.apache.spark.sql.catalyst.analysis.resolver.HybridAnalyzer.resolveInFixedPoint(HybridAnalyzer.scala:192)\n\tat org.apache.spark.sql.catalyst.analysis.resolver.HybridAnalyzer.$anonfun$apply$1(HybridAnalyzer.scala:76)\n\tat org.apache.spark.sql.catalyst.analysis.resolver.HybridAnalyzer.withTrackedAnalyzerBridgeState(HybridAnalyzer.scala:111)\n\tat org.apache.spark.sql.catalyst.analysis.resolver.HybridAnalyzer.apply(HybridAnalyzer.scala:71)\n\tat org.apache.spark.sql.catalyst.analysis.Analyzer.$anonfun$executeAndCheck$1(Analyzer.scala:330)\n\tat org.apache.spark.sql.catalyst.plans.logical.AnalysisHelper$.markInAnalyzer(AnalysisHelper.scala:423)\n\tat org.apache.spark.sql.catalyst.analysis.Analyzer.executeAndCheck(Analyzer.scala:330)\n\tat org.apache.spark.sql.execution.QueryExecution.$anonfun$lazyAnalyzed$2(QueryExecution.scala:110)\n\tat org.apache.spark.sql.catalyst.QueryPlanningTracker.measurePhase(QueryPlanningTracker.scala:148)\n\tat org.apache.spark.sql.execution.QueryExecution.$anonfun$executePhase$2(QueryExecution.scala:278)\n\tat org.apache.spark.sql.execution.QueryExecution$.withInternalError(QueryExecution.scala:654)\n\tat org.apache.spark.sql.execution.QueryExecution.$anonfun$executePhase$1(QueryExecution.scala:278)\n\tat org.apache.spark.sql.SparkSession.withActive(SparkSession.scala:804)\n\tat org.apache.spark.sql.execution.QueryExecution.executePhase(QueryExecution.scala:277)\n\tat org.apache.spark.sql.execution.QueryExecution.$anonfun$lazyAnalyzed$1(QueryExecution.scala:110)\n\tat scala.util.Try$.apply(Try.scala:217)\n\tat org.apache.spark.util.Utils$.doTryWithCallerStacktrace(Utils.scala:1378)\n\tat org.apache.spark.util.Utils$.getTryWithCallerStacktrace(Utils.scala:1439)\n\tat org.apache.spark.util.LazyTry.get(LazyTry.scala:58)\n\tat org.apache.spark.sql.execution.QueryExecution.analyzed(QueryExecution.scala:121)\n\tat org.apache.spark.sql.execution.QueryExecution.assertAnalyzed(QueryExecution.scala:80)\n\tat org.apache.spark.sql.classic.Dataset$.$anonfun$ofRows$1(Dataset.scala:115)\n\tat org.apache.spark.sql.SparkSession.withActive(SparkSession.scala:804)\n\tat org.apache.spark.sql.classic.Dataset$.ofRows(Dataset.scala:113)\n\tat org.apache.spark.sql.classic.Dataset.withPlan(Dataset.scala:2263)\n\tat org.apache.spark.sql.classic.Dataset.withColumns(Dataset.scala:1283)\n\tat org.apache.spark.sql.classic.Dataset.withColumns(Dataset.scala:232)\n\tat org.apache.spark.sql.Dataset.withColumn(Dataset.scala:2187)\n\tat org.apache.spark.sql.classic.Dataset.withColumn(Dataset.scala:1819)\n\tat java.base/jdk.internal.reflect.NativeMethodAccessorImpl.invoke0(Native Method)\n\tat java.base/jdk.internal.reflect.NativeMethodAccessorImpl.invoke(NativeMethodAccessorImpl.java:77)\n\tat java.base/jdk.internal.reflect.DelegatingMethodAccessorImpl.invoke(DelegatingMethodAccessorImpl.java:43)\n\tat java.base/java.lang.reflect.Method.invoke(Method.java:569)\n\tat py4j.reflection.MethodInvoker.invoke(MethodInvoker.java:244)\n\tat py4j.reflection.ReflectionEngine.invoke(ReflectionEngine.java:374)\n\tat py4j.Gateway.invoke(Gateway.java:282)\n\tat py4j.commands.AbstractCommand.invokeMethod(AbstractCommand.java:132)\n\tat py4j.commands.CallCommand.execute(CallCommand.java:79)\n\tat py4j.ClientServerConnection.waitForCommands(ClientServerConnection.java:184)\n\tat py4j.ClientServerConnection.run(ClientServerConnection.java:108)\n\tat java.base/java.lang.Thread.run(Thread.java:840)\n\tSuppressed: org.apache.spark.util.Utils$OriginalTryStackTraceException: Full stacktrace of original doTryWithCallerStacktrace caller\n\t\tat org.apache.spark.sql.catalyst.analysis.package$AnalysisErrorAt.dataTypeMismatch(package.scala:77)\n\t\tat org.apache.spark.sql.catalyst.analysis.package$AnalysisErrorAt.dataTypeMismatch(package.scala:70)\n\t\tat org.apache.spark.sql.catalyst.analysis.CheckAnalysis.$anonfun$checkAnalysis0$7(CheckAnalysis.scala:420)\n\t\tat org.apache.spark.sql.catalyst.analysis.CheckAnalysis.$anonfun$checkAnalysis0$7$adapted(CheckAnalysis.scala:402)\n\t\tat org.apache.spark.sql.catalyst.trees.TreeNode.foreachUp(TreeNode.scala:252)\n\t\tat org.apache.spark.sql.catalyst.trees.TreeNode.$anonfun$foreachUp$1(TreeNode.scala:251)\n\t\tat org.apache.spark.sql.catalyst.trees.TreeNode.$anonfun$foreachUp$1$adapted(TreeNode.scala:251)\n\t\tat scala.collection.immutable.Vector.foreach(Vector.scala:2125)\n\t\tat org.apache.spark.sql.catalyst.trees.TreeNode.foreachUp(TreeNode.scala:251)\n\t\tat org.apache.spark.sql.catalyst.trees.TreeNode.$anonfun$foreachUp$1(TreeNode.scala:251)\n\t\tat org.apache.spark.sql.catalyst.trees.TreeNode.$anonfun$foreachUp$1$adapted(TreeNode.scala:251)\n\t\tat scala.collection.immutable.Vector.foreach(Vector.scala:2125)\n\t\tat org.apache.spark.sql.catalyst.trees.TreeNode.foreachUp(TreeNode.scala:251)\n\t\tat org.apache.spark.sql.catalyst.analysis.CheckAnalysis.$anonfun$checkAnalysis0$6(CheckAnalysis.scala:402)\n\t\tat org.apache.spark.sql.catalyst.analysis.CheckAnalysis.$anonfun$checkAnalysis0$6$adapted(CheckAnalysis.scala:402)\n\t\tat scala.collection.immutable.List.foreach(List.scala:334)\n\t\tat org.apache.spark.sql.catalyst.analysis.CheckAnalysis.$anonfun$checkAnalysis0$2(CheckAnalysis.scala:402)\n\t\tat org.apache.spark.sql.catalyst.analysis.CheckAnalysis.$anonfun$checkAnalysis0$2$adapted(CheckAnalysis.scala:284)\n\t\tat org.apache.spark.sql.catalyst.trees.TreeNode.foreachUp(TreeNode.scala:252)\n\t\tat org.apache.spark.sql.catalyst.analysis.CheckAnalysis.checkAnalysis0(CheckAnalysis.scala:284)\n\t\tat org.apache.spark.sql.catalyst.analysis.CheckAnalysis.checkAnalysis0$(CheckAnalysis.scala:255)\n\t\tat org.apache.spark.sql.catalyst.analysis.Analyzer.checkAnalysis0(Analyzer.scala:299)\n\t\tat org.apache.spark.sql.catalyst.analysis.CheckAnalysis.checkAnalysis(CheckAnalysis.scala:244)\n\t\tat org.apache.spark.sql.catalyst.analysis.CheckAnalysis.checkAnalysis$(CheckAnalysis.scala:231)\n\t\tat org.apache.spark.sql.catalyst.analysis.Analyzer.checkAnalysis(Analyzer.scala:299)\n\t\tat org.apache.spark.sql.catalyst.analysis.resolver.HybridAnalyzer.$anonfun$resolveInFixedPoint$1(HybridAnalyzer.scala:192)\n\t\tat scala.runtime.java8.JFunction0$mcV$sp.apply(JFunction0$mcV$sp.scala:18)\n\t\tat org.apache.spark.sql.catalyst.QueryPlanningTracker$.withTracker(QueryPlanningTracker.scala:89)\n\t\tat org.apache.spark.sql.catalyst.analysis.resolver.HybridAnalyzer.resolveInFixedPoint(HybridAnalyzer.scala:192)\n\t\tat org.apache.spark.sql.catalyst.analysis.resolver.HybridAnalyzer.$anonfun$apply$1(HybridAnalyzer.scala:76)\n\t\tat org.apache.spark.sql.catalyst.analysis.resolver.HybridAnalyzer.withTrackedAnalyzerBridgeState(HybridAnalyzer.scala:111)\n\t\tat org.apache.spark.sql.catalyst.analysis.resolver.HybridAnalyzer.apply(HybridAnalyzer.scala:71)\n\t\tat org.apache.spark.sql.catalyst.analysis.Analyzer.$anonfun$executeAndCheck$1(Analyzer.scala:330)\n\t\tat org.apache.spark.sql.catalyst.plans.logical.AnalysisHelper$.markInAnalyzer(AnalysisHelper.scala:423)\n\t\tat org.apache.spark.sql.catalyst.analysis.Analyzer.executeAndCheck(Analyzer.scala:330)\n\t\tat org.apache.spark.sql.execution.QueryExecution.$anonfun$lazyAnalyzed$2(QueryExecution.scala:110)\n\t\tat org.apache.spark.sql.catalyst.QueryPlanningTracker.measurePhase(QueryPlanningTracker.scala:148)\n\t\tat org.apache.spark.sql.execution.QueryExecution.$anonfun$executePhase$2(QueryExecution.scala:278)\n\t\tat org.apache.spark.sql.execution.QueryExecution$.withInternalError(QueryExecution.scala:654)\n\t\tat org.apache.spark.sql.execution.QueryExecution.$anonfun$executePhase$1(QueryExecution.scala:278)\n\t\tat org.apache.spark.sql.SparkSession.withActive(SparkSession.scala:804)\n\t\tat org.apache.spark.sql.execution.QueryExecution.executePhase(QueryExecution.scala:277)\n\t\tat org.apache.spark.sql.execution.QueryExecution.$anonfun$lazyAnalyzed$1(QueryExecution.scala:110)\n\t\tat scala.util.Try$.apply(Try.scala:217)\n\t\tat org.apache.spark.util.Utils$.doTryWithCallerStacktrace(Utils.scala:1378)\n\t\tat org.apache.spark.util.LazyTry.tryT$lzycompute(LazyTry.scala:46)\n\t\tat org.apache.spark.util.LazyTry.tryT(LazyTry.scala:46)\n\t\t... 23 more\n", "stacktrace": [{"class": null, "method": "deco", "file": "/opt/spark/python/lib/pyspark.zip/pyspark/errors/exceptions/captured.py", "line": "282"}, {"class": null, "method": "get_return_value", "file": "/opt/spark/python/lib/py4j-0.10.9.9-src.zip/py4j/protocol.py", "line": "327"}]}}
+2026-02-10 16:50:14.024 | 2026-02-10 22:50:14,021 - SparkPreprocessIceberg - ERROR - Failed fitting pipeline: [DATATYPE_MISMATCH.UNEXPECTED_INPUT_TYPE] Cannot resolve "map()[protocol]" due to data type mismatch: The second parameter requires the "VOID" type, however "protocol" has the type "STRING". SQLSTATE: 42K09;
+2026-02-10 16:50:14.024 | 'Project [src_port#25L, dst_port#26L, protocol#27, packet_count#28L, conn_state#29, bytes_transferred#30, timestamp#31, attack#32L, timestamp_ts#64, hour#65, dayofweek_raw#66, dayofweek#67, is_weekend#68, hour_sin#69, hour_cos#70, bytes_log#71, packet_log#72, protocol_conn#73, 'coalesce(map()[protocol#27], -1) AS protocol_idx#76]
+2026-02-10 16:50:14.024 | +- Project [src_port#25L, dst_port#26L, protocol#27, packet_count#28L, conn_state#29, bytes_transferred#30, timestamp#31, attack#32L, timestamp_ts#64, hour#65, dayofweek_raw#66, dayofweek#67, is_weekend#68, hour_sin#69, hour_cos#70, bytes_log#71, packet_log#72, concat_ws(_, protocol#27, conn_state#29) AS protocol_conn#73]
+2026-02-10 16:50:14.024 |    +- Project [src_port#25L, dst_port#26L, protocol#27, packet_count#28L, conn_state#29, bytes_transferred#30, timestamp#31, attack#32L, timestamp_ts#64, hour#65, dayofweek_raw#66, dayofweek#67, is_weekend#68, hour_sin#69, hour_cos#70, bytes_log#71, LOG1P(cast(packet_count#28L as double)) AS packet_log#72]
+2026-02-10 16:50:14.024 |       +- Project [src_port#25L, dst_port#26L, protocol#27, packet_count#28L, conn_state#29, bytes_transferred#30, timestamp#31, attack#32L, timestamp_ts#64, hour#65, dayofweek_raw#66, dayofweek#67, is_weekend#68, hour_sin#69, hour_cos#70, LOG1P(bytes_transferred#30) AS bytes_log#71]
+2026-02-10 16:50:14.024 |          +- Project [src_port#25L, dst_port#26L, protocol#27, packet_count#28L, conn_state#29, bytes_transferred#30, timestamp#31, attack#32L, timestamp_ts#64, hour#65, dayofweek_raw#66, dayofweek#67, is_weekend#68, hour_sin#69, COS(((cast(hour#65 as double) * 6.283185307179586) / 24.0)) AS hour_cos#70]
+2026-02-10 16:50:14.024 |             +- Project [src_port#25L, dst_port#26L, protocol#27, packet_count#28L, conn_state#29, bytes_transferred#30, timestamp#31, attack#32L, timestamp_ts#64, hour#65, dayofweek_raw#66, dayofweek#67, is_weekend#68, SIN(((cast(hour#65 as double) * 6.283185307179586) / 24.0)) AS hour_sin#69]
+2026-02-10 16:50:14.024 |                +- Project [src_port#25L, dst_port#26L, protocol#27, packet_count#28L, conn_state#29, bytes_transferred#30, timestamp#31, attack#32L, timestamp_ts#64, hour#65, dayofweek_raw#66, dayofweek#67, CASE WHEN dayofweek#67 IN (5,6) THEN 1 ELSE 0 END AS is_weekend#68]
+2026-02-10 16:50:14.024 |                   +- Project [src_port#25L, dst_port#26L, protocol#27, packet_count#28L, conn_state#29, bytes_transferred#30, timestamp#31, attack#32L, timestamp_ts#64, hour#65, dayofweek_raw#66, (dayofweek_raw#66 - 1) AS dayofweek#67]
+2026-02-10 16:50:14.024 |                      +- Project [src_port#25L, dst_port#26L, protocol#27, packet_count#28L, conn_state#29, bytes_transferred#30, timestamp#31, attack#32L, timestamp_ts#64, hour#65, dayofweek(cast(timestamp_ts#64 as date)) AS dayofweek_raw#66]
+2026-02-10 16:50:14.024 |                         +- Project [src_port#25L, dst_port#26L, protocol#27, packet_count#28L, conn_state#29, bytes_transferred#30, timestamp#31, attack#32L, timestamp_ts#64, hour(timestamp_ts#64, Some(Etc/UTC)) AS hour#65]
+2026-02-10 16:50:14.024 |                            +- Project [src_port#25L, dst_port#26L, protocol#27, packet_count#28L, conn_state#29, bytes_transferred#30, timestamp#31, attack#32L, cast(timestamp#31 as timestamp) AS timestamp_ts#64]
+2026-02-10 16:50:14.024 |                               +- Filter ((timestamp#31 >= to_timestamp(2024-01-01 00:00:00, None, TimestampType, Some(Etc/UTC), true)) AND (timestamp#31 <= to_timestamp(2024-06-30 23:59:59, None, TimestampType, Some(Etc/UTC), true)))
+2026-02-10 16:50:14.024 |                                  +- SubqueryAlias iceberg.raw.network_traffic_raw
+2026-02-10 16:50:14.024 |                                     +- RelationV2[src_port#25L, dst_port#26L, protocol#27, packet_count#28L, conn_state#29, bytes_transferred#30, timestamp#31, attack#32L] iceberg.raw.network_traffic_raw iceberg.raw.network_traffic_raw
+2026-02-10 16:50:14.024 | Traceback (most recent call last):
+2026-02-10 16:50:14.024 |   File "/app/repo/k3s/spark/spark-preprocess-iceberg.py", line 291, in fit_pipeline
+2026-02-10 16:50:14.024 |     self.pipeline = base_pipeline.fit(df)
+2026-02-10 16:50:14.024 |                     ^^^^^^^^^^^^^^^^^^^^^
+2026-02-10 16:50:14.024 |   File "/app/repo/src/dsl/pipeline.py", line 123, in fit
+2026-02-10 16:50:14.024 |     current_df = fitted_stage.transform(current_df)
+2026-02-10 16:50:14.024 |                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-02-10 16:50:14.024 |   File "/app/repo/src/dsl/estimators.py", line 81, in transform
+2026-02-10 16:50:14.024 |     return df.withColumn(
+2026-02-10 16:50:14.024 |            ^^^^^^^^^^^^^^
+2026-02-10 16:50:14.024 |   File "/opt/spark/python/lib/pyspark.zip/pyspark/sql/classic/dataframe.py", line 1623, in withColumn
+2026-02-10 16:50:14.024 |     return DataFrame(self._jdf.withColumn(colName, col._jc), self.sparkSession)
+2026-02-10 16:50:14.024 |                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-02-10 16:50:14.024 |   File "/opt/spark/python/lib/py4j-0.10.9.9-src.zip/py4j/java_gateway.py", line 1362, in __call__
+2026-02-10 16:50:14.024 |     return_value = get_return_value(
+2026-02-10 16:50:14.024 |                    ^^^^^^^^^^^^^^^^^
+2026-02-10 16:50:14.024 |   File "/opt/spark/python/lib/pyspark.zip/pyspark/errors/exceptions/captured.py", line 288, in deco
+2026-02-10 16:50:14.024 |     raise converted from None
+2026-02-10 16:50:14.024 | pyspark.errors.exceptions.captured.AnalysisException: [DATATYPE_MISMATCH.UNEXPECTED_INPUT_TYPE] Cannot resolve "map()[protocol]" due to data type mismatch: The second parameter requires the "VOID" type, however "protocol" has the type "STRING". SQLSTATE: 42K09;
+2026-02-10 16:50:14.024 | 'Project [src_port#25L, dst_port#26L, protocol#27, packet_count#28L, conn_state#29, bytes_transferred#30, timestamp#31, attack#32L, timestamp_ts#64, hour#65, dayofweek_raw#66, dayofweek#67, is_weekend#68, hour_sin#69, hour_cos#70, bytes_log#71, packet_log#72, protocol_conn#73, 'coalesce(map()[protocol#27], -1) AS protocol_idx#76]
+2026-02-10 16:50:14.024 | +- Project [src_port#25L, dst_port#26L, protocol#27, packet_count#28L, conn_state#29, bytes_transferred#30, timestamp#31, attack#32L, timestamp_ts#64, hour#65, dayofweek_raw#66, dayofweek#67, is_weekend#68, hour_sin#69, hour_cos#70, bytes_log#71, packet_log#72, concat_ws(_, protocol#27, conn_state#29) AS protocol_conn#73]
+2026-02-10 16:50:14.024 |    +- Project [src_port#25L, dst_port#26L, protocol#27, packet_count#28L, conn_state#29, bytes_transferred#30, timestamp#31, attack#32L, timestamp_ts#64, hour#65, dayofweek_raw#66, dayofweek#67, is_weekend#68, hour_sin#69, hour_cos#70, bytes_log#71, LOG1P(cast(packet_count#28L as double)) AS packet_log#72]
+2026-02-10 16:50:14.024 |       +- Project [src_port#25L, dst_port#26L, protocol#27, packet_count#28L, conn_state#29, bytes_transferred#30, timestamp#31, attack#32L, timestamp_ts#64, hour#65, dayofweek_raw#66, dayofweek#67, is_weekend#68, hour_sin#69, hour_cos#70, LOG1P(bytes_transferred#30) AS bytes_log#71]
+2026-02-10 16:50:14.024 |          +- Project [src_port#25L, dst_port#26L, protocol#27, packet_count#28L, conn_state#29, bytes_transferred#30, timestamp#31, attack#32L, timestamp_ts#64, hour#65, dayofweek_raw#66, dayofweek#67, is_weekend#68, hour_sin#69, COS(((cast(hour#65 as double) * 6.283185307179586) / 24.0)) AS hour_cos#70]
+2026-02-10 16:50:14.024 |             +- Project [src_port#25L, dst_port#26L, protocol#27, packet_count#28L, conn_state#29, bytes_transferred#30, timestamp#31, attack#32L, timestamp_ts#64, hour#65, dayofweek_raw#66, dayofweek#67, is_weekend#68, SIN(((cast(hour#65 as double) * 6.283185307179586) / 24.0)) AS hour_sin#69]
+2026-02-10 16:50:14.024 |                +- Project [src_port#25L, dst_port#26L, protocol#27, packet_count#28L, conn_state#29, bytes_transferred#30, timestamp#31, attack#32L, timestamp_ts#64, hour#65, dayofweek_raw#66, dayofweek#67, CASE WHEN dayofweek#67 IN (5,6) THEN 1 ELSE 0 END AS is_weekend#68]
+2026-02-10 16:50:14.024 |                   +- Project [src_port#25L, dst_port#26L, protocol#27, packet_count#28L, conn_state#29, bytes_transferred#30, timestamp#31, attack#32L, timestamp_ts#64, hour#65, dayofweek_raw#66, (dayofweek_raw#66 - 1) AS dayofweek#67]
+2026-02-10 16:50:14.024 |                      +- Project [src_port#25L, dst_port#26L, protocol#27, packet_count#28L, conn_state#29, bytes_transferred#30, timestamp#31, attack#32L, timestamp_ts#64, hour#65, dayofweek(cast(timestamp_ts#64 as date)) AS dayofweek_raw#66]
+2026-02-10 16:50:14.024 |                         +- Project [src_port#25L, dst_port#26L, protocol#27, packet_count#28L, conn_state#29, bytes_transferred#30, timestamp#31, attack#32L, timestamp_ts#64, hour(timestamp_ts#64, Some(Etc/UTC)) AS hour#65]
+2026-02-10 16:50:14.024 |                            +- Project [src_port#25L, dst_port#26L, protocol#27, packet_count#28L, conn_state#29, bytes_transferred#30, timestamp#31, attack#32L, cast(timestamp#31 as timestamp) AS timestamp_ts#64]
+2026-02-10 16:50:14.024 |                               +- Filter ((timestamp#31 >= to_timestamp(2024-01-01 00:00:00, None, TimestampType, Some(Etc/UTC), true)) AND (timestamp#31 <= to_timestamp(2024-06-30 23:59:59, None, TimestampType, Some(Etc/UTC), true)))
+2026-02-10 16:50:14.024 |                                  +- SubqueryAlias iceberg.raw.network_traffic_raw
+2026-02-10 16:50:14.024 |                                     +- RelationV2[src_port#25L, dst_port#26L, protocol#27, packet_count#28L, conn_state#29, bytes_transferred#30, timestamp#31, attack#32L] iceberg.raw.network_traffic_raw iceberg.raw.network_traffic_raw
+2026-02-10 16:50:14.024 | 
+2026-02-10 16:50:14.026 | 2026-02-10 22:50:14,025 - SparkPreprocessIceberg - ERROR - Preprocessing pipeline failed: [DATATYPE_MISMATCH.UNEXPECTED_INPUT_TYPE] Cannot resolve "map()[protocol]" due to data type mismatch: The second parameter requires the "VOID" type, however "protocol" has the type "STRING". SQLSTATE: 42K09;
+2026-02-10 16:50:14.026 | 'Project [src_port#25L, dst_port#26L, protocol#27, packet_count#28L, conn_state#29, bytes_transferred#30, timestamp#31, attack#32L, timestamp_ts#64, hour#65, dayofweek_raw#66, dayofweek#67, is_weekend#68, hour_sin#69, hour_cos#70, bytes_log#71, packet_log#72, protocol_conn#73, 'coalesce(map()[protocol#27], -1) AS protocol_idx#76]
+2026-02-10 16:50:14.026 | +- Project [src_port#25L, dst_port#26L, protocol#27, packet_count#28L, conn_state#29, bytes_transferred#30, timestamp#31, attack#32L, timestamp_ts#64, hour#65, dayofweek_raw#66, dayofweek#67, is_weekend#68, hour_sin#69, hour_cos#70, bytes_log#71, packet_log#72, concat_ws(_, protocol#27, conn_state#29) AS protocol_conn#73]
+2026-02-10 16:50:14.026 |    +- Project [src_port#25L, dst_port#26L, protocol#27, packet_count#28L, conn_state#29, bytes_transferred#30, timestamp#31, attack#32L, timestamp_ts#64, hour#65, dayofweek_raw#66, dayofweek#67, is_weekend#68, hour_sin#69, hour_cos#70, bytes_log#71, LOG1P(cast(packet_count#28L as double)) AS packet_log#72]
+2026-02-10 16:50:14.026 |       +- Project [src_port#25L, dst_port#26L, protocol#27, packet_count#28L, conn_state#29, bytes_transferred#30, timestamp#31, attack#32L, timestamp_ts#64, hour#65, dayofweek_raw#66, dayofweek#67, is_weekend#68, hour_sin#69, hour_cos#70, LOG1P(bytes_transferred#30) AS bytes_log#71]
+2026-02-10 16:50:14.026 |          +- Project [src_port#25L, dst_port#26L, protocol#27, packet_count#28L, conn_state#29, bytes_transferred#30, timestamp#31, attack#32L, timestamp_ts#64, hour#65, dayofweek_raw#66, dayofweek#67, is_weekend#68, hour_sin#69, COS(((cast(hour#65 as double) * 6.283185307179586) / 24.0)) AS hour_cos#70]
+2026-02-10 16:50:14.026 |             +- Project [src_port#25L, dst_port#26L, protocol#27, packet_count#28L, conn_state#29, bytes_transferred#30, timestamp#31, attack#32L, timestamp_ts#64, hour#65, dayofweek_raw#66, dayofweek#67, is_weekend#68, SIN(((cast(hour#65 as double) * 6.283185307179586) / 24.0)) AS hour_sin#69]
+2026-02-10 16:50:14.026 |                +- Project [src_port#25L, dst_port#26L, protocol#27, packet_count#28L, conn_state#29, bytes_transferred#30, timestamp#31, attack#32L, timestamp_ts#64, hour#65, dayofweek_raw#66, dayofweek#67, CASE WHEN dayofweek#67 IN (5,6) THEN 1 ELSE 0 END AS is_weekend#68]
+2026-02-10 16:50:14.026 |                   +- Project [src_port#25L, dst_port#26L, protocol#27, packet_count#28L, conn_state#29, bytes_transferred#30, timestamp#31, attack#32L, timestamp_ts#64, hour#65, dayofweek_raw#66, (dayofweek_raw#66 - 1) AS dayofweek#67]
+2026-02-10 16:50:14.026 |                      +- Project [src_port#25L, dst_port#26L, protocol#27, packet_count#28L, conn_state#29, bytes_transferred#30, timestamp#31, attack#32L, timestamp_ts#64, hour#65, dayofweek(cast(timestamp_ts#64 as date)) AS dayofweek_raw#66]
+2026-02-10 16:50:14.026 |                         +- Project [src_port#25L, dst_port#26L, protocol#27, packet_count#28L, conn_state#29, bytes_transferred#30, timestamp#31, attack#32L, timestamp_ts#64, hour(timestamp_ts#64, Some(Etc/UTC)) AS hour#65]
+2026-02-10 16:50:14.026 |                            +- Project [src_port#25L, dst_port#26L, protocol#27, packet_count#28L, conn_state#29, bytes_transferred#30, timestamp#31, attack#32L, cast(timestamp#31 as timestamp) AS timestamp_ts#64]
+2026-02-10 16:50:14.026 |                               +- Filter ((timestamp#31 >= to_timestamp(2024-01-01 00:00:00, None, TimestampType, Some(Etc/UTC), true)) AND (timestamp#31 <= to_timestamp(2024-06-30 23:59:59, None, TimestampType, Some(Etc/UTC), true)))
+2026-02-10 16:50:14.026 |                                  +- SubqueryAlias iceberg.raw.network_traffic_raw
+2026-02-10 16:50:14.026 |                                     +- RelationV2[src_port#25L, dst_port#26L, protocol#27, packet_count#28L, conn_state#29, bytes_transferred#30, timestamp#31, attack#32L] iceberg.raw.network_traffic_raw iceberg.raw.network_traffic_raw
+2026-02-10 16:50:14.026 | Traceback (most recent call last):
+2026-02-10 16:50:14.026 |   File "/app/repo/k3s/spark/spark-preprocess-iceberg.py", line 543, in run_preprocessing_pipeline
+2026-02-10 16:50:14.026 |     pipeline_hash = self.fit_pipeline(df_train, dsl_path)
+2026-02-10 16:50:14.026 |                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-02-10 16:50:14.026 |   File "/app/repo/k3s/spark/spark-preprocess-iceberg.py", line 291, in fit_pipeline
+2026-02-10 16:50:14.026 |     self.pipeline = base_pipeline.fit(df)
+2026-02-10 16:50:14.026 |                     ^^^^^^^^^^^^^^^^^^^^^
+2026-02-10 16:50:14.026 |   File "/app/repo/src/dsl/pipeline.py", line 123, in fit
+2026-02-10 16:50:14.026 |     current_df = fitted_stage.transform(current_df)
+2026-02-10 16:50:14.026 |                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-02-10 16:50:14.026 |   File "/app/repo/src/dsl/estimators.py", line 81, in transform
+2026-02-10 16:50:14.026 |     return df.withColumn(
+2026-02-10 16:50:14.026 |            ^^^^^^^^^^^^^^
+2026-02-10 16:50:14.026 |   File "/opt/spark/python/lib/pyspark.zip/pyspark/sql/classic/dataframe.py", line 1623, in withColumn
+2026-02-10 16:50:14.026 |     return DataFrame(self._jdf.withColumn(colName, col._jc), self.sparkSession)
+2026-02-10 16:50:14.026 |                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-02-10 16:50:14.026 |   File "/opt/spark/python/lib/py4j-0.10.9.9-src.zip/py4j/java_gateway.py", line 1362, in __call__
+2026-02-10 16:50:14.026 |     return_value = get_return_value(
+2026-02-10 16:50:14.026 |                    ^^^^^^^^^^^^^^^^^
+2026-02-10 16:50:14.026 |   File "/opt/spark/python/lib/pyspark.zip/pyspark/errors/exceptions/captured.py", line 288, in deco
+2026-02-10 16:50:14.026 |     raise converted from None
+2026-02-10 16:50:14.026 | pyspark.errors.exceptions.captured.AnalysisException: [DATATYPE_MISMATCH.UNEXPECTED_INPUT_TYPE] Cannot resolve "map()[protocol]" due to data type mismatch: The second parameter requires the "VOID" type, however "protocol" has the type "STRING". SQLSTATE: 42K09;
+2026-02-10 16:50:14.026 | 'Project [src_port#25L, dst_port#26L, protocol#27, packet_count#28L, conn_state#29, bytes_transferred#30, timestamp#31, attack#32L, timestamp_ts#64, hour#65, dayofweek_raw#66, dayofweek#67, is_weekend#68, hour_sin#69, hour_cos#70, bytes_log#71, packet_log#72, protocol_conn#73, 'coalesce(map()[protocol#27], -1) AS protocol_idx#76]
+2026-02-10 16:50:14.026 | +- Project [src_port#25L, dst_port#26L, protocol#27, packet_count#28L, conn_state#29, bytes_transferred#30, timestamp#31, attack#32L, timestamp_ts#64, hour#65, dayofweek_raw#66, dayofweek#67, is_weekend#68, hour_sin#69, hour_cos#70, bytes_log#71, packet_log#72, concat_ws(_, protocol#27, conn_state#29) AS protocol_conn#73]
+2026-02-10 16:50:14.026 |    +- Project [src_port#25L, dst_port#26L, protocol#27, packet_count#28L, conn_state#29, bytes_transferred#30, timestamp#31, attack#32L, timestamp_ts#64, hour#65, dayofweek_raw#66, dayofweek#67, is_weekend#68, hour_sin#69, hour_cos#70, bytes_log#71, LOG1P(cast(packet_count#28L as double)) AS packet_log#72]
+2026-02-10 16:50:14.026 |       +- Project [src_port#25L, dst_port#26L, protocol#27, packet_count#28L, conn_state#29, bytes_transferred#30, timestamp#31, attack#32L, timestamp_ts#64, hour#65, dayofweek_raw#66, dayofweek#67, is_weekend#68, hour_sin#69, hour_cos#70, LOG1P(bytes_transferred#30) AS bytes_log#71]
+2026-02-10 16:50:14.026 |          +- Project [src_port#25L, dst_port#26L, protocol#27, packet_count#28L, conn_state#29, bytes_transferred#30, timestamp#31, attack#32L, timestamp_ts#64, hour#65, dayofweek_raw#66, dayofweek#67, is_weekend#68, hour_sin#69, COS(((cast(hour#65 as double) * 6.283185307179586) / 24.0)) AS hour_cos#70]
+2026-02-10 16:50:14.026 |             +- Project [src_port#25L, dst_port#26L, protocol#27, packet_count#28L, conn_state#29, bytes_transferred#30, timestamp#31, attack#32L, timestamp_ts#64, hour#65, dayofweek_raw#66, dayofweek#67, is_weekend#68, SIN(((cast(hour#65 as double) * 6.283185307179586) / 24.0)) AS hour_sin#69]
+2026-02-10 16:50:14.026 |                +- Project [src_port#25L, dst_port#26L, protocol#27, packet_count#28L, conn_state#29, bytes_transferred#30, timestamp#31, attack#32L, timestamp_ts#64, hour#65, dayofweek_raw#66, dayofweek#67, CASE WHEN dayofweek#67 IN (5,6) THEN 1 ELSE 0 END AS is_weekend#68]
+2026-02-10 16:50:14.026 |                   +- Project [src_port#25L, dst_port#26L, protocol#27, packet_count#28L, conn_state#29, bytes_transferred#30, timestamp#31, attack#32L, timestamp_ts#64, hour#65, dayofweek_raw#66, (dayofweek_raw#66 - 1) AS dayofweek#67]
+2026-02-10 16:50:14.026 |                      +- Project [src_port#25L, dst_port#26L, protocol#27, packet_count#28L, conn_state#29, bytes_transferred#30, timestamp#31, attack#32L, timestamp_ts#64, hour#65, dayofweek(cast(timestamp_ts#64 as date)) AS dayofweek_raw#66]
+2026-02-10 16:50:14.026 |                         +- Project [src_port#25L, dst_port#26L, protocol#27, packet_count#28L, conn_state#29, bytes_transferred#30, timestamp#31, attack#32L, timestamp_ts#64, hour(timestamp_ts#64, Some(Etc/UTC)) AS hour#65]
+2026-02-10 16:50:14.026 |                            +- Project [src_port#25L, dst_port#26L, protocol#27, packet_count#28L, conn_state#29, bytes_transferred#30, timestamp#31, attack#32L, cast(timestamp#31 as timestamp) AS timestamp_ts#64]
+2026-02-10 16:50:14.026 |                               +- Filter ((timestamp#31 >= to_timestamp(2024-01-01 00:00:00, None, TimestampType, Some(Etc/UTC), true)) AND (timestamp#31 <= to_timestamp(2024-06-30 23:59:59, None, TimestampType, Some(Etc/UTC), true)))
+2026-02-10 16:50:14.026 |                                  +- SubqueryAlias iceberg.raw.network_traffic_raw
+2026-02-10 16:50:14.026 |                                     +- RelationV2[src_port#25L, dst_port#26L, protocol#27, packet_count#28L, conn_state#29, bytes_transferred#30, timestamp#31, attack#32L] iceberg.raw.network_traffic_raw iceberg.raw.network_traffic_raw
+2026-02-10 16:50:14.026 | 
+2026-02-10 16:50:14.026 | Traceback (most recent call last):
+2026-02-10 16:50:14.026 |   File "/app/repo/k3s/spark/spark-preprocess-iceberg.py", line 634, in <module>
+2026-02-10 16:50:14.026 |     main()
+2026-02-10 16:50:14.026 |   File "/app/repo/k3s/spark/spark-preprocess-iceberg.py", line 627, in main
+2026-02-10 16:50:14.026 |     job.run_preprocessing_pipeline(
+2026-02-10 16:50:14.026 |   File "/app/repo/k3s/spark/spark-preprocess-iceberg.py", line 543, in run_preprocessing_pipeline
+2026-02-10 16:50:14.026 |     pipeline_hash = self.fit_pipeline(df_train, dsl_path)
+2026-02-10 16:50:14.026 |                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-02-10 16:50:14.026 |   File "/app/repo/k3s/spark/spark-preprocess-iceberg.py", line 291, in fit_pipeline
+2026-02-10 16:50:14.027 |     self.pipeline = base_pipeline.fit(df)
+2026-02-10 16:50:14.027 |                     ^^^^^^^^^^^^^^^^^^^^^
+2026-02-10 16:50:14.027 |   File "/app/repo/src/dsl/pipeline.py", line 123, in fit
+2026-02-10 16:50:14.027 |     current_df = fitted_stage.transform(current_df)
+2026-02-10 16:50:14.027 |                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-02-10 16:50:14.027 |   File "/app/repo/src/dsl/estimators.py", line 81, in transform
+2026-02-10 16:50:14.027 |     return df.withColumn(
+2026-02-10 16:50:14.027 |            ^^^^^^^^^^^^^^
+2026-02-10 16:50:14.027 |   File "/opt/spark/python/lib/pyspark.zip/pyspark/sql/classic/dataframe.py", line 1623, in withColumn
+2026-02-10 16:50:14.027 |   File "/opt/spark/python/lib/py4j-0.10.9.9-src.zip/py4j/java_gateway.py", line 1362, in __call__
+2026-02-10 16:50:14.027 |   File "/opt/spark/python/lib/pyspark.zip/pyspark/errors/exceptions/captured.py", line 288, in deco
+2026-02-10 16:50:14.028 | pyspark.errors.exceptions.captured.AnalysisException: [DATATYPE_MISMATCH.UNEXPECTED_INPUT_TYPE] Cannot resolve "map()[protocol]" due to data type mismatch: The second parameter requires the "VOID" type, however "protocol" has the type "STRING". SQLSTATE: 42K09;
+2026-02-10 16:50:14.028 | 'Project [src_port#25L, dst_port#26L, protocol#27, packet_count#28L, conn_state#29, bytes_transferred#30, timestamp#31, attack#32L, timestamp_ts#64, hour#65, dayofweek_raw#66, dayofweek#67, is_weekend#68, hour_sin#69, hour_cos#70, bytes_log#71, packet_log#72, protocol_conn#73, 'coalesce(map()[protocol#27], -1) AS protocol_idx#76]
+2026-02-10 16:50:14.028 | +- Project [src_port#25L, dst_port#26L, protocol#27, packet_count#28L, conn_state#29, bytes_transferred#30, timestamp#31, attack#32L, timestamp_ts#64, hour#65, dayofweek_raw#66, dayofweek#67, is_weekend#68, hour_sin#69, hour_cos#70, bytes_log#71, packet_log#72, concat_ws(_, protocol#27, conn_state#29) AS protocol_conn#73]
+2026-02-10 16:50:14.028 |    +- Project [src_port#25L, dst_port#26L, protocol#27, packet_count#28L, conn_state#29, bytes_transferred#30, timestamp#31, attack#32L, timestamp_ts#64, hour#65, dayofweek_raw#66, dayofweek#67, is_weekend#68, hour_sin#69, hour_cos#70, bytes_log#71, LOG1P(cast(packet_count#28L as double)) AS packet_log#72]
+2026-02-10 16:50:14.028 |       +- Project [src_port#25L, dst_port#26L, protocol#27, packet_count#28L, conn_state#29, bytes_transferred#30, timestamp#31, attack#32L, timestamp_ts#64, hour#65, dayofweek_raw#66, dayofweek#67, is_weekend#68, hour_sin#69, hour_cos#70, LOG1P(bytes_transferred#30) AS bytes_log#71]
+2026-02-10 16:50:14.028 |          +- Project [src_port#25L, dst_port#26L, protocol#27, packet_count#28L, conn_state#29, bytes_transferred#30, timestamp#31, attack#32L, timestamp_ts#64, hour#65, dayofweek_raw#66, dayofweek#67, is_weekend#68, hour_sin#69, COS(((cast(hour#65 as double) * 6.283185307179586) / 24.0)) AS hour_cos#70]
+2026-02-10 16:50:14.028 |             +- Project [src_port#25L, dst_port#26L, protocol#27, packet_count#28L, conn_state#29, bytes_transferred#30, timestamp#31, attack#32L, timestamp_ts#64, hour#65, dayofweek_raw#66, dayofweek#67, is_weekend#68, SIN(((cast(hour#65 as double) * 6.283185307179586) / 24.0)) AS hour_sin#69]
+2026-02-10 16:50:14.028 |                +- Project [src_port#25L, dst_port#26L, protocol#27, packet_count#28L, conn_state#29, bytes_transferred#30, timestamp#31, attack#32L, timestamp_ts#64, hour#65, dayofweek_raw#66, dayofweek#67, CASE WHEN dayofweek#67 IN (5,6) THEN 1 ELSE 0 END AS is_weekend#68]
+2026-02-10 16:50:14.028 |                   +- Project [src_port#25L, dst_port#26L, protocol#27, packet_count#28L, conn_state#29, bytes_transferred#30, timestamp#31, attack#32L, timestamp_ts#64, hour#65, dayofweek_raw#66, (dayofweek_raw#66 - 1) AS dayofweek#67]
+2026-02-10 16:50:14.028 |                      +- Project [src_port#25L, dst_port#26L, protocol#27, packet_count#28L, conn_state#29, bytes_transferred#30, timestamp#31, attack#32L, timestamp_ts#64, hour#65, dayofweek(cast(timestamp_ts#64 as date)) AS dayofweek_raw#66]
+2026-02-10 16:50:14.028 |                         +- Project [src_port#25L, dst_port#26L, protocol#27, packet_count#28L, conn_state#29, bytes_transferred#30, timestamp#31, attack#32L, timestamp_ts#64, hour(timestamp_ts#64, Some(Etc/UTC)) AS hour#65]
+2026-02-10 16:50:14.028 |                            +- Project [src_port#25L, dst_port#26L, protocol#27, packet_count#28L, conn_state#29, bytes_transferred#30, timestamp#31, attack#32L, cast(timestamp#31 as timestamp) AS timestamp_ts#64]
+2026-02-10 16:50:14.028 |                               +- Filter ((timestamp#31 >= to_timestamp(2024-01-01 00:00:00, None, TimestampType, Some(Etc/UTC), true)) AND (timestamp#31 <= to_timestamp(2024-06-30 23:59:59, None, TimestampType, Some(Etc/UTC), true)))
+2026-02-10 16:50:14.028 |                                  +- SubqueryAlias iceberg.raw.network_traffic_raw
+2026-02-10 16:50:14.028 |                                     +- RelationV2[src_port#25L, dst_port#26L, protocol#27, packet_count#28L, conn_state#29, bytes_transferred#30, timestamp#31, attack#32L] iceberg.raw.network_traffic_raw iceberg.raw.network_traffic_raw
+2026-02-10 16:50:14.028 | 
+2026-02-10 16:50:14.154 | 26/02/10 22:50:14 INFO SparkContext: SparkContext is stopping with exitCode 0 from stop at SparkSubmit.scala:1036.
+2026-02-10 16:50:14.166 | 26/02/10 22:50:14 INFO SparkUI: Stopped Spark web UI at http://spark-app-0-driver-svc.spark.svc:4040
+2026-02-10 16:50:14.171 | 26/02/10 22:50:14 INFO KubernetesClusterSchedulerBackend: Shutting down all executors
+2026-02-10 16:50:14.172 | 26/02/10 22:50:14 INFO KubernetesClusterSchedulerBackend$KubernetesDriverEndpoint: Asking each executor to shut down
+2026-02-10 16:50:14.178 | 26/02/10 22:50:14 INFO ExecutorPodsWatchSnapshotSource: Kubernetes client has been closed.
+2026-02-10 16:50:14.324 | 26/02/10 22:50:14 INFO MapOutputTrackerMasterEndpoint: MapOutputTrackerMasterEndpoint stopped!
+2026-02-10 16:50:14.342 | 26/02/10 22:50:14 INFO MemoryStore: MemoryStore cleared
+2026-02-10 16:50:14.342 | 26/02/10 22:50:14 INFO BlockManager: BlockManager stopped
+2026-02-10 16:50:14.346 | 26/02/10 22:50:14 INFO BlockManagerMaster: BlockManagerMaster stopped
+2026-02-10 16:50:14.349 | 26/02/10 22:50:14 INFO OutputCommitCoordinator$OutputCommitCoordinatorEndpoint: OutputCommitCoordinator stopped!
+2026-02-10 16:50:14.363 | 26/02/10 22:50:14 INFO SparkContext: Successfully stopped SparkContext
+2026-02-10 16:50:14.366 | 26/02/10 22:50:14 INFO ShutdownHookManager: Shutdown hook called
+2026-02-10 16:50:14.366 | 26/02/10 22:50:14 INFO ShutdownHookManager: Deleting directory /var/data/spark-29981db7-83a1-4747-9bcd-d8ad75dd8e9b/spark-525b6763-7b29-4529-90ff-c9063b2df848
+2026-02-10 16:50:14.370 | 26/02/10 22:50:14 INFO ShutdownHookManager: Deleting directory /tmp/localPyFiles-d1584614-ad4c-4ecb-9506-4f648f171516
+2026-02-10 16:50:14.373 | 26/02/10 22:50:14 INFO ShutdownHookManager: Deleting directory /tmp/spark-044e9b6f-4783-4677-9617-c854185850b3
+2026-02-10 16:50:14.376 | 26/02/10 22:50:14 INFO ShutdownHookManager: Deleting directory /tmp/spark-7bd21b54-2296-4342-9c19-aeb559e4ebaa
+2026-02-10 16:50:14.379 | 26/02/10 22:50:14 INFO ShutdownHookManager: Deleting directory /var/data/spark-29981db7-83a1-4747-9bcd-d8ad75dd8e9b/spark-525b6763-7b29-4529-90ff-c9063b2df848/pyspark-2a3e921d-ba1f-41b9-ac8c-f3aaede90e4b
+2026-02-10 16:50:14.382 | 26/02/10 22:50:14 INFO ShutdownHookManager: Deleting directory /tmp/spark-cd14e633-2fe5-4352-9869-da290a7d6ad4
+2026-02-10 16:50:14.385 | 26/02/10 22:50:14 INFO ShutdownHookManager: Deleting directory /tmp/artifacts-48eb6498-d072-46ad-8b8a-96fa4eff42d3
+2026-02-10 16:50:14.388 | 26/02/10 22:50:14 INFO ShutdownHookManager: Deleting directory /tmp/spark-02408087-1370-4917-aa65-93ff10dbde93
+2026-02-10 16:50:14.396 | 26/02/10 22:50:14 INFO MetricsSystemImpl: Stopping s3a-file-system metrics system...
+2026-02-10 16:50:14.396 | 26/02/10 22:50:14 INFO MetricsSystemImpl: s3a-file-system metrics system stopped.
+2026-02-10 16:50:14.396 | 26/02/10 22:50:14 INFO MetricsSystemImpl: s3a-file-system metrics system shutdown complete.
