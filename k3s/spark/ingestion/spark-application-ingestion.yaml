@@ -9,22 +9,57 @@ spec:
 
   runtimeVersions:
     sparkVersion: "4.0.1"
-  applicationTolerations:
-    instanceConfig:
-      initExecutors: 2
-      minExecutors: 2
-      maxExecutors: 4
 
   # Spark confs (S3A + Kubernetes image reference via spark.kubernetes.container.image)
   sparkConf:
-    # Resource allocation
+    # ==================== RESOURCE ALLOCATION ====================
     spark.driver.memory: "2048m"
     spark.driver.cores: "1"
     spark.executor.memory: "4096m"
-    spark.executor.cores: "6"
+    spark.executor.cores: "4"
+    
+    # Dynamic Allocation - ya optimizado
+    spark.dynamicAllocation.enabled: "true"
+    spark.dynamicAllocation.shuffleTracking.enabled: "true"
+    spark.dynamicAllocation.minExecutors: "2"
+    spark.dynamicAllocation.initialExecutors: "2"
+    spark.dynamicAllocation.maxExecutors: "4"
 
+    # ==================== ADAPTIVE QUERY EXECUTION (AQE) ====================
+    # Ya estaban habilitados - mantener
+    spark.sql.adaptive.enabled: "true"
+    spark.sql.adaptive.coalescePartitions.enabled: "true"
+    spark.sql.adaptive.skewJoin.enabled: "true"
+    spark.sql.adaptive.localShuffleReader.enabled: "true"
+    spark.sql.optimizer.dynamicPartitionPruning.enabled: "true"
+    
+    # NUEVAS optimizaciones AQE
+    # Tamaño advisory de partición: 128MB (balance entre paralelismo y overhead)
+    spark.sql.adaptive.advisoryPartitionSizeInBytes: "134217728"  # 128MB
+    
+    # Tamaño mínimo al coalescer particiones: 16MB (evita particiones muy pequeñas)
+    spark.sql.adaptive.coalescePartitions.minPartitionSize: "16777216"  # 16MB
+    
+    # Skew join: detectar particiones 5x más grandes que la mediana
+    spark.sql.adaptive.skewJoin.skewedPartitionFactor: "5"
+    
+    # Skew join: threshold de 256MB para considerar partición sesgada
+    spark.sql.adaptive.skewJoin.skewedPartitionThresholdInBytes: "268435456"  # 256MB
+
+    # ==================== SHUFFLE OPTIMIZATION ====================
+    # Shuffle partitions: 200 es un buen default, AQE optimizará dinámicamente
+    # Para datasets pequeños, AQE reducirá automáticamente
+    spark.sql.shuffle.partitions: "200"
+    
+    # ==================== BROADCAST JOIN OPTIMIZATION ====================
+    # OPTIMIZACIÓN CLAVE: Aumentar threshold a 50MB
+    # Permite que tablas/DataFrames hasta 50MB se hagan broadcast
+    # Esto evita shuffles costosos en joins pequeños/medianos
+    # Beneficia enormemente a datasets pequeños sin perjudicar grandes
+    spark.sql.autoBroadcastJoinThreshold: "52428800"  # 50MB (antes era 10MB default)
+    
     # General Spark configs
-    spark.kubernetes.container.image: k3s-spark-cluster-ingestion:latest
+    spark.kubernetes.container.image: k3s-spark-cluster:latest
     spark.speculation.interval: "30"
     spark.kubernetes.authenticate.driver.serviceAccountName: "spark"
 
@@ -67,7 +102,7 @@ spec:
       spec:
         containers:
           - name: spark-kubernetes-driver
-            image: k3s-spark-cluster-ingestion:latest
+            image: k3s-spark-cluster:latest
             #command: ["sh", "-c"]
             #args: ["echo 'DEBUG MODE'; sleep infinity"]
             volumeMounts:
@@ -116,7 +151,7 @@ spec:
       spec:
         containers:
           - name: spark-kubernetes-executor
-            image: k3s-spark-cluster-ingestion:latest
+            image: k3s-spark-cluster:latest
             volumeMounts:
               - name: app-files
                 mountPath: /app

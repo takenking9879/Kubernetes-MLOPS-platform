@@ -96,7 +96,7 @@ data:
             "wideLayout": true
           },
           "pluginVersion": "10.4.1",
-          "title": "Total Dataset Runs (Splits)",
+          "title": "Total Dataset Runs",
           "type": "stat",
           "targets": [
             {
