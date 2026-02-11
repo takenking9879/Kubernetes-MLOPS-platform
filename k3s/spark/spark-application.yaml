@@ -63,6 +63,16 @@ spec:
     spark.speculation.interval: "30"
     spark.kubernetes.authenticate.driver.serviceAccountName: "spark"
 
+    #Iceberg configurations
+    # Habilitar Iceberg SQL extensions
+    spark.sql.extensions: org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions
+
+    # Configurar catálogo Iceberg usando AWS Glue
+    spark.sql.catalog.iceberg: org.apache.iceberg.spark.SparkCatalog
+    spark.sql.catalog.iceberg.catalog-impl: org.apache.iceberg.aws.glue.GlueCatalog
+    spark.sql.catalog.iceberg.io-impl: org.apache.iceberg.aws.s3.S3FileIO
+    spark.sql.catalog.iceberg.warehouse: s3a://k8s-mlops-platform-bucket/warehouse
+
     # S3A configurations
     spark.hadoop.fs.s3a.impl: org.apache.hadoop.fs.s3a.S3AFileSystem
     spark.hadoop.fs.s3a.aws.credentials.provider: com.amazonaws.auth.DefaultAWSCredentialsProviderChain

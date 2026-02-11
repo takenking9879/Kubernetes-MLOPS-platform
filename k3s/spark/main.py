@@ -162,7 +162,8 @@ class SparkPreprocessIceberg(BaseUtils):
                     "org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions")
             .config("spark.sql.catalog.iceberg",
                     "org.apache.iceberg.spark.SparkCatalog")
-            .config("spark.sql.catalog.iceberg.type", "hadoop")
+            .config("spark.sql.catalog.iceberg.catalog-impl", "org.apache.iceberg.aws.glue.GlueCatalog")
+            .config("spark.sql.catalog.iceberg.io-impl", "org.apache.iceberg.aws.s3.S3FileIO")
             .config("spark.sql.catalog.iceberg.warehouse", warehouse)
             
             # Magic committer for writes
