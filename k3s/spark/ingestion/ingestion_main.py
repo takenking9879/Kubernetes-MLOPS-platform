@@ -7,7 +7,7 @@ import time
 from pyspark.sql import SparkSession
 from src.schemas.spark.schema_registry import get_schema
 from pyspark.sql import functions as F
-from pyspark.sql.types import TimestampType, LongType
+from pyspark.sql.types import TimestampType, LongType, DoubleType, StringType
 
 class SparkIngestionRaw(BaseUtils):
     """
@@ -92,8 +92,33 @@ class SparkIngestionRaw(BaseUtils):
         return spark
 
     def load_data(self, path: str):
-        df = self.spark.read.schema(self.schema).parquet(path)
+        # Read without forcing schema to avoid parquet timestamp mismatch
+        df = self.spark.read.parquet(path)
         self.logger.info("Loaded raw DF | partitions=%s", df.rdd.getNumPartitions())
+        return df
+
+    def _coerce_to_schema(self, df):
+        """Coerce incoming DataFrame to expected schema types with safe casts."""
+        for field in self.schema.fields:
+            name = field.name
+            if name not in df.columns:
+                continue
+
+            dtype = field.dataType
+            if isinstance(dtype, TimestampType):
+                ts_col = F.col(name).cast("double")
+                seconds = (
+                    F.when(ts_col > F.lit(1e14), ts_col / F.lit(1e6))
+                     .when(ts_col > F.lit(1e11), ts_col / F.lit(1e3))
+                     .otherwise(ts_col)
+                )
+                df = df.withColumn(name, F.to_timestamp(F.from_unixtime(seconds)))
+            elif isinstance(dtype, LongType):
+                df = df.withColumn(name, F.col(name).cast("long"))
+            elif isinstance(dtype, DoubleType):
+                df = df.withColumn(name, F.col(name).cast("double"))
+            elif isinstance(dtype, StringType):
+                df = df.withColumn(name, F.col(name).cast("string"))
         return df
 
     def table_exists(self, full_table_name: str) -> bool:
@@ -107,27 +132,19 @@ class SparkIngestionRaw(BaseUtils):
         Ordena solo los datos recién leídos por 'timestamp'.
         Convierte epoch a timestamp cuando sea necesario para orden correcto.
         """
-        ts_field = next((f for f in df.schema.fields if f.name == "timestamp"), None)
-
-        # If already timestamp, keep as-is. If numeric, convert based on magnitude.
-        if ts_field is not None and isinstance(ts_field.dataType, TimestampType):
-            df_with_ts = df
-        else:
-            ts_col = F.col("timestamp").cast("double")
-            # Heuristic for units: microseconds (>1e14), milliseconds (>1e11), else seconds
-            seconds = (
-                F.when(ts_col > F.lit(1e14), ts_col / F.lit(1e6))
-                 .when(ts_col > F.lit(1e11), ts_col / F.lit(1e3))
-                 .otherwise(ts_col)
-            )
-            df_with_ts = df.withColumn("timestamp", F.to_timestamp(F.from_unixtime(seconds)))
-
+        # Coerce to expected schema and ensure timestamp is valid
+        df_with_ts = self._coerce_to_schema(df)
         df_ordered = df_with_ts.orderBy(F.col("timestamp").asc_nulls_last())
         return df_ordered
 
     def write_raw_to_iceberg(self, df, namespace: str = "raw"):
         full_table = f"iceberg.{namespace}.{self.table_name}"
         self.spark.sql(f"CREATE NAMESPACE IF NOT EXISTS iceberg.{namespace}")
+
+        force_recreate = os.getenv("FORCE_RECREATE_RAW", "false").lower() == "true"
+        if force_recreate and self.table_exists(full_table):
+            self.logger.warning("FORCE_RECREATE_RAW=true -> dropping table %s", full_table)
+            self.spark.sql(f"DROP TABLE IF EXISTS {full_table}")
 
         if not self.table_exists(full_table):
             self.logger.info("Table does not exist — creating %s", full_table)

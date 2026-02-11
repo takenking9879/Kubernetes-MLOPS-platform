@@ -1,449 +1,107 @@
-2026-02-10 19:16:09.557 | WARNING: Using incubator modules: jdk.incubator.vector
-2026-02-10 19:16:10.711 | Files local:///app/repo/k3s/spark/spark-preprocess-iceberg.py from /app/.worktrees/6402b20db1c914ad4f7105c4c47e05ec80399a7c/k3s/spark/spark-preprocess-iceberg.py to /opt/spark/work-dir/spark-preprocess-iceberg.py
-2026-02-10 19:16:10.797 | 26/02/11 01:16:10 WARN NativeCodeLoader: Unable to load native-hadoop library for your platform... using builtin-java classes where applicable
-2026-02-10 19:16:11.620 | 2026-02-11 01:16:11,619 - SparkPreprocessIceberg - DEBUG - Parameters retrieved from /app/repo/k3s/params.yaml
-2026-02-10 19:16:12.014 | 2026-02-11 01:16:12,014 - SparkPreprocessIceberg - INFO - S3 connection verified. Buckets: ['frontend-crm-bucket', 'k8s-mlops-platform-bucket']
-2026-02-10 19:16:12.402 | Using Spark's default log4j profile: org/apache/spark/log4j2-defaults.properties
-2026-02-10 19:16:12.406 | 26/02/11 01:16:12 INFO SparkContext: Running Spark version 4.0.1
-2026-02-10 19:16:12.408 | 26/02/11 01:16:12 INFO SparkContext: OS info Linux, 6.6.87.2-microsoft-standard-WSL2, amd64
-2026-02-10 19:16:12.409 | 26/02/11 01:16:12 INFO SparkContext: Java version 17.0.17
-2026-02-10 19:16:12.433 | 26/02/11 01:16:12 INFO ResourceUtils: ==============================================================
-2026-02-10 19:16:12.433 | 26/02/11 01:16:12 INFO ResourceUtils: No custom resources configured for spark.driver.
-2026-02-10 19:16:12.433 | 26/02/11 01:16:12 INFO ResourceUtils: ==============================================================
-2026-02-10 19:16:12.434 | 26/02/11 01:16:12 INFO SparkContext: Submitted application: spark-preprocessing
-2026-02-10 19:16:12.456 | 26/02/11 01:16:12 INFO ResourceProfile: Default ResourceProfile created, executor resources: Map(cores -> name: cores, amount: 6, script: , vendor: , memory -> name: memory, amount: 4096, script: , vendor: , offHeap -> name: offHeap, amount: 0, script: , vendor: ), task resources: Map(cpus -> name: cpus, amount: 1.0)
-2026-02-10 19:16:12.460 | 26/02/11 01:16:12 INFO ResourceProfile: Limiting resource is cpus at 6 tasks per executor
-2026-02-10 19:16:12.463 | 26/02/11 01:16:12 INFO ResourceProfileManager: Added ResourceProfile id: 0
-2026-02-10 19:16:12.504 | 26/02/11 01:16:12 INFO SecurityManager: Changing view acls to: spark
-2026-02-10 19:16:12.505 | 26/02/11 01:16:12 INFO SecurityManager: Changing modify acls to: spark
-2026-02-10 19:16:12.505 | 26/02/11 01:16:12 INFO SecurityManager: Changing view acls groups to: spark
-2026-02-10 19:16:12.506 | 26/02/11 01:16:12 INFO SecurityManager: Changing modify acls groups to: spark
-2026-02-10 19:16:12.508 | 26/02/11 01:16:12 INFO SecurityManager: SecurityManager: authentication disabled; ui acls disabled; users with view permissions: spark groups with view permissions: EMPTY; users with modify permissions: spark; groups with modify permissions: EMPTY; RPC SSL disabled
-2026-02-10 19:16:12.705 | 26/02/11 01:16:12 INFO Utils: Successfully started service 'sparkDriver' on port 7078.
-2026-02-10 19:16:12.729 | 26/02/11 01:16:12 INFO SparkEnv: Registering MapOutputTracker
-2026-02-10 19:16:12.739 | 26/02/11 01:16:12 INFO SparkEnv: Registering BlockManagerMaster
-2026-02-10 19:16:12.751 | 26/02/11 01:16:12 INFO BlockManagerMasterEndpoint: Using org.apache.spark.storage.DefaultTopologyMapper for getting topology information
-2026-02-10 19:16:12.752 | 26/02/11 01:16:12 INFO BlockManagerMasterEndpoint: BlockManagerMasterEndpoint up
-2026-02-10 19:16:12.755 | 26/02/11 01:16:12 INFO SparkEnv: Registering BlockManagerMasterHeartbeat
-2026-02-10 19:16:12.773 | 26/02/11 01:16:12 INFO DiskBlockManager: Created local directory at /var/data/spark-02dcb4eb-e8ae-43c4-8926-704c74554c4f/blockmgr-639beaa3-98bf-451f-ab4a-c34365e9aa8f
-2026-02-10 19:16:12.792 | 26/02/11 01:16:12 INFO SparkEnv: Registering OutputCommitCoordinator
-2026-02-10 19:16:12.896 | 26/02/11 01:16:12 INFO JettyUtils: Start Jetty 0.0.0.0:4040 for SparkUI
-2026-02-10 19:16:12.949 | 26/02/11 01:16:12 INFO Utils: Successfully started service 'SparkUI' on port 4040.
-2026-02-10 19:16:12.983 | 26/02/11 01:16:12 WARN SparkContext: File with 'local' scheme local:/app/repo/k3s/spark/spark-preprocess-iceberg.py is not supported to add to file server, since it is already available on every node.
-2026-02-10 19:16:13.000 | 26/02/11 01:16:12 INFO SecurityManager: Changing view acls to: spark
-2026-02-10 19:16:13.000 | 26/02/11 01:16:13 INFO SecurityManager: Changing modify acls to: spark
-2026-02-10 19:16:13.000 | 26/02/11 01:16:13 INFO SecurityManager: Changing view acls groups to: spark
-2026-02-10 19:16:13.000 | 26/02/11 01:16:13 INFO SecurityManager: Changing modify acls groups to: spark
-2026-02-10 19:16:13.001 | 26/02/11 01:16:13 INFO SecurityManager: SecurityManager: authentication disabled; ui acls disabled; users with view permissions: spark groups with view permissions: EMPTY; users with modify permissions: spark; groups with modify permissions: EMPTY; RPC SSL disabled
-2026-02-10 19:16:13.045 | 26/02/11 01:16:13 INFO SparkKubernetesClientFactory: Auto-configuring K8S client using current context from users K8S config file
-2026-02-10 19:16:14.158 | 26/02/11 01:16:14 INFO ExecutorPodsAllocator: Going to request 2 executors from Kubernetes for ResourceProfile Id: 0, target: 2, known: 0, sharedSlotFromPendingPods: 2147483647.
-2026-02-10 19:16:14.217 | 26/02/11 01:16:14 INFO KubernetesClientUtils: Spark configuration files loaded from Some(/opt/spark/conf) : spark.kubernetes.namespace
-2026-02-10 19:16:14.396 | 26/02/11 01:16:14 INFO ExecutorPodsAllocator: Found 0 reusable PVCs from 0 PVCs
-2026-02-10 19:16:14.438 | 26/02/11 01:16:14 INFO KubernetesClientUtils: Spark configuration files loaded from Some(/opt/spark/conf) : spark.kubernetes.namespace
-2026-02-10 19:16:14.438 | 26/02/11 01:16:14 INFO Utils: Successfully started service 'org.apache.spark.network.netty.NettyBlockTransferService' on port 7079.
-2026-02-10 19:16:14.442 | 26/02/11 01:16:14 INFO NettyBlockTransferService: Server created on spark-app-0-driver-svc.spark.svc 10.1.10.120:7079
-2026-02-10 19:16:14.444 | 26/02/11 01:16:14 INFO BlockManager: Using org.apache.spark.storage.RandomBlockReplicationPolicy for block replication policy
-2026-02-10 19:16:14.446 | 26/02/11 01:16:14 INFO BasicExecutorFeatureStep: Decommissioning not enabled, skipping shutdown script
-2026-02-10 19:16:14.458 | 26/02/11 01:16:14 INFO BlockManagerMaster: Registering BlockManager BlockManagerId(driver, spark-app-0-driver-svc.spark.svc, 7079, None)
-2026-02-10 19:16:14.464 | 26/02/11 01:16:14 INFO BlockManagerMasterEndpoint: Registering block manager spark-app-0-driver-svc.spark.svc:7079 with 1048.8 MiB RAM, BlockManagerId(driver, spark-app-0-driver-svc.spark.svc, 7079, None)
-2026-02-10 19:16:14.467 | 26/02/11 01:16:14 INFO BlockManagerMaster: Registered BlockManager BlockManagerId(driver, spark-app-0-driver-svc.spark.svc, 7079, None)
-2026-02-10 19:16:14.468 | 26/02/11 01:16:14 INFO BlockManager: Initialized BlockManager: BlockManagerId(driver, spark-app-0-driver-svc.spark.svc, 7079, None)
-2026-02-10 19:16:14.529 | 26/02/11 01:16:14 INFO KubernetesClientUtils: Spark configuration files loaded from Some(/opt/spark/conf) : spark.kubernetes.namespace
-2026-02-10 19:16:14.531 | 26/02/11 01:16:14 INFO BasicExecutorFeatureStep: Decommissioning not enabled, skipping shutdown script
-2026-02-10 19:16:19.946 | 26/02/11 01:16:19 INFO KubernetesClusterSchedulerBackend$KubernetesDriverEndpoint: Registered executor NettyRpcEndpointRef(spark-client://Executor) (10.1.10.121:52086) with ID 1, ResourceProfileId 0
-2026-02-10 19:16:20.064 | 26/02/11 01:16:20 INFO BlockManagerMasterEndpoint: Registering block manager 10.1.10.121:43635 with 2.2 GiB RAM, BlockManagerId(1, 10.1.10.121, 43635, None)
-2026-02-10 19:16:44.096 | 26/02/11 01:16:44 INFO KubernetesClusterSchedulerBackend: SchedulerBackend is ready for scheduling beginning after waiting maxRegisteredResourcesWaitingTime: 30000.0(ms)
-2026-02-10 19:16:45.761 | 2026-02-11 01:16:45,760 - SparkPreprocessIceberg - INFO - SparkSession created with Iceberg catalog at s3a://k8s-mlops-platform-bucket/warehouse
-2026-02-10 19:16:45.761 | 2026-02-11 01:16:45,761 - SparkPreprocessIceberg - INFO - Artifacts config: bucket=k8s-mlops-platform-bucket, prefix=pipelines
-2026-02-10 19:16:45.838 | 26/02/11 01:16:45 INFO SharedState: Setting hive.metastore.warehouse.dir ('null') to the value of spark.sql.warehouse.dir.
-2026-02-10 19:16:45.845 | 26/02/11 01:16:45 INFO SharedState: Warehouse path is 'file:/opt/spark/work-dir/spark-warehouse'.
-2026-02-10 19:16:46.584 | 26/02/11 01:16:46 WARN MetricsConfig: Cannot locate configuration: tried hadoop-metrics2-s3a-file-system.properties,hadoop-metrics2.properties
-2026-02-10 19:16:46.593 | 26/02/11 01:16:46 INFO MetricsSystemImpl: Scheduled Metric snapshot period at 10 second(s).
-2026-02-10 19:16:46.593 | 26/02/11 01:16:46 INFO MetricsSystemImpl: s3a-file-system metrics system started
-2026-02-10 19:16:47.143 | 26/02/11 01:16:47 INFO CatalogUtil: Loading custom FileIO implementation: org.apache.iceberg.hadoop.HadoopFileIO
-2026-02-10 19:16:49.729 | 26/02/11 01:16:49 INFO BaseMetastoreCatalog: Table loaded by catalog: iceberg.raw.network_traffic_raw.snapshots
-2026-02-10 19:16:50.701 | 26/02/11 01:16:50 INFO BaseMetastoreCatalog: Table loaded by catalog: iceberg.raw.network_traffic_raw
-2026-02-10 19:16:51.266 | 26/02/11 01:16:51 INFO V2ScanRelationPushDown: 
-2026-02-10 19:16:51.266 | Output: committed_at#0, snapshot_id#1L
-2026-02-10 19:16:51.266 |            
-2026-02-10 19:16:51.400 | 26/02/11 01:16:51 INFO SparkPartitioningAwareScan: Reporting UnknownPartitioning with 1 partition(s) for table iceberg.raw.network_traffic_raw.snapshots
-2026-02-10 19:16:51.520 | 26/02/11 01:16:51 INFO MemoryStore: MemoryStore started with capacity 1048.8 MiB
-2026-02-10 19:16:51.538 | 26/02/11 01:16:51 INFO MemoryStore: Block broadcast_0 stored as values in memory (estimated size 32.0 KiB, free 1048.8 MiB)
-2026-02-10 19:16:51.589 | 26/02/11 01:16:51 INFO MemoryStore: Block broadcast_0_piece0 stored as bytes in memory (estimated size 35.0 KiB, free 1048.7 MiB)
-2026-02-10 19:16:51.597 | 26/02/11 01:16:51 INFO SparkContext: Created broadcast 0 from collect at /app/repo/k3s/spark/spark-preprocess-iceberg.py:133
-2026-02-10 19:16:51.621 | 26/02/11 01:16:51 INFO MemoryStore: Block broadcast_1 stored as values in memory (estimated size 32.0 KiB, free 1048.7 MiB)
-2026-02-10 19:16:51.632 | 26/02/11 01:16:51 INFO MemoryStore: Block broadcast_1_piece0 stored as bytes in memory (estimated size 35.1 KiB, free 1048.7 MiB)
-2026-02-10 19:16:51.633 | 26/02/11 01:16:51 INFO SparkContext: Created broadcast 1 from collect at /app/repo/k3s/spark/spark-preprocess-iceberg.py:133
-2026-02-10 19:16:51.898 | 26/02/11 01:16:51 INFO CodeGenerator: Code generated in 147.977014 ms
-2026-02-10 19:16:51.953 | 26/02/11 01:16:51 INFO CodeGenerator: Code generated in 12.567591 ms
-2026-02-10 19:16:52.060 | 26/02/11 01:16:52 INFO SparkContext: Starting job: collect at /app/repo/k3s/spark/spark-preprocess-iceberg.py:133
-2026-02-10 19:16:52.071 | 26/02/11 01:16:52 INFO DAGScheduler: Got job 0 (collect at /app/repo/k3s/spark/spark-preprocess-iceberg.py:133) with 1 output partitions
-2026-02-10 19:16:52.072 | 26/02/11 01:16:52 INFO DAGScheduler: Final stage: ResultStage 0 (collect at /app/repo/k3s/spark/spark-preprocess-iceberg.py:133)
-2026-02-10 19:16:52.073 | 26/02/11 01:16:52 INFO DAGScheduler: Parents of final stage: List()
-2026-02-10 19:16:52.075 | 26/02/11 01:16:52 INFO DAGScheduler: Missing parents: List()
-2026-02-10 19:16:52.081 | 26/02/11 01:16:52 INFO DAGScheduler: Submitting ResultStage 0 (MapPartitionsRDD[4] at collect at /app/repo/k3s/spark/spark-preprocess-iceberg.py:133), which has no missing parents
-2026-02-10 19:16:52.098 | 26/02/11 01:16:52 INFO MemoryStore: Block broadcast_2 stored as values in memory (estimated size 13.8 KiB, free 1048.7 MiB)
-2026-02-10 19:16:52.105 | 26/02/11 01:16:52 INFO MemoryStore: Block broadcast_2_piece0 stored as bytes in memory (estimated size 5.9 KiB, free 1048.6 MiB)
-2026-02-10 19:16:52.106 | 26/02/11 01:16:52 INFO SparkContext: Created broadcast 2 from broadcast at DAGScheduler.scala:1676
-2026-02-10 19:16:52.126 | 26/02/11 01:16:52 INFO DAGScheduler: Submitting 1 missing tasks from ResultStage 0 (MapPartitionsRDD[4] at collect at /app/repo/k3s/spark/spark-preprocess-iceberg.py:133) (first 15 tasks are for partitions Vector(0))
-2026-02-10 19:16:52.136 | 26/02/11 01:16:52 INFO TaskSchedulerImpl: Adding task set 0.0 with 1 tasks resource profile 0
-2026-02-10 19:16:52.174 | 26/02/11 01:16:52 INFO TaskSetManager: Starting task 0.0 in stage 0.0 (TID 0) (10.1.10.121,executor 1, partition 0, PROCESS_LOCAL, 14756 bytes) 
-2026-02-10 19:16:53.138 | 26/02/11 01:16:53 INFO TaskSetManager: Finished task 0.0 in stage 0.0 (TID 0) in 986 ms on 10.1.10.121 (executor 1) (1/1)
-2026-02-10 19:16:53.140 | 26/02/11 01:16:53 INFO TaskSchedulerImpl: Removed TaskSet 0.0 whose tasks have all completed, from pool 
-2026-02-10 19:16:53.144 | 26/02/11 01:16:53 INFO DAGScheduler: ResultStage 0 (collect at /app/repo/k3s/spark/spark-preprocess-iceberg.py:133) finished in 1053 ms
-2026-02-10 19:16:53.146 | 26/02/11 01:16:53 INFO DAGScheduler: Job 0 is finished. Cancelling potential speculative or zombie tasks for this job
-2026-02-10 19:16:53.147 | 26/02/11 01:16:53 INFO TaskSchedulerImpl: Canceling stage 0
-2026-02-10 19:16:53.148 | 26/02/11 01:16:53 INFO TaskSchedulerImpl: Killing all running tasks in stage 0: Stage finished
-2026-02-10 19:16:53.150 | 26/02/11 01:16:53 INFO DAGScheduler: Job 0 finished: collect at /app/repo/k3s/spark/spark-preprocess-iceberg.py:133, took 1089.58824 ms
-2026-02-10 19:16:53.168 | 26/02/11 01:16:53 INFO CodeGenerator: Code generated in 10.713295 ms
-2026-02-10 19:16:53.188 | 2026-02-11 01:16:53,188 - SparkPreprocessIceberg - DEBUG - Raw snapshots sample: [{'snapshot_id': 945057764955348278}]
-2026-02-10 19:16:53.197 | 26/02/11 01:16:53 INFO V2ScanRelationPushDown: 
-2026-02-10 19:16:53.198 | Output: committed_at#0, snapshot_id#1L
-2026-02-10 19:16:53.198 |            
-2026-02-10 19:16:53.274 | 26/02/11 01:16:53 INFO SparkPartitioningAwareScan: Reporting UnknownPartitioning with 1 partition(s) for table iceberg.raw.network_traffic_raw.snapshots
-2026-02-10 19:16:53.280 | 26/02/11 01:16:53 INFO MemoryStore: Block broadcast_3 stored as values in memory (estimated size 32.0 KiB, free 1048.6 MiB)
-2026-02-10 19:16:53.289 | 26/02/11 01:16:53 INFO MemoryStore: Block broadcast_3_piece0 stored as bytes in memory (estimated size 35.0 KiB, free 1048.6 MiB)
-2026-02-10 19:16:53.291 | 26/02/11 01:16:53 INFO SparkContext: Created broadcast 3 from collect at /app/repo/k3s/spark/spark-preprocess-iceberg.py:138
-2026-02-10 19:16:53.295 | 26/02/11 01:16:53 INFO MemoryStore: Block broadcast_4 stored as values in memory (estimated size 32.0 KiB, free 1048.6 MiB)
-2026-02-10 19:16:53.298 | 26/02/11 01:16:53 INFO MemoryStore: Block broadcast_4_piece0 stored as bytes in memory (estimated size 35.1 KiB, free 1048.5 MiB)
-2026-02-10 19:16:53.309 | 26/02/11 01:16:53 INFO SparkContext: Created broadcast 4 from collect at /app/repo/k3s/spark/spark-preprocess-iceberg.py:138
-2026-02-10 19:16:53.338 | 26/02/11 01:16:53 INFO SparkContext: Starting job: collect at /app/repo/k3s/spark/spark-preprocess-iceberg.py:138
-2026-02-10 19:16:53.338 | 26/02/11 01:16:53 INFO DAGScheduler: Got job 1 (collect at /app/repo/k3s/spark/spark-preprocess-iceberg.py:138) with 1 output partitions
-2026-02-10 19:16:53.339 | 26/02/11 01:16:53 INFO DAGScheduler: Final stage: ResultStage 1 (collect at /app/repo/k3s/spark/spark-preprocess-iceberg.py:138)
-2026-02-10 19:16:53.339 | 26/02/11 01:16:53 INFO DAGScheduler: Parents of final stage: List()
-2026-02-10 19:16:53.339 | 26/02/11 01:16:53 INFO DAGScheduler: Missing parents: List()
-2026-02-10 19:16:53.340 | 26/02/11 01:16:53 INFO DAGScheduler: Submitting ResultStage 1 (MapPartitionsRDD[9] at collect at /app/repo/k3s/spark/spark-preprocess-iceberg.py:138), which has no missing parents
-2026-02-10 19:16:53.342 | 26/02/11 01:16:53 INFO MemoryStore: Block broadcast_5 stored as values in memory (estimated size 13.8 KiB, free 1048.5 MiB)
-2026-02-10 19:16:53.349 | 26/02/11 01:16:53 INFO MemoryStore: Block broadcast_5_piece0 stored as bytes in memory (estimated size 5.9 KiB, free 1048.5 MiB)
-2026-02-10 19:16:53.351 | 26/02/11 01:16:53 INFO SparkContext: Created broadcast 5 from broadcast at DAGScheduler.scala:1676
-2026-02-10 19:16:53.352 | 26/02/11 01:16:53 INFO DAGScheduler: Submitting 1 missing tasks from ResultStage 1 (MapPartitionsRDD[9] at collect at /app/repo/k3s/spark/spark-preprocess-iceberg.py:138) (first 15 tasks are for partitions Vector(0))
-2026-02-10 19:16:53.352 | 26/02/11 01:16:53 INFO TaskSchedulerImpl: Adding task set 1.0 with 1 tasks resource profile 0
-2026-02-10 19:16:53.354 | 26/02/11 01:16:53 INFO TaskSetManager: Starting task 0.0 in stage 1.0 (TID 1) (10.1.10.121,executor 1, partition 0, PROCESS_LOCAL, 14761 bytes) 
-2026-02-10 19:16:53.411 | 26/02/11 01:16:53 INFO TaskSetManager: Finished task 0.0 in stage 1.0 (TID 1) in 57 ms on 10.1.10.121 (executor 1) (1/1)
-2026-02-10 19:16:53.411 | 26/02/11 01:16:53 INFO TaskSchedulerImpl: Removed TaskSet 1.0 whose tasks have all completed, from pool 
-2026-02-10 19:16:53.412 | 26/02/11 01:16:53 INFO DAGScheduler: ResultStage 1 (collect at /app/repo/k3s/spark/spark-preprocess-iceberg.py:138) finished in 72 ms
-2026-02-10 19:16:53.412 | 26/02/11 01:16:53 INFO DAGScheduler: Job 1 is finished. Cancelling potential speculative or zombie tasks for this job
-2026-02-10 19:16:53.413 | 26/02/11 01:16:53 INFO TaskSchedulerImpl: Canceling stage 1
-2026-02-10 19:16:53.413 | 26/02/11 01:16:53 INFO TaskSchedulerImpl: Killing all running tasks in stage 1: Stage finished
-2026-02-10 19:16:53.413 | 26/02/11 01:16:53 INFO DAGScheduler: Job 1 finished: collect at /app/repo/k3s/spark/spark-preprocess-iceberg.py:138, took 75.518576 ms
-2026-02-10 19:16:53.421 | 2026-02-11 01:16:53,421 - SparkPreprocessIceberg - INFO - Raw table snapshot: 945057764955348278
-2026-02-10 19:16:55.841 | 2026-02-11 01:16:55,841 - SparkPreprocessIceberg - INFO - Creating metadata table: iceberg.metadata.preprocessing_artifacts
-2026-02-10 19:16:57.729 | 26/02/11 01:16:57 INFO BaseMetastoreCatalog: Table properties set at catalog level through catalog properties: {}
-2026-02-10 19:16:58.556 | 26/02/11 01:16:58 INFO BaseMetastoreCatalog: Table properties enforced at catalog level through catalog properties: {}
-2026-02-10 19:16:59.697 | 26/02/11 01:16:59 INFO HadoopTableOperations: Committed a new metadata file s3a://k8s-mlops-platform-bucket/warehouse/metadata/preprocessing_artifacts/metadata/v1.metadata.json
-2026-02-10 19:17:01.758 | 2026-02-11 01:17:01,757 - SparkPreprocessIceberg - INFO - Metadata table created: iceberg.metadata.preprocessing_artifacts
-2026-02-10 19:17:01.758 | 2026-02-11 01:17:01,757 - SparkPreprocessIceberg - INFO - ============================================================
-2026-02-10 19:17:01.758 | 2026-02-11 01:17:01,757 - SparkPreprocessIceberg - INFO - Processing TRAIN split
-2026-02-10 19:17:01.758 | 2026-02-11 01:17:01,757 - SparkPreprocessIceberg - INFO - ============================================================
-2026-02-10 19:17:01.758 | 2026-02-11 01:17:01,757 - SparkPreprocessIceberg - INFO - Loading raw data: 2026-01-01 00:30:00 to 2026-01-01 13:00:00
-2026-02-10 19:17:01.780 | 2026-02-11 01:17:01,780 - SparkPreprocessIceberg - DEBUG - Raw table schema: struct<src_port:bigint,dst_port:bigint,protocol:string,packet_count:bigint,conn_state:string,bytes_transferred:double,timestamp:timestamp,attack:bigint>
-2026-02-10 19:17:01.780 | 2026-02-11 01:17:01,780 - SparkPreprocessIceberg - DEBUG - Raw table columns: ['src_port', 'dst_port', 'protocol', 'packet_count', 'conn_state', 'bytes_transferred', 'timestamp', 'attack']
-2026-02-10 19:17:01.797 | 26/02/11 01:17:01 INFO V2ScanRelationPushDown: 
-2026-02-10 19:17:01.797 | Output: src_port#15L, dst_port#16L, protocol#17, packet_count#18L, conn_state#19, bytes_transferred#20, timestamp#21, attack#22L
-2026-02-10 19:17:01.797 |            
-2026-02-10 19:17:01.804 | 26/02/11 01:17:01 INFO SnapshotScan: Scanning table iceberg.raw.network_traffic_raw snapshot 945057764955348278 created at 2026-02-11T01:15:32.484+00:00 with filter true
-2026-02-10 19:17:02.148 | 26/02/11 01:17:02 INFO BaseDistributedDataScan: Planning file tasks locally for table iceberg.raw.network_traffic_raw
-2026-02-10 19:17:02.421 | 26/02/11 01:17:02 INFO SparkPartitioningAwareScan: Reporting UnknownPartitioning with 1 partition(s) for table iceberg.raw.network_traffic_raw
-2026-02-10 19:17:02.426 | 26/02/11 01:17:02 INFO MemoryStore: Block broadcast_6 stored as values in memory (estimated size 32.0 KiB, free 1048.5 MiB)
-2026-02-10 19:17:02.435 | 26/02/11 01:17:02 INFO MemoryStore: Block broadcast_6_piece0 stored as bytes in memory (estimated size 34.9 KiB, free 1048.5 MiB)
-2026-02-10 19:17:02.438 | 26/02/11 01:17:02 INFO SparkContext: Created broadcast 6 from collect at /app/repo/k3s/spark/spark-preprocess-iceberg.py:171
-2026-02-10 19:17:02.445 | 26/02/11 01:17:02 INFO MemoryStore: Block broadcast_7 stored as values in memory (estimated size 32.0 KiB, free 1048.4 MiB)
-2026-02-10 19:17:02.449 | 26/02/11 01:17:02 INFO MemoryStore: Block broadcast_7_piece0 stored as bytes in memory (estimated size 34.9 KiB, free 1048.4 MiB)
-2026-02-10 19:17:02.450 | 26/02/11 01:17:02 INFO SparkContext: Created broadcast 7 from collect at /app/repo/k3s/spark/spark-preprocess-iceberg.py:171
-2026-02-10 19:17:02.510 | 26/02/11 01:17:02 INFO CodeGenerator: Code generated in 31.538048 ms
-2026-02-10 19:17:02.527 | 26/02/11 01:17:02 INFO SparkContext: Starting job: collect at /app/repo/k3s/spark/spark-preprocess-iceberg.py:171
-2026-02-10 19:17:02.527 | 26/02/11 01:17:02 INFO DAGScheduler: Got job 2 (collect at /app/repo/k3s/spark/spark-preprocess-iceberg.py:171) with 1 output partitions
-2026-02-10 19:17:02.527 | 26/02/11 01:17:02 INFO DAGScheduler: Final stage: ResultStage 2 (collect at /app/repo/k3s/spark/spark-preprocess-iceberg.py:171)
-2026-02-10 19:17:02.527 | 26/02/11 01:17:02 INFO DAGScheduler: Parents of final stage: List()
-2026-02-10 19:17:02.528 | 26/02/11 01:17:02 INFO DAGScheduler: Missing parents: List()
-2026-02-10 19:17:02.529 | 26/02/11 01:17:02 INFO DAGScheduler: Submitting ResultStage 2 (MapPartitionsRDD[13] at collect at /app/repo/k3s/spark/spark-preprocess-iceberg.py:171), which has no missing parents
-2026-02-10 19:17:02.533 | 26/02/11 01:17:02 INFO MemoryStore: Block broadcast_8 stored as values in memory (estimated size 17.9 KiB, free 1048.4 MiB)
-2026-02-10 19:17:02.543 | 26/02/11 01:17:02 INFO MemoryStore: Block broadcast_8_piece0 stored as bytes in memory (estimated size 6.4 KiB, free 1048.4 MiB)
-2026-02-10 19:17:02.545 | 26/02/11 01:17:02 INFO SparkContext: Created broadcast 8 from broadcast at DAGScheduler.scala:1676
-2026-02-10 19:17:02.546 | 26/02/11 01:17:02 INFO DAGScheduler: Submitting 1 missing tasks from ResultStage 2 (MapPartitionsRDD[13] at collect at /app/repo/k3s/spark/spark-preprocess-iceberg.py:171) (first 15 tasks are for partitions Vector(0))
-2026-02-10 19:17:02.546 | 26/02/11 01:17:02 INFO TaskSchedulerImpl: Adding task set 2.0 with 1 tasks resource profile 0
-2026-02-10 19:17:02.552 | 26/02/11 01:17:02 INFO TaskSetManager: Starting task 0.0 in stage 2.0 (TID 2) (10.1.10.121,executor 1, partition 0, PROCESS_LOCAL, 15119 bytes) 
-2026-02-10 19:17:05.199 | 26/02/11 01:17:05 INFO TaskSetManager: Finished task 0.0 in stage 2.0 (TID 2) in 2652 ms on 10.1.10.121 (executor 1) (1/1)
-2026-02-10 19:17:05.200 | 26/02/11 01:17:05 INFO TaskSchedulerImpl: Removed TaskSet 2.0 whose tasks have all completed, from pool 
-2026-02-10 19:17:05.200 | 26/02/11 01:17:05 INFO DAGScheduler: ResultStage 2 (collect at /app/repo/k3s/spark/spark-preprocess-iceberg.py:171) finished in 2671 ms
-2026-02-10 19:17:05.201 | 26/02/11 01:17:05 INFO DAGScheduler: Job 2 is finished. Cancelling potential speculative or zombie tasks for this job
-2026-02-10 19:17:05.201 | 26/02/11 01:17:05 INFO TaskSchedulerImpl: Canceling stage 2
-2026-02-10 19:17:05.201 | 26/02/11 01:17:05 INFO TaskSchedulerImpl: Killing all running tasks in stage 2: Stage finished
-2026-02-10 19:17:05.201 | 26/02/11 01:17:05 INFO DAGScheduler: Job 2 finished: collect at /app/repo/k3s/spark/spark-preprocess-iceberg.py:171, took 2674.694626 ms
-2026-02-10 19:17:05.210 | 2026-02-11 01:17:05,208 - SparkPreprocessIceberg - DEBUG - Failed to collect raw sample
-2026-02-10 19:17:05.210 | Traceback (most recent call last):
-2026-02-10 19:17:05.210 |   File "/app/repo/k3s/spark/spark-preprocess-iceberg.py", line 171, in load_raw_data_by_date_range
-2026-02-10 19:17:05.210 |     raw_sample = df.limit(5).collect()
-2026-02-10 19:17:05.210 |                  ^^^^^^^^^^^^^^^^^^^^^
-2026-02-10 19:17:05.210 |   File "/opt/spark/python/lib/pyspark.zip/pyspark/sql/classic/dataframe.py", line 444, in collect
-2026-02-10 19:17:05.210 |     return list(_load_from_socket(sock_info, BatchedSerializer(CPickleSerializer())))
-2026-02-10 19:17:05.210 |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-2026-02-10 19:17:05.210 |   File "/opt/spark/python/lib/pyspark.zip/pyspark/serializers.py", line 151, in load_stream
-2026-02-10 19:17:05.210 |     yield self._read_with_length(stream)
-2026-02-10 19:17:05.210 |           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-2026-02-10 19:17:05.210 |   File "/opt/spark/python/lib/pyspark.zip/pyspark/serializers.py", line 173, in _read_with_length
-2026-02-10 19:17:05.210 |     return self.loads(obj)
-2026-02-10 19:17:05.210 |            ^^^^^^^^^^^^^^^
-2026-02-10 19:17:05.210 |   File "/opt/spark/python/lib/pyspark.zip/pyspark/serializers.py", line 473, in loads
-2026-02-10 19:17:05.210 |     return cloudpickle.loads(obj, encoding=encoding)
-2026-02-10 19:17:05.210 |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-2026-02-10 19:17:05.210 |   File "/opt/spark/python/lib/pyspark.zip/pyspark/sql/types.py", line 2983, in <lambda>
-2026-02-10 19:17:05.210 |     return lambda *a: dataType.fromInternal(a)
-2026-02-10 19:17:05.210 |                       ^^^^^^^^^^^^^^^^^^^^^^^^
-2026-02-10 19:17:05.210 |   File "/opt/spark/python/lib/pyspark.zip/pyspark/sql/types.py", line 1556, in fromInternal
-2026-02-10 19:17:05.210 |     values = [
-2026-02-10 19:17:05.210 |              ^
-2026-02-10 19:17:05.210 |   File "/opt/spark/python/lib/pyspark.zip/pyspark/sql/types.py", line 1557, in <listcomp>
-2026-02-10 19:17:05.210 |     f.fromInternal(v) if c else v
-2026-02-10 19:17:05.210 |     ^^^^^^^^^^^^^^^^^
-2026-02-10 19:17:05.210 |   File "/opt/spark/python/lib/pyspark.zip/pyspark/sql/types.py", line 1119, in fromInternal
-2026-02-10 19:17:05.210 |     return self.dataType.fromInternal(obj)
-2026-02-10 19:17:05.210 |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-2026-02-10 19:17:05.210 |   File "/opt/spark/python/lib/pyspark.zip/pyspark/sql/types.py", line 400, in fromInternal
-2026-02-10 19:17:05.210 |     return datetime.datetime.fromtimestamp(ts // 1000000).replace(microsecond=ts % 1000000)
-2026-02-10 19:17:05.210 |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-2026-02-10 19:17:05.210 | ValueError: year -290272 is out of range
-2026-02-10 19:17:05.420 | 26/02/11 01:17:05 INFO V2ScanRelationPushDown: 
-2026-02-10 19:17:05.420 | Pushing operators to iceberg.raw.network_traffic_raw
-2026-02-10 19:17:05.420 | Pushed Filters: timestamp IS NOT NULL, timestamp >= 1767227400000000, timestamp <= 1767272400000000
-2026-02-10 19:17:05.420 | Post-Scan Filters: isnotnull(timestamp#21),(timestamp#21 >= 2026-01-01 00:30:00),(timestamp#21 <= 2026-01-01 13:00:00)
-2026-02-10 19:17:05.420 |            
-2026-02-10 19:17:05.425 | 26/02/11 01:17:05 INFO V2ScanRelationPushDown: 
-2026-02-10 19:17:05.425 | Output: timestamp#21
-2026-02-10 19:17:05.425 |            
-2026-02-10 19:17:05.430 | 26/02/11 01:17:05 INFO SnapshotScan: Scanning table iceberg.raw.network_traffic_raw snapshot 945057764955348278 created at 2026-02-11T01:15:32.484+00:00 with filter ((timestamp IS NOT NULL AND timestamp >= (16-digit-int)) AND timestamp <= (16-digit-int))
-2026-02-10 19:17:05.436 | 26/02/11 01:17:05 INFO BaseDistributedDataScan: Planning file tasks locally for table iceberg.raw.network_traffic_raw
-2026-02-10 19:17:05.645 | 26/02/11 01:17:05 INFO SparkPartitioningAwareScan: Reporting UnknownPartitioning with 1 partition(s) for table iceberg.raw.network_traffic_raw
-2026-02-10 19:17:05.701 | 26/02/11 01:17:05 INFO MemoryStore: Block broadcast_9 stored as values in memory (estimated size 32.0 KiB, free 1048.4 MiB)
-2026-02-10 19:17:05.712 | 26/02/11 01:17:05 INFO MemoryStore: Block broadcast_9_piece0 stored as bytes in memory (estimated size 34.9 KiB, free 1048.3 MiB)
-2026-02-10 19:17:05.714 | 26/02/11 01:17:05 INFO SparkContext: Created broadcast 9 from broadcast at SparkBatch.java:87
-2026-02-10 19:17:05.752 | 26/02/11 01:17:05 INFO MemoryStore: Block broadcast_10 stored as values in memory (estimated size 32.0 KiB, free 1048.3 MiB)
-2026-02-10 19:17:05.761 | 26/02/11 01:17:05 INFO MemoryStore: Block broadcast_10_piece0 stored as bytes in memory (estimated size 34.9 KiB, free 1048.3 MiB)
-2026-02-10 19:17:05.763 | 26/02/11 01:17:05 INFO SparkContext: Created broadcast 10 from broadcast at SparkBatch.java:87
-2026-02-10 19:17:05.843 | 26/02/11 01:17:05 INFO CodeGenerator: Code generated in 12.762041 ms
-2026-02-10 19:17:05.861 | 26/02/11 01:17:05 INFO DAGScheduler: Registering RDD 17 ($anonfun$withThreadLocalCaptured$2 at CompletableFuture.java:1768) as input to shuffle 0
-2026-02-10 19:17:05.866 | 26/02/11 01:17:05 INFO DAGScheduler: Got map stage job 3 ($anonfun$withThreadLocalCaptured$2 at CompletableFuture.java:1768) with 1 output partitions
-2026-02-10 19:17:05.866 | 26/02/11 01:17:05 INFO DAGScheduler: Final stage: ShuffleMapStage 3 ($anonfun$withThreadLocalCaptured$2 at CompletableFuture.java:1768)
-2026-02-10 19:17:05.867 | 26/02/11 01:17:05 INFO DAGScheduler: Parents of final stage: List()
-2026-02-10 19:17:05.867 | 26/02/11 01:17:05 INFO DAGScheduler: Missing parents: List()
-2026-02-10 19:17:05.869 | 26/02/11 01:17:05 INFO DAGScheduler: Submitting ShuffleMapStage 3 (MapPartitionsRDD[17] at $anonfun$withThreadLocalCaptured$2 at CompletableFuture.java:1768), which has no missing parents
-2026-02-10 19:17:05.877 | 26/02/11 01:17:05 INFO MemoryStore: Block broadcast_11 stored as values in memory (estimated size 16.7 KiB, free 1048.3 MiB)
-2026-02-10 19:17:05.887 | 26/02/11 01:17:05 INFO MemoryStore: Block broadcast_11_piece0 stored as bytes in memory (estimated size 7.0 KiB, free 1048.3 MiB)
-2026-02-10 19:17:05.888 | 26/02/11 01:17:05 INFO SparkContext: Created broadcast 11 from broadcast at DAGScheduler.scala:1676
-2026-02-10 19:17:05.891 | 26/02/11 01:17:05 INFO DAGScheduler: Submitting 1 missing tasks from ShuffleMapStage 3 (MapPartitionsRDD[17] at $anonfun$withThreadLocalCaptured$2 at CompletableFuture.java:1768) (first 15 tasks are for partitions Vector(0))
-2026-02-10 19:17:05.891 | 26/02/11 01:17:05 INFO TaskSchedulerImpl: Adding task set 3.0 with 1 tasks resource profile 0
-2026-02-10 19:17:05.897 | 26/02/11 01:17:05 INFO TaskSetManager: Starting task 0.0 in stage 3.0 (TID 3) (10.1.10.121,executor 1, partition 0, PROCESS_LOCAL, 15441 bytes) 
-2026-02-10 19:17:06.470 | 26/02/11 01:17:06 INFO TaskSetManager: Finished task 0.0 in stage 3.0 (TID 3) in 577 ms on 10.1.10.121 (executor 1) (1/1)
-2026-02-10 19:17:06.470 | 26/02/11 01:17:06 INFO TaskSchedulerImpl: Removed TaskSet 3.0 whose tasks have all completed, from pool 
-2026-02-10 19:17:06.472 | 26/02/11 01:17:06 INFO DAGScheduler: ShuffleMapStage 3 ($anonfun$withThreadLocalCaptured$2 at CompletableFuture.java:1768) finished in 600 ms
-2026-02-10 19:17:06.472 | 26/02/11 01:17:06 INFO DAGScheduler: looking for newly runnable stages
-2026-02-10 19:17:06.472 | 26/02/11 01:17:06 INFO DAGScheduler: running: HashSet()
-2026-02-10 19:17:06.473 | 26/02/11 01:17:06 INFO DAGScheduler: waiting: HashSet()
-2026-02-10 19:17:06.473 | 26/02/11 01:17:06 INFO DAGScheduler: failed: HashSet()
-2026-02-10 19:17:06.525 | 26/02/11 01:17:06 INFO CodeGenerator: Code generated in 13.661405 ms
-2026-02-10 19:17:06.540 | 26/02/11 01:17:06 INFO SparkContext: Starting job: $anonfun$withThreadLocalCaptured$2 at CompletableFuture.java:1768
-2026-02-10 19:17:06.541 | 26/02/11 01:17:06 INFO DAGScheduler: Got job 4 ($anonfun$withThreadLocalCaptured$2 at CompletableFuture.java:1768) with 1 output partitions
-2026-02-10 19:17:06.541 | 26/02/11 01:17:06 INFO DAGScheduler: Final stage: ResultStage 5 ($anonfun$withThreadLocalCaptured$2 at CompletableFuture.java:1768)
-2026-02-10 19:17:06.541 | 26/02/11 01:17:06 INFO DAGScheduler: Parents of final stage: List(ShuffleMapStage 4)
-2026-02-10 19:17:06.541 | 26/02/11 01:17:06 INFO DAGScheduler: Missing parents: List()
-2026-02-10 19:17:06.542 | 26/02/11 01:17:06 INFO DAGScheduler: Submitting ResultStage 5 (MapPartitionsRDD[21] at $anonfun$withThreadLocalCaptured$2 at CompletableFuture.java:1768), which has no missing parents
-2026-02-10 19:17:06.546 | 26/02/11 01:17:06 INFO MemoryStore: Block broadcast_12 stored as values in memory (estimated size 15.2 KiB, free 1048.2 MiB)
-2026-02-10 19:17:06.555 | 26/02/11 01:17:06 INFO MemoryStore: Block broadcast_12_piece0 stored as bytes in memory (estimated size 6.8 KiB, free 1048.2 MiB)
-2026-02-10 19:17:06.556 | 26/02/11 01:17:06 INFO SparkContext: Created broadcast 12 from broadcast at DAGScheduler.scala:1676
-2026-02-10 19:17:06.557 | 26/02/11 01:17:06 INFO DAGScheduler: Submitting 1 missing tasks from ResultStage 5 (MapPartitionsRDD[21] at $anonfun$withThreadLocalCaptured$2 at CompletableFuture.java:1768) (first 15 tasks are for partitions Vector(0))
-2026-02-10 19:17:06.558 | 26/02/11 01:17:06 INFO TaskSchedulerImpl: Adding task set 5.0 with 1 tasks resource profile 0
-2026-02-10 19:17:06.561 | 26/02/11 01:17:06 INFO TaskSetManager: Starting task 0.0 in stage 5.0 (TID 4) (10.1.10.121,executor 1, partition 0, PROCESS_LOCAL, 9623 bytes) 
-2026-02-10 19:17:06.612 | 26/02/11 01:17:06 INFO MapOutputTrackerMasterEndpoint: Asked to send map output locations for shuffle 0 to 10.1.10.121:52086
-2026-02-10 19:17:06.707 | 26/02/11 01:17:06 INFO TaskSetManager: Finished task 0.0 in stage 5.0 (TID 4) in 147 ms on 10.1.10.121 (executor 1) (1/1)
-2026-02-10 19:17:06.707 | 26/02/11 01:17:06 INFO TaskSchedulerImpl: Removed TaskSet 5.0 whose tasks have all completed, from pool 
-2026-02-10 19:17:06.708 | 26/02/11 01:17:06 INFO DAGScheduler: ResultStage 5 ($anonfun$withThreadLocalCaptured$2 at CompletableFuture.java:1768) finished in 163 ms
-2026-02-10 19:17:06.708 | 26/02/11 01:17:06 INFO DAGScheduler: Job 4 is finished. Cancelling potential speculative or zombie tasks for this job
-2026-02-10 19:17:06.708 | 26/02/11 01:17:06 INFO TaskSchedulerImpl: Canceling stage 5
-2026-02-10 19:17:06.708 | 26/02/11 01:17:06 INFO TaskSchedulerImpl: Killing all running tasks in stage 5: Stage finished
-2026-02-10 19:17:06.708 | 26/02/11 01:17:06 INFO DAGScheduler: Job 4 finished: $anonfun$withThreadLocalCaptured$2 at CompletableFuture.java:1768, took 168.054722 ms
-2026-02-10 19:17:06.720 | 2026-02-11 01:17:06,720 - SparkPreprocessIceberg - INFO - Loaded sample presence=0 for range 2026-01-01 00:30:00 to 2026-01-01 13:00:00
-2026-02-10 19:17:06.720 | 2026-02-11 01:17:06,720 - SparkPreprocessIceberg - DEBUG - Filter bounds: start=2026-01-01 00:30:00 end=2026-01-01 13:00:00
-2026-02-10 19:17:06.722 | 2026-02-11 01:17:06,722 - SparkPreprocessIceberg - DEBUG - Filtered df schema: struct<src_port:bigint,dst_port:bigint,protocol:string,packet_count:bigint,conn_state:string,bytes_transferred:double,timestamp:timestamp,attack:bigint>
-2026-02-10 19:17:06.741 | 26/02/11 01:17:06 INFO V2ScanRelationPushDown: 
-2026-02-10 19:17:06.741 | Pushing operators to iceberg.raw.network_traffic_raw
-2026-02-10 19:17:06.741 | Pushed Filters: timestamp IS NOT NULL, timestamp >= 1767227400000000, timestamp <= 1767272400000000
-2026-02-10 19:17:06.741 | Post-Scan Filters: isnotnull(timestamp#21),(timestamp#21 >= 2026-01-01 00:30:00),(timestamp#21 <= 2026-01-01 13:00:00)
-2026-02-10 19:17:06.741 |            
-2026-02-10 19:17:06.744 | 26/02/11 01:17:06 INFO V2ScanRelationPushDown: 
-2026-02-10 19:17:06.744 | Output: src_port#15L, dst_port#16L, protocol#17, packet_count#18L, conn_state#19, bytes_transferred#20, timestamp#21, attack#22L
-2026-02-10 19:17:06.744 |            
-2026-02-10 19:17:06.745 | 26/02/11 01:17:06 INFO SnapshotScan: Scanning table iceberg.raw.network_traffic_raw snapshot 945057764955348278 created at 2026-02-11T01:15:32.484+00:00 with filter ((timestamp IS NOT NULL AND timestamp >= (16-digit-int)) AND timestamp <= (16-digit-int))
-2026-02-10 19:17:06.746 | 26/02/11 01:17:06 INFO BaseDistributedDataScan: Planning file tasks locally for table iceberg.raw.network_traffic_raw
-2026-02-10 19:17:06.962 | 26/02/11 01:17:06 INFO SparkPartitioningAwareScan: Reporting UnknownPartitioning with 1 partition(s) for table iceberg.raw.network_traffic_raw
-2026-02-10 19:17:06.966 | 26/02/11 01:17:06 INFO MemoryStore: Block broadcast_13 stored as values in memory (estimated size 32.0 KiB, free 1048.2 MiB)
-2026-02-10 19:17:06.968 | 26/02/11 01:17:06 INFO MemoryStore: Block broadcast_13_piece0 stored as bytes in memory (estimated size 34.9 KiB, free 1048.2 MiB)
-2026-02-10 19:17:06.970 | 26/02/11 01:17:06 INFO SparkContext: Created broadcast 13 from collect at /app/repo/k3s/spark/spark-preprocess-iceberg.py:220
-2026-02-10 19:17:06.974 | 26/02/11 01:17:06 INFO MemoryStore: Block broadcast_14 stored as values in memory (estimated size 32.0 KiB, free 1048.2 MiB)
-2026-02-10 19:17:06.976 | 26/02/11 01:17:06 INFO MemoryStore: Block broadcast_14_piece0 stored as bytes in memory (estimated size 34.9 KiB, free 1048.1 MiB)
-2026-02-10 19:17:06.977 | 26/02/11 01:17:06 INFO SparkContext: Created broadcast 14 from collect at /app/repo/k3s/spark/spark-preprocess-iceberg.py:220
-2026-02-10 19:17:07.008 | 26/02/11 01:17:07 INFO CodeGenerator: Code generated in 18.973389 ms
-2026-02-10 19:17:07.018 | 26/02/11 01:17:07 INFO SparkContext: Starting job: collect at /app/repo/k3s/spark/spark-preprocess-iceberg.py:220
-2026-02-10 19:17:07.019 | 26/02/11 01:17:07 INFO DAGScheduler: Got job 5 (collect at /app/repo/k3s/spark/spark-preprocess-iceberg.py:220) with 1 output partitions
-2026-02-10 19:17:07.019 | 26/02/11 01:17:07 INFO DAGScheduler: Final stage: ResultStage 6 (collect at /app/repo/k3s/spark/spark-preprocess-iceberg.py:220)
-2026-02-10 19:17:07.019 | 26/02/11 01:17:07 INFO DAGScheduler: Parents of final stage: List()
-2026-02-10 19:17:07.019 | 26/02/11 01:17:07 INFO DAGScheduler: Missing parents: List()
-2026-02-10 19:17:07.019 | 26/02/11 01:17:07 INFO DAGScheduler: Submitting ResultStage 6 (MapPartitionsRDD[25] at collect at /app/repo/k3s/spark/spark-preprocess-iceberg.py:220), which has no missing parents
-2026-02-10 19:17:07.022 | 26/02/11 01:17:07 INFO MemoryStore: Block broadcast_15 stored as values in memory (estimated size 18.5 KiB, free 1048.1 MiB)
-2026-02-10 19:17:07.023 | 26/02/11 01:17:07 INFO MemoryStore: Block broadcast_15_piece0 stored as bytes in memory (estimated size 6.6 KiB, free 1048.1 MiB)
-2026-02-10 19:17:07.024 | 26/02/11 01:17:07 INFO SparkContext: Created broadcast 15 from broadcast at DAGScheduler.scala:1676
-2026-02-10 19:17:07.025 | 26/02/11 01:17:07 INFO DAGScheduler: Submitting 1 missing tasks from ResultStage 6 (MapPartitionsRDD[25] at collect at /app/repo/k3s/spark/spark-preprocess-iceberg.py:220) (first 15 tasks are for partitions Vector(0))
-2026-02-10 19:17:07.025 | 26/02/11 01:17:07 INFO TaskSchedulerImpl: Adding task set 6.0 with 1 tasks resource profile 0
-2026-02-10 19:17:07.027 | 26/02/11 01:17:07 INFO TaskSetManager: Starting task 0.0 in stage 6.0 (TID 5) (10.1.10.121,executor 1, partition 0, PROCESS_LOCAL, 15877 bytes) 
-2026-02-10 19:17:07.589 | 26/02/11 01:17:07 INFO TaskSetManager: Finished task 0.0 in stage 6.0 (TID 5) in 563 ms on 10.1.10.121 (executor 1) (1/1)
-2026-02-10 19:17:07.589 | 26/02/11 01:17:07 INFO TaskSchedulerImpl: Removed TaskSet 6.0 whose tasks have all completed, from pool 
-2026-02-10 19:17:07.590 | 26/02/11 01:17:07 INFO DAGScheduler: ResultStage 6 (collect at /app/repo/k3s/spark/spark-preprocess-iceberg.py:220) finished in 570 ms
-2026-02-10 19:17:07.590 | 26/02/11 01:17:07 INFO DAGScheduler: Job 5 is finished. Cancelling potential speculative or zombie tasks for this job
-2026-02-10 19:17:07.590 | 26/02/11 01:17:07 INFO TaskSchedulerImpl: Canceling stage 6
-2026-02-10 19:17:07.590 | 26/02/11 01:17:07 INFO TaskSchedulerImpl: Killing all running tasks in stage 6: Stage finished
-2026-02-10 19:17:07.590 | 26/02/11 01:17:07 INFO DAGScheduler: Job 5 finished: collect at /app/repo/k3s/spark/spark-preprocess-iceberg.py:220, took 572.390235 ms
-2026-02-10 19:17:07.594 | 2026-02-11 01:17:07,593 - SparkPreprocessIceberg - DEBUG - Filtered sample (up to 5 rows): []
-2026-02-10 19:17:07.594 | 2026-02-11 01:17:07,594 - SparkPreprocessIceberg - INFO - Fitting pipeline from DSL: /app/repo/k3s/spark/preprocess/dsl_001.yaml
-2026-02-10 19:17:07.617 | 26/02/11 01:17:07 INFO V2ScanRelationPushDown: 
-2026-02-10 19:17:07.617 | Pushing operators to iceberg.raw.network_traffic_raw
-2026-02-10 19:17:07.617 | Pushed Filters: timestamp IS NOT NULL, timestamp >= 1767227400000000, timestamp <= 1767272400000000
-2026-02-10 19:17:07.617 | Post-Scan Filters: isnotnull(timestamp#21),(timestamp#21 >= 2026-01-01 00:30:00),(timestamp#21 <= 2026-01-01 13:00:00)
-2026-02-10 19:17:07.617 |            
-2026-02-10 19:17:07.619 | 26/02/11 01:17:07 INFO V2ScanRelationPushDown: 
-2026-02-10 19:17:07.619 | Output: timestamp#21
-2026-02-10 19:17:07.619 |            
-2026-02-10 19:17:07.620 | 26/02/11 01:17:07 INFO SnapshotScan: Scanning table iceberg.raw.network_traffic_raw snapshot 945057764955348278 created at 2026-02-11T01:15:32.484+00:00 with filter ((timestamp IS NOT NULL AND timestamp >= (16-digit-int)) AND timestamp <= (16-digit-int))
-2026-02-10 19:17:07.620 | 26/02/11 01:17:07 INFO BaseDistributedDataScan: Planning file tasks locally for table iceberg.raw.network_traffic_raw
-2026-02-10 19:17:07.816 | 26/02/11 01:17:07 INFO SparkPartitioningAwareScan: Reporting UnknownPartitioning with 1 partition(s) for table iceberg.raw.network_traffic_raw
-2026-02-10 19:17:07.822 | 26/02/11 01:17:07 INFO MemoryStore: Block broadcast_16 stored as values in memory (estimated size 32.0 KiB, free 1048.1 MiB)
-2026-02-10 19:17:07.825 | 26/02/11 01:17:07 INFO MemoryStore: Block broadcast_16_piece0 stored as bytes in memory (estimated size 34.9 KiB, free 1048.0 MiB)
-2026-02-10 19:17:07.826 | 26/02/11 01:17:07 INFO SparkContext: Created broadcast 16 from broadcast at SparkBatch.java:87
-2026-02-10 19:17:07.830 | 26/02/11 01:17:07 INFO MemoryStore: Block broadcast_17 stored as values in memory (estimated size 32.0 KiB, free 1048.0 MiB)
-2026-02-10 19:17:07.841 | 26/02/11 01:17:07 INFO MemoryStore: Block broadcast_17_piece0 stored as bytes in memory (estimated size 34.9 KiB, free 1048.0 MiB)
-2026-02-10 19:17:07.842 | 26/02/11 01:17:07 INFO SparkContext: Created broadcast 17 from broadcast at SparkBatch.java:87
-2026-02-10 19:17:07.874 | 26/02/11 01:17:07 INFO CodeGenerator: Code generated in 14.113006 ms
-2026-02-10 19:17:07.880 | 26/02/11 01:17:07 INFO DAGScheduler: Registering RDD 29 ($anonfun$withThreadLocalCaptured$2 at CompletableFuture.java:1768) as input to shuffle 1
-2026-02-10 19:17:07.881 | 26/02/11 01:17:07 INFO DAGScheduler: Got map stage job 6 ($anonfun$withThreadLocalCaptured$2 at CompletableFuture.java:1768) with 1 output partitions
-2026-02-10 19:17:07.881 | 26/02/11 01:17:07 INFO DAGScheduler: Final stage: ShuffleMapStage 7 ($anonfun$withThreadLocalCaptured$2 at CompletableFuture.java:1768)
-2026-02-10 19:17:07.881 | 26/02/11 01:17:07 INFO DAGScheduler: Parents of final stage: List()
-2026-02-10 19:17:07.882 | 26/02/11 01:17:07 INFO DAGScheduler: Missing parents: List()
-2026-02-10 19:17:07.882 | 26/02/11 01:17:07 INFO DAGScheduler: Submitting ShuffleMapStage 7 (MapPartitionsRDD[29] at $anonfun$withThreadLocalCaptured$2 at CompletableFuture.java:1768), which has no missing parents
-2026-02-10 19:17:07.885 | 26/02/11 01:17:07 INFO MemoryStore: Block broadcast_18 stored as values in memory (estimated size 16.7 KiB, free 1048.2 MiB)
-2026-02-10 19:17:07.887 | 26/02/11 01:17:07 INFO MemoryStore: Block broadcast_18_piece0 stored as bytes in memory (estimated size 7.0 KiB, free 1048.2 MiB)
-2026-02-10 19:17:07.888 | 26/02/11 01:17:07 INFO SparkContext: Created broadcast 18 from broadcast at DAGScheduler.scala:1676
-2026-02-10 19:17:07.889 | 26/02/11 01:17:07 INFO DAGScheduler: Submitting 1 missing tasks from ShuffleMapStage 7 (MapPartitionsRDD[29] at $anonfun$withThreadLocalCaptured$2 at CompletableFuture.java:1768) (first 15 tasks are for partitions Vector(0))
-2026-02-10 19:17:07.889 | 26/02/11 01:17:07 INFO TaskSchedulerImpl: Adding task set 7.0 with 1 tasks resource profile 0
-2026-02-10 19:17:07.891 | 26/02/11 01:17:07 INFO TaskSetManager: Starting task 0.0 in stage 7.0 (TID 6) (10.1.10.121,executor 1, partition 0, PROCESS_LOCAL, 15441 bytes) 
-2026-02-10 19:17:08.361 | 26/02/11 01:17:08 INFO TaskSetManager: Finished task 0.0 in stage 7.0 (TID 6) in 470 ms on 10.1.10.121 (executor 1) (1/1)
-2026-02-10 19:17:08.361 | 26/02/11 01:17:08 INFO TaskSchedulerImpl: Removed TaskSet 7.0 whose tasks have all completed, from pool 
-2026-02-10 19:17:08.362 | 26/02/11 01:17:08 INFO DAGScheduler: ShuffleMapStage 7 ($anonfun$withThreadLocalCaptured$2 at CompletableFuture.java:1768) finished in 479 ms
-2026-02-10 19:17:08.362 | 26/02/11 01:17:08 INFO DAGScheduler: looking for newly runnable stages
-2026-02-10 19:17:08.362 | 26/02/11 01:17:08 INFO DAGScheduler: running: HashSet()
-2026-02-10 19:17:08.362 | 26/02/11 01:17:08 INFO DAGScheduler: waiting: HashSet()
-2026-02-10 19:17:08.362 | 26/02/11 01:17:08 INFO DAGScheduler: failed: HashSet()
-2026-02-10 19:17:08.385 | 26/02/11 01:17:08 INFO CodeGenerator: Code generated in 9.598833 ms
-2026-02-10 19:17:08.396 | 26/02/11 01:17:08 INFO SparkContext: Starting job: $anonfun$withThreadLocalCaptured$2 at CompletableFuture.java:1768
-2026-02-10 19:17:08.397 | 26/02/11 01:17:08 INFO DAGScheduler: Got job 7 ($anonfun$withThreadLocalCaptured$2 at CompletableFuture.java:1768) with 1 output partitions
-2026-02-10 19:17:08.397 | 26/02/11 01:17:08 INFO DAGScheduler: Final stage: ResultStage 9 ($anonfun$withThreadLocalCaptured$2 at CompletableFuture.java:1768)
-2026-02-10 19:17:08.397 | 26/02/11 01:17:08 INFO DAGScheduler: Parents of final stage: List(ShuffleMapStage 8)
-2026-02-10 19:17:08.398 | 26/02/11 01:17:08 INFO DAGScheduler: Missing parents: List()
-2026-02-10 19:17:08.398 | 26/02/11 01:17:08 INFO DAGScheduler: Submitting ResultStage 9 (MapPartitionsRDD[33] at $anonfun$withThreadLocalCaptured$2 at CompletableFuture.java:1768), which has no missing parents
-2026-02-10 19:17:08.400 | 26/02/11 01:17:08 INFO MemoryStore: Block broadcast_19 stored as values in memory (estimated size 15.2 KiB, free 1048.4 MiB)
-2026-02-10 19:17:08.402 | 26/02/11 01:17:08 INFO MemoryStore: Block broadcast_19_piece0 stored as bytes in memory (estimated size 6.8 KiB, free 1048.4 MiB)
-2026-02-10 19:17:08.403 | 26/02/11 01:17:08 INFO SparkContext: Created broadcast 19 from broadcast at DAGScheduler.scala:1676
-2026-02-10 19:17:08.403 | 26/02/11 01:17:08 INFO DAGScheduler: Submitting 1 missing tasks from ResultStage 9 (MapPartitionsRDD[33] at $anonfun$withThreadLocalCaptured$2 at CompletableFuture.java:1768) (first 15 tasks are for partitions Vector(0))
-2026-02-10 19:17:08.403 | 26/02/11 01:17:08 INFO TaskSchedulerImpl: Adding task set 9.0 with 1 tasks resource profile 0
-2026-02-10 19:17:08.404 | 26/02/11 01:17:08 INFO TaskSetManager: Starting task 0.0 in stage 9.0 (TID 7) (10.1.10.121,executor 1, partition 0, PROCESS_LOCAL, 9623 bytes) 
-2026-02-10 19:17:08.426 | 26/02/11 01:17:08 INFO MapOutputTrackerMasterEndpoint: Asked to send map output locations for shuffle 1 to 10.1.10.121:52086
-2026-02-10 19:17:08.450 | 26/02/11 01:17:08 INFO TaskSetManager: Finished task 0.0 in stage 9.0 (TID 7) in 45 ms on 10.1.10.121 (executor 1) (1/1)
-2026-02-10 19:17:08.450 | 26/02/11 01:17:08 INFO TaskSchedulerImpl: Removed TaskSet 9.0 whose tasks have all completed, from pool 
-2026-02-10 19:17:08.451 | 26/02/11 01:17:08 INFO DAGScheduler: ResultStage 9 ($anonfun$withThreadLocalCaptured$2 at CompletableFuture.java:1768) finished in 52 ms
-2026-02-10 19:17:08.452 | 26/02/11 01:17:08 INFO DAGScheduler: Job 7 is finished. Cancelling potential speculative or zombie tasks for this job
-2026-02-10 19:17:08.452 | 26/02/11 01:17:08 INFO TaskSchedulerImpl: Canceling stage 9
-2026-02-10 19:17:08.452 | 26/02/11 01:17:08 INFO TaskSchedulerImpl: Killing all running tasks in stage 9: Stage finished
-2026-02-10 19:17:08.452 | 26/02/11 01:17:08 INFO DAGScheduler: Job 7 finished: $anonfun$withThreadLocalCaptured$2 at CompletableFuture.java:1768, took 55.936594 ms
-2026-02-10 19:17:08.458 | 2026-02-11 01:17:08,458 - SparkPreprocessIceberg - ERROR - Train DataFrame is empty. Aborting fit.
-2026-02-10 19:17:08.458 | 2026-02-11 01:17:08,458 - SparkPreprocessIceberg - DEBUG - Train DF schema when empty: struct<src_port:bigint,dst_port:bigint,protocol:string,packet_count:bigint,conn_state:string,bytes_transferred:double,timestamp:timestamp,attack:bigint>
-2026-02-10 19:17:08.474 | 26/02/11 01:17:08 INFO V2ScanRelationPushDown: 
-2026-02-10 19:17:08.474 | Pushing operators to iceberg.raw.network_traffic_raw
-2026-02-10 19:17:08.474 | Pushed Filters: timestamp IS NOT NULL, timestamp >= 1767227400000000, timestamp <= 1767272400000000
-2026-02-10 19:17:08.474 | Post-Scan Filters: isnotnull(timestamp#21),(timestamp#21 >= 2026-01-01 00:30:00),(timestamp#21 <= 2026-01-01 13:00:00)
-2026-02-10 19:17:08.474 |            
-2026-02-10 19:17:08.476 | 26/02/11 01:17:08 INFO V2ScanRelationPushDown: 
-2026-02-10 19:17:08.476 | Output: src_port#15L, dst_port#16L, protocol#17, packet_count#18L, conn_state#19, bytes_transferred#20, timestamp#21, attack#22L
-2026-02-10 19:17:08.476 |            
-2026-02-10 19:17:08.477 | 26/02/11 01:17:08 INFO SnapshotScan: Scanning table iceberg.raw.network_traffic_raw snapshot 945057764955348278 created at 2026-02-11T01:15:32.484+00:00 with filter ((timestamp IS NOT NULL AND timestamp >= (16-digit-int)) AND timestamp <= (16-digit-int))
-2026-02-10 19:17:08.479 | 26/02/11 01:17:08 INFO BaseDistributedDataScan: Planning file tasks locally for table iceberg.raw.network_traffic_raw
-2026-02-10 19:17:08.687 | 26/02/11 01:17:08 INFO SparkPartitioningAwareScan: Reporting UnknownPartitioning with 1 partition(s) for table iceberg.raw.network_traffic_raw
-2026-02-10 19:17:08.693 | 26/02/11 01:17:08 INFO MemoryStore: Block broadcast_20 stored as values in memory (estimated size 32.0 KiB, free 1048.3 MiB)
-2026-02-10 19:17:08.695 | 26/02/11 01:17:08 INFO MemoryStore: Block broadcast_20_piece0 stored as bytes in memory (estimated size 34.9 KiB, free 1048.3 MiB)
-2026-02-10 19:17:08.696 | 26/02/11 01:17:08 INFO SparkContext: Created broadcast 20 from collect at /app/repo/k3s/spark/spark-preprocess-iceberg.py:349
-2026-02-10 19:17:08.700 | 26/02/11 01:17:08 INFO MemoryStore: Block broadcast_21 stored as values in memory (estimated size 32.0 KiB, free 1048.3 MiB)
-2026-02-10 19:17:08.702 | 26/02/11 01:17:08 INFO MemoryStore: Block broadcast_21_piece0 stored as bytes in memory (estimated size 34.9 KiB, free 1048.2 MiB)
-2026-02-10 19:17:08.703 | 26/02/11 01:17:08 INFO SparkContext: Created broadcast 21 from collect at /app/repo/k3s/spark/spark-preprocess-iceberg.py:349
-2026-02-10 19:17:08.721 | 26/02/11 01:17:08 INFO SparkContext: Starting job: collect at /app/repo/k3s/spark/spark-preprocess-iceberg.py:349
-2026-02-10 19:17:08.722 | 26/02/11 01:17:08 INFO DAGScheduler: Got job 8 (collect at /app/repo/k3s/spark/spark-preprocess-iceberg.py:349) with 1 output partitions
-2026-02-10 19:17:08.722 | 26/02/11 01:17:08 INFO DAGScheduler: Final stage: ResultStage 10 (collect at /app/repo/k3s/spark/spark-preprocess-iceberg.py:349)
-2026-02-10 19:17:08.722 | 26/02/11 01:17:08 INFO DAGScheduler: Parents of final stage: List()
-2026-02-10 19:17:08.722 | 26/02/11 01:17:08 INFO DAGScheduler: Missing parents: List()
-2026-02-10 19:17:08.722 | 26/02/11 01:17:08 INFO DAGScheduler: Submitting ResultStage 10 (MapPartitionsRDD[37] at collect at /app/repo/k3s/spark/spark-preprocess-iceberg.py:349), which has no missing parents
-2026-02-10 19:17:08.724 | 26/02/11 01:17:08 INFO MemoryStore: Block broadcast_22 stored as values in memory (estimated size 18.5 KiB, free 1048.2 MiB)
-2026-02-10 19:17:08.733 | 26/02/11 01:17:08 INFO MemoryStore: Block broadcast_22_piece0 stored as bytes in memory (estimated size 6.6 KiB, free 1048.2 MiB)
-2026-02-10 19:17:08.734 | 26/02/11 01:17:08 INFO SparkContext: Created broadcast 22 from broadcast at DAGScheduler.scala:1676
-2026-02-10 19:17:08.734 | 26/02/11 01:17:08 INFO DAGScheduler: Submitting 1 missing tasks from ResultStage 10 (MapPartitionsRDD[37] at collect at /app/repo/k3s/spark/spark-preprocess-iceberg.py:349) (first 15 tasks are for partitions Vector(0))
-2026-02-10 19:17:08.734 | 26/02/11 01:17:08 INFO TaskSchedulerImpl: Adding task set 10.0 with 1 tasks resource profile 0
-2026-02-10 19:17:08.737 | 26/02/11 01:17:08 INFO TaskSetManager: Starting task 0.0 in stage 10.0 (TID 8) (10.1.10.121,executor 1, partition 0, PROCESS_LOCAL, 15877 bytes) 
-2026-02-10 19:17:09.224 | 26/02/11 01:17:09 INFO TaskSetManager: Finished task 0.0 in stage 10.0 (TID 8) in 489 ms on 10.1.10.121 (executor 1) (1/1)
-2026-02-10 19:17:09.224 | 26/02/11 01:17:09 INFO TaskSchedulerImpl: Removed TaskSet 10.0 whose tasks have all completed, from pool 
-2026-02-10 19:17:09.225 | 26/02/11 01:17:09 INFO DAGScheduler: ResultStage 10 (collect at /app/repo/k3s/spark/spark-preprocess-iceberg.py:349) finished in 502 ms
-2026-02-10 19:17:09.225 | 26/02/11 01:17:09 INFO DAGScheduler: Job 8 is finished. Cancelling potential speculative or zombie tasks for this job
-2026-02-10 19:17:09.225 | 26/02/11 01:17:09 INFO TaskSchedulerImpl: Canceling stage 10
-2026-02-10 19:17:09.225 | 26/02/11 01:17:09 INFO TaskSchedulerImpl: Killing all running tasks in stage 10: Stage finished
-2026-02-10 19:17:09.226 | 26/02/11 01:17:09 INFO DAGScheduler: Job 8 finished: collect at /app/repo/k3s/spark/spark-preprocess-iceberg.py:349, took 504.539986 ms
-2026-02-10 19:17:09.230 | 2026-02-11 01:17:09,230 - SparkPreprocessIceberg - DEBUG - Train DF sample when empty (up to 5 rows): []
-2026-02-10 19:17:09.230 | 2026-02-11 01:17:09,230 - SparkPreprocessIceberg - ERROR - Failed fitting pipeline: Train DataFrame is empty. Aborting fit.
-2026-02-10 19:17:09.230 | Traceback (most recent call last):
-2026-02-10 19:17:09.230 |   File "/app/repo/k3s/spark/spark-preprocess-iceberg.py", line 353, in fit_pipeline
-2026-02-10 19:17:09.230 |     raise ValueError(msg)
-2026-02-10 19:17:09.230 | ValueError: Train DataFrame is empty. Aborting fit.
-2026-02-10 19:17:09.230 | 2026-02-11 01:17:09,230 - SparkPreprocessIceberg - ERROR - Preprocessing pipeline failed: Train DataFrame is empty. Aborting fit.
-2026-02-10 19:17:09.230 | Traceback (most recent call last):
-2026-02-10 19:17:09.230 |   File "/app/repo/k3s/spark/spark-preprocess-iceberg.py", line 651, in run_preprocessing_pipeline
-2026-02-10 19:17:09.230 |     pipeline_hash = self.fit_pipeline(df_train, dsl_path)
-2026-02-10 19:17:09.230 |                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-2026-02-10 19:17:09.230 |   File "/app/repo/k3s/spark/spark-preprocess-iceberg.py", line 353, in fit_pipeline
-2026-02-10 19:17:09.230 |     raise ValueError(msg)
-2026-02-10 19:17:09.230 | ValueError: Train DataFrame is empty. Aborting fit.
-2026-02-10 19:17:09.230 | Traceback (most recent call last):
-2026-02-10 19:17:09.230 |   File "/app/repo/k3s/spark/spark-preprocess-iceberg.py", line 742, in <module>
-2026-02-10 19:17:09.231 |     main()
-2026-02-10 19:17:09.231 |   File "/app/repo/k3s/spark/spark-preprocess-iceberg.py", line 735, in main
-2026-02-10 19:17:09.231 |     job.run_preprocessing_pipeline(
-2026-02-10 19:17:09.231 |   File "/app/repo/k3s/spark/spark-preprocess-iceberg.py", line 651, in run_preprocessing_pipeline
-2026-02-10 19:17:09.231 |     pipeline_hash = self.fit_pipeline(df_train, dsl_path)
-2026-02-10 19:17:09.231 |                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-2026-02-10 19:17:09.231 |   File "/app/repo/k3s/spark/spark-preprocess-iceberg.py", line 353, in fit_pipeline
-2026-02-10 19:17:09.231 |     raise ValueError(msg)
-2026-02-10 19:17:09.231 | ValueError: Train DataFrame is empty. Aborting fit.
-2026-02-10 19:17:09.365 | 26/02/11 01:17:09 INFO SparkContext: SparkContext is stopping with exitCode 0 from stop at SparkSubmit.scala:1036.
-2026-02-10 19:17:09.375 | 26/02/11 01:17:09 INFO SparkUI: Stopped Spark web UI at http://spark-app-0-driver-svc.spark.svc:4040
-2026-02-10 19:17:09.378 | 26/02/11 01:17:09 INFO KubernetesClusterSchedulerBackend: Shutting down all executors
-2026-02-10 19:17:09.378 | 26/02/11 01:17:09 INFO KubernetesClusterSchedulerBackend$KubernetesDriverEndpoint: Asking each executor to shut down
-2026-02-10 19:17:09.383 | 26/02/11 01:17:09 INFO ExecutorPodsWatchSnapshotSource: Kubernetes client has been closed.
-2026-02-10 19:17:09.518 | 26/02/11 01:17:09 INFO MapOutputTrackerMasterEndpoint: MapOutputTrackerMasterEndpoint stopped!
-2026-02-10 19:17:09.534 | 26/02/11 01:17:09 INFO MemoryStore: MemoryStore cleared
-2026-02-10 19:17:09.535 | 26/02/11 01:17:09 INFO BlockManager: BlockManager stopped
-2026-02-10 19:17:09.537 | 26/02/11 01:17:09 INFO BlockManagerMaster: BlockManagerMaster stopped
-2026-02-10 19:17:09.540 | 26/02/11 01:17:09 INFO OutputCommitCoordinator$OutputCommitCoordinatorEndpoint: OutputCommitCoordinator stopped!
-2026-02-10 19:17:09.560 | 26/02/11 01:17:09 INFO SparkContext: Successfully stopped SparkContext
-2026-02-10 19:17:09.563 | 26/02/11 01:17:09 INFO ShutdownHookManager: Shutdown hook called
-2026-02-10 19:17:09.564 | 26/02/11 01:17:09 INFO ShutdownHookManager: Deleting directory /tmp/spark-cfe2a482-ec6b-4c3a-b8c4-a94148d04584
-2026-02-10 19:17:09.567 | 26/02/11 01:17:09 INFO ShutdownHookManager: Deleting directory /var/data/spark-02dcb4eb-e8ae-43c4-8926-704c74554c4f/spark-83adb2e9-1ad2-4416-85be-3f61ce6b7f60/pyspark-39835a7e-6175-4f75-bbf7-6d28c72ce0fb
-2026-02-10 19:17:09.570 | 26/02/11 01:17:09 INFO ShutdownHookManager: Deleting directory /var/data/spark-02dcb4eb-e8ae-43c4-8926-704c74554c4f/spark-83adb2e9-1ad2-4416-85be-3f61ce6b7f60
-2026-02-10 19:17:09.574 | 26/02/11 01:17:09 INFO ShutdownHookManager: Deleting directory /tmp/artifacts-81ce0b0a-b2fb-42b9-8e51-9ea0dc3bc505
-2026-02-10 19:17:09.596 | 26/02/11 01:17:09 INFO ShutdownHookManager: Deleting directory /tmp/spark-4ba089fe-c8c3-4f91-bd89-24a0f0c04659
-2026-02-10 19:17:09.613 | 26/02/11 01:17:09 INFO ShutdownHookManager: Deleting directory /tmp/spark-91128636-b6f9-4fc5-b744-b089c57f9768
-2026-02-10 19:17:09.616 | 26/02/11 01:17:09 INFO ShutdownHookManager: Deleting directory /tmp/localPyFiles-e94ab577-e505-44d5-81da-68afc0c487dd
-2026-02-10 19:17:09.619 | 26/02/11 01:17:09 INFO ShutdownHookManager: Deleting directory /tmp/spark-3cb31df1-2dd6-4935-bf7a-ff7227527510
-2026-02-10 19:17:09.629 | 26/02/11 01:17:09 INFO MetricsSystemImpl: Stopping s3a-file-system metrics system...
-2026-02-10 19:17:09.629 | 26/02/11 01:17:09 INFO MetricsSystemImpl: s3a-file-system metrics system stopped.
-2026-02-10 19:17:09.629 | 26/02/11 01:17:09 INFO MetricsSystemImpl: s3a-file-system metrics system shutdown complete.
+2026-02-10 1
+2026-02-10 19:22:15.034 | Caused by: org.apache.spark.sql.execution.datasources.SchemaColumnConvertNotSupportedException: column: [timestamp], physicalType: INT64, logicalType: timestamp
+2026-02-10 19:22:15.034 | 	at org.apache.spark.sql.execution.datasources.parquet.ParquetVectorUpdaterFactory.constructConvertNotSupportedException(ParquetVectorUpdaterFactory.java:1602)
+2026-02-10 19:22:15.034 | 	at org.apache.spark.sql.execution.datasources.parquet.ParquetVectorUpdaterFactory.getUpdater(ParquetVectorUpdaterFactory.java:226)
+2026-02-10 19:22:15.034 | 	at org.apache.spark.sql.execution.datasources.parquet.VectorizedColumnReader.readBatch(VectorizedColumnReader.java:210)
+2026-02-10 19:22:15.034 | 	at org.apache.spark.sql.execution.datasources.parquet.VectorizedParquetRecordReader.nextBatch(VectorizedParquetRecordReader.java:341)
+2026-02-10 19:22:15.034 | 	at org.apache.spark.sql.execution.datasources.parquet.VectorizedParquetRecordReader.nextKeyValue(VectorizedParquetRecordReader.java:234)
+2026-02-10 19:22:15.034 | 	at org.apache.spark.sql.execution.datasources.RecordReaderIterator.hasNext(RecordReaderIterator.scala:39)
+2026-02-10 19:22:15.034 | 	at org.apache.spark.sql.execution.datasources.FileScanRDD$$anon$1.hasNext0(FileScanRDD.scala:131)
+2026-02-10 19:22:15.034 | 	at org.apache.spark.sql.execution.datasources.FileScanRDD$$anon$1.nextIterator(FileScanRDD.scala:292)
+2026-02-10 19:22:15.034 | 	at org.apache.spark.sql.execution.datasources.FileScanRDD$$anon$1.hasNext0(FileScanRDD.scala:131)
+2026-02-10 19:22:15.034 | 	at org.apache.spark.sql.execution.datasources.FileScanRDD$$anon$1.hasNext(FileScanRDD.scala:140)
+2026-02-10 19:22:15.034 | 	at org.apache.spark.sql.execution.FileSourceScanExec$$anon$1.hasNext(DataSourceScanExec.scala:695)
+2026-02-10 19:22:15.034 | 	at org.apache.spark.sql.catalyst.expressions.GeneratedClass$GeneratedIteratorForCodegenStage1.columnartorow_nextBatch_0$(Unknown Source)
+2026-02-10 19:22:15.034 | 	at org.apache.spark.sql.catalyst.expressions.GeneratedClass$GeneratedIteratorForCodegenStage1.processNext(Unknown Source)
+2026-02-10 19:22:15.034 | 	at org.apache.spark.sql.execution.BufferedRowIterator.hasNext(BufferedRowIterator.java:43)
+2026-02-10 19:22:15.034 | 	at org.apache.spark.sql.execution.WholeStageCodegenEvaluatorFactory$WholeStageCodegenPartitionEvaluator$$anon$1.hasNext(WholeStageCodegenEvaluatorFactory.scala:50)
+2026-02-10 19:22:15.034 | 	at scala.collection.Iterator$$anon$9.hasNext(Iterator.scala:583)
+2026-02-10 19:22:15.034 | 	at scala.collection.Iterator$$anon$9.hasNext(Iterator.scala:583)
+2026-02-10 19:22:15.034 | 	at org.apache.spark.util.random.SamplingUtils$.reservoirSampleAndCount(SamplingUtils.scala:41)
+2026-02-10 19:22:15.034 | 	at org.apache.spark.RangePartitioner$.$anonfun$sketch$1(Partitioner.scala:342)
+2026-02-10 19:22:15.034 | 	at org.apache.spark.RangePartitioner$.$anonfun$sketch$1$adapted(Partitioner.scala:340)
+2026-02-10 19:22:15.034 | 	at org.apache.spark.rdd.RDD.$anonfun$mapPartitionsWithIndex$2(RDD.scala:918)
+2026-02-10 19:22:15.034 | 	at org.apache.spark.rdd.RDD.$anonfun$mapPartitionsWithIndex$2$adapted(RDD.scala:918)
+2026-02-10 19:22:15.034 | 	at org.apache.spark.rdd.MapPartitionsRDD.compute(MapPartitionsRDD.scala:52)
+2026-02-10 19:22:15.034 | 	at org.apache.spark.rdd.RDD.computeOrReadCheckpoint(RDD.scala:374)
+2026-02-10 19:22:15.034 | 	at org.apache.spark.rdd.RDD.iterator(RDD.scala:338)
+2026-02-10 19:22:15.034 | 	at org.apache.spark.scheduler.ResultTask.runTask(ResultTask.scala:93)
+2026-02-10 19:22:15.034 | 	at org.apache.spark.TaskContext.runTaskWithListeners(TaskContext.scala:171)
+2026-02-10 19:22:15.034 | 	at org.apache.spark.scheduler.Task.run(Task.scala:147)
+2026-02-10 19:22:15.034 | 	at org.apache.spark.executor.Executor$TaskRunner.$anonfun$run$5(Executor.scala:647)
+2026-02-10 19:22:15.034 | 	at org.apache.spark.util.SparkErrorUtils.tryWithSafeFinally(SparkErrorUtils.scala:80)
+2026-02-10 19:22:15.034 | 	at org.apache.spark.util.SparkErrorUtils.tryWithSafeFinally$(SparkErrorUtils.scala:77)
+2026-02-10 19:22:15.034 | 	at org.apache.spark.util.Utils$.tryWithSafeFinally(Utils.scala:99)
+2026-02-10 19:22:15.034 | 	at org.apache.spark.executor.Executor$TaskRunner.run(Executor.scala:650)
+2026-02-10 19:22:15.034 | 	at java.base/java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1136)
+2026-02-10 19:22:15.034 | 	at java.base/java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:635)
+2026-02-10 19:22:15.034 | 	... 1 more
+2026-02-10 19:22:15.034 | 
+2026-02-10 19:22:15.035 | 2026-02-11 01:22:15,033 - SparkIngestRaw - INFO - Ingest job elapsed: 16.29s
+2026-02-10 19:22:15.035 | Traceback (most recent call last):
+2026-02-10 19:22:15.035 |   File "/app/repo/k3s/spark/ingestion/ingestion_main.py", line 162, in <module>
+2026-02-10 19:22:15.035 |     main()
+2026-02-10 19:22:15.035 |   File "/app/repo/k3s/spark/ingestion/ingestion_main.py", line 152, in main
+2026-02-10 19:22:15.035 |     job.write_raw_to_iceberg(df_final, namespace="raw")
+2026-02-10 19:22:15.035 |   File "/app/repo/k3s/spark/ingestion/ingestion_main.py", line 134, in write_raw_to_iceberg
+2026-02-10 19:22:15.035 |     df.writeTo(full_table).using("iceberg").option("format-version", "2").create()
+2026-02-10 19:22:15.035 |   File "/opt/spark/python/lib/pyspark.zip/pyspark/sql/readwriter.py", line 2457, in create
+2026-02-10 19:22:15.036 |   File "/opt/spark/python/lib/py4j-0.10.9.9-src.zip/py4j/java_gateway.py", line 1362, in __call__
+2026-02-10 19:22:15.036 |   File "/opt/spark/python/lib/pyspark.zip/pyspark/errors/exceptions/captured.py", line 282, in deco
+2026-02-10 19:22:15.037 |   File "/opt/spark/python/lib/py4j-0.10.9.9-src.zip/py4j/protocol.py", line 327, in get_return_value
+2026-02-10 19:22:15.084 | py4j.protocol.Py4JJavaError: An error occurred while calling o109.create.
+2026-02-10 19:22:15.084 | : org.apache.spark.SparkException: [FAILED_READ_FILE.PARQUET_COLUMN_DATA_TYPE_MISMATCH] Encountered error while reading file s3a://k8s-mlops-platform-bucket/raw/2026_01_01_001.parquet. Data type mismatches when reading Parquet column [timestamp]. Expected Spark type timestamp, actual Parquet type INT64. SQLSTATE: KD001
+2026-02-10 19:22:15.084 | 	at org.apache.spark.sql.errors.QueryExecutionErrors$.parquetColumnDataTypeMismatchError(QueryExecutionErrors.scala:847)
+2026-02-10 19:22:15.084 | 	at org.apache.spark.sql.execution.datasources.v2.FileDataSourceV2$.attachFilePath(FileDataSourceV2.scala:138)
+2026-02-10 19:22:15.084 | 	at org.apache.spark.sql.execution.datasources.FileScanRDD$$anon$1.hasNext(FileScanRDD.scala:142)
+2026-02-10 19:22:15.084 | 	at org.apache.spark.sql.execution.FileSourceScanExec$$anon$1.hasNext(DataSourceScanExec.scala:695)
+2026-02-10 19:22:15.084 | 	at org.apache.spark.sql.catalyst.expressions.GeneratedClass$GeneratedIteratorForCodegenStage1.columnartorow_nextBatch_0$(Unknown Source)
+2026-02-10 19:22:15.084 | 	at org.apache.spark.sql.catalyst.expressions.GeneratedClass$GeneratedIteratorForCodegenStage1.processNext(Unknown Source)
+2026-02-10 19:22:15.084 | 	at org.apache.spark.sql.execution.BufferedRowIterator.hasNext(BufferedRowIterator.java:43)
+2026-02-10 19:22:15.084 | 	at org.apache.spark.sql.execution.WholeStageCodegenEvaluatorFactory$WholeStageCodegenPartitionEvaluator$$anon$1.hasNext(WholeStageCodegenEvaluatorFactory.scala:50)
+2026-02-10 19:22:15.084 | 	at scala.collection.Iterator$$anon$9.hasNext(Iterator.scala:583)
+2026-02-10 19:22:15.084 | 	at scala.collection.Iterator$$anon$9.hasNext(Iterator.scala:583)
+2026-02-10 19:22:15.084 | 	at org.apache.spark.util.random.SamplingUtils$.reservoirSampleAndCount(SamplingUtils.scala:41)
+2026-02-10 19:22:15.084 | 	at org.apache.spark.RangePartitioner$.$anonfun$sketch$1(Partitioner.scala:342)
+2026-02-10 19:22:15.084 | 	at org.apache.spark.RangePartitioner$.$anonfun$sketch$1$adapted(Partitioner.scala:340)
+2026-02-10 19:22:15.084 | 	at org.apache.spark.rdd.RDD.$anonfun$mapPartitionsWithIndex$2(RDD.scala:918)
+2026-02-10 19:22:15.084 | 	at org.apache.spark.rdd.RDD.$anonfun$mapPartitionsWithIndex$2$adapted(RDD.scala:918)
+2026-02-10 19:22:15.084 | 	at org.apache.spark.rdd.MapPartitionsRDD.compute(MapPartitionsRDD.scala:52)
+2026-02-10 19:22:15.084 | 	at org.apache.spark.rdd.RDD.computeOrReadCheckpoint(RDD.scala:374)
+2026-02-10 19:22:15.084 | 	at org.apache.spark.rdd.RDD.iterator(RDD.scala:338)
+2026-02-10 19:22:15.084 | 	at org.apache.spark.scheduler.ResultTask.runTask(ResultTask.scala:93)
+2026-02-10 19:22:15.084 | 	at org.apache.spark.TaskContext.runTaskWithListeners(TaskContext.scala:171)
+2026-02-10 19:22:15.084 | 	at org.apache.spark.scheduler.Task.run(Task.scala:147)
+2026-02-10 19:22:15.084 | 	at org.apache.spark.executor.Executor$TaskRunner.$anonfun$run$5(Executor.scala:647)
+2026-02-10 19:22:15.084 | 	at org.apache.spark.util.SparkErrorUtils.tryWithSafeFinally(SparkErrorUtils.scala:80)
+2026-02-10 19:22:15.084 | 	at org.apache.spark.util.SparkErrorUtils.tryWithSafeFinally$(SparkErrorUtils.scala:77)
+2026-02-10 19:22:15.084 | 	at org.apache.spark.util.Utils$.tryWithSafeFinally(Utils.scala:99)
+2026-02-10 19:22:15.084 | 	at org.apache.spark.executor.Executor$TaskRunner.run(Executor.scala:650)
+2026-02-10 19:22:15.084 | 	at java.base/java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1136)
+2026-02-10 19:22:15.084 | 	at java.base/java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:635)
+2026-02-10 19:22:15.084 | 	at java.base/java.lang.Thread.run(Thread.java:840)
+2026-02-10 19:22:15.084 | 	at org.apache.spark.scheduler.DAGScheduler.runJob(DAGScheduler.scala:1009)
+2026-02-10 19:22:15.084 | 	at org.apache.spark.SparkContext.runJob(SparkContext.scala:2484)
+2026-02-10 19:22:15.084 | 	at org.apache.spark.SparkContext.runJob(SparkContext.scala:2505)
+2026-02-10 19:22:15.084 | 	at org.apache.spark.SparkContext.runJob(SparkContext.scala:2524)
+2026-02-10 19:22:15.084 | 	at org.apache.spark.SparkContext.runJob(SparkContext.scala:2549)
+2026-02-10 19:22:15.084 | 	at org.apache.spark.rdd.RDD.$anonfun$collect$1(RDD.scala:1057)
+2026-02-10 19:22:15.084 | 	at org.apache.spark.rdd.RDDOperationScope$.withScope(RDDOperationScope.scala:151)
+2026-02-10 19:22:15.084 | 	at org.apache.spark.rdd.RDDOperationScope$.withScope(RDDOperationScope.scala:112)
+2026-02-10 19:22:15.084 | 	at org.apache.spark.rdd.RDD.withScope(RDD.scala:417)
+2026-02-10 19:22:15.084 | 	at org.apache.spark.rdd.RDD.collect(RDD.scala:1056)
+2026-02-10 19:22:15.084 | 	at org.apache.spark.RangePartitioner$.sketch(Partitioner.scala:340)
+2026-02-10 19:22:15.084 | 	at org.apache.spark.RangePartitioner.<init>(Partitioner.scala:207)
+2026-02-10 19:22:15.084 | 	at org.apache.spark.sql.execution.exchange.ShuffleExchangeExec$.prepareShuffleDependency(ShuffleExchangeExec.scala:363)
+2026-02-10 19:22:15.084 | 	at org.apache.spark.sql.execution.exchange.ShuffleExchangeExec.shuffleDependency$lzycompute(ShuffleExchangeExec.scala:249)
+2026-02-10 19:22:15.084 | 	at org.apache.spark.sql.execution.exchange.ShuffleExchangeExec.shuffleDependency(ShuffleExchangeExec.scala:243)
+2026-02-10 19:22:15.084 | 	at org.apache.spark.sql.execution.exchange.ShuffleExchangeExec.mapOutputStatisticsFuture$lzycompute(ShuffleExchangeExec.scala:217)
+2026-02-10 19:22:15.084 | 	at org.apache.spark.sql.execution.exchange.ShuffleExchangeExec.mapOutputStatisticsFuture(ShuffleExchangeExec.scala:213)
+2026-02-10 19:22:15.084 | 	at org.apache.spark.sql.execution.exchange.ShuffleExchangeLike.$anonfun$triggerFuture$3(ShuffleExchangeExec.scala:97)
+2026-02-10 19:22:15.084 | 	at org.apache.spark.rdd.RDDOperationScope$.withScope(RDDOperationScope.scala:151)
+2026-02-10 19:22:15.084 | 	at org.apache.spark.sql.execution.exchange.ShuffleExchangeLike.$anonfun$triggerFuture$1(ShuffleExchangeExec.scala:97)
+2026-02-10 19:22:15.084 | 	at org.apache.spark.sql.execution.SQLExecution$.$anonfun$withThreadLocalCaptured$4(SQLExecution.scala:322)
+2026-02-10 19:22:15.084 | 	at org.apache.spark.sql.execution.SQLExecution$.withSessionTagsApplied(SQLExecution.scala:272)
+2026-02-10 19:22:15.084 | 	at org.apache.spark.sql.execution.SQLExecution$.$anonfun$withThreadLocalCaptured$3(SQLExecution.scala:320)
+2026-02-10 19:22:15.084 | 	at org.apache.spark.JobArtifactSet$.withActiveJobArtifactState(JobArtifactSet.scala:94)
+2026-02-10 19:22:15.084 | 	at org.apache.spark.sql.execution.SQLExecution$.$anonfun$withThreadLocalCaptured$2(SQLExecution.scala:316)
