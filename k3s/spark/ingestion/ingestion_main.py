@@ -79,12 +79,13 @@ class SparkIngestionRaw(BaseUtils):
             .config("spark.hadoop.fs.s3a.experimental.fadvise", "random")
             .config("spark.sql.files.maxPartitionBytes",
                     int(self.params.get('read_batch_size', 256)) * 1024 * 1024)
-            .config("spark.sql.extensions",
+                .config("spark.sql.extensions",
                     "org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions")
-            .config("spark.sql.catalog.iceberg",
+                .config("spark.sql.catalog.iceberg",
                     "org.apache.iceberg.spark.SparkCatalog")
-            .config("spark.sql.catalog.iceberg.type", "hadoop")
-            .config("spark.sql.catalog.iceberg.warehouse", warehouse)
+                .config("spark.sql.catalog.iceberg.catalog-impl", "org.apache.iceberg.aws.glue.GlueCatalog")
+                .config("spark.sql.catalog.iceberg.io-impl", "org.apache.iceberg.aws.s3.S3FileIO")
+                .config("spark.sql.catalog.iceberg.warehouse", warehouse)
             .getOrCreate()
         )
         self.logger.info("SparkSession created (Iceberg catalog at %s)", warehouse)
