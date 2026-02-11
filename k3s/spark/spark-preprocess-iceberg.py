@@ -67,6 +67,55 @@ class SparkPreprocessIceberg(BaseUtils):
         
         self.logger.info(f"Artifacts config: bucket={self.artifacts_bucket}, prefix={self.pipelines_prefix}")
 
+    def _debug_log_and_save(self, tag: str, df=None, extra_msg: str = None):
+        """Registra info útil para depuración y la vuelca en /tmp/spark_preprocess_debug.txt.
+
+        - `tag`: etiqueta corta para identificar la sección de debug
+        - `df`: DataFrame opcional a inspeccionar (limit(1) + schema + sample)
+        - `extra_msg`: mensaje adicional para contextualizar
+        """
+        dbg_path = "/tmp/spark_preprocess_debug.txt"
+        lines = []
+        lines.append("=" * 80)
+        lines.append(f"DEBUG {tag} @ {datetime.now().isoformat()}")
+        if extra_msg:
+            lines.append(f"MSG: {extra_msg}")
+
+        if df is None:
+            lines.append("No DataFrame provided for this debug entry.")
+        else:
+            try:
+                has_any = df.limit(1).count()
+                lines.append(f"has_any (limit1 count)={has_any}")
+                try:
+                    lines.append(f"schema: {df.schema.simpleString()}")
+                except Exception:
+                    lines.append("schema: <failed to read schema>")
+
+                try:
+                    cols = df.columns
+                    lines.append(f"columns: {cols}")
+                except Exception:
+                    lines.append("columns: <failed to read columns>")
+
+                try:
+                    sample = df.limit(5).collect()
+                    sample_rows = [r.asDict() for r in sample]
+                    lines.append(f"sample_rows (up to 5): {sample_rows}")
+                except Exception as e:
+                    lines.append(f"sample_rows: <failed to collect sample: {e}>")
+
+            except Exception as e:
+                lines.append(f"Exception while introspecting DataFrame: {e}")
+
+        lines.append("\n")
+        try:
+            with open(dbg_path, "a") as fh:
+                fh.write("\n".join(lines) + "\n")
+            self.logger.info("Wrote debug info to %s (tag=%s)", dbg_path, tag)
+        except Exception as e:
+            self.logger.warning("Failed writing debug file %s: %s", dbg_path, str(e))
+
     def _check_s3_connection(self):
         """Verifica conexión a S3/MinIO."""
         try:
@@ -148,7 +197,29 @@ class SparkPreprocessIceberg(BaseUtils):
         """
         try:
             self.logger.info(f"Loading raw data: {start_date} to {end_date}")
-            
+
+            # Verificar existencia de la tabla raw antes de intentar leer
+            try:
+                exists = False
+                try:
+                    exists = self.spark.catalog.tableExists(self.raw_table)
+                except Exception:
+                    try:
+                        # Fallback: intento de DESCRIBE
+                        self.spark.sql(f"DESCRIBE {self.raw_table}")
+                        exists = True
+                    except Exception:
+                        exists = False
+
+                if not exists:
+                    msg = f"Raw table not found: {self.raw_table}"
+                    self.logger.warning(msg)
+                    self._debug_log_and_save('raw_table_missing', None, msg)
+                    raise ValueError(msg)
+            except Exception as e:
+                self.logger.error(f"Error checking raw table existence: {e}", exc_info=True)
+                raise
+
             # Leer toda la tabla raw
             df = self.spark.table(self.raw_table)
             
@@ -177,7 +248,21 @@ class SparkPreprocessIceberg(BaseUtils):
             # Avoid full count (expensive). Use a cheap existence check for logging.
             has_any = df_filtered.limit(1).count()
             self.logger.info(f"Loaded sample presence={has_any} for range {start_date} to {end_date}")
-            
+
+            # Escribir info de debug detallada
+            try:
+                self._debug_log_and_save('raw_filtered', df_filtered, f"range {start_date} to {end_date}")
+            except Exception:
+                self.logger.warning("Failed writing debug info for raw_filtered", exc_info=True)
+
+            # Si no hay filas en el filtro, también guardar una muestra de la tabla raw sin filtrar
+            if has_any == 0:
+                try:
+                    raw_sample = self.spark.table(self.raw_table).limit(5)
+                    self._debug_log_and_save('raw_unfiltered_sample', raw_sample, 'No rows in requested range')
+                except Exception as e:
+                    self.logger.warning(f"Failed collecting unfiltered raw sample: {e}")
+
             return df_filtered
             
         except Exception as e:
@@ -285,6 +370,23 @@ class SparkPreprocessIceberg(BaseUtils):
         """
         try:
             self.logger.info(f"Fitting pipeline from DSL: {dsl_path}")
+
+            # Verificar que hay datos en el DataFrame de train
+            try:
+                train_has_any = df.limit(1).count()
+            except Exception as e:
+                self.logger.error(f"Failed to peek into train DataFrame: {e}", exc_info=True)
+                self._debug_log_and_save('train_peek_failed', df, 'Failed to inspect train DF before fit')
+                raise
+
+            if train_has_any == 0:
+                msg = "Train DataFrame is empty. Aborting fit. See /tmp/spark_preprocess_debug.txt for details."
+                self.logger.error(msg)
+                try:
+                    self._debug_log_and_save('train_empty', df, 'Train split empty')
+                except Exception:
+                    self.logger.warning('Failed to write train_empty debug info')
+                raise ValueError(msg)
             
             # Cargar y entrenar pipeline
             base_pipeline = Pipeline.from_yaml(dsl_path)
@@ -315,6 +417,23 @@ class SparkPreprocessIceberg(BaseUtils):
         try:
             if self.pipeline is None:
                 raise ValueError("Pipeline not fitted. Call fit_pipeline first.")
+
+            # Quick check that df has rows before attempting transform
+            try:
+                has_any = df.limit(1).count()
+            except Exception as e:
+                self.logger.error(f"Failed to inspect DataFrame before transform: {e}", exc_info=True)
+                self._debug_log_and_save('transform_peek_failed', df, 'Failed to inspect DF before transform')
+                raise
+
+            if has_any == 0:
+                msg = "Input DataFrame to transform is empty. Aborting transform. See /tmp/spark_preprocess_debug.txt"
+                self.logger.error(msg)
+                try:
+                    self._debug_log_and_save('transform_input_empty', df, 'Input to transform empty')
+                except Exception:
+                    self.logger.warning('Failed to write transform_input_empty debug info')
+                raise ValueError(msg)
             
             self.logger.info("Applying pipeline transformations...")
             df_processed = self.pipeline.transform(df)
@@ -540,7 +659,23 @@ class SparkPreprocessIceberg(BaseUtils):
             )
             
             # Fit pipeline en train
-            pipeline_hash = self.fit_pipeline(df_train, dsl_path)
+            try:
+                pipeline_hash = self.fit_pipeline(df_train, dsl_path)
+            except Exception as e:
+                # Recoger info adicional de debug: snapshots y muestra sin filtrar
+                try:
+                    snaps = self.spark.sql(f"SELECT * FROM {self.raw_table}.snapshots ORDER BY committed_at DESC LIMIT 10")
+                    self._debug_log_and_save('raw_snapshots_on_fit_error', snaps, f"fit error: {e}")
+                except Exception:
+                    self.logger.warning('Failed to collect snapshots for debug')
+
+                try:
+                    raw_sample = self.spark.table(self.raw_table).limit(10)
+                    self._debug_log_and_save('raw_unfiltered_on_fit_error', raw_sample, 'Fit error occurred')
+                except Exception:
+                    self.logger.warning('Failed to collect unfiltered raw sample for debug')
+
+                raise
 
             # 5. Procesar TODOS los datos (train + val + test)
             self.logger.info("=" * 60)
