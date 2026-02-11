@@ -57,9 +57,8 @@ class KubeRayTraining(BaseUtils):
 
         self.logger.info(f"Initializing Iceberg catalog with warehouse: {warehouse}")
         return load_catalog("iceberg", **{
-            "type": "hadoop",
+            "type": "glue",
             "warehouse": warehouse,
-            "s3.endpoint": os.environ.get("S3_ENDPOINT", "http://minio:9000"),
             "s3.access-key-id": os.environ.get("AWS_ACCESS_KEY_ID"),
             "s3.secret-access-key": os.environ.get("AWS_SECRET_ACCESS_KEY"),
             "s3.region": os.environ.get("AWS_REGION", "us-east-2"),
@@ -383,9 +382,8 @@ class KubeRayTraining(BaseUtils):
             ).replace('s3a://', 's3://')
             
             catalog_config = {
-                "type": "hadoop",
+                "type": "glue",
                 "warehouse": warehouse,
-                "s3.endpoint": os.environ.get("S3_ENDPOINT", "http://minio:9000"),
                 "s3.access-key-id": os.environ.get("AWS_ACCESS_KEY_ID"),
                 "s3.secret-access-key": os.environ.get("AWS_SECRET_ACCESS_KEY"),
                 "s3.region": os.environ.get("AWS_REGION", "us-east-2"),
