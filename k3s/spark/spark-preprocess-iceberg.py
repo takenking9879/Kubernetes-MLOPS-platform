@@ -583,7 +583,7 @@ class SparkPreprocessIceberg(BaseUtils):
             val_cfg = self.splits_config.get('val', {})
             test_cfg = self.splits_config.get('test', {})
             
-            # Crear registro
+            # Crear registro con casting explícito a TIMESTAMP para los rangos
             metadata_row = self.spark.createDataFrame([{
                 'artifact_set_id': artifact_set_id,
                 'created_at': datetime.now(),
@@ -598,6 +598,11 @@ class SparkPreprocessIceberg(BaseUtils):
                 'test_start': test_cfg.get('start'),
                 'test_end': test_cfg.get('end')
             }])
+
+            # Aplicar casting explícito para asegurar compatibilidad con el esquema de la tabla Iceberg
+            timestamp_cols = ['train_start', 'train_end', 'val_start', 'val_end', 'test_start', 'test_end']
+            for col in timestamp_cols:
+                metadata_row = metadata_row.withColumn(col, F.to_timestamp(F.col(col)))
             
             # Insertar en metadata table
             metadata_row.writeTo(self.metadata_table).append()
