@@ -104,9 +104,18 @@ class SparkIngestionRaw(BaseUtils):
     def build_final_df(self, df):
         """
         Ordena solo los datos recién leídos por 'timestamp'.
-        Convierte epoch a timestamp para orden correcto.
+        Convierte epoch a timestamp para orden correcto si es necesario.
         """
-        df_with_ts = df.withColumn("timestamp", F.to_timestamp(F.from_unixtime(F.col("timestamp"))))
+        from pyspark.sql.types import TimestampType
+        
+        # Si ya es TimestampType (como define schema_full), no aplicamos from_unixtime
+        field = next((f for f in df.schema.fields if f.name == 'timestamp'), None)
+        if field is not None and isinstance(field.dataType, TimestampType):
+            df_with_ts = df
+        else:
+            # Si fuera un long/string, lo convertimos
+            df_with_ts = df.withColumn("timestamp", F.to_timestamp(F.from_unixtime(F.col("timestamp"))))
+            
         df_ordered = df_with_ts.orderBy(F.col("timestamp").asc_nulls_last())
         return df_ordered
 

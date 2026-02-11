@@ -1,180 +1,133 @@
-2026-02-10 19:25:53.163 | WARNING: Using incubator modules: jdk.incubator.vector
-2026-02-10 19:25:54.375 | Files local:///app/repo/k3s/spark/ingestion/ingestion_main.py from /app/.worktrees/75cc4681ff653d0f1b767ec3464cb1548ad191a8/k3s/spark/ingestion/ingestion_main.py to /opt/spark/work-dir/ingestion_main.py
-2026-02-10 19:25:54.454 | 26/02/11 01:25:54 WARN NativeCodeLoader: Unable to load native-hadoop library for your platform... using builtin-java classes where applicable
-2026-02-10 19:25:55.254 | 2026-02-11 01:25:55,253 - SparkIngestRaw - DEBUG - Parameters retrieved from /app/repo/k3s/params.yaml
-2026-02-10 19:25:55.646 | 2026-02-11 01:25:55,646 - SparkIngestRaw - INFO - S3 connection verified. Buckets: ['frontend-crm-bucket', 'k8s-mlops-platform-bucket']
-2026-02-10 19:25:56.040 | Using Spark's default log4j profile: org/apache/spark/log4j2-defaults.properties
-2026-02-10 19:25:56.044 | 26/02/11 01:25:56 INFO SparkContext: Running Spark version 4.0.1
-2026-02-10 19:25:56.045 | 26/02/11 01:25:56 INFO SparkContext: OS info Linux, 6.6.87.2-microsoft-standard-WSL2, amd64
-2026-02-10 19:25:56.046 | 26/02/11 01:25:56 INFO SparkContext: Java version 17.0.17
-2026-02-10 19:25:56.069 | 26/02/11 01:25:56 INFO ResourceUtils: ==============================================================
-2026-02-10 19:25:56.070 | 26/02/11 01:25:56 INFO ResourceUtils: No custom resources configured for spark.driver.
-2026-02-10 19:25:56.070 | 26/02/11 01:25:56 INFO ResourceUtils: ==============================================================
-2026-02-10 19:25:56.071 | 26/02/11 01:25:56 INFO SparkContext: Submitted application: spark-preprocessing
-2026-02-10 19:25:56.094 | 26/02/11 01:25:56 INFO ResourceProfile: Default ResourceProfile created, executor resources: Map(cores -> name: cores, amount: 6, script: , vendor: , memory -> name: memory, amount: 4096, script: , vendor: , offHeap -> name: offHeap, amount: 0, script: , vendor: ), task resources: Map(cpus -> name: cpus, amount: 1.0)
-2026-02-10 19:25:56.098 | 26/02/11 01:25:56 INFO ResourceProfile: Limiting resource is cpus at 6 tasks per executor
-2026-02-10 19:25:56.100 | 26/02/11 01:25:56 INFO ResourceProfileManager: Added ResourceProfile id: 0
-2026-02-10 19:25:56.141 | 26/02/11 01:25:56 INFO SecurityManager: Changing view acls to: spark
-2026-02-10 19:25:56.142 | 26/02/11 01:25:56 INFO SecurityManager: Changing modify acls to: spark
-2026-02-10 19:25:56.143 | 26/02/11 01:25:56 INFO SecurityManager: Changing view acls groups to: spark
-2026-02-10 19:25:56.143 | 26/02/11 01:25:56 INFO SecurityManager: Changing modify acls groups to: spark
-2026-02-10 19:25:56.145 | 26/02/11 01:25:56 INFO SecurityManager: SecurityManager: authentication disabled; ui acls disabled; users with view permissions: spark groups with view permissions: EMPTY; users with modify permissions: spark; groups with modify permissions: EMPTY; RPC SSL disabled
-2026-02-10 19:25:56.338 | 26/02/11 01:25:56 INFO Utils: Successfully started service 'sparkDriver' on port 7078.
-2026-02-10 19:25:56.365 | 26/02/11 01:25:56 INFO SparkEnv: Registering MapOutputTracker
-2026-02-10 19:25:56.376 | 26/02/11 01:25:56 INFO SparkEnv: Registering BlockManagerMaster
-2026-02-10 19:25:56.391 | 26/02/11 01:25:56 INFO BlockManagerMasterEndpoint: Using org.apache.spark.storage.DefaultTopologyMapper for getting topology information
-2026-02-10 19:25:56.391 | 26/02/11 01:25:56 INFO BlockManagerMasterEndpoint: BlockManagerMasterEndpoint up
-2026-02-10 19:25:56.394 | 26/02/11 01:25:56 INFO SparkEnv: Registering BlockManagerMasterHeartbeat
-2026-02-10 19:25:56.413 | 26/02/11 01:25:56 INFO DiskBlockManager: Created local directory at /var/data/spark-ca9f9983-3094-471a-b802-227f93c14ff5/blockmgr-29f86ce4-2a0e-4694-b45b-bae716e07f2e
-2026-02-10 19:25:56.433 | 26/02/11 01:25:56 INFO SparkEnv: Registering OutputCommitCoordinator
-2026-02-10 19:25:56.542 | 26/02/11 01:25:56 INFO JettyUtils: Start Jetty 0.0.0.0:4040 for SparkUI
-2026-02-10 19:25:56.594 | 26/02/11 01:25:56 INFO Utils: Successfully started service 'SparkUI' on port 4040.
-2026-02-10 19:25:56.622 | 26/02/11 01:25:56 WARN SparkContext: File with 'local' scheme local:/app/repo/k3s/spark/ingestion/ingestion_main.py is not supported to add to file server, since it is already available on every node.
-2026-02-10 19:25:56.639 | 26/02/11 01:25:56 INFO SecurityManager: Changing view acls to: spark
-2026-02-10 19:25:56.639 | 26/02/11 01:25:56 INFO SecurityManager: Changing modify acls to: spark
-2026-02-10 19:25:56.639 | 26/02/11 01:25:56 INFO SecurityManager: Changing view acls groups to: spark
-2026-02-10 19:25:56.639 | 26/02/11 01:25:56 INFO SecurityManager: Changing modify acls groups to: spark
-2026-02-10 19:25:56.639 | 26/02/11 01:25:56 INFO SecurityManager: SecurityManager: authentication disabled; ui acls disabled; users with view permissions: spark groups with view permissions: EMPTY; users with modify permissions: spark; groups with modify permissions: EMPTY; RPC SSL disabled
-2026-02-10 19:25:56.680 | 26/02/11 01:25:56 INFO SparkKubernetesClientFactory: Auto-configuring K8S client using current context from users K8S config file
-2026-02-10 19:25:57.818 | 26/02/11 01:25:57 INFO ExecutorPodsAllocator: Going to request 2 executors from Kubernetes for ResourceProfile Id: 0, target: 2, known: 0, sharedSlotFromPendingPods: 2147483647.
-2026-02-10 19:25:57.862 | 26/02/11 01:25:57 INFO KubernetesClientUtils: Spark configuration files loaded from Some(/opt/spark/conf) : spark.kubernetes.namespace
-2026-02-10 19:25:58.029 | 26/02/11 01:25:58 INFO ExecutorPodsAllocator: Found 0 reusable PVCs from 0 PVCs
-2026-02-10 19:25:58.070 | 26/02/11 01:25:58 INFO KubernetesClientUtils: Spark configuration files loaded from Some(/opt/spark/conf) : spark.kubernetes.namespace
-2026-02-10 19:25:58.071 | 26/02/11 01:25:58 INFO Utils: Successfully started service 'org.apache.spark.network.netty.NettyBlockTransferService' on port 7079.
-2026-02-10 19:25:58.074 | 26/02/11 01:25:58 INFO NettyBlockTransferService: Server created on spark-ingestion-0-driver-svc.spark.svc 10.1.10.124:7079
-2026-02-10 19:25:58.076 | 26/02/11 01:25:58 INFO BlockManager: Using org.apache.spark.storage.RandomBlockReplicationPolicy for block replication policy
-2026-02-10 19:25:58.078 | 26/02/11 01:25:58 INFO BasicExecutorFeatureStep: Decommissioning not enabled, skipping shutdown script
-2026-02-10 19:25:58.087 | 26/02/11 01:25:58 INFO BlockManagerMaster: Registering BlockManager BlockManagerId(driver, spark-ingestion-0-driver-svc.spark.svc, 7079, None)
-2026-02-10 19:25:58.092 | 26/02/11 01:25:58 INFO BlockManagerMasterEndpoint: Registering block manager spark-ingestion-0-driver-svc.spark.svc:7079 with 1048.8 MiB RAM, BlockManagerId(driver, spark-ingestion-0-driver-svc.spark.svc, 7079, None)
-2026-02-10 19:25:58.095 | 26/02/11 01:25:58 INFO BlockManagerMaster: Registered BlockManager BlockManagerId(driver, spark-ingestion-0-driver-svc.spark.svc, 7079, None)
-2026-02-10 19:25:58.095 | 26/02/11 01:25:58 INFO BlockManager: Initialized BlockManager: BlockManagerId(driver, spark-ingestion-0-driver-svc.spark.svc, 7079, None)
-2026-02-10 19:25:58.171 | 26/02/11 01:25:58 INFO KubernetesClientUtils: Spark configuration files loaded from Some(/opt/spark/conf) : spark.kubernetes.namespace
-2026-02-10 19:25:58.175 | 26/02/11 01:25:58 INFO BasicExecutorFeatureStep: Decommissioning not enabled, skipping shutdown script
-2026-02-10 19:26:03.239 | 26/02/11 01:26:03 INFO KubernetesClusterSchedulerBackend$KubernetesDriverEndpoint: Registered executor NettyRpcEndpointRef(spark-client://Executor) (10.1.10.125:60936) with ID 1, ResourceProfileId 0
-2026-02-10 19:26:03.338 | 26/02/11 01:26:03 INFO BlockManagerMasterEndpoint: Registering block manager 10.1.10.125:37719 with 2.2 GiB RAM, BlockManagerId(1, 10.1.10.125, 37719, None)
-2026-02-10 19:26:27.811 | 26/02/11 01:26:27 INFO KubernetesClusterSchedulerBackend: SchedulerBackend is ready for scheduling beginning after waiting maxRegisteredResourcesWaitingTime: 30000.0(ms)
-2026-02-10 19:26:29.549 | 2026-02-11 01:26:29,548 - SparkIngestRaw - INFO - SparkSession created (Iceberg catalog at s3a://k8s-mlops-platform-bucket/warehouse)
-2026-02-10 19:26:29.619 | 26/02/11 01:26:29 INFO SharedState: Setting hive.metastore.warehouse.dir ('null') to the value of spark.sql.warehouse.dir.
-2026-02-10 19:26:29.627 | 26/02/11 01:26:29 INFO SharedState: Warehouse path is 'file:/opt/spark/work-dir/spark-warehouse'.
-2026-02-10 19:26:30.396 | 26/02/11 01:26:30 WARN MetricsConfig: Cannot locate configuration: tried hadoop-metrics2-s3a-file-system.properties,hadoop-metrics2.properties
-2026-02-10 19:26:30.407 | 26/02/11 01:26:30 INFO MetricsSystemImpl: Scheduled Metric snapshot period at 10 second(s).
-2026-02-10 19:26:30.407 | 26/02/11 01:26:30 INFO MetricsSystemImpl: s3a-file-system metrics system started
-2026-02-10 19:26:31.997 | 26/02/11 01:26:31 INFO HadoopFSUtils: Listing s3a://k8s-mlops-platform-bucket/raw with listFiles API
-2026-02-10 19:26:32.120 | 26/02/11 01:26:32 INFO InMemoryFileIndex: It took 137 ms to list leaf files for 1 paths.
-2026-02-10 19:26:32.326 | 26/02/11 01:26:32 INFO SparkContext: Starting job: parquet at NativeMethodAccessorImpl.java:0
-2026-02-10 19:26:32.338 | 26/02/11 01:26:32 INFO DAGScheduler: Got job 0 (parquet at NativeMethodAccessorImpl.java:0) with 1 output partitions
-2026-02-10 19:26:32.339 | 26/02/11 01:26:32 INFO DAGScheduler: Final stage: ResultStage 0 (parquet at NativeMethodAccessorImpl.java:0)
-2026-02-10 19:26:32.341 | 26/02/11 01:26:32 INFO DAGScheduler: Parents of final stage: List()
-2026-02-10 19:26:32.343 | 26/02/11 01:26:32 INFO DAGScheduler: Missing parents: List()
-2026-02-10 19:26:32.346 | 26/02/11 01:26:32 INFO DAGScheduler: Submitting ResultStage 0 (MapPartitionsRDD[1] at parquet at NativeMethodAccessorImpl.java:0), which has no missing parents
-2026-02-10 19:26:32.385 | 26/02/11 01:26:32 INFO MemoryStore: MemoryStore started with capacity 1048.8 MiB
-2026-02-10 19:26:32.395 | 26/02/11 01:26:32 INFO MemoryStore: Block broadcast_0 stored as values in memory (estimated size 120.4 KiB, free 1048.7 MiB)
-2026-02-10 19:26:32.421 | 26/02/11 01:26:32 INFO MemoryStore: Block broadcast_0_piece0 stored as bytes in memory (estimated size 43.9 KiB, free 1048.6 MiB)
-2026-02-10 19:26:32.427 | 26/02/11 01:26:32 INFO SparkContext: Created broadcast 0 from broadcast at DAGScheduler.scala:1676
-2026-02-10 19:26:32.447 | 26/02/11 01:26:32 INFO DAGScheduler: Submitting 1 missing tasks from ResultStage 0 (MapPartitionsRDD[1] at parquet at NativeMethodAccessorImpl.java:0) (first 15 tasks are for partitions Vector(0))
-2026-02-10 19:26:32.458 | 26/02/11 01:26:32 INFO TaskSchedulerImpl: Adding task set 0.0 with 1 tasks resource profile 0
-2026-02-10 19:26:32.493 | 26/02/11 01:26:32 INFO TaskSetManager: Starting task 0.0 in stage 0.0 (TID 0) (10.1.10.125,executor 1, partition 0, PROCESS_LOCAL, 9846 bytes) 
-2026-02-10 19:26:35.009 | 26/02/11 01:26:35 WARN TaskSetManager: Lost task 0.0 in stage 0.0 (TID 0) (10.1.10.125 executor 1): org.apache.spark.sql.AnalysisException: [PARQUET_TYPE_ILLEGAL] Illegal Parquet type: INT64 (TIMESTAMP(NANOS,false)). SQLSTATE: 42846
-2026-02-10 19:26:35.009 | 	at org.apache.spark.sql.errors.QueryCompilationErrors$.illegalParquetTypeError(QueryCompilationErrors.scala:2044)
-2026-02-10 19:26:35.009 | 	at org.apache.spark.sql.execution.datasources.parquet.ParquetToSparkSchemaConverter.illegalType$1(ParquetSchemaConverter.scala:232)
-2026-02-10 19:26:35.009 | 	at org.apache.spark.sql.execution.datasources.parquet.ParquetToSparkSchemaConverter.$anonfun$convertPrimitiveField$2(ParquetSchemaConverter.scala:309)
-2026-02-10 19:26:35.009 | 	at scala.Option.getOrElse(Option.scala:201)
-2026-02-10 19:26:35.009 | 	at org.apache.spark.sql.execution.datasources.parquet.ParquetToSparkSchemaConverter.convertPrimitiveField(ParquetSchemaConverter.scala:250)
-2026-02-10 19:26:35.009 | 	at org.apache.spark.sql.execution.datasources.parquet.ParquetToSparkSchemaConverter.convertField(ParquetSchemaConverter.scala:203)
-2026-02-10 19:26:35.009 | 	at org.apache.spark.sql.execution.datasources.parquet.ParquetToSparkSchemaConverter.$anonfun$convertInternal$4(ParquetSchemaConverter.scala:163)
-2026-02-10 19:26:35.009 | 	at org.apache.spark.sql.execution.datasources.parquet.ParquetToSparkSchemaConverter.$anonfun$convertInternal$4$adapted(ParquetSchemaConverter.scala:127)
-2026-02-10 19:26:35.009 | 	at scala.collection.immutable.Range.map(Range.scala:60)
-2026-02-10 19:26:35.009 | 	at org.apache.spark.sql.execution.datasources.parquet.ParquetToSparkSchemaConverter.convertInternal(ParquetSchemaConverter.scala:127)
-2026-02-10 19:26:35.009 | 	at org.apache.spark.sql.execution.datasources.parquet.ParquetToSparkSchemaConverter.convert(ParquetSchemaConverter.scala:85)
-2026-02-10 19:26:35.009 | 	at org.apache.spark.sql.execution.datasources.parquet.ParquetFileFormat$.$anonfun$readSchemaFromFooter$2(ParquetFileFormat.scala:515)
-2026-02-10 19:26:35.009 | 	at scala.Option.getOrElse(Option.scala:201)
-2026-02-10 19:26:35.009 | 	at org.apache.spark.sql.execution.datasources.parquet.ParquetFileFormat$.readSchemaFromFooter(ParquetFileFormat.scala:515)
-2026-02-10 19:26:35.009 | 	at org.apache.spark.sql.execution.datasources.parquet.ParquetFileFormat$.$anonfun$mergeSchemasInParallel$2(ParquetFileFormat.scala:495)
-2026-02-10 19:26:35.009 | 	at scala.collection.immutable.List.map(List.scala:247)
-2026-02-10 19:26:35.009 | 	at scala.collection.immutable.List.map(List.scala:79)
-2026-02-10 19:26:35.009 | 	at org.apache.spark.sql.execution.datasources.parquet.ParquetFileFormat$.$anonfun$mergeSchemasInParallel$1(ParquetFileFormat.scala:495)
-2026-02-10 19:26:35.009 | 	at org.apache.spark.sql.execution.datasources.parquet.ParquetFileFormat$.$anonfun$mergeSchemasInParallel$1$adapted(ParquetFileFormat.scala:486)
-2026-02-10 19:26:35.009 | 	at org.apache.spark.sql.execution.datasources.SchemaMergeUtils$.$anonfun$mergeSchemasInParallel$2(SchemaMergeUtils.scala:80)
-2026-02-10 19:26:35.009 | 	at org.apache.spark.rdd.RDD.$anonfun$mapPartitions$2(RDD.scala:866)
-2026-02-10 19:26:35.009 | 	at org.apache.spark.rdd.RDD.$anonfun$mapPartitions$2$adapted(RDD.scala:866)
-2026-02-10 19:26:35.009 | 	at org.apache.spark.rdd.MapPartitionsRDD.compute(MapPartitionsRDD.scala:52)
-2026-02-10 19:26:35.009 | 	at org.apache.spark.rdd.RDD.computeOrReadCheckpoint(RDD.scala:374)
-2026-02-10 19:26:35.009 | 	at org.apache.spark.rdd.RDD.iterator(RDD.scala:338)
-2026-02-10 19:26:35.009 | 	at org.apache.spark.scheduler.ResultTask.runTask(ResultTask.scala:93)
-2026-02-10 19:26:35.009 | 	at org.apache.spark.TaskContext.runTaskWithListeners(TaskContext.scala:171)
-2026-02-10 19:26:35.009 | 	at org.apache.spark.scheduler.Task.run(Task.scala:147)
-2026-02-10 19:26:35.009 | 	at org.apache.spark.executor.Executor$TaskRunner.$anonfun$run$5(Executor.scala:647)
-2026-02-10 19:26:35.009 | 	at org.apache.spark.util.SparkErrorUtils.tryWithSafeFinally(SparkErrorUtils.scala:80)
-2026-02-10 19:26:35.009 | 	at org.apache.spark.util.SparkErrorUtils.tryWithSafeFinally$(SparkErrorUtils.scala:77)
-2026-02-10 19:26:35.009 | 	at org.apache.spark.util.Utils$.tryWithSafeFinally(Utils.scala:99)
-2026-02-10 19:26:35.009 | 	at org.apache.spark.executor.Executor$TaskRunner.run(Executor.scala:650)
-2026-02-10 19:26:35.009 | 	at java.base/java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1136)
-2026-02-10 19:26:35.009 | 	at java.base/java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:635)
-2026-02-10 19:26:35.009 | 	at java.base/java.lang.Thread.run(Thread.java:840)
-2026-02-10 19:26:35.009 | 
-2026-02-10 19:26:35.012 | 26/02/11 01:26:35 INFO TaskSetManager: Starting task 0.1 in stage 0.0 (TID 1) (10.1.10.125,executor 1, partition 0, PROCESS_LOCAL, 9846 bytes) 
-2026-02-10 19:26:35.345 | 26/02/11 01:26:35 INFO TaskSetManager: Lost task 0.1 in stage 0.0 (TID 1) on 10.1.10.125, executor 1: org.apache.spark.sql.AnalysisException ([PARQUET_TYPE_ILLEGAL] Illegal Parquet type: INT64 (TIMESTAMP(NANOS,false)). SQLSTATE: 42846) [duplicate 1]
-2026-02-10 19:26:35.346 | 26/02/11 01:26:35 INFO TaskSetManager: Starting task 0.2 in stage 0.0 (TID 2) (10.1.10.125,executor 1, partition 0, PROCESS_LOCAL, 9846 bytes) 
-2026-02-10 19:26:35.675 | 26/02/11 01:26:35 INFO TaskSetManager: Lost task 0.2 in stage 0.0 (TID 2) on 10.1.10.125, executor 1: org.apache.spark.sql.AnalysisException ([PARQUET_TYPE_ILLEGAL] Illegal Parquet type: INT64 (TIMESTAMP(NANOS,false)). SQLSTATE: 42846) [duplicate 2]
-2026-02-10 19:26:35.677 | 26/02/11 01:26:35 INFO TaskSetManager: Starting task 0.3 in stage 0.0 (TID 3) (10.1.10.125,executor 1, partition 0, PROCESS_LOCAL, 9846 bytes) 
-2026-02-10 19:26:36.012 | 26/02/11 01:26:36 INFO TaskSetManager: Lost task 0.3 in stage 0.0 (TID 3) on 10.1.10.125, executor 1: org.apache.spark.sql.AnalysisException ([PARQUET_TYPE_ILLEGAL] Illegal Parquet type: INT64 (TIMESTAMP(NANOS,false)). SQLSTATE: 42846) [duplicate 3]
-2026-02-10 19:26:36.014 | 26/02/11 01:26:36 ERROR TaskSetManager: Task 0 in stage 0.0 failed 4 times; aborting job
-2026-02-10 19:26:36.016 | 26/02/11 01:26:36 INFO TaskSchedulerImpl: Removed TaskSet 0.0 whose tasks have all completed, from pool 
-2026-02-10 19:26:36.017 | 26/02/11 01:26:36 INFO TaskSchedulerImpl: Canceling stage 0
-2026-02-10 19:26:36.018 | 26/02/11 01:26:36 INFO TaskSchedulerImpl: Killing all running tasks in stage 0: [PARQUET_TYPE_ILLEGAL] Illegal Parquet type: INT64 (TIMESTAMP(NANOS,false)). SQLSTATE: 42846
-2026-02-10 19:26:36.020 | 26/02/11 01:26:36 INFO DAGScheduler: ResultStage 0 (parquet at NativeMethodAccessorImpl.java:0) failed in 3663 ms due to [PARQUET_TYPE_ILLEGAL] Illegal Parquet type: INT64 (TIMESTAMP(NANOS,false)). SQLSTATE: 42846
-2026-02-10 19:26:36.023 | 26/02/11 01:26:36 INFO DAGScheduler: Job 0 failed: parquet at NativeMethodAccessorImpl.java:0, took 3696.138987 ms
-2026-02-10 19:26:36.110 | 2026-02-11 01:26:36,098 - SparkIngestRaw - ERROR - Ingest job failed
-2026-02-10 19:26:36.110 | Traceback (most recent call last):
-2026-02-10 19:26:36.110 |   File "/app/repo/k3s/spark/ingestion/ingestion_main.py", line 167, in main
-2026-02-10 19:26:36.110 |     df_raw = job.load_data(job.raw_s3_path)
-2026-02-10 19:26:36.110 |              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-2026-02-10 19:26:36.110 |   File "/app/repo/k3s/spark/ingestion/ingestion_main.py", line 96, in load_data
-2026-02-10 19:26:36.110 |     df = self.spark.read.parquet(path)
-2026-02-10 19:26:36.110 |          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-2026-02-10 19:26:36.110 |   File "/opt/spark/python/lib/pyspark.zip/pyspark/sql/readwriter.py", line 642, in parquet
-2026-02-10 19:26:36.110 |     return self._df(self._jreader.parquet(_to_seq(self._spark._sc, paths)))
-2026-02-10 19:26:36.110 |                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-2026-02-10 19:26:36.110 |   File "/opt/spark/python/lib/py4j-0.10.9.9-src.zip/py4j/java_gateway.py", line 1362, in __call__
-2026-02-10 19:26:36.110 |     return_value = get_return_value(
-2026-02-10 19:26:36.110 |                    ^^^^^^^^^^^^^^^^^
-2026-02-10 19:26:36.110 |   File "/opt/spark/python/lib/pyspark.zip/pyspark/errors/exceptions/captured.py", line 288, in deco
-2026-02-10 19:26:36.110 |     raise converted from None
-2026-02-10 19:26:36.110 | pyspark.errors.exceptions.captured.AnalysisException: [PARQUET_TYPE_ILLEGAL] Illegal Parquet type: INT64 (TIMESTAMP(NANOS,false)). SQLSTATE: 42846
-2026-02-10 19:26:36.111 | 2026-02-11 01:26:36,110 - SparkIngestRaw - INFO - Ingest job elapsed: 6.56s
-2026-02-10 19:26:36.111 | Traceback (most recent call last):
-2026-02-10 19:26:36.111 |   File "/app/repo/k3s/spark/ingestion/ingestion_main.py", line 179, in <module>
-2026-02-10 19:26:36.111 |     main()
-2026-02-10 19:26:36.111 |   File "/app/repo/k3s/spark/ingestion/ingestion_main.py", line 167, in main
-2026-02-10 19:26:36.111 |     df_raw = job.load_data(job.raw_s3_path)
-2026-02-10 19:26:36.111 |              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-2026-02-10 19:26:36.111 |   File "/app/repo/k3s/spark/ingestion/ingestion_main.py", line 96, in load_data
-2026-02-10 19:26:36.111 |     df = self.spark.read.parquet(path)
-2026-02-10 19:26:36.111 |          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-2026-02-10 19:26:36.111 |   File "/opt/spark/python/lib/pyspark.zip/pyspark/sql/readwriter.py", line 642, in parquet
-2026-02-10 19:26:36.111 |   File "/opt/spark/python/lib/py4j-0.10.9.9-src.zip/py4j/java_gateway.py", line 1362, in __call__
-2026-02-10 19:26:36.111 |   File "/opt/spark/python/lib/pyspark.zip/pyspark/errors/exceptions/captured.py", line 288, in deco
-2026-02-10 19:26:36.113 | pyspark.errors.exceptions.captured.AnalysisException: [PARQUET_TYPE_ILLEGAL] Illegal Parquet type: INT64 (TIMESTAMP(NANOS,false)). SQLSTATE: 42846
-2026-02-10 19:26:36.235 | 26/02/11 01:26:36 INFO SparkContext: SparkContext is stopping with exitCode 0 from stop at SparkSubmit.scala:1036.
-2026-02-10 19:26:36.247 | 26/02/11 01:26:36 INFO SparkUI: Stopped Spark web UI at http://spark-ingestion-0-driver-svc.spark.svc:4040
-2026-02-10 19:26:36.250 | 26/02/11 01:26:36 INFO KubernetesClusterSchedulerBackend: Shutting down all executors
-2026-02-10 19:26:36.251 | 26/02/11 01:26:36 INFO KubernetesClusterSchedulerBackend$KubernetesDriverEndpoint: Asking each executor to shut down
-2026-02-10 19:26:36.256 | 26/02/11 01:26:36 INFO ExecutorPodsWatchSnapshotSource: Kubernetes client has been closed.
-2026-02-10 19:26:36.399 | 26/02/11 01:26:36 INFO MapOutputTrackerMasterEndpoint: MapOutputTrackerMasterEndpoint stopped!
-2026-02-10 19:26:36.417 | 26/02/11 01:26:36 INFO MemoryStore: MemoryStore cleared
-2026-02-10 19:26:36.417 | 26/02/11 01:26:36 INFO BlockManager: BlockManager stopped
-2026-02-10 19:26:36.422 | 26/02/11 01:26:36 INFO BlockManagerMaster: BlockManagerMaster stopped
-2026-02-10 19:26:36.424 | 26/02/11 01:26:36 INFO OutputCommitCoordinator$OutputCommitCoordinatorEndpoint: OutputCommitCoordinator stopped!
-2026-02-10 19:26:36.435 | 26/02/11 01:26:36 INFO SparkContext: Successfully stopped SparkContext
-2026-02-10 19:26:36.437 | 26/02/11 01:26:36 INFO ShutdownHookManager: Shutdown hook called
-2026-02-10 19:26:36.438 | 26/02/11 01:26:36 INFO ShutdownHookManager: Deleting directory /tmp/localPyFiles-c5a5303b-3e51-4b4b-8dbc-b71a44438068
-2026-02-10 19:26:36.441 | 26/02/11 01:26:36 INFO ShutdownHookManager: Deleting directory /var/data/spark-ca9f9983-3094-471a-b802-227f93c14ff5/spark-ad7befc6-da38-4ce3-ae7c-df288ed0cc2f/pyspark-1886b8ae-ae6d-4089-917d-6e299e396d48
-2026-02-10 19:26:36.444 | 26/02/11 01:26:36 INFO ShutdownHookManager: Deleting directory /tmp/spark-52066b68-5724-4542-ace3-81e465d4b0c2
-2026-02-10 19:26:36.447 | 26/02/11 01:26:36 INFO ShutdownHookManager: Deleting directory /tmp/spark-8f0c0949-02ec-43e6-94a2-eda5565c8345
-2026-02-10 19:26:36.450 | 26/02/11 01:26:36 INFO ShutdownHookManager: Deleting directory /tmp/spark-0bb4a5ed-9cdc-4ebd-ac79-2045eab33cfa
-2026-02-10 19:26:36.453 | 26/02/11 01:26:36 INFO ShutdownHookManager: Deleting directory /tmp/artifacts-4057aa6d-341d-4203-9717-999011b0261c
-2026-02-10 19:26:36.456 | 26/02/11 01:26:36 INFO ShutdownHookManager: Deleting directory /tmp/spark-c035d3dd-0075-4cd5-b6ee-7a53a4fd50ac
-2026-02-10 19:26:36.459 | 26/02/11 01:26:36 INFO ShutdownHookManager: Deleting directory /var/data/spark-ca9f9983-3094-471a-b802-227f93c14ff5/spark-ad7befc6-da38-4ce3-ae7c-df288ed0cc2f
-2026-02-10 19:26:36.467 | 26/02/11 01:26:36 INFO MetricsSystemImpl: Stopping s3a-file-system metrics system...
-2026-02-10 19:26:36.467 | 26/02/11 01:26:36 INFO MetricsSystemImpl: s3a-file-system metrics system stopped.
-2026-02-10 19:26:36.468 | 26/02/11 01:26:36 INFO MetricsSystemImpl: s3a-file-system metrics system shutdown complete.
+2026-02-10 19:42:25.085 | WARNING: Using incubator modules: jdk.incubator.vector
+2026-02-10 19:42:26.285 | Files local:///app/repo/k3s/spark/ingestion/ingestion_main.py from /app/.worktrees/87d0237aba9f6a0c2b4fd88b68cf91925093612a/k3s/spark/ingestion/ingestion_main.py to /opt/spark/work-dir/ingestion_main.py
+2026-02-10 19:42:26.360 | 26/02/11 01:42:26 WARN NativeCodeLoader: Unable to load native-hadoop library for your platform... using builtin-java classes where applicable
+2026-02-10 19:42:27.159 | 2026-02-11 01:42:27,158 - SparkIngestRaw - DEBUG - Parameters retrieved from /app/repo/k3s/params.yaml
+2026-02-10 19:42:27.542 | 2026-02-11 01:42:27,542 - SparkIngestRaw - INFO - S3 connection verified. Buckets: ['frontend-crm-bucket', 'k8s-mlops-platform-bucket']
+2026-02-10 19:42:27.929 | Using Spark's default log4j profile: org/apache/spark/log4j2-defaults.properties
+2026-02-10 19:42:27.933 | 26/02/11 01:42:27 INFO SparkContext: Running Spark version 4.0.1
+2026-02-10 19:42:27.935 | 26/02/11 01:42:27 INFO SparkContext: OS info Linux, 6.6.87.2-microsoft-standard-WSL2, amd64
+2026-02-10 19:42:27.936 | 26/02/11 01:42:27 INFO SparkContext: Java version 17.0.17
+2026-02-10 19:42:27.958 | 26/02/11 01:42:27 INFO ResourceUtils: ==============================================================
+2026-02-10 19:42:27.958 | 26/02/11 01:42:27 INFO ResourceUtils: No custom resources configured for spark.driver.
+2026-02-10 19:42:27.958 | 26/02/11 01:42:27 INFO ResourceUtils: ==============================================================
+2026-02-10 19:42:27.959 | 26/02/11 01:42:27 INFO SparkContext: Submitted application: spark-preprocessing
+2026-02-10 19:42:27.986 | 26/02/11 01:42:27 INFO ResourceProfile: Default ResourceProfile created, executor resources: Map(cores -> name: cores, amount: 6, script: , vendor: , memory -> name: memory, amount: 4096, script: , vendor: , offHeap -> name: offHeap, amount: 0, script: , vendor: ), task resources: Map(cpus -> name: cpus, amount: 1.0)
+2026-02-10 19:42:27.990 | 26/02/11 01:42:27 INFO ResourceProfile: Limiting resource is cpus at 6 tasks per executor
+2026-02-10 19:42:27.992 | 26/02/11 01:42:27 INFO ResourceProfileManager: Added ResourceProfile id: 0
+2026-02-10 19:42:28.026 | 26/02/11 01:42:28 INFO SecurityManager: Changing view acls to: spark
+2026-02-10 19:42:28.027 | 26/02/11 01:42:28 INFO SecurityManager: Changing modify acls to: spark
+2026-02-10 19:42:28.028 | 26/02/11 01:42:28 INFO SecurityManager: Changing view acls groups to: spark
+2026-02-10 19:42:28.028 | 26/02/11 01:42:28 INFO SecurityManager: Changing modify acls groups to: spark
+2026-02-10 19:42:28.030 | 26/02/11 01:42:28 INFO SecurityManager: SecurityManager: authentication disabled; ui acls disabled; users with view permissions: spark groups with view permissions: EMPTY; users with modify permissions: spark; groups with modify permissions: EMPTY; RPC SSL disabled
+2026-02-10 19:42:28.207 | 26/02/11 01:42:28 INFO Utils: Successfully started service 'sparkDriver' on port 7078.
+2026-02-10 19:42:28.233 | 26/02/11 01:42:28 INFO SparkEnv: Registering MapOutputTracker
+2026-02-10 19:42:28.244 | 26/02/11 01:42:28 INFO SparkEnv: Registering BlockManagerMaster
+2026-02-10 19:42:28.257 | 26/02/11 01:42:28 INFO BlockManagerMasterEndpoint: Using org.apache.spark.storage.DefaultTopologyMapper for getting topology information
+2026-02-10 19:42:28.258 | 26/02/11 01:42:28 INFO BlockManagerMasterEndpoint: BlockManagerMasterEndpoint up
+2026-02-10 19:42:28.260 | 26/02/11 01:42:28 INFO SparkEnv: Registering BlockManagerMasterHeartbeat
+2026-02-10 19:42:28.277 | 26/02/11 01:42:28 INFO DiskBlockManager: Created local directory at /var/data/spark-c8dd9337-2ad2-4178-a19b-52337f2ba598/blockmgr-8cb32f1c-3285-4e29-b2c8-1275388d73fe
+2026-02-10 19:42:28.296 | 26/02/11 01:42:28 INFO SparkEnv: Registering OutputCommitCoordinator
+2026-02-10 19:42:28.400 | 26/02/11 01:42:28 INFO JettyUtils: Start Jetty 0.0.0.0:4040 for SparkUI
+2026-02-10 19:42:28.478 | 26/02/11 01:42:28 INFO Utils: Successfully started service 'SparkUI' on port 4040.
+2026-02-10 19:42:28.514 | 26/02/11 01:42:28 WARN SparkContext: File with 'local' scheme local:/app/repo/k3s/spark/ingestion/ingestion_main.py is not supported to add to file server, since it is already available on every node.
+2026-02-10 19:42:28.539 | 26/02/11 01:42:28 INFO SecurityManager: Changing view acls to: spark
+2026-02-10 19:42:28.539 | 26/02/11 01:42:28 INFO SecurityManager: Changing modify acls to: spark
+2026-02-10 19:42:28.539 | 26/02/11 01:42:28 INFO SecurityManager: Changing view acls groups to: spark
+2026-02-10 19:42:28.540 | 26/02/11 01:42:28 INFO SecurityManager: Changing modify acls groups to: spark
+2026-02-10 19:42:28.540 | 26/02/11 01:42:28 INFO SecurityManager: SecurityManager: authentication disabled; ui acls disabled; users with view permissions: spark groups with view permissions: EMPTY; users with modify permissions: spark; groups with modify permissions: EMPTY; RPC SSL disabled
+2026-02-10 19:42:28.585 | 26/02/11 01:42:28 INFO SparkKubernetesClientFactory: Auto-configuring K8S client using current context from users K8S config file
+2026-02-10 19:42:29.722 | 26/02/11 01:42:29 INFO ExecutorPodsAllocator: Going to request 2 executors from Kubernetes for ResourceProfile Id: 0, target: 2, known: 0, sharedSlotFromPendingPods: 2147483647.
+2026-02-10 19:42:29.773 | 26/02/11 01:42:29 INFO KubernetesClientUtils: Spark configuration files loaded from Some(/opt/spark/conf) : spark.kubernetes.namespace
+2026-02-10 19:42:29.965 | 26/02/11 01:42:29 INFO ExecutorPodsAllocator: Found 0 reusable PVCs from 0 PVCs
+2026-02-10 19:42:30.002 | 26/02/11 01:42:30 INFO KubernetesClientUtils: Spark configuration files loaded from Some(/opt/spark/conf) : spark.kubernetes.namespace
+2026-02-10 19:42:30.003 | 26/02/11 01:42:30 INFO Utils: Successfully started service 'org.apache.spark.network.netty.NettyBlockTransferService' on port 7079.
+2026-02-10 19:42:30.007 | 26/02/11 01:42:30 INFO NettyBlockTransferService: Server created on spark-ingestion-0-driver-svc.spark.svc 10.1.10.126:7079
+2026-02-10 19:42:30.008 | 26/02/11 01:42:30 INFO BlockManager: Using org.apache.spark.storage.RandomBlockReplicationPolicy for block replication policy
+2026-02-10 19:42:30.011 | 26/02/11 01:42:30 INFO BasicExecutorFeatureStep: Decommissioning not enabled, skipping shutdown script
+2026-02-10 19:42:30.020 | 26/02/11 01:42:30 INFO BlockManagerMaster: Registering BlockManager BlockManagerId(driver, spark-ingestion-0-driver-svc.spark.svc, 7079, None)
+2026-02-10 19:42:30.025 | 26/02/11 01:42:30 INFO BlockManagerMasterEndpoint: Registering block manager spark-ingestion-0-driver-svc.spark.svc:7079 with 1048.8 MiB RAM, BlockManagerId(driver, spark-ingestion-0-driver-svc.spark.svc, 7079, None)
+2026-02-10 19:42:30.027 | 26/02/11 01:42:30 INFO BlockManagerMaster: Registered BlockManager BlockManagerId(driver, spark-ingestion-0-driver-svc.spark.svc, 7079, None)
+2026-02-10 19:42:30.028 | 26/02/11 01:42:30 INFO BlockManager: Initialized BlockManager: BlockManagerId(driver, spark-ingestion-0-driver-svc.spark.svc, 7079, None)
+2026-02-10 19:42:30.084 | 26/02/11 01:42:30 INFO KubernetesClientUtils: Spark configuration files loaded from Some(/opt/spark/conf) : spark.kubernetes.namespace
+2026-02-10 19:42:30.086 | 26/02/11 01:42:30 INFO BasicExecutorFeatureStep: Decommissioning not enabled, skipping shutdown script
+2026-02-10 19:42:35.323 | 26/02/11 01:42:35 INFO KubernetesClusterSchedulerBackend$KubernetesDriverEndpoint: Registered executor NettyRpcEndpointRef(spark-client://Executor) (10.1.10.127:51002) with ID 1, ResourceProfileId 0
+2026-02-10 19:42:35.438 | 26/02/11 01:42:35 INFO BlockManagerMasterEndpoint: Registering block manager 10.1.10.127:40235 with 2.2 GiB RAM, BlockManagerId(1, 10.1.10.127, 40235, None)
+2026-02-10 19:42:59.691 | 26/02/11 01:42:59 INFO KubernetesClusterSchedulerBackend: SchedulerBackend is ready for scheduling beginning after waiting maxRegisteredResourcesWaitingTime: 30000.0(ms)
+2026-02-10 19:43:01.314 | 2026-02-11 01:43:01,314 - SparkIngestRaw - INFO - SparkSession created (Iceberg catalog at s3a://k8s-mlops-platform-bucket/warehouse)
+2026-02-10 19:43:01.376 | 26/02/11 01:43:01 INFO SharedState: Setting hive.metastore.warehouse.dir ('null') to the value of spark.sql.warehouse.dir.
+2026-02-10 19:43:01.384 | 26/02/11 01:43:01 INFO SharedState: Warehouse path is 'file:/opt/spark/work-dir/spark-warehouse'.
+2026-02-10 19:43:02.196 | 26/02/11 01:43:02 WARN MetricsConfig: Cannot locate configuration: tried hadoop-metrics2-s3a-file-system.properties,hadoop-metrics2.properties
+2026-02-10 19:43:02.205 | 26/02/11 01:43:02 INFO MetricsSystemImpl: Scheduled Metric snapshot period at 10 second(s).
+2026-02-10 19:43:02.205 | 26/02/11 01:43:02 INFO MetricsSystemImpl: s3a-file-system metrics system started
+2026-02-10 19:43:03.799 | 26/02/11 01:43:03 INFO HadoopFSUtils: Listing s3a://k8s-mlops-platform-bucket/raw with listFiles API
+2026-02-10 19:43:03.921 | 26/02/11 01:43:03 INFO InMemoryFileIndex: It took 129 ms to list leaf files for 1 paths.
+2026-02-10 19:43:04.411 | 26/02/11 01:43:04 INFO FileSourceStrategy: Pushed Filters: 
+2026-02-10 19:43:04.415 | 26/02/11 01:43:04 INFO FileSourceStrategy: Post-Scan Filters: Set()
+2026-02-10 19:43:04.739 | 26/02/11 01:43:04 INFO CodeGenerator: Code generated in 180.823209 ms
+2026-02-10 19:43:04.763 | 26/02/11 01:43:04 INFO MemoryStore: MemoryStore started with capacity 1048.8 MiB
+2026-02-10 19:43:04.791 | 26/02/11 01:43:04 INFO MemoryStore: Block broadcast_0 stored as values in memory (estimated size 239.7 KiB, free 1048.6 MiB)
+2026-02-10 19:43:04.832 | 26/02/11 01:43:04 INFO MemoryStore: Block broadcast_0_piece0 stored as bytes in memory (estimated size 41.9 KiB, free 1048.5 MiB)
+2026-02-10 19:43:04.839 | 26/02/11 01:43:04 INFO SparkContext: Created broadcast 0 from javaToPython at NativeMethodAccessorImpl.java:0
+2026-02-10 19:43:04.854 | 26/02/11 01:43:04 INFO FileSourceScanExec: Planning scan with bin packing, max size: 4194304 bytes, open cost is considered as scanning 4194304 bytes.
+2026-02-10 19:43:04.943 | 2026-02-11 01:43:04,943 - SparkIngestRaw - INFO - Loaded raw DF | partitions=5
+2026-02-10 19:43:05.154 | {"ts": "2026-02-11 01:43:05.109", "level": "ERROR", "logger": "DataFrameQueryContextLogger", "msg": "[DATATYPE_MISMATCH.UNEXPECTED_INPUT_TYPE] Cannot resolve \"from_unixtime(timestamp, yyyy-MM-dd HH:mm:ss)\" due to data type mismatch: The first parameter requires the \"BIGINT\" type, however \"timestamp\" has the type \"TIMESTAMP\". SQLSTATE: 42K09", "context": {"file": "java.base/jdk.internal.reflect.NativeMethodAccessorImpl.invoke0(Native Method)", "line": "", "fragment": "from_unixtime", "errorClass": "DATATYPE_MISMATCH.UNEXPECTED_INPUT_TYPE"}, "exception": {"class": "Py4JJavaError", "msg": "An error occurred while calling o92.withColumn.\n: org.apache.spark.sql.AnalysisException: [DATATYPE_MISMATCH.UNEXPECTED_INPUT_TYPE] Cannot resolve \"from_unixtime(timestamp, yyyy-MM-dd HH:mm:ss)\" due to data type mismatch: The first parameter requires the \"BIGINT\" type, however \"timestamp\" has the type \"TIMESTAMP\". SQLSTATE: 42K09;\n'Project [src_port#0L, dst_port#1L, protocol#2, packet_count#3L, conn_state#4, bytes_transferred#5, 'to_timestamp(from_unixtime(timestamp#6, yyyy-MM-dd HH:mm:ss, Some(Etc/UTC))) AS timestamp#9, attack#7L]\n+- Relation [src_port#0L,dst_port#1L,protocol#2,packet_count#3L,conn_state#4,bytes_transferred#5,timestamp#6,attack#7L] parquet\n\n\tat org.apache.spark.sql.catalyst.analysis.package$AnalysisErrorAt.dataTypeMismatch(package.scala:77)\n\tat org.apache.spark.sql.catalyst.analysis.package$AnalysisErrorAt.dataTypeMismatch(package.scala:70)\n\tat org.apache.spark.sql.catalyst.analysis.CheckAnalysis.$anonfun$checkAnalysis0$7(CheckAnalysis.scala:420)\n\tat org.apache.spark.sql.catalyst.analysis.CheckAnalysis.$anonfun$checkAnalysis0$7$adapted(CheckAnalysis.scala:402)\n\tat org.apache.spark.sql.catalyst.trees.TreeNode.foreachUp(TreeNode.scala:252)\n\tat org.apache.spark.sql.catalyst.trees.TreeNode.$anonfun$foreachUp$1(TreeNode.scala:251)\n\tat org.apache.spark.sql.catalyst.trees.TreeNode.$anonfun$foreachUp$1$adapted(TreeNode.scala:251)\n\tat scala.collection.IterableOnceOps.foreach(IterableOnce.scala:619)\n\tat scala.collection.IterableOnceOps.foreach$(IterableOnce.scala:617)\n\tat scala.collection.AbstractIterable.foreach(Iterable.scala:935)\n\tat org.apache.spark.sql.catalyst.trees.TreeNode.foreachUp(TreeNode.scala:251)\n\tat org.apache.spark.sql.catalyst.trees.TreeNode.$anonfun$foreachUp$1(TreeNode.scala:251)\n\tat org.apache.spark.sql.catalyst.trees.TreeNode.$anonfun$foreachUp$1$adapted(TreeNode.scala:251)\n\tat scala.collection.immutable.Vector.foreach(Vector.scala:2125)\n\tat org.apache.spark.sql.catalyst.trees.TreeNode.foreachUp(TreeNode.scala:251)\n\tat org.apache.spark.sql.catalyst.analysis.CheckAnalysis.$anonfun$checkAnalysis0$6(CheckAnalysis.scala:402)\n\tat org.apache.spark.sql.catalyst.analysis.CheckAnalysis.$anonfun$checkAnalysis0$6$adapted(CheckAnalysis.scala:402)\n\tat scala.collection.immutable.List.foreach(List.scala:334)\n\tat org.apache.spark.sql.catalyst.analysis.CheckAnalysis.$anonfun$checkAnalysis0$2(CheckAnalysis.scala:402)\n\tat org.apache.spark.sql.catalyst.analysis.CheckAnalysis.$anonfun$checkAnalysis0$2$adapted(CheckAnalysis.scala:284)\n\tat org.apache.spark.sql.catalyst.trees.TreeNode.foreachUp(TreeNode.scala:252)\n\tat org.apache.spark.sql.catalyst.analysis.CheckAnalysis.checkAnalysis0(CheckAnalysis.scala:284)\n\tat org.apache.spark.sql.catalyst.analysis.CheckAnalysis.checkAnalysis0$(CheckAnalysis.scala:255)\n\tat org.apache.spark.sql.catalyst.analysis.Analyzer.checkAnalysis0(Analyzer.scala:299)\n\tat org.apache.spark.sql.catalyst.analysis.CheckAnalysis.checkAnalysis(CheckAnalysis.scala:244)\n\tat org.apache.spark.sql.catalyst.analysis.CheckAnalysis.checkAnalysis$(CheckAnalysis.scala:231)\n\tat org.apache.spark.sql.catalyst.analysis.Analyzer.checkAnalysis(Analyzer.scala:299)\n\tat org.apache.spark.sql.catalyst.analysis.resolver.HybridAnalyzer.$anonfun$resolveInFixedPoint$1(HybridAnalyzer.scala:192)\n\tat scala.runtime.java8.JFunction0$mcV$sp.apply(JFunction0$mcV$sp.scala:18)\n\tat org.apache.spark.sql.catalyst.QueryPlanningTracker$.withTracker(QueryPlanningTracker.scala:89)\n\tat org.apache.spark.sql.catalyst.analysis.resolver.HybridAnalyzer.resolveInFixedPoint(HybridAnalyzer.scala:192)\n\tat org.apache.spark.sql.catalyst.analysis.resolver.HybridAnalyzer.$anonfun$apply$1(HybridAnalyzer.scala:76)\n\tat org.apache.spark.sql.catalyst.analysis.resolver.HybridAnalyzer.withTrackedAnalyzerBridgeState(HybridAnalyzer.scala:111)\n\tat org.apache.spark.sql.catalyst.analysis.resolver.HybridAnalyzer.apply(HybridAnalyzer.scala:71)\n\tat org.apache.spark.sql.catalyst.analysis.Analyzer.$anonfun$executeAndCheck$1(Analyzer.scala:330)\n\tat org.apache.spark.sql.catalyst.plans.logical.AnalysisHelper$.markInAnalyzer(AnalysisHelper.scala:423)\n\tat org.apache.spark.sql.catalyst.analysis.Analyzer.executeAndCheck(Analyzer.scala:330)\n\tat org.apache.spark.sql.execution.QueryExecution.$anonfun$lazyAnalyzed$2(QueryExecution.scala:110)\n\tat org.apache.spark.sql.catalyst.QueryPlanningTracker.measurePhase(QueryPlanningTracker.scala:148)\n\tat org.apache.spark.sql.execution.QueryExecution.$anonfun$executePhase$2(QueryExecution.scala:278)\n\tat org.apache.spark.sql.execution.QueryExecution$.withInternalError(QueryExecution.scala:654)\n\tat org.apache.spark.sql.execution.QueryExecution.$anonfun$executePhase$1(QueryExecution.scala:278)\n\tat org.apache.spark.sql.SparkSession.withActive(SparkSession.scala:804)\n\tat org.apache.spark.sql.execution.QueryExecution.executePhase(QueryExecution.scala:277)\n\tat org.apache.spark.sql.execution.QueryExecution.$anonfun$lazyAnalyzed$1(QueryExecution.scala:110)\n\tat scala.util.Try$.apply(Try.scala:217)\n\tat org.apache.spark.util.Utils$.doTryWithCallerStacktrace(Utils.scala:1378)\n\tat org.apache.spark.util.Utils$.getTryWithCallerStacktrace(Utils.scala:1439)\n\tat org.apache.spark.util.LazyTry.get(LazyTry.scala:58)\n\tat org.apache.spark.sql.execution.QueryExecution.analyzed(QueryExecution.scala:121)\n\tat org.apache.spark.sql.execution.QueryExecution.assertAnalyzed(QueryExecution.scala:80)\n\tat org.apache.spark.sql.classic.Dataset$.$anonfun$ofRows$1(Dataset.scala:115)\n\tat org.apache.spark.sql.SparkSession.withActive(SparkSession.scala:804)\n\tat org.apache.spark.sql.classic.Dataset$.ofRows(Dataset.scala:113)\n\tat org.apache.spark.sql.classic.Dataset.withPlan(Dataset.scala:2263)\n\tat org.apache.spark.sql.classic.Dataset.withColumns(Dataset.scala:1283)\n\tat org.apache.spark.sql.classic.Dataset.withColumns(Dataset.scala:232)\n\tat org.apache.spark.sql.Dataset.withColumn(Dataset.scala:2187)\n\tat org.apache.spark.sql.classic.Dataset.withColumn(Dataset.scala:1819)\n\tat java.base/jdk.internal.reflect.NativeMethodAccessorImpl.invoke0(Native Method)\n\tat java.base/jdk.internal.reflect.NativeMethodAccessorImpl.invoke(NativeMethodAccessorImpl.java:77)\n\tat java.base/jdk.internal.reflect.DelegatingMethodAccessorImpl.invoke(DelegatingMethodAccessorImpl.java:43)\n\tat java.base/java.lang.reflect.Method.invoke(Method.java:569)\n\tat py4j.reflection.MethodInvoker.invoke(MethodInvoker.java:244)\n\tat py4j.reflection.ReflectionEngine.invoke(ReflectionEngine.java:374)\n\tat py4j.Gateway.invoke(Gateway.java:282)\n\tat py4j.commands.AbstractCommand.invokeMethod(AbstractCommand.java:132)\n\tat py4j.commands.CallCommand.execute(CallCommand.java:79)\n\tat py4j.ClientServerConnection.waitForCommands(ClientServerConnection.java:184)\n\tat py4j.ClientServerConnection.run(ClientServerConnection.java:108)\n\tat java.base/java.lang.Thread.run(Thread.java:840)\n\tSuppressed: org.apache.spark.util.Utils$OriginalTryStackTraceException: Full stacktrace of original doTryWithCallerStacktrace caller\n\t\tat org.apache.spark.sql.catalyst.analysis.package$AnalysisErrorAt.dataTypeMismatch(package.scala:77)\n\t\tat org.apache.spark.sql.catalyst.analysis.package$AnalysisErrorAt.dataTypeMismatch(package.scala:70)\n\t\tat org.apache.spark.sql.catalyst.analysis.CheckAnalysis.$anonfun$checkAnalysis0$7(CheckAnalysis.scala:420)\n\t\tat org.apache.spark.sql.catalyst.analysis.CheckAnalysis.$anonfun$checkAnalysis0$7$adapted(CheckAnalysis.scala:402)\n\t\tat org.apache.spark.sql.catalyst.trees.TreeNode.foreachUp(TreeNode.scala:252)\n\t\tat org.apache.spark.sql.catalyst.trees.TreeNode.$anonfun$foreachUp$1(TreeNode.scala:251)\n\t\tat org.apache.spark.sql.catalyst.trees.TreeNode.$anonfun$foreachUp$1$adapted(TreeNode.scala:251)\n\t\tat scala.collection.IterableOnceOps.foreach(IterableOnce.scala:619)\n\t\tat scala.collection.IterableOnceOps.foreach$(IterableOnce.scala:617)\n\t\tat scala.collection.AbstractIterable.foreach(Iterable.scala:935)\n\t\tat org.apache.spark.sql.catalyst.trees.TreeNode.foreachUp(TreeNode.scala:251)\n\t\tat org.apache.spark.sql.catalyst.trees.TreeNode.$anonfun$foreachUp$1(TreeNode.scala:251)\n\t\tat org.apache.spark.sql.catalyst.trees.TreeNode.$anonfun$foreachUp$1$adapted(TreeNode.scala:251)\n\t\tat scala.collection.immutable.Vector.foreach(Vector.scala:2125)\n\t\tat org.apache.spark.sql.catalyst.trees.TreeNode.foreachUp(TreeNode.scala:251)\n\t\tat org.apache.spark.sql.catalyst.analysis.CheckAnalysis.$anonfun$checkAnalysis0$6(CheckAnalysis.scala:402)\n\t\tat org.apache.spark.sql.catalyst.analysis.CheckAnalysis.$anonfun$checkAnalysis0$6$adapted(CheckAnalysis.scala:402)\n\t\tat scala.collection.immutable.List.foreach(List.scala:334)\n\t\tat org.apache.spark.sql.catalyst.analysis.CheckAnalysis.$anonfun$checkAnalysis0$2(CheckAnalysis.scala:402)\n\t\tat org.apache.spark.sql.catalyst.analysis.CheckAnalysis.$anonfun$checkAnalysis0$2$adapted(CheckAnalysis.scala:284)\n\t\tat org.apache.spark.sql.catalyst.trees.TreeNode.foreachUp(TreeNode.scala:252)\n\t\tat org.apache.spark.sql.catalyst.analysis.CheckAnalysis.checkAnalysis0(CheckAnalysis.scala:284)\n\t\tat org.apache.spark.sql.catalyst.analysis.CheckAnalysis.checkAnalysis0$(CheckAnalysis.scala:255)\n\t\tat org.apache.spark.sql.catalyst.analysis.Analyzer.checkAnalysis0(Analyzer.scala:299)\n\t\tat org.apache.spark.sql.catalyst.analysis.CheckAnalysis.checkAnalysis(CheckAnalysis.scala:244)\n\t\tat org.apache.spark.sql.catalyst.analysis.CheckAnalysis.checkAnalysis$(CheckAnalysis.scala:231)\n\t\tat org.apache.spark.sql.catalyst.analysis.Analyzer.checkAnalysis(Analyzer.scala:299)\n\t\tat org.apache.spark.sql.catalyst.analysis.resolver.HybridAnalyzer.$anonfun$resolveInFixedPoint$1(HybridAnalyzer.scala:192)\n\t\tat scala.runtime.java8.JFunction0$mcV$sp.apply(JFunction0$mcV$sp.scala:18)\n\t\tat org.apache.spark.sql.catalyst.QueryPlanningTracker$.withTracker(QueryPlanningTracker.scala:89)\n\t\tat org.apache.spark.sql.catalyst.analysis.resolver.HybridAnalyzer.resolveInFixedPoint(HybridAnalyzer.scala:192)\n\t\tat org.apache.spark.sql.catalyst.analysis.resolver.HybridAnalyzer.$anonfun$apply$1(HybridAnalyzer.scala:76)\n\t\tat org.apache.spark.sql.catalyst.analysis.resolver.HybridAnalyzer.withTrackedAnalyzerBridgeState(HybridAnalyzer.scala:111)\n\t\tat org.apache.spark.sql.catalyst.analysis.resolver.HybridAnalyzer.apply(HybridAnalyzer.scala:71)\n\t\tat org.apache.spark.sql.catalyst.analysis.Analyzer.$anonfun$executeAndCheck$1(Analyzer.scala:330)\n\t\tat org.apache.spark.sql.catalyst.plans.logical.AnalysisHelper$.markInAnalyzer(AnalysisHelper.scala:423)\n\t\tat org.apache.spark.sql.catalyst.analysis.Analyzer.executeAndCheck(Analyzer.scala:330)\n\t\tat org.apache.spark.sql.execution.QueryExecution.$anonfun$lazyAnalyzed$2(QueryExecution.scala:110)\n\t\tat org.apache.spark.sql.catalyst.QueryPlanningTracker.measurePhase(QueryPlanningTracker.scala:148)\n\t\tat org.apache.spark.sql.execution.QueryExecution.$anonfun$executePhase$2(QueryExecution.scala:278)\n\t\tat org.apache.spark.sql.execution.QueryExecution$.withInternalError(QueryExecution.scala:654)\n\t\tat org.apache.spark.sql.execution.QueryExecution.$anonfun$executePhase$1(QueryExecution.scala:278)\n\t\tat org.apache.spark.sql.SparkSession.withActive(SparkSession.scala:804)\n\t\tat org.apache.spark.sql.execution.QueryExecution.executePhase(QueryExecution.scala:277)\n\t\tat org.apache.spark.sql.execution.QueryExecution.$anonfun$lazyAnalyzed$1(QueryExecution.scala:110)\n\t\tat scala.util.Try$.apply(Try.scala:217)\n\t\tat org.apache.spark.util.Utils$.doTryWithCallerStacktrace(Utils.scala:1378)\n\t\tat org.apache.spark.util.LazyTry.tryT$lzycompute(LazyTry.scala:46)\n\t\tat org.apache.spark.util.LazyTry.tryT(LazyTry.scala:46)\n\t\t... 23 more\n", "stacktrace": [{"class": null, "method": "deco", "file": "/opt/spark/python/lib/pyspark.zip/pyspark/errors/exceptions/captured.py", "line": "282"}, {"class": null, "method": "get_return_value", "file": "/opt/spark/python/lib/py4j-0.10.9.9-src.zip/py4j/protocol.py", "line": "327"}]}}
+2026-02-10 19:43:05.167 | 2026-02-11 01:43:05,154 - SparkIngestRaw - ERROR - Ingest job failed
+2026-02-10 19:43:05.167 | Traceback (most recent call last):
+2026-02-10 19:43:05.167 |   File "/app/repo/k3s/spark/ingestion/ingestion_main.py", line 136, in main
+2026-02-10 19:43:05.167 |     df_final = job.build_final_df(df_raw)  # Ordena solo lo recién leído
+2026-02-10 19:43:05.167 |                ^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-02-10 19:43:05.167 |   File "/app/repo/k3s/spark/ingestion/ingestion_main.py", line 109, in build_final_df
+2026-02-10 19:43:05.167 |     df_with_ts = df.withColumn("timestamp", F.to_timestamp(F.from_unixtime(F.col("timestamp"))))
+2026-02-10 19:43:05.167 |                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-02-10 19:43:05.167 |   File "/opt/spark/python/lib/pyspark.zip/pyspark/sql/classic/dataframe.py", line 1623, in withColumn
+2026-02-10 19:43:05.167 |     return DataFrame(self._jdf.withColumn(colName, col._jc), self.sparkSession)
+2026-02-10 19:43:05.167 |                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-02-10 19:43:05.167 |   File "/opt/spark/python/lib/py4j-0.10.9.9-src.zip/py4j/java_gateway.py", line 1362, in __call__
+2026-02-10 19:43:05.167 |     return_value = get_return_value(
+2026-02-10 19:43:05.167 |                    ^^^^^^^^^^^^^^^^^
+2026-02-10 19:43:05.167 |   File "/opt/spark/python/lib/pyspark.zip/pyspark/errors/exceptions/captured.py", line 288, in deco
+2026-02-10 19:43:05.167 |     raise converted from None
+2026-02-10 19:43:05.167 | pyspark.errors.exceptions.captured.AnalysisException: [DATATYPE_MISMATCH.UNEXPECTED_INPUT_TYPE] Cannot resolve "from_unixtime(timestamp, yyyy-MM-dd HH:mm:ss)" due to data type mismatch: The first parameter requires the "BIGINT" type, however "timestamp" has the type "TIMESTAMP". SQLSTATE: 42K09;
+2026-02-10 19:43:05.167 | 'Project [src_port#0L, dst_port#1L, protocol#2, packet_count#3L, conn_state#4, bytes_transferred#5, 'to_timestamp(from_unixtime(timestamp#6, yyyy-MM-dd HH:mm:ss, Some(Etc/UTC))) AS timestamp#9, attack#7L]
+2026-02-10 19:43:05.167 | +- Relation [src_port#0L,dst_port#1L,protocol#2,packet_count#3L,conn_state#4,bytes_transferred#5,timestamp#6,attack#7L] parquet
+2026-02-10 19:43:05.167 | 
+2026-02-10 19:43:05.167 | 2026-02-11 01:43:05,167 - SparkIngestRaw - INFO - Ingest job elapsed: 3.85s
+2026-02-10 19:43:05.167 | Traceback (most recent call last):
+2026-02-10 19:43:05.167 |   File "/app/repo/k3s/spark/ingestion/ingestion_main.py", line 147, in <module>
+2026-02-10 19:43:05.168 |     main()
+2026-02-10 19:43:05.168 |   File "/app/repo/k3s/spark/ingestion/ingestion_main.py", line 136, in main
+2026-02-10 19:43:05.168 |     df_final = job.build_final_df(df_raw)  # Ordena solo lo recién leído
+2026-02-10 19:43:05.168 |                ^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-02-10 19:43:05.168 |   File "/app/repo/k3s/spark/ingestion/ingestion_main.py", line 109, in build_final_df
+2026-02-10 19:43:05.168 |     df_with_ts = df.withColumn("timestamp", F.to_timestamp(F.from_unixtime(F.col("timestamp"))))
+2026-02-10 19:43:05.168 |                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-02-10 19:43:05.168 |   File "/opt/spark/python/lib/pyspark.zip/pyspark/sql/classic/dataframe.py", line 1623, in withColumn
+2026-02-10 19:43:05.168 |   File "/opt/spark/python/lib/py4j-0.10.9.9-src.zip/py4j/java_gateway.py", line 1362, in __call__
+2026-02-10 19:43:05.168 |   File "/opt/spark/python/lib/pyspark.zip/pyspark/errors/exceptions/captured.py", line 288, in deco
+2026-02-10 19:43:05.171 | pyspark.errors.exceptions.captured.AnalysisException: [DATATYPE_MISMATCH.UNEXPECTED_INPUT_TYPE] Cannot resolve "from_unixtime(timestamp, yyyy-MM-dd HH:mm:ss)" due to data type mismatch: The first parameter requires the "BIGINT" type, however "timestamp" has the type "TIMESTAMP". SQLSTATE: 42K09;
+2026-02-10 19:43:05.171 | 'Project [src_port#0L, dst_port#1L, protocol#2, packet_count#3L, conn_state#4, bytes_transferred#5, 'to_timestamp(from_unixtime(timestamp#6, yyyy-MM-dd HH:mm:ss, Some(Etc/UTC))) AS timestamp#9, attack#7L]
+2026-02-10 19:43:05.171 | +- Relation [src_port#0L,dst_port#1L,protocol#2,packet_count#3L,conn_state#4,bytes_transferred#5,timestamp#6,attack#7L] parquet
+2026-02-10 19:43:05.171 | 
+2026-02-10 19:43:05.297 | 26/02/11 01:43:05 INFO SparkContext: SparkContext is stopping with exitCode 0 from stop at SparkSubmit.scala:1036.
+2026-02-10 19:43:05.308 | 26/02/11 01:43:05 INFO SparkUI: Stopped Spark web UI at http://spark-ingestion-0-driver-svc.spark.svc:4040
+2026-02-10 19:43:05.312 | 26/02/11 01:43:05 INFO KubernetesClusterSchedulerBackend: Shutting down all executors
+2026-02-10 19:43:05.312 | 26/02/11 01:43:05 INFO KubernetesClusterSchedulerBackend$KubernetesDriverEndpoint: Asking each executor to shut down
+2026-02-10 19:43:05.318 | 26/02/11 01:43:05 INFO ExecutorPodsWatchSnapshotSource: Kubernetes client has been closed.
+2026-02-10 19:43:05.469 | 26/02/11 01:43:05 INFO MapOutputTrackerMasterEndpoint: MapOutputTrackerMasterEndpoint stopped!
+2026-02-10 19:43:05.486 | 26/02/11 01:43:05 INFO MemoryStore: MemoryStore cleared
+2026-02-10 19:43:05.487 | 26/02/11 01:43:05 INFO BlockManager: BlockManager stopped
+2026-02-10 19:43:05.492 | 26/02/11 01:43:05 INFO BlockManagerMaster: BlockManagerMaster stopped
+2026-02-10 19:43:05.495 | 26/02/11 01:43:05 INFO OutputCommitCoordinator$OutputCommitCoordinatorEndpoint: OutputCommitCoordinator stopped!
+2026-02-10 19:43:05.505 | 26/02/11 01:43:05 INFO SparkContext: Successfully stopped SparkContext
+2026-02-10 19:43:05.508 | 26/02/11 01:43:05 INFO ShutdownHookManager: Shutdown hook called
+2026-02-10 19:43:05.509 | 26/02/11 01:43:05 INFO ShutdownHookManager: Deleting directory /tmp/spark-22f323d7-99a3-41b5-b2a1-8b580b7df11d
+2026-02-10 19:43:05.512 | 26/02/11 01:43:05 INFO ShutdownHookManager: Deleting directory /var/data/spark-c8dd9337-2ad2-4178-a19b-52337f2ba598/spark-43119147-1fc3-459e-a465-068a99c68733
+2026-02-10 19:43:05.516 | 26/02/11 01:43:05 INFO ShutdownHookManager: Deleting directory /tmp/spark-d465444b-c01c-4aec-a6aa-b5651c050e2c
+2026-02-10 19:43:05.519 | 26/02/11 01:43:05 INFO ShutdownHookManager: Deleting directory /tmp/spark-b520c690-b570-4126-993a-e04ae799a302
+2026-02-10 19:43:05.523 | 26/02/11 01:43:05 INFO ShutdownHookManager: Deleting directory /var/data/spark-c8dd9337-2ad2-4178-a19b-52337f2ba598/spark-43119147-1fc3-459e-a465-068a99c68733/pyspark-23aceedf-e493-4916-9fac-c54bd998d65f
+2026-02-10 19:43:05.526 | 26/02/11 01:43:05 INFO ShutdownHookManager: Deleting directory /tmp/artifacts-fe110682-fc8f-460e-98d7-4a38858ff609
+2026-02-10 19:43:05.530 | 26/02/11 01:43:05 INFO ShutdownHookManager: Deleting directory /tmp/spark-43cae8c3-e56b-41cf-9fe8-a890ee1d947b
+2026-02-10 19:43:05.533 | 26/02/11 01:43:05 INFO ShutdownHookManager: Deleting directory /tmp/localPyFiles-b045e4b0-64bd-492b-be4b-239f2c47f3e8
+2026-02-10 19:43:05.542 | 26/02/11 01:43:05 INFO MetricsSystemImpl: Stopping s3a-file-system metrics system...
+2026-02-10 19:43:05.542 | 26/02/11 01:43:05 INFO MetricsSystemImpl: s3a-file-system metrics system stopped.
+2026-02-10 19:43:05.542 | 26/02/11 01:43:05 INFO MetricsSystemImpl: s3a-file-system metrics system shutdown complete.
