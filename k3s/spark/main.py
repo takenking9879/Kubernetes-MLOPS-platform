@@ -634,6 +634,10 @@ class SparkPreprocessIceberg(BaseUtils):
             
             train_start = train_cfg.get('start')
             train_end = train_cfg.get('end')
+            val_start = val_cfg.get('start')
+            val_end = val_cfg.get('end')
+            test_start = test_cfg.get('start')
+            test_end = test_cfg.get('end')
             
             # ========== OPTIMIZACIÓN CRÍTICA: LECTURA ÚNICA ==========
             self.logger.info("=" * 60)
@@ -701,6 +705,61 @@ class SparkPreprocessIceberg(BaseUtils):
                     cnt = row['count']
                     PREPROCESS_RECORDS_BY_CLASS.labels(dataset="train", **{'class': cls}).inc(cnt)
                     PREPROCESS_RECORDS_LAST_BATCH.labels(dataset="train", **{'class': cls}).set(cnt)
+
+            # ===== PROMETHEUS METRICS (val/test subsets) =====
+            if val_start and val_end:
+                val_stage_start = time.time()
+                val_start_ts = F.to_timestamp(F.lit(val_start))
+                val_end_ts = F.to_timestamp(F.lit(val_end))
+                df_val = df_full.filter(
+                    (F.col("timestamp") >= val_start_ts) &
+                    (F.col("timestamp") <= val_end_ts)
+                )
+                val_count = df_val.count()
+                val_elapsed = time.time() - val_stage_start
+                self.logger.info(f"Val subset created: {val_count} rows")
+
+                PREPROCESS_RECORDS.labels(dataset="val").inc(val_count)
+                PREPROCESS_BATCHES.labels(dataset="val").inc(1)
+                PREPROCESS_BATCH_LATENCY.labels(dataset="val").observe(val_elapsed)
+                PREPROCESS_BATCH_LATENCY_LAST.labels(dataset="val").set(val_elapsed)
+
+                for c in range(max(num_classes, 1)):
+                    PREPROCESS_RECORDS_LAST_BATCH.labels(dataset="val", **{'class': str(c)}).set(0)
+                if target_col in df_val.columns:
+                    class_counts = df_val.groupBy(target_col).count().collect()
+                    for row in class_counts:
+                        cls = str(row[target_col])
+                        cnt = row['count']
+                        PREPROCESS_RECORDS_BY_CLASS.labels(dataset="val", **{'class': cls}).inc(cnt)
+                        PREPROCESS_RECORDS_LAST_BATCH.labels(dataset="val", **{'class': cls}).set(cnt)
+
+            if test_start and test_end:
+                test_stage_start = time.time()
+                test_start_ts = F.to_timestamp(F.lit(test_start))
+                test_end_ts = F.to_timestamp(F.lit(test_end))
+                df_test = df_full.filter(
+                    (F.col("timestamp") >= test_start_ts) &
+                    (F.col("timestamp") <= test_end_ts)
+                )
+                test_count = df_test.count()
+                test_elapsed = time.time() - test_stage_start
+                self.logger.info(f"Test subset created: {test_count} rows")
+
+                PREPROCESS_RECORDS.labels(dataset="test").inc(test_count)
+                PREPROCESS_BATCHES.labels(dataset="test").inc(1)
+                PREPROCESS_BATCH_LATENCY.labels(dataset="test").observe(test_elapsed)
+                PREPROCESS_BATCH_LATENCY_LAST.labels(dataset="test").set(test_elapsed)
+
+                for c in range(max(num_classes, 1)):
+                    PREPROCESS_RECORDS_LAST_BATCH.labels(dataset="test", **{'class': str(c)}).set(0)
+                if target_col in df_test.columns:
+                    class_counts = df_test.groupBy(target_col).count().collect()
+                    for row in class_counts:
+                        cls = str(row[target_col])
+                        cnt = row['count']
+                        PREPROCESS_RECORDS_BY_CLASS.labels(dataset="test", **{'class': cls}).inc(cnt)
+                        PREPROCESS_RECORDS_LAST_BATCH.labels(dataset="test", **{'class': cls}).set(cnt)
             
             # ========== FIT PIPELINE EN TRAIN ==========
             self.logger.info("=" * 60)
