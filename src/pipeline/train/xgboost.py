@@ -31,7 +31,8 @@ def train_func(config: Dict):
     # `num_boost_round` is a top-level argument to xgboost.train, not a param.
     # Keep it out of `params` to avoid XGBoost warnings (and keep logs clean).
     num_boost_round = int(params.pop("num_boost_round", 100))
-    dtrain, dval = get_train_val_dmatrix(target)
+    feature_columns = config.get("feature_columns")
+    dtrain, dval = get_train_val_dmatrix(target, feature_columns=feature_columns)
 
     #Aqui el tiempo de entrenamiento
     start_time = time.perf_counter()
@@ -63,6 +64,7 @@ def train(
     target,
     storage_path,
     name,
+    feature_columns: Optional[List[str]] = None,
     input_dim: int = 14,  # Solo para mantener consistencia con otros entrenamientos
     num_classes: int = 6,
     xgboost_params=None,
@@ -75,6 +77,7 @@ def train(
     params = xgboost_params if xgboost_params is not None else XGBOOST_PARAMS
     config = {
         "target": target,
+        "feature_columns": feature_columns,
         "num_classes": int(num_classes),
         "xgboost_params": params,
         "cpus_per_worker": int(os.getenv("CPUS_PER_WORKER", 2)),
@@ -112,6 +115,7 @@ def train(
             ds=val_dataset,
             split="val",
             target=target,
+            feature_columns=feature_columns,
             num_classes=int(num_classes),
             booster_checkpoint=result.checkpoint,
         )
@@ -124,6 +128,7 @@ def train(
                 ds=test_dataset,
                 split="test",
                 target=target,
+                feature_columns=feature_columns,
                 num_classes=int(num_classes),
                 booster_checkpoint=result.checkpoint,
             )

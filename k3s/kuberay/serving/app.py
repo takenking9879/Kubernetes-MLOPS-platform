@@ -1,11 +1,9 @@
 import os
 import random
-import tempfile
 import time
 from dataclasses import dataclass
 from typing import Any, Dict, List, Optional, Protocol
 
-import boto3
 import yaml
 
 from ray import serve
@@ -16,10 +14,13 @@ from ray.util.metrics import Counter, Histogram
 from src.utils.logger import create_logger
 from src.utils.baseclass import BaseUtils
 
+
 @dataclass(frozen=True)
 class ModelSpec:
     framework: str
-    model_key: str
+    registry_name: str
+    alias: str
+    version: Optional[str] = None
 
 
 def load_params() -> Dict[str, Any]:
@@ -34,26 +35,7 @@ def load_params() -> Dict[str, Any]:
     return {}
 
 
-class S3Store:
-    def __init__(self, *, bucket: str, endpoint_url: Optional[str] = None):
-        self._logger = create_logger("S3Store")
-        self._bucket = bucket
-        self._client = boto3.client(
-            "s3",
-            aws_access_key_id=os.getenv("AWS_ACCESS_KEY_ID"),
-            aws_secret_access_key=os.getenv("AWS_SECRET_ACCESS_KEY"),
-            region_name=os.getenv("AWS_REGION", "us-east-2"),
-            endpoint_url=endpoint_url or os.getenv("S3_ENDPOINT_URL") or None,
-        )
-
-    def download_to_tmp(self, *, key: str, filename: str) -> str:
-        local_path = os.path.join(tempfile.gettempdir(), filename)
-        self._logger.info("Downloading s3://%s/%s -> %s", self._bucket, key, local_path)
-        self._client.download_file(self._bucket, key, local_path)
-        return local_path
-
-
-def _normalize_payload(payload: Any) -> List[Dict[str, Any]]:
+def _normalize_payload(payload: Any) -> List[List[Any]]:
     """Normalize request payload into a strict matrix.
 
     Contract: Ray Serve is schema-agnostic and does NOT accept column names.
@@ -83,84 +65,134 @@ def _normalize_payload(payload: Any) -> List[Dict[str, Any]]:
     return [list(r) for r in data]
 
 
+# ──────────────────────────────────────────────────────────────────────────────
+# MLflow Model Registry loader
+# ──────────────────────────────────────────────────────────────────────────────
+
+def _load_model_from_registry(
+    *,
+    tracking_uri: str,
+    registry_name: str,
+    alias: str,
+    framework: str,
+    logger,
+):
+    """Load a model from MLflow Model Registry using an alias (MLflow 3.x).
+
+    Returns ``(model_object, model_version_str)``.
+    """
+    import mlflow
+    from mlflow.tracking import MlflowClient
+
+    mlflow.set_tracking_uri(tracking_uri)
+    client = MlflowClient()
+
+    # Resolve alias → version
+    mv = client.get_model_version_by_alias(registry_name, alias)
+    version = str(mv.version)
+    model_uri = f"models:/{registry_name}@{alias}"
+
+    logger.info(
+        "Loading model from MLflow: %s @%s (v%s, framework=%s)",
+        registry_name, alias, version, framework,
+    )
+
+    if framework == "xgboost":
+        import mlflow.xgboost
+        model = mlflow.xgboost.load_model(model_uri)
+    elif framework == "pytorch":
+        import mlflow.pytorch
+        model = mlflow.pytorch.load_model(model_uri)
+    else:
+        raise ValueError(f"Unsupported framework for MLflow loading: {framework!r}")
+
+    logger.info("Model loaded successfully: %s @%s v%s", registry_name, alias, version)
+    return model, version
+
+
 class ModelAdapter(Protocol):
     def predict(self, data: List[List[Any]]) -> Dict[str, Any]:
         ...
 
 
 class XGBoostAdapter:
-    def __init__(self, model_path: str):
-        from src.serve.xgboost import XGBoostHandler
+    """Wraps an XGBoost Booster for serving predictions."""
 
-        self._handler = XGBoostHandler(model_path)
+    def __init__(self, model):
+        import xgboost as xgb
+        import numpy as np
+
+        self._model = model
+        self._xgb = xgb
+        self._np = np
 
     def predict(self, data: List[List[Any]]) -> Dict[str, Any]:
         if not isinstance(data, list) or any(not isinstance(r, list) for r in data):
             raise TypeError("data must be List[List]")
-        return self._handler.predict(data)
+        import pandas as pd
+
+        df = pd.DataFrame(data)
+        # Map feature names when dimensions match
+        if hasattr(self._model, "feature_names") and self._model.feature_names:
+            if len(df.columns) == len(self._model.feature_names):
+                first_col = df.columns[0]
+                is_int_col = isinstance(first_col, int) or (
+                    isinstance(first_col, str) and first_col.isdigit()
+                )
+                if is_int_col:
+                    df.columns = self._model.feature_names
+
+        dmatrix = self._xgb.DMatrix(df)
+        probs = self._model.predict(dmatrix)
+        if len(probs.shape) > 1 and probs.shape[1] > 1:
+            predictions = self._np.argmax(probs, axis=1)
+        else:
+            predictions = (probs > 0.5).astype(int)
+        return {"predictions": predictions.tolist(), "probabilities": probs.tolist()}
 
 
 class PyTorchAdapter:
-    def __init__(self, model_path: str, *, input_dim: int, num_classes: int):
-        from src.serve.pytorch import PyTorchHandler
+    """Wraps a PyTorch nn.Module for serving predictions."""
 
-        self._handler = PyTorchHandler(model_path, input_dim=input_dim, num_classes=num_classes)
+    def __init__(self, model):
+        import torch
+
+        self._model = model
+        self._torch = torch
+        self._device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        self._model.to(self._device)
+        self._model.eval()
 
     def predict(self, data: List[List[Any]]) -> Dict[str, Any]:
         if not isinstance(data, list) or any(not isinstance(r, list) for r in data):
             raise TypeError("data must be List[List]")
-        return self._handler.predict(data)
+
+        tensor_data = self._torch.tensor(data, dtype=self._torch.float32).to(self._device)
+        with self._torch.no_grad():
+            outputs = self._model(tensor_data)
+            probs = self._torch.softmax(outputs, dim=1)
+            predictions = self._torch.argmax(probs, dim=1)
+        return {
+            "predictions": predictions.cpu().numpy().tolist(),
+            "probabilities": probs.cpu().numpy().tolist(),
+        }
 
 
-class ModelFactory:
-    @staticmethod
-    def count_input_dim_from_dsl(params_path: Optional[str] = None) -> int:
-        """Count input dim (categorical + numerical) from DSL referenced in params.
-
-        This uses `BaseUtils.load_params()` so we don't duplicate YAML loading logic.
-        """
-        logger = create_logger("ModelFactory")
-        params_file = params_path or os.getenv("PARAMS_PATH", "/home/ray/app/repo/k3s/params.yaml")
-        utils = BaseUtils(logger, params_file)
-        try:
-            params = utils.load_params()
-            dsl_path = params.get('spark', {}).get('preprocessing', {}).get(
-                'dsl_path', '/app/repo/k3s/spark/preprocess/dsl_001.yaml'
-            )
-            # Resolve under /home/ray so relative paths used in cluster match container layout
-            dsl_path = os.path.join('/home/ray/', dsl_path.lstrip('/'))
-            with open(dsl_path, 'r') as f:
-                doc = yaml.safe_load(f)
-            final_features = doc.get('pipeline', {}).get('final_features', {})
-            categorical = final_features.get('categorical', []) or []
-            numerical = final_features.get('numerical', []) or []
-            return int(len(categorical) + len(numerical))
-        except Exception:
-            # Fallback to explicit input_dim in params or default 14
-            try:
-                cfg = params.get('kuberay', {}).get('model', {}) if 'params' in locals() else {}
-                return int(cfg.get('input_dim', 14))
-            except Exception:
-                return 14
-
-    @staticmethod
-    def create_adapter(framework: str, *, model_path: str, params: Dict[str, Any] = None) -> ModelAdapter:
-        fw = framework.strip().lower()
-        if fw == "xgboost":
-            return XGBoostAdapter(model_path)
-        if fw == "pytorch":
-            model_cfg = (params or {}).get("kuberay", {}).get("model", {})
-            if model_cfg.get('dsl_count_dim'):
-                input_dim = ModelFactory.count_input_dim_from_dsl()
-            else:
-                input_dim = int(model_cfg.get("input_dim", 14))
-            num_classes = int(model_cfg.get("num_classes"))
-            return PyTorchAdapter(model_path, input_dim=input_dim, num_classes=num_classes)
-        raise ValueError(f"Unsupported MODEL_FRAMEWORK={framework!r}")
+def _create_adapter(framework: str, model) -> ModelAdapter:
+    """Wrap a loaded model object into the serving adapter."""
+    fw = framework.strip().lower()
+    if fw == "xgboost":
+        return XGBoostAdapter(model)
+    if fw == "pytorch":
+        return PyTorchAdapter(model)
+    raise ValueError(f"Unsupported framework={framework!r}")
 
 
 class _ModelRuntime:
     """Shared (non-deployment) runtime.
+
+    Loads models from **MLflow Model Registry** using aliases (MLflow 3.x).
+    Each variant (stable / canary) maps to an alias (champion / challenger).
 
     IMPORTANT: Do not subclass a class decorated by @serve.deployment.
     Ray wraps deployment classes, and Python inheritance breaks with that wrapper.
@@ -169,12 +201,10 @@ class _ModelRuntime:
     def __init__(self, *, name: str, variant: str):
         self._logger = create_logger(name)
         self._variant = variant
-        self._store: Optional[S3Store] = None
         self._adapter: Optional[ModelAdapter] = None
         self._spec: Optional[ModelSpec] = None
 
         # Custom metrics exported via Ray's Prometheus endpoint (metrics-export-port).
-        # These let us break down traffic by model variant/framework (stable/canary, xgboost/pytorch).
         self._requests_total = Counter(
             "serve_infer_requests_total",
             description="Total inference requests handled by a model deployment",
@@ -192,42 +222,68 @@ class _ModelRuntime:
             tag_keys=("application", "variant", "framework"),
         )
 
-    def _load_from_config(self, config: Dict[str, Any], overrides: Optional[Dict[str, Any]] = None) -> None:
-        """Load model configuration.
+    def _load_from_config(
+        self,
+        config: Dict[str, Any],
+        overrides: Optional[Dict[str, Any]] = None,
+    ) -> None:
+        """Load model from MLflow Model Registry.
 
-        Priority order for framework/model_key:
-          1. overrides (explicit per-deployment, e.g. canary)
-          2. kuberay.serving in params.yaml
-          3. kuberay.model in params.yaml
-
-        This keeps params.yaml as source of truth but allows per-deployment
-        overrides defined under `kuberay.canary`.
+        Resolution order for ``framework`` / ``registry_name`` / ``alias``:
+          1. *overrides* (per-deployment, e.g. canary section)
+          2. ``kuberay.serving`` in params.yaml
+          3. ``kuberay.model`` in params.yaml
         """
         params = load_params()
         model_cfg = params.get("kuberay", {}).get("model", {})
         serving_cfg = params.get("kuberay", {}).get("serving", {})
         overrides = overrides or {}
-        bucket = os.getenv("S3_BUCKET_NAME", "k8s-mlops-platform-bucket")
 
-        framework = overrides.get("framework") or serving_cfg.get("framework") or model_cfg.get("framework")
+        framework = (
+            overrides.get("framework")
+            or serving_cfg.get("framework")
+            or model_cfg.get("framework")
+        )
         if not framework:
             raise RuntimeError(
-                "Missing required configuration: kuberay.serving.framework or kuberay.model.framework in params.yaml"
+                "Missing required configuration: "
+                "kuberay.serving.framework or kuberay.model.framework in params.yaml"
             )
 
-        model_key = overrides.get("model_key") or serving_cfg.get("model_key") or model_cfg.get("model_key")
-        if not model_key:
-            model_key = f"v1/models/model_{framework}.pkl"
-        self._spec = ModelSpec(framework=framework, model_key=model_key)
-
-        self._store = S3Store(bucket=bucket)
-        model_path = self._store.download_to_tmp(
-            key=self._spec.model_key,
-            filename=f"{self._variant}_{framework}.pkl",
+        tracking_uri = (
+            overrides.get("mlflow_tracking_uri")
+            or model_cfg.get("mlflow_tracking_uri")
+            or os.getenv("MLFLOW_TRACKING_URI", "http://my-mlflow")
         )
 
-        # NOTE: preprocessing lives in Spark. Serving is pure inference only.
-        self._adapter = ModelFactory.create_adapter(framework, model_path=model_path, params=params)
+        registry_name = (
+            overrides.get("mlflow_registry_model_name")
+            or model_cfg.get("mlflow_registry_model_name")
+            or serving_cfg.get("mlflow_registry_model_name")
+        )
+        if not registry_name:
+            raise RuntimeError(
+                "Missing required configuration: "
+                "kuberay.model.mlflow_registry_model_name in params.yaml"
+            )
+
+        alias = overrides.get("alias") or serving_cfg.get("alias", "champion")
+
+        model, version = _load_model_from_registry(
+            tracking_uri=tracking_uri,
+            registry_name=registry_name,
+            alias=alias,
+            framework=framework,
+            logger=self._logger,
+        )
+
+        self._spec = ModelSpec(
+            framework=framework,
+            registry_name=registry_name,
+            alias=alias,
+            version=version,
+        )
+        self._adapter = _create_adapter(framework, model)
 
         self._logger.info("Model loaded (%s): %s", self._variant, self._spec)
 
@@ -257,7 +313,9 @@ class _ModelRuntime:
         result["model"] = {
             "variant": self._variant,
             "framework": self._spec.framework,
-            "model_key": self._spec.model_key,
+            "registry": self._spec.registry_name,
+            "alias": self._spec.alias,
+            "version": self._spec.version,
         }
         return result
 

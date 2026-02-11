@@ -848,5 +848,11 @@ def main():
         artifact_set_id=artifact_set_id
     )
 
+    # Optional: keep the driver alive briefly so Prometheus can scrape final metrics.
+    grace = int(os.getenv('PROMETHEUS_GRACE_SECONDS', '0'))
+    if grace > 0:
+        job.logger.info(f"Sleeping {grace}s for Prometheus scrape grace period...")
+        time.sleep(grace)
+
 if __name__ == "__main__":
     main()

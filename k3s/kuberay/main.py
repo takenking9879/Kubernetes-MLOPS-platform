@@ -9,6 +9,9 @@ import pickle
 import subprocess
 import yaml
 import time
+import tempfile
+from pyiceberg.catalog import load_catalog
+from pyiceberg.expressions import GreaterThanOrEqual, LessThanOrEqual, And
 from urllib.parse import urlparse
 from typing import Dict, Any
 from ray.train.xgboost import RayTrainReportCallback
@@ -31,16 +34,55 @@ from src.prometheus import (
 # training loops in pytorch_utils.py/xgboost_utils.py, not via callbacks.
 
 class KubeRayTraining(BaseUtils):
-    def __init__(self, params_path: str, data_dir: str, output_dir: str):
+    def __init__(self, params_path: str, output_dir: str):
         logger = create_logger('KubeRayTraining', 'kuberay_training.log')
         super().__init__(logger, params_path)
-        self.params = self.load_params()['kuberay']['model']
+        self.params_full = self.load_params()
+        self.params = self.params_full['kuberay']['model']
         self.schema = self._load_schema_features()
-        self.data_dir = data_dir
         self.output_dir = output_dir
+        
+        # Iceberg setup
+        self.catalog = self._get_iceberg_catalog()
         
         # Start Prometheus metrics server
         self._start_prometheus_server()
+
+    def _get_iceberg_catalog(self):
+        """Initializes PyIceberg catalog using configuration from Spark/S3."""
+        warehouse = self.params_full.get('spark', {}).get('iceberg', {}).get(
+            'warehouse',
+            's3a://k8s-mlops-platform-bucket/warehouse'
+        ).replace('s3a://', 's3://')
+
+        self.logger.info(f"Initializing Iceberg catalog with warehouse: {warehouse}")
+        return load_catalog("iceberg", **{
+            "type": "hadoop",
+            "warehouse": warehouse,
+            "s3.endpoint": os.environ.get("S3_ENDPOINT", "http://minio:9000"),
+            "s3.access-key-id": os.environ.get("AWS_ACCESS_KEY_ID"),
+            "s3.secret-access-key": os.environ.get("AWS_SECRET_ACCESS_KEY"),
+            "s3.region": os.environ.get("AWS_REGION", "us-east-2"),
+        })
+
+    def _get_latest_artifact_set_id(self):
+        """Retrieves the latest artifact_set_id from the metadata table."""
+        try:
+            meta_cfg = self.params_full.get('iceberg_tables', {}).get('metadata', {})
+            # Identifier for pyiceberg (removing the catalog prefix)
+            identifier = f"{meta_cfg.get('namespace', 'metadata')}.{meta_cfg.get('table', 'preprocessing_artifacts')}"
+            
+            table = self.catalog.load_table(identifier)
+            df = table.scan().to_pandas()
+            if df.empty:
+                return None
+            
+            latest = df.sort_values('created_at', ascending=False).iloc[0]
+            self.logger.info(f"Latest artifact_set_id found in metadata: {latest['artifact_set_id']}")
+            return latest['artifact_set_id']
+        except Exception as e:
+            self.logger.warning(f"Could not find latest artifact_set_id from metadata: {e}")
+            return None
     
     def _start_prometheus_server(self):
         """Start Prometheus metrics HTTP server on port 8002."""
@@ -78,23 +120,40 @@ class KubeRayTraining(BaseUtils):
             self.logger.error('Minio connection failed: %s', str(e), exc_info=True)
             raise
     
-    def _load_data(self, path: str):
+    def _load_data(self, split: str, table_name: str):
+        """Loads a specific split from Iceberg using timestamp ranges from params.yaml."""
         try:
-            ds = ray.data.read_parquet(path, override_num_blocks=self.params.get('num_data_blocks', None))
+            split_cfg = self.params_full.get('splits', {}).get(split, {})
+            start_ts = split_cfg.get('start')
+            end_ts = split_cfg.get('end')
+
+            row_filter = None
+            if start_ts and end_ts:
+                self.logger.info(f"Loading {split} split from {table_name} ({start_ts} to {end_ts})")
+                row_filter = And(
+                    GreaterThanOrEqual("timestamp", start_ts),
+                    LessThanOrEqual("timestamp", end_ts)
+                )
+            else:
+                self.logger.warning(f"No valid split configuration for {split}. Loading all data.")
+
+            ds = ray.data.read_iceberg(
+                table_name,
+                catalog=self.catalog,
+                row_filter=row_filter
+            )
             
             # Senior validation before heavy processing
             self._validate_schema(ds)
 
             # Senior Optimization: Materialize data in the Object Store once.
-            # This avoids re-scanning S3/Parquet files during each epoch of training.
-            # It keeps only 1 batch in the Python worker memory while sharing blocks via shared-memory.
             if os.getenv("RAY_MATERIALIZE_DATASETS", "0") in ("1", "true", "True"):
-                self.logger.info("Materializing dataset in Ray Object Store for performance.")
+                self.logger.info(f"Materializing {split} dataset in Ray Object Store for performance.")
                 ds = ds.materialize()
-            self.logger.info(f"Data loaded from {path}.")
+            self.logger.info(f"Data for split '{split}' loaded.")
             return ds
         except Exception as e:
-            self.logger.error(f"Failed to load data from {path}: {str(e)}", exc_info=True)
+            self.logger.error(f"Failed to load {split} data from {table_name}: {str(e)}", exc_info=True)
             raise
 
     def _validate_schema(self, ds: ray.data.Dataset):
@@ -190,23 +249,77 @@ class KubeRayTraining(BaseUtils):
         self.logger.info(f"Input dimension calculated from DSL: {self.input_dim} features.")
         return categorical + numerical
 
-    def _log_final_to_mlflow(self, *, framework: str, params: Dict[str, Any], metrics: Dict[str, Any]) -> None:
-        # Senior Optimization: Encapsulated MLflow logic into a helper utility.
-        # This reduces noise in the main orchestrator and separates plotting concerns.
+    def _log_final_to_mlflow(
+        self,
+        *,
+        framework: str,
+        params: Dict[str, Any],
+        metrics: Dict[str, Any],
+        model=None,
+        artifact_set_id: str = None,
+        table_identifier: str = None,
+    ) -> None:
+        """Log metrics, artifacts, and register the model in MLflow Model Registry."""
         artifact_location = (
             params.get("mlflow_artifact_location", "s3://k8s-mlops-platform-bucket/mlflow-artifacts/")
         )
+        registry_model_name = params.get("mlflow_registry_model_name")
 
         try:
-            log_training_run(
+            result_info = log_training_run(
                 framework=framework,
                 params=params,
                 metrics=metrics,
-                artifact_location=artifact_location
+                artifact_location=artifact_location,
+                artifact_set_id=artifact_set_id,
+                table_identifier=table_identifier,
+                model=model,
+                registry_model_name=registry_model_name,
             )
+            if result_info:
+                self.logger.info(
+                    "MLflow run completed: run_id=%s, model_version=%s, registry=%s",
+                    result_info.get("run_id"),
+                    result_info.get("model_version"),
+                    result_info.get("registry_model_name"),
+                )
         except Exception as e:
             self.logger.error(f"Error al loggear en MLflow: {str(e)}", exc_info=True)
 
+    def _extract_model(self, result, framework: str):
+        """Extract the trained model object from a Ray Train checkpoint.
+
+        Used for logging to MLflow Model Registry with native flavors
+        (mlflow.xgboost / mlflow.pytorch).
+        """
+        checkpoint = result.checkpoint
+        if not checkpoint:
+            self.logger.warning("No checkpoint found in training result.")
+            return None
+
+        try:
+            if framework == "xgboost":
+                booster = RayTrainReportCallback.get_model(checkpoint)
+                return booster
+            elif framework == "pytorch":
+                import torch
+                from src.models.pytorch import NeuralNetwork
+                num_classes = int(self.params.get("num_classes", 6))
+                model = NeuralNetwork(input_dim=self.input_dim, num_classes=num_classes)
+                with checkpoint.as_directory() as ckpt_dir:
+                    state = torch.load(
+                        os.path.join(ckpt_dir, "model.pt"),
+                        map_location="cpu",
+                    )
+                    model.load_state_dict(state["model_state_dict"])
+                model.eval()
+                return model
+            else:
+                self.logger.warning(f"Unknown framework '{framework}' for model extraction.")
+                return None
+        except Exception as e:
+            self.logger.error(f"Failed to extract model from checkpoint: {e}", exc_info=True)
+            return None
 
     def _stratified_sample(self, ds, target_col, fraction):
         """
@@ -254,24 +367,41 @@ class KubeRayTraining(BaseUtils):
 
             framework = self.params.get("framework", "xgboost")
 
+            artifact_set_id = self._get_latest_artifact_set_id()
+
+            if not artifact_set_id:
+                raise ValueError("ARTIFACT_SET_ID not found and no metadata records available. Preprocessing must run first.")
+
+            self.logger.info(f"Using latest artifact_set_id from metadata: {artifact_set_id}")
+
+            table_identifier = f"processed.{artifact_set_id}"
+            self.logger.info(f"Starting training pipeline with Iceberg table: {table_identifier}")
+
+            warehouse = self.params_full.get('spark', {}).get('iceberg', {}).get(
+                'warehouse',
+                's3a://k8s-mlops-platform-bucket/warehouse'
+            ).replace('s3a://', 's3://')
+            
+            catalog_config = {
+                "type": "hadoop",
+                "warehouse": warehouse,
+                "s3.endpoint": os.environ.get("S3_ENDPOINT", "http://minio:9000"),
+                "s3.access-key-id": os.environ.get("AWS_ACCESS_KEY_ID"),
+                "s3.secret-access-key": os.environ.get("AWS_SECRET_ACCESS_KEY"),
+                "s3.region": os.environ.get("AWS_REGION", "us-east-2"),
+            }
+
             self.logger.info(f"Starting training using framework: {framework}")
             best_params = None
             num_classes = int(self.params.get("num_classes", 2))
             input_dim = self.input_dim if self.params.get("dsl_count_dim", True) else int(self.params.get("input_dim", 14))
             mlflow_tracking_uri = self.params.get("mlflow_tracking_uri")
             mlflow_experiment_name = self.params.get("mlflow_experiment_name")
+            
             if self.params.get('tune', False):
-                self.logger.info("Starting hyperparameter tuning...")
+                self.logger.info("Starting hyperparameter tuning with Iceberg row filtering...")
 
-                # NOTE:
-                # We do NOT pass Ray Datasets into Tune trainables.
-                # Ray Tune's `tune.with_parameters(...)` stores parameters via `ray.put`, and
-                # Ray Datasets are not picklable under Ray 2.52 in that code path.
-                # Instead, we pass *paths* and load/sample datasets inside each trial.
                 sample_frac = self.params.get('sample_fraction_for_tuning')
-                train_path = os.path.join(self.data_dir, 'train')
-                val_path = os.path.join(self.data_dir, 'val')
-                
                 tuner = importlib.import_module('src.pipeline.tuning.'+ framework)
 
                 if framework == 'xgboost':
@@ -281,15 +411,15 @@ class KubeRayTraining(BaseUtils):
                 else:
                     tune_metric = 'accuracy'
 
-                ######### ESTO ESTA MEDIO HARDCODEADO ############
-
                 tune_mode = 'min'
                 prom_tune_cb = PrometheusTuneCallback(framework=framework, metric_name=tune_metric, mode=tune_mode)
 
                 best_config = tuner.tune_model(
-                    train_path=train_path,
-                    val_path=val_path,
+                    table_identifier=table_identifier,
+                    catalog_config=catalog_config,
+                    split_ranges=self.params_full.get('splits', {}),
                     target=self.params['target'],
+                    feature_columns=self.schema,
                     sample_fraction=sample_frac,
                     seed=int(self.params.get('seed', 42)),
                     storage_path=self.output_dir,
@@ -304,10 +434,10 @@ class KubeRayTraining(BaseUtils):
                 best_params = best_config.get(framework + "_params")
                 self.logger.info(f"Best hyperparameters found: {best_params}")
 
-            self.logger.info("Loading datasets...")
-            train_ds = self._load_data(os.path.join(self.data_dir, 'train'))
-            val_ds = self._load_data(os.path.join(self.data_dir, 'val'))
-            test_ds = self._load_data(os.path.join(self.data_dir, 'test'))
+            self.logger.info("Loading final datasets from Iceberg...")
+            train_ds = self._load_data('train', table_identifier)
+            val_ds = self._load_data('val', table_identifier)
+            test_ds = self._load_data('test', table_identifier)
 
             # Export dataset sizes for Grafana (best-effort)
             try:
@@ -325,6 +455,7 @@ class KubeRayTraining(BaseUtils):
                 "storage_path": self.output_dir,
                 "name": self.params.get('name', framework),
                 "target": self.params.get('target', 'attack'),
+                "feature_columns": self.schema,
                 "input_dim": input_dim,
                 "num_classes": num_classes,
             }
@@ -368,12 +499,13 @@ class KubeRayTraining(BaseUtils):
             #     TRAIN_ACCURACY.labels(framework=framework, split='val').set(...)
             # etc.
 
-            # Guardar el modelo en S3 al finalizar
+            # Guardar el modelo en S3 al finalizar (backward compat con serving)
             self._save_model(result, framework)
 
-            # Log final en MLflow (sin artifacts)
-            # Prefer métricas ya calculadas por el módulo; si no hay, usamos las del Result.
+            # Extract model from checkpoint for MLflow Model Registry
+            model_obj = self._extract_model(result, framework)
 
+            # Log en MLflow con Model Registry y trazabilidad completa
             mlflow_payload = {
                 **self.params,
                 "name": train_kwargs.get("name", framework),
@@ -388,8 +520,15 @@ class KubeRayTraining(BaseUtils):
                     framework,
                     float(mc_time_sec),
                 )
-                
-            self._log_final_to_mlflow(framework=framework, params=mlflow_payload, metrics=final_metrics)
+
+            self._log_final_to_mlflow(
+                framework=framework,
+                params=mlflow_payload,
+                metrics=final_metrics,
+                model=model_obj,
+                artifact_set_id=artifact_set_id,
+                table_identifier=table_identifier,
+            )
 
             # Allow Prometheus a small window to scrape the final metric values
             # before the RayJob tears down the head pod.
@@ -409,12 +548,11 @@ def main():
     ctx.enable_rich_progress_bars = True
     ctx.use_ray_tqdm = False
 
-    data_dir = "s3://k8s-mlops-platform-bucket/v1/processed/" #Para kuberay
-    output_dir = "s3://k8s-mlops-platform-bucket/v1/models" #Para el modelo
+    # For Iceberg, we don't strictly need a data_dir path as the catalog knows where data is.
+    output_dir = os.getenv("OUTPUT_DIR", "s3://k8s-mlops-platform-bucket/v1/models")
 
     model = KubeRayTraining(
-        params_path="/home/ray/app/repo/k3s/params.yaml",
-        data_dir=data_dir,
+        params_path=os.getenv("PARAMS_PATH", "/home/ray/app/repo/k3s/params.yaml"),
         output_dir=output_dir
     )
     model.train()

@@ -166,7 +166,7 @@ def train_func(config: Dict):
     checkpoint_every = max(checkpoint_every, 1)
 
     start_time = time.perf_counter()
-    feature_cols = None
+    feature_cols = config.get("feature_columns")
     for epoch in range(max_epochs):
         epoch_start = time.perf_counter()
         model.train()

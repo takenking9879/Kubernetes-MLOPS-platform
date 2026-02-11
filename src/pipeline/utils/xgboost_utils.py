@@ -36,7 +36,7 @@ except Exception as e:  # pragma: no cover
     TRAIN_RECALL = None
     print(f"[xgboost_utils] Prometheus setup failed: {e}")
 
-def get_train_val_dmatrix(target: str) -> Tuple[xgboost.DMatrix, xgboost.DMatrix]:
+def get_train_val_dmatrix(target: str, feature_columns: Optional[List[str]] = None) -> Tuple[xgboost.DMatrix, xgboost.DMatrix]:
     train_shard = ray.train.get_dataset_shard("train")
     val_shard = ray.train.get_dataset_shard("val")
 
@@ -47,7 +47,14 @@ def get_train_val_dmatrix(target: str) -> Tuple[xgboost.DMatrix, xgboost.DMatrix
     train_df = train_shard.materialize().to_pandas()
     val_df = val_shard.materialize().to_pandas()
 
-    train_X = train_df.drop(columns=target)
+    if feature_columns:
+        train_X = train_df[feature_columns]
+        val_X = val_df[feature_columns]
+    else:
+        # Fallback to dropping label if no features specified
+        train_X = train_df.drop(columns=target)
+        val_X = val_df.drop(columns=target)
+    
     train_y = train_df[target]
     val_X = val_df.drop(columns=target)
     val_y = val_df[target]

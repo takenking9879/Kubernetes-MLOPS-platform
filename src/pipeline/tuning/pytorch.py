@@ -23,11 +23,13 @@ from ray.air.integrations.mlflow import MLflowLoggerCallback
 # Tuning entrypoint
 # --------------------------
 def tune_model(
-    train_path: str,
-    val_path: str,
+    table_identifier: str,
+    catalog_config: dict,
+    split_ranges: dict,
     target,
-    storage_path,
-    name,
+    feature_columns: list | None = None,
+    storage_path: str = None,
+    name: str = "tune",
     input_dim: int = 14,
     num_classes: int = 6,
     sample_fraction: float | None = None,
@@ -95,9 +97,27 @@ def tune_model(
 
     # Same workaround as xgboost: build the Trainer inside a function trainable.
     def _trainable(trial_config: Dict):
+        from pyiceberg.catalog import load_catalog
+        from pyiceberg.expressions import GreaterThanOrEqual, LessThanOrEqual, And
+
+        catalog = load_catalog("iceberg", **catalog_config)
         
-        train_dataset = _maybe_sample_train_ds(ray.data.read_parquet(train_path))
-        val_dataset = ray.data.read_parquet(val_path)
+        # Load datasets with Iceberg row filters
+        train_range = split_ranges.get('train', {})
+        val_range = split_ranges.get('val', {})
+
+        train_filter = And(
+            GreaterThanOrEqual("timestamp", train_range['start']),
+            LessThanOrEqual("timestamp", train_range['end'])
+        ) if train_range.get('start') and train_range.get('end') else None
+
+        val_filter = And(
+            GreaterThanOrEqual("timestamp", val_range['start']),
+            LessThanOrEqual("timestamp", val_range['end'])
+        ) if val_range.get('start') and val_range.get('end') else None
+
+        train_dataset = _maybe_sample_train_ds(ray.data.read_iceberg(table_identifier, catalog=catalog, row_filter=train_filter))
+        val_dataset = ray.data.read_iceberg(table_identifier, catalog=catalog, row_filter=val_filter)
 
         max_train_rows = int(os.getenv("TUNE_MAX_TRAIN_ROWS", "0"))
         max_val_rows = int(os.getenv("TUNE_MAX_VAL_ROWS", "0"))
@@ -115,6 +135,7 @@ def tune_model(
 
         train_loop_config = {
             "target": target,
+            "feature_columns": feature_columns,
             "pytorch_params": trial_config["pytorch_params"],
             "input_dim": int(input_dim),  # Ajustado a las columnas de preprocessing_001.py (3 cat + 11 num)
             "num_classes": int(num_classes),

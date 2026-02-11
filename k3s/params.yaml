@@ -32,12 +32,12 @@ kuberay:
     seed: 42
     mlflow_tracking_uri: "http://my-mlflow"
     mlflow_experiment_name: "kuberay-attack-detection"
-    mlflow_artifact_location: "s3://k8s-mlops-platform-bucket/mlflow-artifacts/" 
+    mlflow_artifact_location: "s3://k8s-mlops-platform-bucket/mlflow-artifacts/"
+    mlflow_registry_model_name: "attack-detection"  # Name in MLflow Model Registry (optional, defaults to experiment name)
     
   serving:
     framework: "pytorch"
-    # Model key used by Serve (should point to an existing object in S3/MinIO)
-    model_key: "v1/models/model_pytorch.pkl"
+    alias: "champion"  # MLflow Model Registry alias (champion = production model)
     canary_probability: 0.0    
 
   # Optional per-deployment canary configuration. When present, `CanaryModel`
@@ -45,7 +45,7 @@ kuberay:
   # Example: set `initial_replicas: 0` to keep canary inactive until you scale it.
   canary:
     framework: "pytorch"
-    model_key: "v1/models/model_canary.pkl"
+    alias: "challenger"  # MLflow Model Registry alias for canary
     canary_probability: 0.10
     # initial_replicas controls whether a canary instance is started automatically
     initial_replicas: 0
@@ -140,6 +140,9 @@ spark:
 # ICEBERG TABLES CONFIGURATION
 # ============================================================================
 iceberg_tables:
+
+  warehouse: "s3://k8s-mlops-platform-bucket/warehouse" # Ruta al warehouse de Iceberg en S3
+
   # Tabla de raw data
   raw:
     catalog: "iceberg"
@@ -160,3 +163,4 @@ iceberg_tables:
     namespace: "processed"
     # Las tablas procesadas se crearán dinámicamente con formato:
     # iceberg.processed.{artifact_set_id}
+    # cambiar a iceberg.processed.{network_traffic}

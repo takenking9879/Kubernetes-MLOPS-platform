@@ -72,11 +72,13 @@ def train_func(config: Dict):
 # Tuning entrypoint
 # --------------------------------------------------
 def tune_model(
-    train_path: str,
-    val_path: str,
+    table_identifier: str,
+    catalog_config: dict,
+    split_ranges: dict,
     target,
-    storage_path,
-    name,
+    feature_columns: list | None = None,
+    storage_path: str = None,
+    name: str = "tune",
     input_dim: int = 14,  # Solo para mantener consistencia con otros entrenamientos
     num_classes: int = 6,
     sample_fraction: float | None = None,
@@ -122,10 +124,28 @@ def tune_model(
         return ds
 
     def _trainable(trial_config: Dict):
-        train_ds = ray.data.read_parquet(train_path)
-        val_ds = ray.data.read_parquet(val_path)
+        from pyiceberg.catalog import load_catalog
+        from pyiceberg.expressions import GreaterThanOrEqual, LessThanOrEqual, And
 
-        train_ds = _maybe_sample_train_ds(train_ds)
+        catalog = load_catalog("iceberg", **catalog_config)
+        
+        # Load datasets with Iceberg row filters
+        train_range = split_ranges.get('train', {})
+        val_range = split_ranges.get('val', {})
+
+        train_filter = And(
+            GreaterThanOrEqual("timestamp", train_range['start']),
+            LessThanOrEqual("timestamp", train_range['end'])
+        ) if train_range.get('start') and train_range.get('end') else None
+
+        val_filter = And(
+            GreaterThanOrEqual("timestamp", val_range['start']),
+            LessThanOrEqual("timestamp", val_range['end'])
+        ) if val_range.get('start') and val_range.get('end') else None
+
+        train_ds = _maybe_sample_train_ds(ray.data.read_iceberg(table_identifier, catalog=catalog, row_filter=train_filter))
+        val_ds = ray.data.read_iceberg(table_identifier, catalog=catalog, row_filter=val_filter)
+
         # apply limits if configured
         max_train_rows = int(os.getenv("TUNE_MAX_TRAIN_ROWS", "0"))
         max_val_rows = int(os.getenv("TUNE_MAX_VAL_ROWS", "0"))
@@ -141,6 +161,7 @@ def tune_model(
 
         train_loop_config = {
             "target": target,
+            "feature_columns": feature_columns,
             "num_classes": int(num_classes),
             "cpus_per_worker": cpus_per_worker,
             "num_boost_round": int(XGBOOST_TUNE_SETTINGS["num_boost_round"]),

@@ -66,6 +66,7 @@ def xgb_multiclass_metrics_on_ds(
     ds,
     split: str,
     target: str,
+    feature_columns: Optional[List[str]] = None,
     num_classes: int,
     booster_checkpoint,
 ) -> Dict[str, Any]:
@@ -86,7 +87,10 @@ def xgb_multiclass_metrics_on_ds(
 
         def predict_and_cm_batch(df: "pd.DataFrame") -> "pd.DataFrame":
             y_true = df[target].astype("int64").to_numpy()
-            X = df.drop(columns=[target])
+            if feature_columns:
+                X = df[feature_columns]
+            else:
+                X = df.drop(columns=[target])
 
             # Load model from bytes inside the worker
             tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".ubj")

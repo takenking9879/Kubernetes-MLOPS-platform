@@ -83,6 +83,7 @@ def _evaluate_on_dataset(
     checkpoint: ray.train.Checkpoint,
     ds,
     target: str,
+    feature_columns: Optional[List[str]] = None,
     num_classes: int,
     input_dim: int,
     batch_size: int,
@@ -102,7 +103,7 @@ def _evaluate_on_dataset(
     total_loss = 0.0
     total_batches = 0
 
-    feature_cols = None
+    feature_cols = feature_columns
     for batch in ds.iter_torch_batches(batch_size=batch_size, dtypes=torch.float32):
         y = batch.pop(target).long()
         if feature_cols is None:
@@ -139,6 +140,7 @@ def train(
     target,
     storage_path,
     name,
+    feature_columns: Optional[List[str]] = None,
     input_dim: int = 14,
     num_classes: int = 6,
     pytorch_params=None,
@@ -155,6 +157,7 @@ def train(
     params = pytorch_params if pytorch_params is not None else PYTORCH_PARAMS
     config = {
         "target": target,
+        "feature_columns": feature_columns,
         "pytorch_params": params,
         "input_dim": int(input_dim),  # Ajustado a las columnas de preprocessing_001.py (3 cat + 11 num)
         "num_classes": int(num_classes),
@@ -201,6 +204,7 @@ def train(
             checkpoint=result.checkpoint,
             ds=val_dataset,
             target=target,
+            feature_columns=feature_columns,
             num_classes=int(num_classes),
             input_dim=int(config.get("input_dim", 14)),
             batch_size=int(params.get("batch_size", 256)),
@@ -215,6 +219,7 @@ def train(
                 checkpoint=result.checkpoint,
                 ds=test_dataset,
                 target=target,
+                feature_columns=feature_columns,
                 num_classes=int(num_classes),
                 input_dim=int(config.get("input_dim", 14)),
                 batch_size=int(params.get("batch_size", 256)),
