@@ -18,6 +18,7 @@ set -euo pipefail
 # ============================================================
 # FLAGS (EDIT HERE)
 # ============================================================
+ENABLE_INGESTION=${ENABLE_INGESTION:-true}
 ENABLE_PREPROCESS=${ENABLE_PREPROCESS:-true}
 ENABLE_TRAINING=${ENABLE_TRAINING:-true}
 ENABLE_DELETION=${ENABLE_DELETION:-true}
@@ -25,6 +26,7 @@ ENABLE_DELETION=${ENABLE_DELETION:-true}
 # ============================================================
 # RESOURCE NAMES
 # ============================================================
+SPARK_INGESTION_NAME=${SPARK_INGESTION_NAME:-spark-ingestion}
 SPARK_APP_NAME=${SPARK_APP_NAME:-spark-app}
 RAY_JOB_NAME=${RAY_JOB_NAME:-kuberay-job}
 
@@ -65,6 +67,45 @@ fi
 # Ensure namespaces exist
 kubectl get namespace spark &> /dev/null || kubectl create namespace spark
 kubectl get namespace ray &> /dev/null || kubectl create namespace ray
+
+# ============================================================
+# SPARK INGESTION
+# ============================================================
+deploy_spark_ingestion() {
+  sep
+  log_info "Deploying Spark Ingestion"
+
+  kubectl apply -f "${SCRIPT_DIR}/spark/ingestion/spark-application-ingestion.yaml"
+
+  log_info "Waiting for Spark Ingestion to complete..."
+  INTERVAL=10
+  ELAPSED=0
+  SPARK_STATE=""
+  while [ $ELAPSED -lt $SPARK_COMPLETION_TIMEOUT ]; do
+    SPARK_STATE=$(kubectl get sparkapplication "$SPARK_INGESTION_NAME" -n spark -o jsonpath='{.status.currentState.currentStateSummary}' 2>/dev/null || echo "")
+    if [ "$SPARK_STATE" = "ResourceReleased" ] || [ "$SPARK_STATE" = "RESOURCE_RELEASED" ]; then
+      log_info "SparkApplication ${SPARK_INGESTION_NAME} reached ResourceReleased"
+      break
+    fi
+    if [ "$SPARK_STATE" = "FAILED" ] || [ "$SPARK_STATE" = "Failed" ]; then
+      log_error "SparkApplication ${SPARK_INGESTION_NAME} finished with failure: $SPARK_STATE"
+      exit 1
+    fi
+    sleep $INTERVAL
+    ELAPSED=$((ELAPSED + INTERVAL))
+    echo -n "."
+  done
+  echo ""
+
+  if [ "$SPARK_STATE" = "ResourceReleased" ] || [ "$SPARK_STATE" = "RESOURCE_RELEASED" ]; then
+    log_info "Deleting SparkApplication ${SPARK_INGESTION_NAME}..."
+    kubectl delete sparkapp "$SPARK_INGESTION_NAME" -n spark || true
+    ok "Spark ingestion completed and cleaned up"
+  else
+    log_error "SparkApplication ${SPARK_INGESTION_NAME} did not reach ResourceReleased within timeout"
+    exit 1
+  fi
+}
 
 # ============================================================
 # SPARK PREPROCESSING
@@ -210,6 +251,10 @@ cleanup_resources() {
 # EXECUTION FLOW
 # ============================================================
 
+if [ "$ENABLE_INGESTION" = "true" ]; then
+  deploy_spark_ingestion
+fi
+
 if [ "$ENABLE_PREPROCESS" = "true" ]; then
   deploy_spark_preprocessing
 fi
@@ -225,6 +270,13 @@ cleanup_resources
 # ============================================================
 sep
 log_info "=== DEPLOYMENT SUMMARY ==="
+
+if [ "$ENABLE_INGESTION" = "true" ]; then
+  echo ""
+  echo "  Spark Ingestion:"
+  echo "    - Status:           Completed and Deleted"
+  echo "    - Resource:         ${SPARK_INGESTION_NAME} (namespace: spark)"
+fi
 
 if [ "$ENABLE_PREPROCESS" = "true" ]; then
   echo ""

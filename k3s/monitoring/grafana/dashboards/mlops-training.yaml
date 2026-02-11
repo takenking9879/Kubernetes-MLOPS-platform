@@ -903,13 +903,18 @@ data:
             "includeAll": false,
             "multi": false,
             "name": "split",
-            "options": [],
-            "query": "label_values(preprocess_records_last_batch, dataset)",
-            "refresh": 1,
+            "options": [
+              { "selected": true, "text": "train", "value": "train" },
+              { "selected": false, "text": "val", "value": "val" },
+              { "selected": false, "text": "test", "value": "test" },
+              { "selected": false, "text": "full", "value": "full" }
+            ],
+            "query": "train,val,test,full",
+            "refresh": 0,
             "regex": "",
             "skipUrlSync": false,
             "sort": 0,
-            "type": "query"
+            "type": "custom"
           }
         ]
       },
