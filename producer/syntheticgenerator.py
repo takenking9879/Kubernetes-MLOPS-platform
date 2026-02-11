@@ -434,7 +434,7 @@ class SyntheticTrafficGenerator:
         else:
             df['attack'] = attack_id.astype(int)
 
-        df['timestamp'] = pd.to_datetime(df['timestamp'])
+        df['timestamp'] = pd.to_datetime(df['timestamp']).astype('datetime64[us]')
         return df
 
     # Optional explicit batch API for streaming simulators
