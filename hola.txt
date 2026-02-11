@@ -1,127 +1,180 @@
-2026-02-11 14:44:56.201 | WARNING: Using incubator modules: jdk.incubator.vector
-2026-02-11 14:44:57.388 | Files local:///app/repo/k3s/spark/ingestion/ingestion_main.py from /app/.worktrees/4af1588361921c7389326813148a0f26ca436e09/k3s/spark/ingestion/ingestion_main.py to /opt/spark/work-dir/ingestion_main.py
-2026-02-11 14:44:57.472 | 26/02/11 20:44:57 WARN NativeCodeLoader: Unable to load native-hadoop library for your platform... using builtin-java classes where applicable
-2026-02-11 14:44:58.276 | 2026-02-11 20:44:58,275 - SparkIngestRaw - DEBUG - Parameters retrieved from /app/repo/k3s/params.yaml
-2026-02-11 14:44:58.886 | 2026-02-11 20:44:58,885 - SparkIngestRaw - INFO - S3 connection verified. Buckets: ['frontend-crm-bucket', 'k8s-mlops-platform-bucket']
-2026-02-11 14:44:59.267 | Using Spark's default log4j profile: org/apache/spark/log4j2-defaults.properties
-2026-02-11 14:44:59.271 | 26/02/11 20:44:59 INFO SparkContext: Running Spark version 4.0.1
-2026-02-11 14:44:59.272 | 26/02/11 20:44:59 INFO SparkContext: OS info Linux, 6.6.87.2-microsoft-standard-WSL2, amd64
-2026-02-11 14:44:59.273 | 26/02/11 20:44:59 INFO SparkContext: Java version 17.0.17
-2026-02-11 14:44:59.293 | 26/02/11 20:44:59 INFO ResourceUtils: ==============================================================
-2026-02-11 14:44:59.294 | 26/02/11 20:44:59 INFO ResourceUtils: No custom resources configured for spark.driver.
-2026-02-11 14:44:59.294 | 26/02/11 20:44:59 INFO ResourceUtils: ==============================================================
-2026-02-11 14:44:59.295 | 26/02/11 20:44:59 INFO SparkContext: Submitted application: spark-preprocessing
-2026-02-11 14:44:59.319 | 26/02/11 20:44:59 INFO ResourceProfile: Default ResourceProfile created, executor resources: Map(cores -> name: cores, amount: 4, script: , vendor: , memory -> name: memory, amount: 4096, script: , vendor: , offHeap -> name: offHeap, amount: 0, script: , vendor: ), task resources: Map(cpus -> name: cpus, amount: 1.0)
-2026-02-11 14:44:59.323 | 26/02/11 20:44:59 INFO ResourceProfile: Limiting resource is cpus at 4 tasks per executor
-2026-02-11 14:44:59.325 | 26/02/11 20:44:59 INFO ResourceProfileManager: Added ResourceProfile id: 0
-2026-02-11 14:44:59.364 | 26/02/11 20:44:59 INFO SecurityManager: Changing view acls to: spark
-2026-02-11 14:44:59.365 | 26/02/11 20:44:59 INFO SecurityManager: Changing modify acls to: spark
-2026-02-11 14:44:59.365 | 26/02/11 20:44:59 INFO SecurityManager: Changing view acls groups to: spark
-2026-02-11 14:44:59.365 | 26/02/11 20:44:59 INFO SecurityManager: Changing modify acls groups to: spark
-2026-02-11 14:44:59.367 | 26/02/11 20:44:59 INFO SecurityManager: SecurityManager: authentication disabled; ui acls disabled; users with view permissions: spark groups with view permissions: EMPTY; users with modify permissions: spark; groups with modify permissions: EMPTY; RPC SSL disabled
-2026-02-11 14:44:59.570 | 26/02/11 20:44:59 INFO Utils: Successfully started service 'sparkDriver' on port 7078.
-2026-02-11 14:44:59.593 | 26/02/11 20:44:59 INFO SparkEnv: Registering MapOutputTracker
-2026-02-11 14:44:59.604 | 26/02/11 20:44:59 INFO SparkEnv: Registering BlockManagerMaster
-2026-02-11 14:44:59.616 | 26/02/11 20:44:59 INFO BlockManagerMasterEndpoint: Using org.apache.spark.storage.DefaultTopologyMapper for getting topology information
-2026-02-11 14:44:59.616 | 26/02/11 20:44:59 INFO BlockManagerMasterEndpoint: BlockManagerMasterEndpoint up
-2026-02-11 14:44:59.619 | 26/02/11 20:44:59 INFO SparkEnv: Registering BlockManagerMasterHeartbeat
-2026-02-11 14:44:59.634 | 26/02/11 20:44:59 INFO DiskBlockManager: Created local directory at /var/data/spark-71d42757-81b3-4b59-94f0-9f95f1aac94b/blockmgr-dcba8a82-032a-4234-b013-d39878c71233
-2026-02-11 14:44:59.650 | 26/02/11 20:44:59 INFO SparkEnv: Registering OutputCommitCoordinator
-2026-02-11 14:44:59.749 | 26/02/11 20:44:59 INFO JettyUtils: Start Jetty 0.0.0.0:4040 for SparkUI
-2026-02-11 14:44:59.811 | 26/02/11 20:44:59 INFO Utils: Successfully started service 'SparkUI' on port 4040.
-2026-02-11 14:44:59.847 | 26/02/11 20:44:59 WARN SparkContext: File with 'local' scheme local:/app/repo/k3s/spark/ingestion/ingestion_main.py is not supported to add to file server, since it is already available on every node.
-2026-02-11 14:44:59.863 | 26/02/11 20:44:59 INFO SecurityManager: Changing view acls to: spark
-2026-02-11 14:44:59.864 | 26/02/11 20:44:59 INFO SecurityManager: Changing modify acls to: spark
-2026-02-11 14:44:59.864 | 26/02/11 20:44:59 INFO SecurityManager: Changing view acls groups to: spark
-2026-02-11 14:44:59.864 | 26/02/11 20:44:59 INFO SecurityManager: Changing modify acls groups to: spark
-2026-02-11 14:44:59.865 | 26/02/11 20:44:59 INFO SecurityManager: SecurityManager: authentication disabled; ui acls disabled; users with view permissions: spark groups with view permissions: EMPTY; users with modify permissions: spark; groups with modify permissions: EMPTY; RPC SSL disabled
-2026-02-11 14:44:59.909 | 26/02/11 20:44:59 INFO SparkKubernetesClientFactory: Auto-configuring K8S client using current context from users K8S config file
-2026-02-11 14:45:00.887 | 26/02/11 20:45:00 WARN Utils: spark.executor.instances less than spark.dynamicAllocation.minExecutors is invalid, ignoring its setting, please update your configs.
-2026-02-11 14:45:00.892 | 26/02/11 20:45:00 INFO Utils: Using initial executors = 2, max of spark.dynamicAllocation.initialExecutors,spark.dynamicAllocation.minExecutors and spark.executor.instances
-2026-02-11 14:45:01.085 | 26/02/11 20:45:01 INFO ExecutorPodsAllocator: Going to request 2 executors from Kubernetes for ResourceProfile Id: 0, target: 2, known: 0, sharedSlotFromPendingPods: 2147483647.
-2026-02-11 14:45:01.140 | 26/02/11 20:45:01 INFO ExecutorPodsAllocator: Found 0 reusable PVCs from 0 PVCs
-2026-02-11 14:45:01.140 | 26/02/11 20:45:01 INFO KubernetesClientUtils: Spark configuration files loaded from Some(/opt/spark/conf) : spark.kubernetes.namespace
-2026-02-11 14:45:01.166 | 26/02/11 20:45:01 INFO KubernetesClientUtils: Spark configuration files loaded from Some(/opt/spark/conf) : spark.kubernetes.namespace
-2026-02-11 14:45:01.176 | 26/02/11 20:45:01 INFO BasicExecutorFeatureStep: Decommissioning not enabled, skipping shutdown script
-2026-02-11 14:45:01.277 | 26/02/11 20:45:01 INFO KubernetesClientUtils: Spark configuration files loaded from Some(/opt/spark/conf) : spark.kubernetes.namespace
-2026-02-11 14:45:01.282 | 26/02/11 20:45:01 INFO BasicExecutorFeatureStep: Decommissioning not enabled, skipping shutdown script
-2026-02-11 14:45:01.454 | 26/02/11 20:45:01 INFO Utils: Successfully started service 'org.apache.spark.network.netty.NettyBlockTransferService' on port 7079.
-2026-02-11 14:45:01.457 | 26/02/11 20:45:01 INFO NettyBlockTransferService: Server created on spark-ingestion-0-driver-svc.spark.svc 10.1.10.224:7079
-2026-02-11 14:45:01.459 | 26/02/11 20:45:01 INFO BlockManager: Using org.apache.spark.storage.RandomBlockReplicationPolicy for block replication policy
-2026-02-11 14:45:01.472 | 26/02/11 20:45:01 INFO BlockManagerMaster: Registering BlockManager BlockManagerId(driver, spark-ingestion-0-driver-svc.spark.svc, 7079, None)
-2026-02-11 14:45:01.476 | 26/02/11 20:45:01 INFO BlockManagerMasterEndpoint: Registering block manager spark-ingestion-0-driver-svc.spark.svc:7079 with 1048.8 MiB RAM, BlockManagerId(driver, spark-ingestion-0-driver-svc.spark.svc, 7079, None)
-2026-02-11 14:45:01.478 | 26/02/11 20:45:01 INFO BlockManagerMaster: Registered BlockManager BlockManagerId(driver, spark-ingestion-0-driver-svc.spark.svc, 7079, None)
-2026-02-11 14:45:01.479 | 26/02/11 20:45:01 INFO BlockManager: Initialized BlockManager: BlockManagerId(driver, spark-ingestion-0-driver-svc.spark.svc, 7079, None)
-2026-02-11 14:45:01.489 | 26/02/11 20:45:01 WARN Utils: spark.executor.instances less than spark.dynamicAllocation.minExecutors is invalid, ignoring its setting, please update your configs.
-2026-02-11 14:45:01.490 | 26/02/11 20:45:01 INFO Utils: Using initial executors = 2, max of spark.dynamicAllocation.initialExecutors,spark.dynamicAllocation.minExecutors and spark.executor.instances
-2026-02-11 14:45:01.490 | 26/02/11 20:45:01 INFO ExecutorAllocationManager: Dynamic allocation is enabled without a shuffle service.
-2026-02-11 14:45:06.416 | 26/02/11 20:45:06 INFO KubernetesClusterSchedulerBackend$KubernetesDriverEndpoint: Registered executor NettyRpcEndpointRef(spark-client://Executor) (10.1.10.225:35590) with ID 1, ResourceProfileId 0
-2026-02-11 14:45:06.420 | 26/02/11 20:45:06 INFO ExecutorMonitor: New executor 1 has registered (new total is 1)
-2026-02-11 14:45:06.539 | 26/02/11 20:45:06 INFO BlockManagerMasterEndpoint: Registering block manager 10.1.10.225:35305 with 2.2 GiB RAM, BlockManagerId(1, 10.1.10.225, 35305, None)
-2026-02-11 14:45:31.435 | 26/02/11 20:45:31 INFO KubernetesClusterSchedulerBackend: SchedulerBackend is ready for scheduling beginning after waiting maxRegisteredResourcesWaitingTime: 30000.0(ms)
-2026-02-11 14:45:33.070 | 2026-02-11 20:45:33,069 - SparkIngestRaw - INFO - SparkSession created (Iceberg catalog at s3a://k8s-mlops-platform-bucket/warehouse)
-2026-02-11 14:45:33.131 | 26/02/11 20:45:33 INFO SharedState: Setting hive.metastore.warehouse.dir ('null') to the value of spark.sql.warehouse.dir.
-2026-02-11 14:45:33.137 | 26/02/11 20:45:33 INFO SharedState: Warehouse path is 'file:/opt/spark/work-dir/spark-warehouse'.
-2026-02-11 14:45:33.880 | 26/02/11 20:45:33 WARN MetricsConfig: Cannot locate configuration: tried hadoop-metrics2-s3a-file-system.properties,hadoop-metrics2.properties
-2026-02-11 14:45:33.893 | 26/02/11 20:45:33 INFO MetricsSystemImpl: Scheduled Metric snapshot period at 10 second(s).
-2026-02-11 14:45:33.894 | 26/02/11 20:45:33 INFO MetricsSystemImpl: s3a-file-system metrics system started
-2026-02-11 14:45:35.968 | 26/02/11 20:45:35 INFO HadoopFSUtils: Listing s3a://k8s-mlops-platform-bucket/raw with listFiles API
-2026-02-11 14:45:36.151 | 26/02/11 20:45:36 INFO InMemoryFileIndex: It took 188 ms to list leaf files for 1 paths.
-2026-02-11 14:45:36.619 | 26/02/11 20:45:36 INFO FileSourceStrategy: Pushed Filters: 
-2026-02-11 14:45:36.623 | 26/02/11 20:45:36 INFO FileSourceStrategy: Post-Scan Filters: Set()
-2026-02-11 14:45:36.933 | 26/02/11 20:45:36 INFO CodeGenerator: Code generated in 170.885343 ms
-2026-02-11 14:45:36.959 | 26/02/11 20:45:36 INFO MemoryStore: MemoryStore started with capacity 1048.8 MiB
-2026-02-11 14:45:36.988 | 26/02/11 20:45:36 INFO MemoryStore: Block broadcast_0 stored as values in memory (estimated size 243.2 KiB, free 1048.6 MiB)
-2026-02-11 14:45:37.028 | 26/02/11 20:45:37 INFO MemoryStore: Block broadcast_0_piece0 stored as bytes in memory (estimated size 42.6 KiB, free 1048.5 MiB)
-2026-02-11 14:45:37.034 | 26/02/11 20:45:37 INFO SparkContext: Created broadcast 0 from javaToPython at NativeMethodAccessorImpl.java:0
-2026-02-11 14:45:37.049 | 26/02/11 20:45:37 INFO FileSourceScanExec: Planning scan with bin packing, max size: 5406186 bytes, open cost is considered as scanning 4194304 bytes.
-2026-02-11 14:45:37.137 | 2026-02-11 20:45:37,136 - SparkIngestRaw - INFO - Loaded raw DF | partitions=3
-2026-02-11 14:45:37.305 | 2026-02-11 20:45:37,294 - SparkIngestRaw - ERROR - Ingest job failed
-2026-02-11 14:45:37.305 | Traceback (most recent call last):
-2026-02-11 14:45:37.305 |   File "/app/repo/k3s/spark/ingestion/ingestion_main.py", line 146, in main
-2026-02-11 14:45:37.305 |     job.write_raw_to_iceberg(df_final, namespace="raw")
-2026-02-11 14:45:37.305 |   File "/app/repo/k3s/spark/ingestion/ingestion_main.py", line 124, in write_raw_to_iceberg
-2026-02-11 14:45:37.305 |     self.spark.sql(f"CREATE NAMESPACE IF NOT EXISTS iceberg.{namespace}")
-2026-02-11 14:45:37.305 |   File "/opt/spark/python/lib/pyspark.zip/pyspark/sql/session.py", line 1810, in sql
-2026-02-11 14:45:37.305 |     return DataFrame(self._jsparkSession.sql(sqlQuery, litArgs), self)
-2026-02-11 14:45:37.305 |                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-2026-02-11 14:45:37.305 |   File "/opt/spark/python/lib/py4j-0.10.9.9-src.zip/py4j/java_gateway.py", line 1362, in __call__
-2026-02-11 14:45:37.305 |     return_value = get_return_value(
-2026-02-11 14:45:37.305 |                    ^^^^^^^^^^^^^^^^^
-2026-02-11 14:45:37.305 |   File "/opt/spark/python/lib/pyspark.zip/pyspark/errors/exceptions/captured.py", line 288, in deco
-2026-02-11 14:45:37.305 |     raise converted from None
-2026-02-11 14:45:37.305 | pyspark.errors.exceptions.captured.IllegalArgumentException: Cannot create catalog iceberg, both type and catalog-impl are set: type=hadoop, catalog-impl=org.apache.iceberg.aws.glue.GlueCatalog
-2026-02-11 14:45:37.305 | 2026-02-11 20:45:37,305 - SparkIngestRaw - INFO - Ingest job elapsed: 4.24s
-2026-02-11 14:45:37.305 | Traceback (most recent call last):
-2026-02-11 14:45:37.305 |   File "/app/repo/k3s/spark/ingestion/ingestion_main.py", line 156, in <module>
-2026-02-11 14:45:37.306 |     main()
-2026-02-11 14:45:37.306 |   File "/app/repo/k3s/spark/ingestion/ingestion_main.py", line 146, in main
-2026-02-11 14:45:37.306 |     job.write_raw_to_iceberg(df_final, namespace="raw")
-2026-02-11 14:45:37.306 |   File "/app/repo/k3s/spark/ingestion/ingestion_main.py", line 124, in write_raw_to_iceberg
-2026-02-11 14:45:37.307 |     self.spark.sql(f"CREATE NAMESPACE IF NOT EXISTS iceberg.{namespace}")
-2026-02-11 14:45:37.307 |   File "/opt/spark/python/lib/pyspark.zip/pyspark/sql/session.py", line 1810, in sql
-2026-02-11 14:45:37.307 |   File "/opt/spark/python/lib/py4j-0.10.9.9-src.zip/py4j/java_gateway.py", line 1362, in __call__
-2026-02-11 14:45:37.308 |   File "/opt/spark/python/lib/pyspark.zip/pyspark/errors/exceptions/captured.py", line 288, in deco
-2026-02-11 14:45:37.311 | pyspark.errors.exceptions.captured.IllegalArgumentException: Cannot create catalog iceberg, both type and catalog-impl are set: type=hadoop, catalog-impl=org.apache.iceberg.aws.glue.GlueCatalog
-2026-02-11 14:45:37.428 | 26/02/11 20:45:37 INFO SparkContext: SparkContext is stopping with exitCode 0 from stop at SparkSubmit.scala:1036.
-2026-02-11 14:45:37.438 | 26/02/11 20:45:37 INFO SparkUI: Stopped Spark web UI at http://spark-ingestion-0-driver-svc.spark.svc:4040
-2026-02-11 14:45:37.442 | 26/02/11 20:45:37 INFO KubernetesClusterSchedulerBackend: Shutting down all executors
-2026-02-11 14:45:37.442 | 26/02/11 20:45:37 INFO KubernetesClusterSchedulerBackend$KubernetesDriverEndpoint: Asking each executor to shut down
-2026-02-11 14:45:37.448 | 26/02/11 20:45:37 INFO ExecutorPodsWatchSnapshotSource: Kubernetes client has been closed.
-2026-02-11 14:45:37.573 | 26/02/11 20:45:37 INFO MapOutputTrackerMasterEndpoint: MapOutputTrackerMasterEndpoint stopped!
-2026-02-11 14:45:37.591 | 26/02/11 20:45:37 INFO MemoryStore: MemoryStore cleared
-2026-02-11 14:45:37.592 | 26/02/11 20:45:37 INFO BlockManager: BlockManager stopped
-2026-02-11 14:45:37.597 | 26/02/11 20:45:37 INFO BlockManagerMaster: BlockManagerMaster stopped
-2026-02-11 14:45:37.601 | 26/02/11 20:45:37 INFO OutputCommitCoordinator$OutputCommitCoordinatorEndpoint: OutputCommitCoordinator stopped!
-2026-02-11 14:45:37.612 | 26/02/11 20:45:37 INFO SparkContext: Successfully stopped SparkContext
-2026-02-11 14:45:37.614 | 26/02/11 20:45:37 INFO ShutdownHookManager: Shutdown hook called
-2026-02-11 14:45:37.615 | 26/02/11 20:45:37 INFO ShutdownHookManager: Deleting directory /var/data/spark-71d42757-81b3-4b59-94f0-9f95f1aac94b/spark-7f9a1867-49cc-4da4-b479-caa8198f979a
-2026-02-11 14:45:37.618 | 26/02/11 20:45:37 INFO ShutdownHookManager: Deleting directory /tmp/spark-10c7f4e4-188d-4617-bed7-965f6af479bc
-2026-02-11 14:45:37.621 | 26/02/11 20:45:37 INFO ShutdownHookManager: Deleting directory /tmp/spark-e5e6a0a4-2436-4d6a-8293-7f651d199c3f
-2026-02-11 14:45:37.625 | 26/02/11 20:45:37 INFO ShutdownHookManager: Deleting directory /tmp/localPyFiles-eae36677-fff8-45cb-afa3-d3ceab2ed4f0
-2026-02-11 14:45:37.628 | 26/02/11 20:45:37 INFO ShutdownHookManager: Deleting directory /tmp/spark-52922f02-8d50-41fa-b834-2875fcabe981
-2026-02-11 14:45:37.631 | 26/02/11 20:45:37 INFO ShutdownHookManager: Deleting directory /tmp/spark-925d59b9-6130-4114-b375-2835ee3d9afd
-2026-02-11 14:45:37.635 | 26/02/11 20:45:37 INFO ShutdownHookManager: Deleting directory /var/data/spark-71d42757-81b3-4b59-94f0-9f95f1aac94b/spark-7f9a1867-49cc-4da4-b479-caa8198f979a/pyspark-49e0d142-b3d6-47e2-a88d-2fa36cf4341b
-2026-02-11 14:45:37.643 | 26/02/11 20:45:37 INFO MetricsSystemImpl: Stopping s3a-file-system metrics system...
-2026-02-11 14:45:37.643 | 26/02/11 20:45:37 INFO MetricsSystemImpl: s3a-file-system metrics system stopped.
-2026-02-11 14:45:37.643 | 26/02/11 20:45:37 INFO MetricsSystemImpl: s3a-file-system metrics system shutdown complete.
+2026-02-11 14:53:02.583 | WARNING: Using incubator modules: jdk.incubator.vector
+2026-02-11 14:53:03.744 | Files local:///app/repo/k3s/spark/main.py from /app/.worktrees/e5566d30bdaa03343646eb646ef73001a81b73a9/k3s/spark/main.py to /opt/spark/work-dir/main.py
+2026-02-11 14:53:03.832 | 26/02/11 20:53:03 WARN NativeCodeLoader: Unable to load native-hadoop library for your platform... using builtin-java classes where applicable
+2026-02-11 14:53:04.698 | 2026-02-11 20:53:04,697 - SparkPreprocessIceberg - DEBUG - Parameters retrieved from /app/repo/k3s/params.yaml
+2026-02-11 14:53:05.296 | 2026-02-11 20:53:05,296 - SparkPreprocessIceberg - INFO - S3 connection verified. Buckets: ['frontend-crm-bucket', 'k8s-mlops-platform-bucket']
+2026-02-11 14:53:05.701 | Using Spark's default log4j profile: org/apache/spark/log4j2-defaults.properties
+2026-02-11 14:53:05.710 | 26/02/11 20:53:05 INFO SparkContext: Running Spark version 4.0.1
+2026-02-11 14:53:05.713 | 26/02/11 20:53:05 INFO SparkContext: OS info Linux, 6.6.87.2-microsoft-standard-WSL2, amd64
+2026-02-11 14:53:05.714 | 26/02/11 20:53:05 INFO SparkContext: Java version 17.0.17
+2026-02-11 14:53:05.734 | 26/02/11 20:53:05 INFO ResourceUtils: ==============================================================
+2026-02-11 14:53:05.734 | 26/02/11 20:53:05 INFO ResourceUtils: No custom resources configured for spark.driver.
+2026-02-11 14:53:05.735 | 26/02/11 20:53:05 INFO ResourceUtils: ==============================================================
+2026-02-11 14:53:05.735 | 26/02/11 20:53:05 INFO SparkContext: Submitted application: spark-preprocessing
+2026-02-11 14:53:05.754 | 26/02/11 20:53:05 INFO ResourceProfile: Default ResourceProfile created, executor resources: Map(cores -> name: cores, amount: 4, script: , vendor: , memory -> name: memory, amount: 4096, script: , vendor: , offHeap -> name: offHeap, amount: 0, script: , vendor: ), task resources: Map(cpus -> name: cpus, amount: 1.0)
+2026-02-11 14:53:05.758 | 26/02/11 20:53:05 INFO ResourceProfile: Limiting resource is cpus at 4 tasks per executor
+2026-02-11 14:53:05.759 | 26/02/11 20:53:05 INFO ResourceProfileManager: Added ResourceProfile id: 0
+2026-02-11 14:53:05.796 | 26/02/11 20:53:05 INFO SecurityManager: Changing view acls to: spark
+2026-02-11 14:53:05.796 | 26/02/11 20:53:05 INFO SecurityManager: Changing modify acls to: spark
+2026-02-11 14:53:05.797 | 26/02/11 20:53:05 INFO SecurityManager: Changing view acls groups to: spark
+2026-02-11 14:53:05.797 | 26/02/11 20:53:05 INFO SecurityManager: Changing modify acls groups to: spark
+2026-02-11 14:53:05.799 | 26/02/11 20:53:05 INFO SecurityManager: SecurityManager: authentication disabled; ui acls disabled; users with view permissions: spark groups with view permissions: EMPTY; users with modify permissions: spark; groups with modify permissions: EMPTY; RPC SSL disabled
+2026-02-11 14:53:05.986 | 26/02/11 20:53:05 INFO Utils: Successfully started service 'sparkDriver' on port 7078.
+2026-02-11 14:53:06.011 | 26/02/11 20:53:06 INFO SparkEnv: Registering MapOutputTracker
+2026-02-11 14:53:06.022 | 26/02/11 20:53:06 INFO SparkEnv: Registering BlockManagerMaster
+2026-02-11 14:53:06.036 | 26/02/11 20:53:06 INFO BlockManagerMasterEndpoint: Using org.apache.spark.storage.DefaultTopologyMapper for getting topology information
+2026-02-11 14:53:06.037 | 26/02/11 20:53:06 INFO BlockManagerMasterEndpoint: BlockManagerMasterEndpoint up
+2026-02-11 14:53:06.039 | 26/02/11 20:53:06 INFO SparkEnv: Registering BlockManagerMasterHeartbeat
+2026-02-11 14:53:06.057 | 26/02/11 20:53:06 INFO DiskBlockManager: Created local directory at /var/data/spark-2c66602a-e691-4022-b4a2-2bec6641324c/blockmgr-38972312-e53f-489d-8344-02c48b28eed5
+2026-02-11 14:53:06.078 | 26/02/11 20:53:06 INFO SparkEnv: Registering OutputCommitCoordinator
+2026-02-11 14:53:06.187 | 26/02/11 20:53:06 INFO JettyUtils: Start Jetty 0.0.0.0:4040 for SparkUI
+2026-02-11 14:53:06.268 | 26/02/11 20:53:06 INFO Utils: Successfully started service 'SparkUI' on port 4040.
+2026-02-11 14:53:06.309 | 26/02/11 20:53:06 WARN SparkContext: File with 'local' scheme local:/app/repo/k3s/spark/main.py is not supported to add to file server, since it is already available on every node.
+2026-02-11 14:53:06.329 | 26/02/11 20:53:06 INFO SecurityManager: Changing view acls to: spark
+2026-02-11 14:53:06.330 | 26/02/11 20:53:06 INFO SecurityManager: Changing modify acls to: spark
+2026-02-11 14:53:06.331 | 26/02/11 20:53:06 INFO SecurityManager: Changing view acls groups to: spark
+2026-02-11 14:53:06.331 | 26/02/11 20:53:06 INFO SecurityManager: Changing modify acls groups to: spark
+2026-02-11 14:53:06.331 | 26/02/11 20:53:06 INFO SecurityManager: SecurityManager: authentication disabled; ui acls disabled; users with view permissions: spark groups with view permissions: EMPTY; users with modify permissions: spark; groups with modify permissions: EMPTY; RPC SSL disabled
+2026-02-11 14:53:06.377 | 26/02/11 20:53:06 INFO SparkKubernetesClientFactory: Auto-configuring K8S client using current context from users K8S config file
+2026-02-11 14:53:07.328 | 26/02/11 20:53:07 WARN Utils: spark.executor.instances less than spark.dynamicAllocation.minExecutors is invalid, ignoring its setting, please update your configs.
+2026-02-11 14:53:07.335 | 26/02/11 20:53:07 INFO Utils: Using initial executors = 2, max of spark.dynamicAllocation.initialExecutors,spark.dynamicAllocation.minExecutors and spark.executor.instances
+2026-02-11 14:53:07.465 | 26/02/11 20:53:07 INFO ExecutorPodsAllocator: Going to request 2 executors from Kubernetes for ResourceProfile Id: 0, target: 2, known: 0, sharedSlotFromPendingPods: 2147483647.
+2026-02-11 14:53:07.516 | 26/02/11 20:53:07 INFO KubernetesClientUtils: Spark configuration files loaded from Some(/opt/spark/conf) : spark.kubernetes.namespace
+2026-02-11 14:53:07.696 | 26/02/11 20:53:07 INFO ExecutorPodsAllocator: Found 0 reusable PVCs from 0 PVCs
+2026-02-11 14:53:07.751 | 26/02/11 20:53:07 INFO KubernetesClientUtils: Spark configuration files loaded from Some(/opt/spark/conf) : spark.kubernetes.namespace
+2026-02-11 14:53:07.751 | 26/02/11 20:53:07 INFO Utils: Successfully started service 'org.apache.spark.network.netty.NettyBlockTransferService' on port 7079.
+2026-02-11 14:53:07.755 | 26/02/11 20:53:07 INFO NettyBlockTransferService: Server created on spark-app-0-driver-svc.spark.svc 10.1.10.228:7079
+2026-02-11 14:53:07.757 | 26/02/11 20:53:07 INFO BlockManager: Using org.apache.spark.storage.RandomBlockReplicationPolicy for block replication policy
+2026-02-11 14:53:07.760 | 26/02/11 20:53:07 INFO BasicExecutorFeatureStep: Decommissioning not enabled, skipping shutdown script
+2026-02-11 14:53:07.771 | 26/02/11 20:53:07 INFO BlockManagerMaster: Registering BlockManager BlockManagerId(driver, spark-app-0-driver-svc.spark.svc, 7079, None)
+2026-02-11 14:53:07.777 | 26/02/11 20:53:07 INFO BlockManagerMasterEndpoint: Registering block manager spark-app-0-driver-svc.spark.svc:7079 with 1048.8 MiB RAM, BlockManagerId(driver, spark-app-0-driver-svc.spark.svc, 7079, None)
+2026-02-11 14:53:07.779 | 26/02/11 20:53:07 INFO BlockManagerMaster: Registered BlockManager BlockManagerId(driver, spark-app-0-driver-svc.spark.svc, 7079, None)
+2026-02-11 14:53:07.780 | 26/02/11 20:53:07 INFO BlockManager: Initialized BlockManager: BlockManagerId(driver, spark-app-0-driver-svc.spark.svc, 7079, None)
+2026-02-11 14:53:07.796 | 26/02/11 20:53:07 WARN Utils: spark.executor.instances less than spark.dynamicAllocation.minExecutors is invalid, ignoring its setting, please update your configs.
+2026-02-11 14:53:07.797 | 26/02/11 20:53:07 INFO Utils: Using initial executors = 2, max of spark.dynamicAllocation.initialExecutors,spark.dynamicAllocation.minExecutors and spark.executor.instances
+2026-02-11 14:53:07.799 | 26/02/11 20:53:07 INFO ExecutorAllocationManager: Dynamic allocation is enabled without a shuffle service.
+2026-02-11 14:53:07.847 | 26/02/11 20:53:07 INFO KubernetesClientUtils: Spark configuration files loaded from Some(/opt/spark/conf) : spark.kubernetes.namespace
+2026-02-11 14:53:07.850 | 26/02/11 20:53:07 INFO BasicExecutorFeatureStep: Decommissioning not enabled, skipping shutdown script
+2026-02-11 14:53:14.065 | 26/02/11 20:53:14 INFO KubernetesClusterSchedulerBackend$KubernetesDriverEndpoint: Registered executor NettyRpcEndpointRef(spark-client://Executor) (10.1.10.229:35228) with ID 1, ResourceProfileId 0
+2026-02-11 14:53:14.069 | 26/02/11 20:53:14 INFO ExecutorMonitor: New executor 1 has registered (new total is 1)
+2026-02-11 14:53:14.163 | 26/02/11 20:53:14 INFO BlockManagerMasterEndpoint: Registering block manager 10.1.10.229:35159 with 2.2 GiB RAM, BlockManagerId(1, 10.1.10.229, 35159, None)
+2026-02-11 14:53:37.699 | 26/02/11 20:53:37 INFO KubernetesClusterSchedulerBackend: SchedulerBackend is ready for scheduling beginning after waiting maxRegisteredResourcesWaitingTime: 30000.0(ms)
+2026-02-11 14:53:39.260 | 2026-02-11 20:53:39,259 - SparkPreprocessIceberg - INFO - SparkSession created with Iceberg catalog at s3a://k8s-mlops-platform-bucket/warehouse
+2026-02-11 14:53:39.260 | 2026-02-11 20:53:39,260 - SparkPreprocessIceberg - INFO - Computation optimizations enabled: AQE, broadcast threshold=50MB, adaptive shuffle
+2026-02-11 14:53:39.260 | 2026-02-11 20:53:39,260 - SparkPreprocessIceberg - INFO - Artifacts config: bucket=k8s-mlops-platform-bucket, prefix=pipelines
+2026-02-11 14:53:39.260 | 2026-02-11 20:53:39,260 - SparkPreprocessIceberg - INFO - Prometheus metrics server started on port 8001
+2026-02-11 14:53:39.335 | 26/02/11 20:53:39 INFO SharedState: Setting hive.metastore.warehouse.dir ('null') to the value of spark.sql.warehouse.dir.
+2026-02-11 14:53:39.341 | 26/02/11 20:53:39 INFO SharedState: Warehouse path is 'file:/opt/spark/work-dir/spark-warehouse'.
+2026-02-11 14:53:40.099 | 26/02/11 20:53:40 WARN MetricsConfig: Cannot locate configuration: tried hadoop-metrics2-s3a-file-system.properties,hadoop-metrics2.properties
+2026-02-11 14:53:40.110 | 26/02/11 20:53:40 INFO MetricsSystemImpl: Scheduled Metric snapshot period at 10 second(s).
+2026-02-11 14:53:40.110 | 26/02/11 20:53:40 INFO MetricsSystemImpl: s3a-file-system metrics system started
+2026-02-11 14:53:40.604 | 26/02/11 20:53:40 INFO CatalogUtil: Loading custom FileIO implementation: org.apache.iceberg.hadoop.HadoopFileIO
+2026-02-11 14:53:45.828 | {"ts": "2026-02-11 20:53:45.780", "level": "ERROR", "logger": "SQLQueryContextLogger", "msg": "[TABLE_OR_VIEW_NOT_FOUND] The table or view `iceberg`.`raw`.`network_traffic_raw`.`snapshots` cannot be found. Verify the spelling and correctness of the schema and catalog.\nIf you did not qualify the name with a schema, verify the current_schema() output, or qualify the name with the correct schema and catalog.\nTo tolerate the error on drop use DROP VIEW IF EXISTS or DROP TABLE IF EXISTS. SQLSTATE: 42P01", "context": {"errorClass": "TABLE_OR_VIEW_NOT_FOUND"}, "exception": {"class": "Py4JJavaError", "msg": "An error occurred while calling o116.sql.\n: org.apache.spark.sql.AnalysisException: [TABLE_OR_VIEW_NOT_FOUND] The table or view `iceberg`.`raw`.`network_traffic_raw`.`snapshots` cannot be found. Verify the spelling and correctness of the schema and catalog.\nIf you did not qualify the name with a schema, verify the current_schema() output, or qualify the name with the correct schema and catalog.\nTo tolerate the error on drop use DROP VIEW IF EXISTS or DROP TABLE IF EXISTS. SQLSTATE: 42P01; line 1 pos 24;\n'GlobalLimit 1\n+- 'LocalLimit 1\n   +- 'Sort ['committed_at DESC NULLS LAST], true\n      +- 'Project ['snapshot_id]\n         +- 'UnresolvedRelation [iceberg, raw, network_traffic_raw, snapshots], [], false\n\n\tat org.apache.spark.sql.catalyst.analysis.package$AnalysisErrorAt.tableNotFound(package.scala:91)\n\tat org.apache.spark.sql.catalyst.analysis.CheckAnalysis.$anonfun$checkAnalysis0$2(CheckAnalysis.scala:306)\n\tat org.apache.spark.sql.catalyst.analysis.CheckAnalysis.$anonfun$checkAnalysis0$2$adapted(CheckAnalysis.scala:284)\n\tat org.apache.spark.sql.catalyst.trees.TreeNode.foreachUp(TreeNode.scala:252)\n\tat org.apache.spark.sql.catalyst.trees.TreeNode.$anonfun$foreachUp$1(TreeNode.scala:251)\n\tat org.apache.spark.sql.catalyst.trees.TreeNode.$anonfun$foreachUp$1$adapted(TreeNode.scala:251)\n\tat scala.collection.immutable.Vector.foreach(Vector.scala:2125)\n\tat org.apache.spark.sql.catalyst.trees.TreeNode.foreachUp(TreeNode.scala:251)\n\tat org.apache.spark.sql.catalyst.trees.TreeNode.$anonfun$foreachUp$1(TreeNode.scala:251)\n\tat org.apache.spark.sql.catalyst.trees.TreeNode.$anonfun$foreachUp$1$adapted(TreeNode.scala:251)\n\tat scala.collection.immutable.Vector.foreach(Vector.scala:2125)\n\tat org.apache.spark.sql.catalyst.trees.TreeNode.foreachUp(TreeNode.scala:251)\n\tat org.apache.spark.sql.catalyst.trees.TreeNode.$anonfun$foreachUp$1(TreeNode.scala:251)\n\tat org.apache.spark.sql.catalyst.trees.TreeNode.$anonfun$foreachUp$1$adapted(TreeNode.scala:251)\n\tat scala.collection.immutable.Vector.foreach(Vector.scala:2125)\n\tat org.apache.spark.sql.catalyst.trees.TreeNode.foreachUp(TreeNode.scala:251)\n\tat org.apache.spark.sql.catalyst.trees.TreeNode.$anonfun$foreachUp$1(TreeNode.scala:251)\n\tat org.apache.spark.sql.catalyst.trees.TreeNode.$anonfun$foreachUp$1$adapted(TreeNode.scala:251)\n\tat scala.collection.immutable.Vector.foreach(Vector.scala:2125)\n\tat org.apache.spark.sql.catalyst.trees.TreeNode.foreachUp(TreeNode.scala:251)\n\tat org.apache.spark.sql.catalyst.analysis.CheckAnalysis.checkAnalysis0(CheckAnalysis.scala:284)\n\tat org.apache.spark.sql.catalyst.analysis.CheckAnalysis.checkAnalysis0$(CheckAnalysis.scala:255)\n\tat org.apache.spark.sql.catalyst.analysis.Analyzer.checkAnalysis0(Analyzer.scala:299)\n\tat org.apache.spark.sql.catalyst.analysis.CheckAnalysis.checkAnalysis(CheckAnalysis.scala:244)\n\tat org.apache.spark.sql.catalyst.analysis.CheckAnalysis.checkAnalysis$(CheckAnalysis.scala:231)\n\tat org.apache.spark.sql.catalyst.analysis.Analyzer.checkAnalysis(Analyzer.scala:299)\n\tat org.apache.spark.sql.catalyst.analysis.resolver.HybridAnalyzer.$anonfun$resolveInFixedPoint$1(HybridAnalyzer.scala:192)\n\tat scala.runtime.java8.JFunction0$mcV$sp.apply(JFunction0$mcV$sp.scala:18)\n\tat org.apache.spark.sql.catalyst.QueryPlanningTracker$.withTracker(QueryPlanningTracker.scala:89)\n\tat org.apache.spark.sql.catalyst.analysis.resolver.HybridAnalyzer.resolveInFixedPoint(HybridAnalyzer.scala:192)\n\tat org.apache.spark.sql.catalyst.analysis.resolver.HybridAnalyzer.$anonfun$apply$1(HybridAnalyzer.scala:76)\n\tat org.apache.spark.sql.catalyst.analysis.resolver.HybridAnalyzer.withTrackedAnalyzerBridgeState(HybridAnalyzer.scala:111)\n\tat org.apache.spark.sql.catalyst.analysis.resolver.HybridAnalyzer.apply(HybridAnalyzer.scala:71)\n\tat org.apache.spark.sql.catalyst.analysis.Analyzer.$anonfun$executeAndCheck$1(Analyzer.scala:330)\n\tat org.apache.spark.sql.catalyst.plans.logical.AnalysisHelper$.markInAnalyzer(AnalysisHelper.scala:423)\n\tat org.apache.spark.sql.catalyst.analysis.Analyzer.executeAndCheck(Analyzer.scala:330)\n\tat org.apache.spark.sql.execution.QueryExecution.$anonfun$lazyAnalyzed$2(QueryExecution.scala:110)\n\tat org.apache.spark.sql.catalyst.QueryPlanningTracker.measurePhase(QueryPlanningTracker.scala:148)\n\tat org.apache.spark.sql.execution.QueryExecution.$anonfun$executePhase$2(QueryExecution.scala:278)\n\tat org.apache.spark.sql.execution.QueryExecution$.withInternalError(QueryExecution.scala:654)\n\tat org.apache.spark.sql.execution.QueryExecution.$anonfun$executePhase$1(QueryExecution.scala:278)\n\tat org.apache.spark.sql.SparkSession.withActive(SparkSession.scala:804)\n\tat org.apache.spark.sql.execution.QueryExecution.executePhase(QueryExecution.scala:277)\n\tat org.apache.spark.sql.execution.QueryExecution.$anonfun$lazyAnalyzed$1(QueryExecution.scala:110)\n\tat scala.util.Try$.apply(Try.scala:217)\n\tat org.apache.spark.util.Utils$.doTryWithCallerStacktrace(Utils.scala:1378)\n\tat org.apache.spark.util.Utils$.getTryWithCallerStacktrace(Utils.scala:1439)\n\tat org.apache.spark.util.LazyTry.get(LazyTry.scala:58)\n\tat org.apache.spark.sql.execution.QueryExecution.analyzed(QueryExecution.scala:121)\n\tat org.apache.spark.sql.execution.QueryExecution.assertAnalyzed(QueryExecution.scala:80)\n\tat org.apache.spark.sql.classic.Dataset$.$anonfun$ofRows$5(Dataset.scala:139)\n\tat org.apache.spark.sql.SparkSession.withActive(SparkSession.scala:804)\n\tat org.apache.spark.sql.classic.Dataset$.ofRows(Dataset.scala:136)\n\tat org.apache.spark.sql.classic.SparkSession.$anonfun$sql$1(SparkSession.scala:462)\n\tat org.apache.spark.sql.SparkSession.withActive(SparkSession.scala:804)\n\tat org.apache.spark.sql.classic.SparkSession.sql(SparkSession.scala:449)\n\tat org.apache.spark.sql.classic.SparkSession.sql(SparkSession.scala:467)\n\tat org.apache.spark.sql.classic.SparkSession.sql(SparkSession.scala:91)\n\tat java.base/jdk.internal.reflect.NativeMethodAccessorImpl.invoke0(Native Method)\n\tat java.base/jdk.internal.reflect.NativeMethodAccessorImpl.invoke(NativeMethodAccessorImpl.java:77)\n\tat java.base/jdk.internal.reflect.DelegatingMethodAccessorImpl.invoke(DelegatingMethodAccessorImpl.java:43)\n\tat java.base/java.lang.reflect.Method.invoke(Method.java:569)\n\tat py4j.reflection.MethodInvoker.invoke(MethodInvoker.java:244)\n\tat py4j.reflection.ReflectionEngine.invoke(ReflectionEngine.java:374)\n\tat py4j.Gateway.invoke(Gateway.java:282)\n\tat py4j.commands.AbstractCommand.invokeMethod(AbstractCommand.java:132)\n\tat py4j.commands.CallCommand.execute(CallCommand.java:79)\n\tat py4j.ClientServerConnection.waitForCommands(ClientServerConnection.java:184)\n\tat py4j.ClientServerConnection.run(ClientServerConnection.java:108)\n\tat java.base/java.lang.Thread.run(Thread.java:840)\n\tSuppressed: org.apache.spark.util.Utils$OriginalTryStackTraceException: Full stacktrace of original doTryWithCallerStacktrace caller\n\t\tat org.apache.spark.sql.catalyst.analysis.package$AnalysisErrorAt.tableNotFound(package.scala:91)\n\t\tat org.apache.spark.sql.catalyst.analysis.CheckAnalysis.$anonfun$checkAnalysis0$2(CheckAnalysis.scala:306)\n\t\tat org.apache.spark.sql.catalyst.analysis.CheckAnalysis.$anonfun$checkAnalysis0$2$adapted(CheckAnalysis.scala:284)\n\t\tat org.apache.spark.sql.catalyst.trees.TreeNode.foreachUp(TreeNode.scala:252)\n\t\tat org.apache.spark.sql.catalyst.trees.TreeNode.$anonfun$foreachUp$1(TreeNode.scala:251)\n\t\tat org.apache.spark.sql.catalyst.trees.TreeNode.$anonfun$foreachUp$1$adapted(TreeNode.scala:251)\n\t\tat scala.collection.immutable.Vector.foreach(Vector.scala:2125)\n\t\tat org.apache.spark.sql.catalyst.trees.TreeNode.foreachUp(TreeNode.scala:251)\n\t\tat org.apache.spark.sql.catalyst.trees.TreeNode.$anonfun$foreachUp$1(TreeNode.scala:251)\n\t\tat org.apache.spark.sql.catalyst.trees.TreeNode.$anonfun$foreachUp$1$adapted(TreeNode.scala:251)\n\t\tat scala.collection.immutable.Vector.foreach(Vector.scala:2125)\n\t\tat org.apache.spark.sql.catalyst.trees.TreeNode.foreachUp(TreeNode.scala:251)\n\t\tat org.apache.spark.sql.catalyst.trees.TreeNode.$anonfun$foreachUp$1(TreeNode.scala:251)\n\t\tat org.apache.spark.sql.catalyst.trees.TreeNode.$anonfun$foreachUp$1$adapted(TreeNode.scala:251)\n\t\tat scala.collection.immutable.Vector.foreach(Vector.scala:2125)\n\t\tat org.apache.spark.sql.catalyst.trees.TreeNode.foreachUp(TreeNode.scala:251)\n\t\tat org.apache.spark.sql.catalyst.trees.TreeNode.$anonfun$foreachUp$1(TreeNode.scala:251)\n\t\tat org.apache.spark.sql.catalyst.trees.TreeNode.$anonfun$foreachUp$1$adapted(TreeNode.scala:251)\n\t\tat scala.collection.immutable.Vector.foreach(Vector.scala:2125)\n\t\tat org.apache.spark.sql.catalyst.trees.TreeNode.foreachUp(TreeNode.scala:251)\n\t\tat org.apache.spark.sql.catalyst.analysis.CheckAnalysis.checkAnalysis0(CheckAnalysis.scala:284)\n\t\tat org.apache.spark.sql.catalyst.analysis.CheckAnalysis.checkAnalysis0$(CheckAnalysis.scala:255)\n\t\tat org.apache.spark.sql.catalyst.analysis.Analyzer.checkAnalysis0(Analyzer.scala:299)\n\t\tat org.apache.spark.sql.catalyst.analysis.CheckAnalysis.checkAnalysis(CheckAnalysis.scala:244)\n\t\tat org.apache.spark.sql.catalyst.analysis.CheckAnalysis.checkAnalysis$(CheckAnalysis.scala:231)\n\t\tat org.apache.spark.sql.catalyst.analysis.Analyzer.checkAnalysis(Analyzer.scala:299)\n\t\tat org.apache.spark.sql.catalyst.analysis.resolver.HybridAnalyzer.$anonfun$resolveInFixedPoint$1(HybridAnalyzer.scala:192)\n\t\tat scala.runtime.java8.JFunction0$mcV$sp.apply(JFunction0$mcV$sp.scala:18)\n\t\tat org.apache.spark.sql.catalyst.QueryPlanningTracker$.withTracker(QueryPlanningTracker.scala:89)\n\t\tat org.apache.spark.sql.catalyst.analysis.resolver.HybridAnalyzer.resolveInFixedPoint(HybridAnalyzer.scala:192)\n\t\tat org.apache.spark.sql.catalyst.analysis.resolver.HybridAnalyzer.$anonfun$apply$1(HybridAnalyzer.scala:76)\n\t\tat org.apache.spark.sql.catalyst.analysis.resolver.HybridAnalyzer.withTrackedAnalyzerBridgeState(HybridAnalyzer.scala:111)\n\t\tat org.apache.spark.sql.catalyst.analysis.resolver.HybridAnalyzer.apply(HybridAnalyzer.scala:71)\n\t\tat org.apache.spark.sql.catalyst.analysis.Analyzer.$anonfun$executeAndCheck$1(Analyzer.scala:330)\n\t\tat org.apache.spark.sql.catalyst.plans.logical.AnalysisHelper$.markInAnalyzer(AnalysisHelper.scala:423)\n\t\tat org.apache.spark.sql.catalyst.analysis.Analyzer.executeAndCheck(Analyzer.scala:330)\n\t\tat org.apache.spark.sql.execution.QueryExecution.$anonfun$lazyAnalyzed$2(QueryExecution.scala:110)\n\t\tat org.apache.spark.sql.catalyst.QueryPlanningTracker.measurePhase(QueryPlanningTracker.scala:148)\n\t\tat org.apache.spark.sql.execution.QueryExecution.$anonfun$executePhase$2(QueryExecution.scala:278)\n\t\tat org.apache.spark.sql.execution.QueryExecution$.withInternalError(QueryExecution.scala:654)\n\t\tat org.apache.spark.sql.execution.QueryExecution.$anonfun$executePhase$1(QueryExecution.scala:278)\n\t\tat org.apache.spark.sql.SparkSession.withActive(SparkSession.scala:804)\n\t\tat org.apache.spark.sql.execution.QueryExecution.executePhase(QueryExecution.scala:277)\n\t\tat org.apache.spark.sql.execution.QueryExecution.$anonfun$lazyAnalyzed$1(QueryExecution.scala:110)\n\t\tat scala.util.Try$.apply(Try.scala:217)\n\t\tat org.apache.spark.util.Utils$.doTryWithCallerStacktrace(Utils.scala:1378)\n\t\tat org.apache.spark.util.LazyTry.tryT$lzycompute(LazyTry.scala:46)\n\t\tat org.apache.spark.util.LazyTry.tryT(LazyTry.scala:46)\n\t\t... 23 more\n", "stacktrace": [{"class": null, "method": "deco", "file": "/opt/spark/python/lib/pyspark.zip/pyspark/errors/exceptions/captured.py", "line": "282"}, {"class": null, "method": "get_return_value", "file": "/opt/spark/python/lib/py4j-0.10.9.9-src.zip/py4j/protocol.py", "line": "327"}]}}
+2026-02-11 14:53:45.840 | 2026-02-11 20:53:45,835 - SparkPreprocessIceberg - ERROR - Failed to get snapshot from iceberg.raw.network_traffic_raw: [TABLE_OR_VIEW_NOT_FOUND] The table or view `iceberg`.`raw`.`network_traffic_raw`.`snapshots` cannot be found. Verify the spelling and correctness of the schema and catalog.
+2026-02-11 14:53:45.840 | If you did not qualify the name with a schema, verify the current_schema() output, or qualify the name with the correct schema and catalog.
+2026-02-11 14:53:45.840 | To tolerate the error on drop use DROP VIEW IF EXISTS or DROP TABLE IF EXISTS. SQLSTATE: 42P01; line 1 pos 24;
+2026-02-11 14:53:45.840 | 'GlobalLimit 1
+2026-02-11 14:53:45.840 | +- 'LocalLimit 1
+2026-02-11 14:53:45.840 |    +- 'Sort ['committed_at DESC NULLS LAST], true
+2026-02-11 14:53:45.840 |       +- 'Project ['snapshot_id]
+2026-02-11 14:53:45.840 |          +- 'UnresolvedRelation [iceberg, raw, network_traffic_raw, snapshots], [], false
+2026-02-11 14:53:45.840 | Traceback (most recent call last):
+2026-02-11 14:53:45.840 |   File "/app/repo/k3s/spark/main.py", line 209, in get_raw_snapshot_id
+2026-02-11 14:53:45.840 |     snapshots = self.spark.sql(
+2026-02-11 14:53:45.840 |                 ^^^^^^^^^^^^^^^
+2026-02-11 14:53:45.840 |   File "/opt/spark/python/lib/pyspark.zip/pyspark/sql/session.py", line 1810, in sql
+2026-02-11 14:53:45.840 |     return DataFrame(self._jsparkSession.sql(sqlQuery, litArgs), self)
+2026-02-11 14:53:45.840 |                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-02-11 14:53:45.840 |   File "/opt/spark/python/lib/py4j-0.10.9.9-src.zip/py4j/java_gateway.py", line 1362, in __call__
+2026-02-11 14:53:45.840 |     return_value = get_return_value(
+2026-02-11 14:53:45.840 |                    ^^^^^^^^^^^^^^^^^
+2026-02-11 14:53:45.840 |   File "/opt/spark/python/lib/pyspark.zip/pyspark/errors/exceptions/captured.py", line 288, in deco
+2026-02-11 14:53:45.840 |     raise converted from None
+2026-02-11 14:53:45.840 | pyspark.errors.exceptions.captured.AnalysisException: [TABLE_OR_VIEW_NOT_FOUND] The table or view `iceberg`.`raw`.`network_traffic_raw`.`snapshots` cannot be found. Verify the spelling and correctness of the schema and catalog.
+2026-02-11 14:53:45.840 | If you did not qualify the name with a schema, verify the current_schema() output, or qualify the name with the correct schema and catalog.
+2026-02-11 14:53:45.840 | To tolerate the error on drop use DROP VIEW IF EXISTS or DROP TABLE IF EXISTS. SQLSTATE: 42P01; line 1 pos 24;
+2026-02-11 14:53:45.840 | 'GlobalLimit 1
+2026-02-11 14:53:45.840 | +- 'LocalLimit 1
+2026-02-11 14:53:45.840 |    +- 'Sort ['committed_at DESC NULLS LAST], true
+2026-02-11 14:53:45.840 |       +- 'Project ['snapshot_id]
+2026-02-11 14:53:45.840 |          +- 'UnresolvedRelation [iceberg, raw, network_traffic_raw, snapshots], [], false
+2026-02-11 14:53:45.840 | 
+2026-02-11 14:53:45.844 | 2026-02-11 20:53:45,842 - SparkPreprocessIceberg - ERROR - Preprocessing pipeline failed: [TABLE_OR_VIEW_NOT_FOUND] The table or view `iceberg`.`raw`.`network_traffic_raw`.`snapshots` cannot be found. Verify the spelling and correctness of the schema and catalog.
+2026-02-11 14:53:45.844 | If you did not qualify the name with a schema, verify the current_schema() output, or qualify the name with the correct schema and catalog.
+2026-02-11 14:53:45.844 | To tolerate the error on drop use DROP VIEW IF EXISTS or DROP TABLE IF EXISTS. SQLSTATE: 42P01; line 1 pos 24;
+2026-02-11 14:53:45.844 | 'GlobalLimit 1
+2026-02-11 14:53:45.844 | +- 'LocalLimit 1
+2026-02-11 14:53:45.844 |    +- 'Sort ['committed_at DESC NULLS LAST], true
+2026-02-11 14:53:45.844 |       +- 'Project ['snapshot_id]
+2026-02-11 14:53:45.844 |          +- 'UnresolvedRelation [iceberg, raw, network_traffic_raw, snapshots], [], false
+2026-02-11 14:53:45.844 | Traceback (most recent call last):
+2026-02-11 14:53:45.844 |   File "/app/repo/k3s/spark/main.py", line 613, in run_preprocessing_pipeline
+2026-02-11 14:53:45.844 |     raw_snapshot = self.get_raw_snapshot_id()
+2026-02-11 14:53:45.844 |                    ^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-02-11 14:53:45.844 |   File "/app/repo/k3s/spark/main.py", line 209, in get_raw_snapshot_id
+2026-02-11 14:53:45.844 |     snapshots = self.spark.sql(
+2026-02-11 14:53:45.844 |                 ^^^^^^^^^^^^^^^
+2026-02-11 14:53:45.844 |   File "/opt/spark/python/lib/pyspark.zip/pyspark/sql/session.py", line 1810, in sql
+2026-02-11 14:53:45.844 |     return DataFrame(self._jsparkSession.sql(sqlQuery, litArgs), self)
+2026-02-11 14:53:45.844 |                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-02-11 14:53:45.844 |   File "/opt/spark/python/lib/py4j-0.10.9.9-src.zip/py4j/java_gateway.py", line 1362, in __call__
+2026-02-11 14:53:45.844 |     return_value = get_return_value(
+2026-02-11 14:53:45.844 |                    ^^^^^^^^^^^^^^^^^
+2026-02-11 14:53:45.844 |   File "/opt/spark/python/lib/pyspark.zip/pyspark/errors/exceptions/captured.py", line 288, in deco
+2026-02-11 14:53:45.844 |     raise converted from None
+2026-02-11 14:53:45.844 | pyspark.errors.exceptions.captured.AnalysisException: [TABLE_OR_VIEW_NOT_FOUND] The table or view `iceberg`.`raw`.`network_traffic_raw`.`snapshots` cannot be found. Verify the spelling and correctness of the schema and catalog.
+2026-02-11 14:53:45.844 | If you did not qualify the name with a schema, verify the current_schema() output, or qualify the name with the correct schema and catalog.
+2026-02-11 14:53:45.844 | To tolerate the error on drop use DROP VIEW IF EXISTS or DROP TABLE IF EXISTS. SQLSTATE: 42P01; line 1 pos 24;
+2026-02-11 14:53:45.844 | 'GlobalLimit 1
+2026-02-11 14:53:45.844 | +- 'LocalLimit 1
+2026-02-11 14:53:45.844 |    +- 'Sort ['committed_at DESC NULLS LAST], true
+2026-02-11 14:53:45.844 |       +- 'Project ['snapshot_id]
+2026-02-11 14:53:45.844 |          +- 'UnresolvedRelation [iceberg, raw, network_traffic_raw, snapshots], [], false
+2026-02-11 14:53:45.844 | 
+2026-02-11 14:53:45.844 | Traceback (most recent call last):
+2026-02-11 14:53:45.844 |   File "/app/repo/k3s/spark/main.py", line 858, in <module>
+2026-02-11 14:53:45.845 |     main()
+2026-02-11 14:53:45.845 |   File "/app/repo/k3s/spark/main.py", line 847, in main
+2026-02-11 14:53:45.846 |     job.run_preprocessing_pipeline(
+2026-02-11 14:53:45.846 |   File "/app/repo/k3s/spark/main.py", line 613, in run_preprocessing_pipeline
+2026-02-11 14:53:45.847 |     raw_snapshot = self.get_raw_snapshot_id()
+2026-02-11 14:53:45.848 |                    ^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-02-11 14:53:45.848 |   File "/app/repo/k3s/spark/main.py", line 209, in get_raw_snapshot_id
+2026-02-11 14:53:45.849 |     snapshots = self.spark.sql(
+2026-02-11 14:53:45.849 |                 ^^^^^^^^^^^^^^^
+2026-02-11 14:53:45.849 |   File "/opt/spark/python/lib/pyspark.zip/pyspark/sql/session.py", line 1810, in sql
+2026-02-11 14:53:45.850 |   File "/opt/spark/python/lib/py4j-0.10.9.9-src.zip/py4j/java_gateway.py", line 1362, in __call__
+2026-02-11 14:53:45.852 |   File "/opt/spark/python/lib/pyspark.zip/pyspark/errors/exceptions/captured.py", line 288, in deco
+2026-02-11 14:53:45.853 | pyspark.errors.exceptions.captured.AnalysisException: [TABLE_OR_VIEW_NOT_FOUND] The table or view `iceberg`.`raw`.`network_traffic_raw`.`snapshots` cannot be found. Verify the spelling and correctness of the schema and catalog.
+2026-02-11 14:53:45.853 | If you did not qualify the name with a schema, verify the current_schema() output, or qualify the name with the correct schema and catalog.
+2026-02-11 14:53:45.853 | To tolerate the error on drop use DROP VIEW IF EXISTS or DROP TABLE IF EXISTS. SQLSTATE: 42P01; line 1 pos 24;
+2026-02-11 14:53:45.853 | 'GlobalLimit 1
+2026-02-11 14:53:45.853 | +- 'LocalLimit 1
+2026-02-11 14:53:45.853 |    +- 'Sort ['committed_at DESC NULLS LAST], true
+2026-02-11 14:53:45.853 |       +- 'Project ['snapshot_id]
+2026-02-11 14:53:45.853 |          +- 'UnresolvedRelation [iceberg, raw, network_traffic_raw, snapshots], [], false
+2026-02-11 14:53:45.853 | 
+2026-02-11 14:53:45.980 | 26/02/11 20:53:45 INFO SparkContext: SparkContext is stopping with exitCode 0 from stop at SparkSubmit.scala:1036.
+2026-02-11 14:53:45.990 | 26/02/11 20:53:45 INFO SparkUI: Stopped Spark web UI at http://spark-app-0-driver-svc.spark.svc:4040
+2026-02-11 14:53:45.993 | 26/02/11 20:53:45 INFO KubernetesClusterSchedulerBackend: Shutting down all executors
+2026-02-11 14:53:45.993 | 26/02/11 20:53:45 INFO KubernetesClusterSchedulerBackend$KubernetesDriverEndpoint: Asking each executor to shut down
+2026-02-11 14:53:45.999 | 26/02/11 20:53:45 INFO ExecutorPodsWatchSnapshotSource: Kubernetes client has been closed.
+2026-02-11 14:53:46.143 | 26/02/11 20:53:46 INFO MapOutputTrackerMasterEndpoint: MapOutputTrackerMasterEndpoint stopped!
+2026-02-11 14:53:46.163 | 26/02/11 20:53:46 INFO MemoryStore: MemoryStore started with capacity 1048.8 MiB
+2026-02-11 14:53:46.163 | 26/02/11 20:53:46 INFO MemoryStore: MemoryStore cleared
+2026-02-11 14:53:46.164 | 26/02/11 20:53:46 INFO BlockManager: BlockManager stopped
+2026-02-11 14:53:46.168 | 26/02/11 20:53:46 INFO BlockManagerMaster: BlockManagerMaster stopped
+2026-02-11 14:53:46.170 | 26/02/11 20:53:46 INFO OutputCommitCoordinator$OutputCommitCoordinatorEndpoint: OutputCommitCoordinator stopped!
+2026-02-11 14:53:46.180 | 26/02/11 20:53:46 INFO SparkContext: Successfully stopped SparkContext
+2026-02-11 14:53:46.182 | 26/02/11 20:53:46 INFO ShutdownHookManager: Shutdown hook called
+2026-02-11 14:53:46.182 | 26/02/11 20:53:46 INFO ShutdownHookManager: Deleting directory /var/data/spark-2c66602a-e691-4022-b4a2-2bec6641324c/spark-7ab8e513-94d6-44ce-9317-23900c5f6b68/pyspark-15ae488f-aa72-4d80-a930-f07b57c15810
+2026-02-11 14:53:46.185 | 26/02/11 20:53:46 INFO ShutdownHookManager: Deleting directory /tmp/spark-feeb469a-f562-4a9a-8f1d-5ea401b87cae
+2026-02-11 14:53:46.188 | 26/02/11 20:53:46 INFO ShutdownHookManager: Deleting directory /tmp/spark-04a19bfd-b26c-498e-835c-9865ad7edb78
+2026-02-11 14:53:46.190 | 26/02/11 20:53:46 INFO ShutdownHookManager: Deleting directory /var/data/spark-2c66602a-e691-4022-b4a2-2bec6641324c/spark-7ab8e513-94d6-44ce-9317-23900c5f6b68
+2026-02-11 14:53:46.193 | 26/02/11 20:53:46 INFO ShutdownHookManager: Deleting directory /tmp/artifacts-618ca91d-f363-4e06-a82f-1eb4a40807d1
+2026-02-11 14:53:46.195 | 26/02/11 20:53:46 INFO ShutdownHookManager: Deleting directory /tmp/spark-cdf1e79e-c1bb-45f7-b351-fbc6d7c11169
+2026-02-11 14:53:46.198 | 26/02/11 20:53:46 INFO ShutdownHookManager: Deleting directory /tmp/localPyFiles-228113eb-000a-4172-8208-ca66c1675b7d
+2026-02-11 14:53:46.201 | 26/02/11 20:53:46 INFO ShutdownHookManager: Deleting directory /tmp/spark-44910d48-e499-42cf-94e9-a0eef3d73fdd
+2026-02-11 14:53:46.208 | 26/02/11 20:53:46 INFO MetricsSystemImpl: Stopping s3a-file-system metrics system...
+2026-02-11 14:53:46.209 | 26/02/11 20:53:46 INFO MetricsSystemImpl: s3a-file-system metrics system stopped.
+2026-02-11 14:53:46.209 | 26/02/11 20:53:46 INFO MetricsSystemImpl: s3a-file-system metrics system shutdown complete.

@@ -200,21 +200,86 @@ class SparkPreprocessIceberg(BaseUtils):
         self.logger.info("Computation optimizations enabled: AQE, broadcast threshold=50MB, adaptive shuffle")
         return spark
 
+    def _resolve_table_name(self, table_full_name: str) -> str:
+        """
+        Intenta resolver variantes de namespace cuando el layout físico usa `<namespace>.db`.
+        Devuelve el primer identificador que exista según Spark.
+        """
+        try:
+            # 1) Direct check
+            try:
+                if self.spark.catalog.tableExists(table_full_name):
+                    return table_full_name
+            except Exception:
+                # tableExists puede fallar para nombres con catalog.namespace.table; ignorar
+                pass
+
+            parts = table_full_name.split('.')
+            # Si tiene 3 partes: catalog.namespace.table
+            if len(parts) >= 3:
+                catalog = parts[0]
+                namespace = parts[1]
+                tbl = '.'.join(parts[2:])
+
+                # 2) Try namespace with .db suffix (common Hive layout)
+                alt_namespace = f"{namespace}.db"
+                candidate = f"{catalog}.`{alt_namespace}`.{tbl}"
+                try:
+                    if self.spark.catalog.tableExists(candidate):
+                        return candidate
+                except Exception:
+                    # fallback to checking SHOW NAMESPACES
+                    try:
+                        ns_rows = [r[0] for r in self.spark.sql(f"SHOW NAMESPACES IN {catalog}").collect()]
+                        if alt_namespace in ns_rows:
+                            cand2 = f"{catalog}.`{alt_namespace}`.{tbl}"
+                            try:
+                                if self.spark.catalog.tableExists(cand2):
+                                    return cand2
+                            except Exception:
+                                pass
+                    except Exception:
+                        pass
+
+                # 3) As a last resort try namespace as-is without catalog prefix
+                try:
+                    if self.spark.catalog.tableExists(f"{namespace}.{tbl}"):
+                        return f"{namespace}.{tbl}"
+                except Exception:
+                    pass
+
+            # No se encontró variante
+            return None
+        except Exception as e:
+            self.logger.debug(f"_resolve_table_name error: {e}")
+            return None
+
     def get_raw_snapshot_id(self) -> int:
         """
         Obtiene el snapshot ID actual de la tabla raw.
         Este snapshot representa el estado exacto de los datos crudos.
         """
         try:
+            # Verificar existencia de la tabla antes de consultar system table snapshots
+            # Resolve possible namespace variants (e.g., raw vs raw.db)
+            resolved_table = self._resolve_table_name(self.raw_table)
+            if not resolved_table:
+                self.logger.warning(f"Raw table does not exist yet (tried variants): {self.raw_table}")
+                return None
+
             snapshots = self.spark.sql(
-                f"SELECT snapshot_id FROM {self.raw_table}.snapshots ORDER BY committed_at DESC LIMIT 1"
+                f"SELECT snapshot_id FROM {resolved_table}.snapshots ORDER BY committed_at DESC LIMIT 1"
             )
-            snapshot_id = snapshots.collect()[0]['snapshot_id']
+            rows = snapshots.collect()
+            if not rows:
+                self.logger.warning(f"No snapshots found for {resolved_table}")
+                return None
+            snapshot_id = rows[0]['snapshot_id']
             self.logger.info(f"Raw table snapshot: {snapshot_id}")
             return snapshot_id
         except Exception as e:
             self.logger.error(f"Failed to get snapshot from {self.raw_table}: {e}", exc_info=True)
-            raise
+            return None
 
     def load_raw_data_by_date_range(self, start_date: str, end_date: str):
         """
@@ -232,8 +297,11 @@ class SparkPreprocessIceberg(BaseUtils):
         try:
             self.logger.info(f"Loading raw data: {start_date} to {end_date} using explicit schema")
             
-            # Leer la tabla raw y forzar el esquema
-            df = self.spark.table(self.raw_table).to(self.schema)
+            # Leer la tabla raw y forzar el esquema. Intentar variantes (raw vs raw.db)
+            resolved_table = self._resolve_table_name(self.raw_table)
+            if not resolved_table:
+                raise RuntimeError(f"Raw table not found: attempted {self.raw_table} and variants")
+            df = self.spark.table(resolved_table).to(self.schema)
             
             # Robust timestamp conversion
             if 'timestamp' in df.columns:
