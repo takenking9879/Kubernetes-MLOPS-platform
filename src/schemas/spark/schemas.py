@@ -4,7 +4,7 @@
    proporcionamos sustitutos ligeros cuando no esté disponible.
 """
 try:
-    from pyspark.sql.types import StructType, StructField, LongType, DoubleType, StringType
+    from pyspark.sql.types import StructType, StructField, LongType, DoubleType, StringType, TimestampType
 except Exception:
     # Minimal lightweight stand-ins so the module can be imported without pyspark.
     class StructField:
@@ -28,6 +28,7 @@ except Exception:
     class LongType: pass
     class DoubleType: pass
     class StringType: pass
+    class TimestampType: pass
 
 schema_features = StructType([
     StructField("src_port", LongType(), True),
@@ -36,7 +37,7 @@ schema_features = StructType([
     StructField("packet_count", LongType(), True),
     StructField("conn_state", StringType(), True),
     StructField("bytes_transferred", DoubleType(), True),
-    StructField("timestamp", LongType(), True),
+    StructField("timestamp", TimestampType(), True),
 ])
 
 schema_preprocessed = [
@@ -63,7 +64,7 @@ schema_full = StructType([
     StructField("packet_count", LongType(), True),
     StructField("conn_state", StringType(), True),
     StructField("bytes_transferred", DoubleType(), True),
-    StructField("timestamp", LongType(), True),
+    StructField("timestamp", TimestampType(), True),
     StructField("attack", LongType(), True)
 ])
 

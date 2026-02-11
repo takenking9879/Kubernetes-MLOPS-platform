@@ -7,6 +7,7 @@ import time
 from pyspark.sql import SparkSession
 from src.schemas.spark.schema_registry import get_schema
 from pyspark.sql import functions as F
+from pyspark.sql.types import TimestampType, LongType
 
 class SparkIngestionRaw(BaseUtils):
     """
@@ -104,9 +105,23 @@ class SparkIngestionRaw(BaseUtils):
     def build_final_df(self, df):
         """
         Ordena solo los datos recién leídos por 'timestamp'.
-        Convierte epoch a timestamp para orden correcto.
+        Convierte epoch a timestamp cuando sea necesario para orden correcto.
         """
-        df_with_ts = df.withColumn("timestamp", F.to_timestamp(F.from_unixtime(F.col("timestamp"))))
+        ts_field = next((f for f in df.schema.fields if f.name == "timestamp"), None)
+
+        # If already timestamp, keep as-is. If numeric, convert based on magnitude.
+        if ts_field is not None and isinstance(ts_field.dataType, TimestampType):
+            df_with_ts = df
+        else:
+            ts_col = F.col("timestamp").cast("double")
+            # Heuristic for units: microseconds (>1e14), milliseconds (>1e11), else seconds
+            seconds = (
+                F.when(ts_col > F.lit(1e14), ts_col / F.lit(1e6))
+                 .when(ts_col > F.lit(1e11), ts_col / F.lit(1e3))
+                 .otherwise(ts_col)
+            )
+            df_with_ts = df.withColumn("timestamp", F.to_timestamp(F.from_unixtime(seconds)))
+
         df_ordered = df_with_ts.orderBy(F.col("timestamp").asc_nulls_last())
         return df_ordered
 

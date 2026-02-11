@@ -27,3 +27,4 @@ kubectl get sparkapp spark-app -o yaml -n spark
 # Data Ingestion to Iceberg
 kubectl apply -f k3s/spark/ingestion/spark-application-ingestion.yaml
 docker build -t k3s-spark-cluster-ingestion ./k3s/spark/ingestion/
+kubectl delete sparkapp spark-ingestion -n spark
