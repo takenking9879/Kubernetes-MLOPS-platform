@@ -13,7 +13,7 @@ spec:
     instanceConfig:
       initExecutors: 2
       minExecutors: 2
-      maxExecutors: 4
+      maxExecutors: 2
 
   # Spark confs (S3A + Kubernetes image reference via spark.kubernetes.container.image)
   sparkConf:
