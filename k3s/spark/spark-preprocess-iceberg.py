@@ -128,13 +128,6 @@ class SparkPreprocessIceberg(BaseUtils):
         """
         try:
             snapshots = self.spark.sql(f"SELECT snapshot_id FROM {self.raw_table}.snapshots ORDER BY committed_at DESC LIMIT 1")
-            # Debug: sample recent snapshots
-            try:
-                snaps_sample = [r.asDict() for r in snapshots.limit(5).collect()]
-                self.logger.debug("Raw snapshots sample: %s", snaps_sample)
-            except Exception:
-                self.logger.debug("Could not collect snapshots sample", exc_info=True)
-
             snapshot_id = snapshots.collect()[0]['snapshot_id']
             self.logger.info(f"Raw table snapshot: {snapshot_id}")
             return snapshot_id
@@ -154,24 +147,10 @@ class SparkPreprocessIceberg(BaseUtils):
             DataFrame filtrado
         """
         try:
-            self.logger.info(f"Loading raw data: {start_date} to {end_date}")
+            self.logger.info(f"Loading raw data: {start_date} to {end_date} using explicit schema")
             
-            # Leer toda la tabla raw
-            df = self.spark.table(self.raw_table)
-            # Debug: schema/columns and small sample of raw table
-            try:
-                self.logger.debug("Raw table schema: %s", df.schema.simpleString())
-            except Exception:
-                self.logger.debug("Failed to read raw schema", exc_info=True)
-            try:
-                self.logger.debug("Raw table columns: %s", df.columns)
-            except Exception:
-                self.logger.debug("Failed to read raw columns", exc_info=True)
-            try:
-                raw_sample = df.limit(5).collect()
-                self.logger.debug("Raw table sample (up to 5 rows): %s", [r.asDict() for r in raw_sample])
-            except Exception:
-                self.logger.debug("Failed to collect raw sample", exc_info=True)
+            # Leer la tabla raw y forzar el esquema de los params de forma estándar
+            df = self.spark.table(self.raw_table).to(self.schema)
             
             # Robust timestamp conversion:
             # - if numeric epoch -> convert from_unixtime
@@ -182,25 +161,12 @@ class SparkPreprocessIceberg(BaseUtils):
                     # already timestamp type
                     pass
                 else:
-                    # Log original timestamp dtype/sample before conversion
-                    try:
-                        self.logger.debug("Timestamp field type before conversion: %s", [f.dataType.simpleString() for f in df.schema.fields if f.name == 'timestamp'])
-                    except Exception:
-                        self.logger.debug("Failed to inspect timestamp field type", exc_info=True)
-
                     df = df.withColumn(
                         "timestamp",
                         F.when(F.col("timestamp").cast("long").isNotNull(),
                                F.to_timestamp(F.from_unixtime(F.col("timestamp"))))
                         .otherwise(F.to_timestamp(F.col("timestamp")))
                     )
-
-                    # Debug: inspect timestamp column after conversion (sample)
-                    try:
-                        ts_sample = df.select("timestamp").limit(5).collect()
-                        self.logger.debug("Timestamp column sample after conversion: %s", [r.asDict() for r in ts_sample])
-                    except Exception:
-                        self.logger.debug("Failed to collect timestamp sample after conversion", exc_info=True)
 
             # Filtrar por rango de fechas usando to_timestamp on literals for safe comparison
             start_ts = F.to_timestamp(F.lit(start_date))
@@ -210,18 +176,7 @@ class SparkPreprocessIceberg(BaseUtils):
 
             # Avoid full count (expensive). Use a cheap existence check for logging.
             has_any = df_filtered.limit(1).count()
-            self.logger.info(f"Loaded sample presence={has_any} for range {start_date} to {end_date}")
-            self.logger.debug("Filter bounds: start=%s end=%s", start_date, end_date)
-            try:
-                self.logger.debug("Filtered df schema: %s", df_filtered.schema.simpleString())
-            except Exception:
-                self.logger.debug("Failed to read filtered schema", exc_info=True)
-            try:
-                filtered_sample = df_filtered.limit(5).collect()
-                self.logger.debug("Filtered sample (up to 5 rows): %s", [r.asDict() for r in filtered_sample])
-            except Exception:
-                self.logger.debug("Failed to collect filtered sample", exc_info=True)
-            
+            self.logger.info(f"Loaded sample presence={has_any} for range {start_date} to {end_date}")  
             return df_filtered
             
         except Exception as e:
@@ -335,32 +290,11 @@ class SparkPreprocessIceberg(BaseUtils):
                 train_has_any = df.limit(1).count()
             except Exception as e:
                 self.logger.error(f"Failed to peek into train DataFrame: {e}", exc_info=True)
-                self.logger.debug('Train peek failed: could not inspect train DF before fit', exc_info=True)
                 raise
 
             if train_has_any == 0:
                 msg = "Train DataFrame is empty. Aborting fit."
                 self.logger.error(msg)
-                try:
-                    self.logger.debug("Train DF schema when empty: %s", df.schema.simpleString())
-                except Exception:
-                    self.logger.debug("Failed to read train schema when empty", exc_info=True)
-                try:
-                    sample = df.limit(5).collect()
-                    self.logger.debug("Train DF sample when empty (up to 5 rows): %s", [r.asDict() for r in sample])
-                except Exception:
-                    self.logger.debug("Failed to collect train sample when empty", exc_info=True)
-                raise ValueError(msg)
-
-            try:
-                self.logger.debug("Train DF schema before fit: %s", df.schema.simpleString())
-            except Exception:
-                self.logger.debug("Failed to read train schema before fit", exc_info=True)
-            try:
-                train_sample = df.limit(5).collect()
-                self.logger.debug("Train DF sample (up to 5 rows) before fit: %s", [r.asDict() for r in train_sample])
-            except Exception:
-                self.logger.debug("Failed to collect train sample before fit", exc_info=True)
 
             # Cargar y entrenar pipeline
             base_pipeline = Pipeline.from_yaml(dsl_path)
@@ -397,32 +331,11 @@ class SparkPreprocessIceberg(BaseUtils):
                 has_any = df.limit(1).count()
             except Exception as e:
                 self.logger.error(f"Failed to inspect DataFrame before transform: {e}", exc_info=True)
-                self.logger.debug('Transform peek failed: could not inspect DF before transform', exc_info=True)
                 raise
 
             if has_any == 0:
                 msg = "Input DataFrame to transform is empty. Aborting transform."
                 self.logger.error(msg)
-                try:
-                    self.logger.debug("Transform input schema when empty: %s", df.schema.simpleString())
-                except Exception:
-                    self.logger.debug("Failed to read transform input schema when empty", exc_info=True)
-                try:
-                    sample = df.limit(5).collect()
-                    self.logger.debug("Transform input sample when empty (up to 5 rows): %s", [r.asDict() for r in sample])
-                except Exception:
-                    self.logger.debug("Failed to collect transform input sample when empty", exc_info=True)
-                raise ValueError(msg)
-
-            try:
-                self.logger.debug("Transform input schema: %s", df.schema.simpleString())
-            except Exception:
-                self.logger.debug("Failed to read transform input schema", exc_info=True)
-            try:
-                transform_sample = df.limit(5).collect()
-                self.logger.debug("Transform input sample (up to 5 rows): %s", [r.asDict() for r in transform_sample])
-            except Exception:
-                self.logger.debug("Failed to collect transform input sample", exc_info=True)
 
             self.logger.info("Applying pipeline transformations...")
             df_processed = self.pipeline.transform(df)
