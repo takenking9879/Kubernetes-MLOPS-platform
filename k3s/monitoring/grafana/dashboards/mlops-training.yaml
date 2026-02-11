@@ -211,7 +211,7 @@ data:
           "type": "piechart",
           "targets": [
             {
-              "expr": "sum by (class) (preprocess_records_last_batch{dataset=\"train\"})",
+              "expr": "sum by (class) (preprocess_records_last_batch{dataset=\"$split\"})",
               "legendFormat": "class {{class}}",
               "refId": "A"
             }
@@ -882,6 +882,29 @@ data:
             "name": "framework",
             "options": [],
             "query": "label_values(train_loss{split=\"val\"}, framework)",
+            "refresh": 1,
+            "regex": "",
+            "skipUrlSync": false,
+            "sort": 0,
+            "type": "query"
+          },
+          {
+            "current": {
+              "selected": true,
+              "text": "train",
+              "value": "train"
+            },
+            "datasource": {
+              "type": "prometheus",
+              "uid": "PBFA97CFB590B2093"
+            },
+            "definition": "",
+            "hide": 0,
+            "includeAll": false,
+            "multi": false,
+            "name": "split",
+            "options": [],
+            "query": "label_values(preprocess_records_last_batch, dataset)",
             "refresh": 1,
             "regex": "",
             "skipUrlSync": false,
