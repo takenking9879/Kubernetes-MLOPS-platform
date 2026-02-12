@@ -97,10 +97,7 @@ def tune_model(
 
     # Same workaround as xgboost: build the Trainer inside a function trainable.
     def _trainable(trial_config: Dict):
-        from pyiceberg.catalog import load_catalog
         from pyiceberg.expressions import GreaterThanOrEqual, LessThanOrEqual, And
-
-        catalog = load_catalog("iceberg", **catalog_config)
         
         # Load datasets with Iceberg row filters
         train_range = split_ranges.get('train', {})
@@ -116,8 +113,10 @@ def tune_model(
             LessThanOrEqual("timestamp", val_range['end'])
         ) if val_range.get('start') and val_range.get('end') else None
 
-        train_dataset = _maybe_sample_train_ds(ray.data.read_iceberg(table_identifier, catalog=catalog, row_filter=train_filter))
-        val_dataset = ray.data.read_iceberg(table_identifier, catalog=catalog, row_filter=val_filter)
+        train_dataset = _maybe_sample_train_ds(
+            ray.data.read_iceberg(table_identifier, catalog_kwargs=catalog_config, row_filter=train_filter)
+        )
+        val_dataset = ray.data.read_iceberg(table_identifier, catalog_kwargs=catalog_config, row_filter=val_filter)
 
         max_train_rows = int(os.getenv("TUNE_MAX_TRAIN_ROWS", "0"))
         max_val_rows = int(os.getenv("TUNE_MAX_VAL_ROWS", "0"))

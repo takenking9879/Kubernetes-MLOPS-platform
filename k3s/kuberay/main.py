@@ -43,26 +43,30 @@ class KubeRayTraining(BaseUtils):
         self.output_dir = output_dir
         
         # Iceberg setup
-        self.catalog = self._get_iceberg_catalog()
+        self.catalog_kwargs = self._get_iceberg_catalog()
         
         # Start Prometheus metrics server
         self._start_prometheus_server()
 
     def _get_iceberg_catalog(self):
-        """Initializes PyIceberg catalog using configuration from Spark/S3."""
+        """Build Iceberg catalog kwargs for Ray's `read_iceberg`.
+
+        Ray Data can accept `catalog_kwargs` directly and will call
+        `pyiceberg.catalog.load_catalog` internally.
+        """
         warehouse = self.params_full.get('spark', {}).get('iceberg', {}).get(
             'warehouse',
             's3a://k8s-mlops-platform-bucket/warehouse'
         ).replace('s3a://', 's3://')
 
-        self.logger.info(f"Initializing Iceberg catalog with warehouse: {warehouse}")
-        return load_catalog("iceberg", **{
+        self.logger.info(f"Using Iceberg warehouse: {warehouse}")
+        return {
             "type": "glue",
             "warehouse": warehouse,
             "client.access-key-id": os.environ.get("AWS_ACCESS_KEY_ID"),
             "client.secret-access-key": os.environ.get("AWS_SECRET_ACCESS_KEY"),
             "client.region": os.environ.get("AWS_REGION", "us-east-2"),
-        })
+        }
 
     def _get_latest_artifact_set_id(self):
         """Retrieves the latest artifact_set_id from the metadata table."""
@@ -71,7 +75,7 @@ class KubeRayTraining(BaseUtils):
             # Identifier for pyiceberg (removing the catalog prefix)
             identifier = f"{meta_cfg.get('namespace', 'metadata')}.{meta_cfg.get('table', 'preprocessing_artifacts')}"
             
-            table = self.catalog.load_table(identifier)
+            table = load_catalog("iceberg", **self.catalog_kwargs).load_table(identifier)
             df = table.scan().to_pandas()
             if df.empty:
                 return None
@@ -136,11 +140,7 @@ class KubeRayTraining(BaseUtils):
             else:
                 self.logger.warning(f"No valid split configuration for {split}. Loading all data.")
 
-            ds = ray.data.read_iceberg(
-                table_name,
-                catalog=self.catalog,
-                row_filter=row_filter
-            )
+            ds = ray.data.read_iceberg(table_name, catalog_kwargs=self.catalog_kwargs, row_filter=row_filter)
             
             # Senior validation before heavy processing
             self._validate_schema(ds)
@@ -375,19 +375,8 @@ class KubeRayTraining(BaseUtils):
 
             table_identifier = f"processed.{artifact_set_id}"
             self.logger.info(f"Starting training pipeline with Iceberg table: {table_identifier}")
-
-            warehouse = self.params_full.get('spark', {}).get('iceberg', {}).get(
-                'warehouse',
-                's3a://k8s-mlops-platform-bucket/warehouse'
-            ).replace('s3a://', 's3://')
             
-            catalog_config = {
-                "type": "glue",
-                "warehouse": warehouse,
-                "client.access-key-id": os.environ.get("AWS_ACCESS_KEY_ID"),
-                "client.secret-access-key": os.environ.get("AWS_SECRET_ACCESS_KEY"),
-                "client.region": os.environ.get("AWS_REGION", "us-east-2"),
-            }
+            catalog_config = dict(self.catalog_kwargs)
 
             self.logger.info(f"Starting training using framework: {framework}")
             best_params = None

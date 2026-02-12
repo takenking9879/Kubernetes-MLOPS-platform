@@ -124,10 +124,7 @@ def tune_model(
         return ds
 
     def _trainable(trial_config: Dict):
-        from pyiceberg.catalog import load_catalog
         from pyiceberg.expressions import GreaterThanOrEqual, LessThanOrEqual, And
-
-        catalog = load_catalog("iceberg", **catalog_config)
         
         # Load datasets with Iceberg row filters
         train_range = split_ranges.get('train', {})
@@ -143,8 +140,10 @@ def tune_model(
             LessThanOrEqual("timestamp", val_range['end'])
         ) if val_range.get('start') and val_range.get('end') else None
 
-        train_ds = _maybe_sample_train_ds(ray.data.read_iceberg(table_identifier, catalog=catalog, row_filter=train_filter))
-        val_ds = ray.data.read_iceberg(table_identifier, catalog=catalog, row_filter=val_filter)
+        train_ds = _maybe_sample_train_ds(
+            ray.data.read_iceberg(table_identifier, catalog_kwargs=catalog_config, row_filter=train_filter)
+        )
+        val_ds = ray.data.read_iceberg(table_identifier, catalog_kwargs=catalog_config, row_filter=val_filter)
 
         # apply limits if configured
         max_train_rows = int(os.getenv("TUNE_MAX_TRAIN_ROWS", "0"))
