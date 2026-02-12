@@ -42,7 +42,7 @@ spec:
               upscale_delay_s: 1
               downscale_delay_s: 30
   rayClusterConfig:
-    rayVersion: "2.52.0"
+    rayVersion: "2.53.0"
     enableInTreeAutoscaling: true
     autoscalerOptions:
       version: v2
@@ -58,7 +58,7 @@ spec:
         spec:
           containers:
             - name: ray-head
-              image: ray-cluster:2.52.0
+              image: ray-cluster:2.53.0
               ports:
                 - containerPort: 6379
                   name: gcs-server
@@ -126,7 +126,7 @@ spec:
           spec:
             containers:
               - name: ray-worker
-                image: ray-cluster:2.52.0
+                image: ray-cluster:2.53.0
                 envFrom:
                   - secretRef:
                       name: env-secret

@@ -15,6 +15,32 @@ from sklearn.metrics import classification_report
 logger = logging.getLogger(__name__)
 
 
+def _select_model_columns(ds, *, target: str, feature_columns: Optional[List[str]]):
+    """Return a Ray Dataset with only (features + target) columns.
+
+    This prevents Ray Data -> torch tensor conversion from touching metadata
+    columns like timestamps (numpy.datetime64), which PyTorch can't handle.
+    """
+    if feature_columns is None:
+        return ds
+
+    cols = list(feature_columns) + [target]
+    try:
+        return ds.select_columns(cols)
+    except Exception:
+        try:
+            names_attr = getattr(ds.schema(), "names", None)
+            if callable(names_attr):
+                names = names_attr()
+            else:
+                names = names_attr or []
+            present = set(names)
+            keep = [c for c in cols if c in present]
+            return ds.select_columns(keep)
+        except Exception:
+            return ds
+
+
 def _metrics_from_confusion(conf: torch.Tensor, *, prefix: str) -> Dict[str, float]:
     conf = conf.to(torch.float32)
     support = conf.sum(dim=1)
@@ -103,8 +129,10 @@ def _evaluate_on_dataset(
     total_loss = 0.0
     total_batches = 0
 
+    ds_eval = _select_model_columns(ds, target=target, feature_columns=feature_columns)
+
     feature_cols = feature_columns
-    for batch in ds.iter_torch_batches(batch_size=batch_size, dtypes=torch.float32):
+    for batch in ds_eval.iter_torch_batches(batch_size=batch_size, dtypes=torch.float32):
         y = batch.pop(target).long()
         if feature_cols is None:
             feature_cols = sorted(batch.keys())
@@ -155,6 +183,15 @@ def train(
     cpus_per_worker = int(os.getenv("CPUS_PER_WORKER", 2))
 
     params = pytorch_params if pytorch_params is not None else PYTORCH_PARAMS
+
+    # Ensure Ray only converts model columns (features + target) to torch tensors.
+    # If metadata columns (e.g. timestamp datetime64) are present, iter_torch_batches
+    # would otherwise fail before we can pop/ignore them.
+    train_dataset = _select_model_columns(train_dataset, target=target, feature_columns=feature_columns)
+    val_dataset = _select_model_columns(val_dataset, target=target, feature_columns=feature_columns)
+    if test_dataset is not None:
+        test_dataset = _select_model_columns(test_dataset, target=target, feature_columns=feature_columns)
+
     config = {
         "target": target,
         "feature_columns": feature_columns,

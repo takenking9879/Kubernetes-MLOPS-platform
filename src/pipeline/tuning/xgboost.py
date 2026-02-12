@@ -34,7 +34,7 @@ def train_func(config: Dict):
 
     num_boost_round = int(config.get("num_boost_round", 50))
 
-    dtrain, dval = get_train_val_dmatrix(target)
+    dtrain, dval = get_train_val_dmatrix(target, feature_columns=config.get("feature_columns"))
 
     # IMPORTANT:
     # In Ray Train integration, the train loop runs on Train workers.

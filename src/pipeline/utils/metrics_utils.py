@@ -90,7 +90,9 @@ def xgb_multiclass_metrics_on_ds(
             if feature_columns:
                 X = df[feature_columns]
             else:
-                X = df.drop(columns=[target])
+                # Fallback: drop label + keep only numeric/bool columns.
+                # Avoid metadata columns like timestamps (datetime64) which break DMatrix.
+                X = df.drop(columns=[target], errors="ignore").select_dtypes(include=[np.number, "bool"])
 
             # Load model from bytes inside the worker
             tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".ubj")

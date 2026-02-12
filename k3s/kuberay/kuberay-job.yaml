@@ -40,7 +40,7 @@ spec:
       REPORT_FREQUENCY: "4" # Report every N epochs to Prometheus/Grafana (This could add some overhead)
 
   rayClusterSpec:
-    rayVersion: "2.52.0"
+    rayVersion: "2.53.0"
     enableInTreeAutoscaling: false # true
     autoscalerOptions:
       version: v2
@@ -61,7 +61,7 @@ spec:
         spec:
           containers:
             - name: ray-head
-              image: ray-cluster:2.52.0
+              image: ray-cluster:2.53.0
               ports:
                 - containerPort: 6379
                   name: gcs-server
@@ -155,7 +155,7 @@ spec:
 
             containers:
               - name: ray-worker
-                image: ray-cluster:2.52.0
+                image: ray-cluster:2.53.0
                 resources:
                   limits:
                     # Laptop single-node "simulate 2 nodes": run 2 worker pods on the same host.

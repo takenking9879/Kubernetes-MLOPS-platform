@@ -1,4 +1,4 @@
-FROM rayproject/ray:2.52.0-py311
+FROM rayproject/ray:2.53.0-py311
 
 # 1️⃣ Instalar uv (binario precompilado, súper rápido)
 RUN pip install --no-cache-dir uv

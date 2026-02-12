@@ -51,12 +51,12 @@ def get_train_val_dmatrix(target: str, feature_columns: Optional[List[str]] = No
         train_X = train_df[feature_columns]
         val_X = val_df[feature_columns]
     else:
-        # Fallback to dropping label if no features specified
-        train_X = train_df.drop(columns=target)
-        val_X = val_df.drop(columns=target)
+        # Fallback: drop label + keep only numeric/bool columns.
+        # This avoids failures when metadata columns exist (e.g. timestamp datetime64).
+        train_X = train_df.drop(columns=[target], errors="ignore").select_dtypes(include=[np.number, "bool"])
+        val_X = val_df.drop(columns=[target], errors="ignore").select_dtypes(include=[np.number, "bool"])
     
     train_y = train_df[target]
-    val_X = val_df.drop(columns=target)
     val_y = val_df[target]
 
     # XGBoost DMatrix construction can use multiple threads via nthread parameter
