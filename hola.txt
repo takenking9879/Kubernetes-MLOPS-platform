@@ -1,76 +1,90 @@
-zyAnalyzed$2(QueryExecution.scala:110)
-2026-02-11 15:07:30.498 | 	at org.apache.spark.sql.catalyst.QueryPlanningTracker.measurePhase(QueryPlanningTracker.scala:148)
-2026-02-11 15:07:30.498 | 	at org.apache.spark.sql.execution.QueryExecution.$anonfun$executePhase$2(QueryExecution.scala:278)
-2026-02-11 15:07:30.498 | 	at org.apache.spark.sql.execution.QueryExecution$.withInternalError(QueryExecution.scala:654)
-2026-02-11 15:07:30.498 | 	at org.apache.spark.sql.execution.QueryExecution.$anonfun$executePhase$1(QueryExecution.scala:278)
-2026-02-11 15:07:30.498 | 	at org.apache.spark.sql.SparkSession.withActive(SparkSession.scala:804)
-2026-02-11 15:07:30.498 | 	at org.apache.spark.sql.execution.QueryExecution.executePhase(QueryExecution.scala:277)
-2026-02-11 15:07:30.498 | 	at org.apache.spark.sql.execution.QueryExecution.$anonfun$lazyAnalyzed$1(QueryExecution.scala:110)
-2026-02-11 15:07:30.498 | 	at scala.util.Try$.apply(Try.scala:217)
-2026-02-11 15:07:30.498 | 	at org.apache.spark.util.Utils$.doTryWithCallerStacktrace(Utils.scala:1378)
-2026-02-11 15:07:30.498 | 	at org.apache.spark.util.LazyTry.tryT$lzycompute(LazyTry.scala:46)
-2026-02-11 15:07:30.498 | 	at org.apache.spark.util.LazyTry.tryT(LazyTry.scala:46)
-2026-02-11 15:07:30.498 | 	at org.apache.spark.util.LazyTry.get(LazyTry.scala:58)
-2026-02-11 15:07:30.498 | 	at org.apache.spark.sql.execution.QueryExecution.analyzed(QueryExecution.scala:121)
-2026-02-11 15:07:30.498 | 	at org.apache.spark.sql.classic.Catalog.tableExists(Catalog.scala:200)
-2026-02-11 15:07:30.498 | 	at org.apache.spark.sql.classic.Catalog.tableExists(Catalog.scala:546)
-2026-02-11 15:07:30.498 | 	at java.base/jdk.internal.reflect.NativeMethodAccessorImpl.invoke0(Native Method)
-2026-02-11 15:07:30.498 | 	at java.base/jdk.internal.reflect.NativeMethodAccessorImpl.invoke(NativeMethodAccessorImpl.java:77)
-2026-02-11 15:07:30.498 | 	at java.base/jdk.internal.reflect.DelegatingMethodAccessorImpl.invoke(DelegatingMethodAccessorImpl.java:43)
-2026-02-11 15:07:30.498 | 	at java.base/java.lang.reflect.Method.invoke(Method.java:569)
-2026-02-11 15:07:30.498 | 	at py4j.reflection.MethodInvoker.invoke(MethodInvoker.java:244)
-2026-02-11 15:07:30.498 | 	at py4j.reflection.ReflectionEngine.invoke(ReflectionEngine.java:374)
-2026-02-11 15:07:30.498 | 	at py4j.Gateway.invoke(Gateway.java:282)
-2026-02-11 15:07:30.498 | 	at py4j.commands.AbstractCommand.invokeMethod(AbstractCommand.java:132)
-2026-02-11 15:07:30.498 | 	at py4j.commands.CallCommand.execute(CallCommand.java:79)
-2026-02-11 15:07:30.498 | 	at py4j.ClientServerConnection.waitForCommands(ClientServerConnection.java:184)
-2026-02-11 15:07:30.498 | 	at py4j.ClientServerConnection.run(ClientServerConnection.java:108)
-2026-02-11 15:07:30.498 | 	at java.base/java.lang.Thread.run(Thread.java:840)
-2026-02-11 15:07:32.715 | 2026-02-11 21:07:32,714 - SparkPreprocessIceberg - ERROR - Failed loading raw data: Raw table not found: attempted iceberg.raw.network_traffic_raw and variants
-2026-02-11 15:07:32.715 | Traceback (most recent call last):
-2026-02-11 15:07:32.715 |   File "/app/repo/k3s/spark/main.py", line 303, in load_raw_data_by_date_range
-2026-02-11 15:07:32.715 |     raise RuntimeError(f"Raw table not found: attempted {self.raw_table} and variants")
-2026-02-11 15:07:32.715 | RuntimeError: Raw table not found: attempted iceberg.raw.network_traffic_raw and variants
-2026-02-11 15:07:32.716 | 2026-02-11 21:07:32,715 - SparkPreprocessIceberg - ERROR - Preprocessing pipeline failed: Raw table not found: attempted iceberg.raw.network_traffic_raw and variants
-2026-02-11 15:07:32.716 | Traceback (most recent call last):
-2026-02-11 15:07:32.716 |   File "/app/repo/k3s/spark/main.py", line 717, in run_preprocessing_pipeline
-2026-02-11 15:07:32.716 |     df_full = self.load_raw_data_by_date_range(full_start, full_end)
-2026-02-11 15:07:32.716 |               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-2026-02-11 15:07:32.716 |   File "/app/repo/k3s/spark/main.py", line 303, in load_raw_data_by_date_range
-2026-02-11 15:07:32.716 |     raise RuntimeError(f"Raw table not found: attempted {self.raw_table} and variants")
-2026-02-11 15:07:32.716 | RuntimeError: Raw table not found: attempted iceberg.raw.network_traffic_raw and variants
-2026-02-11 15:07:32.716 | Traceback (most recent call last):
-2026-02-11 15:07:32.716 |   File "/app/repo/k3s/spark/main.py", line 926, in <module>
-2026-02-11 15:07:32.716 |     main()
-2026-02-11 15:07:32.716 |   File "/app/repo/k3s/spark/main.py", line 915, in main
-2026-02-11 15:07:32.717 |     job.run_preprocessing_pipeline(
-2026-02-11 15:07:32.717 |   File "/app/repo/k3s/spark/main.py", line 717, in run_preprocessing_pipeline
-2026-02-11 15:07:32.717 |     df_full = self.load_raw_data_by_date_range(full_start, full_end)
-2026-02-11 15:07:32.717 |               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-2026-02-11 15:07:32.717 |   File "/app/repo/k3s/spark/main.py", line 303, in load_raw_data_by_date_range
-2026-02-11 15:07:32.717 |     raise RuntimeError(f"Raw table not found: attempted {self.raw_table} and variants")
-2026-02-11 15:07:32.717 | RuntimeError: Raw table not found: attempted iceberg.raw.network_traffic_raw and variants
-2026-02-11 15:07:32.844 | 26/02/11 21:07:32 INFO SparkContext: SparkContext is stopping with exitCode 0 from stop at SparkSubmit.scala:1036.
-2026-02-11 15:07:32.856 | 26/02/11 21:07:32 INFO SparkUI: Stopped Spark web UI at http://spark-app-0-driver-svc.spark.svc:4040
-2026-02-11 15:07:32.859 | 26/02/11 21:07:32 INFO KubernetesClusterSchedulerBackend: Shutting down all executors
-2026-02-11 15:07:32.860 | 26/02/11 21:07:32 INFO KubernetesClusterSchedulerBackend$KubernetesDriverEndpoint: Asking each executor to shut down
-2026-02-11 15:07:32.866 | 26/02/11 21:07:32 INFO ExecutorPodsWatchSnapshotSource: Kubernetes client has been closed.
-2026-02-11 15:07:33.019 | 26/02/11 21:07:33 INFO MapOutputTrackerMasterEndpoint: MapOutputTrackerMasterEndpoint stopped!
-2026-02-11 15:07:33.036 | 26/02/11 21:07:33 INFO MemoryStore: MemoryStore started with capacity 1048.8 MiB
-2026-02-11 15:07:33.037 | 26/02/11 21:07:33 INFO MemoryStore: MemoryStore cleared
-2026-02-11 15:07:33.037 | 26/02/11 21:07:33 INFO BlockManager: BlockManager stopped
-2026-02-11 15:07:33.041 | 26/02/11 21:07:33 INFO BlockManagerMaster: BlockManagerMaster stopped
-2026-02-11 15:07:33.043 | 26/02/11 21:07:33 INFO OutputCommitCoordinator$OutputCommitCoordinatorEndpoint: OutputCommitCoordinator stopped!
-2026-02-11 15:07:33.053 | 26/02/11 21:07:33 INFO SparkContext: Successfully stopped SparkContext
-2026-02-11 15:07:33.055 | 26/02/11 21:07:33 INFO ShutdownHookManager: Shutdown hook called
-2026-02-11 15:07:33.056 | 26/02/11 21:07:33 INFO ShutdownHookManager: Deleting directory /var/data/spark-789c0dc6-4e8a-4693-a337-51bc2895abb5/spark-66b7b30a-5312-4280-92e9-2505d8b058ad/pyspark-73385900-0261-487f-8d89-86385c76c6e8
-2026-02-11 15:07:33.059 | 26/02/11 21:07:33 INFO ShutdownHookManager: Deleting directory /tmp/spark-8df730e8-e356-434e-9c12-6b5388d0a5ff
-2026-02-11 15:07:33.063 | 26/02/11 21:07:33 INFO ShutdownHookManager: Deleting directory /tmp/spark-53350fa0-3445-4914-92f3-343c7ac5a7b1
-2026-02-11 15:07:33.067 | 26/02/11 21:07:33 INFO ShutdownHookManager: Deleting directory /tmp/spark-2d41ccd8-e7a0-4b08-9a70-41028a3a8f6e
-2026-02-11 15:07:33.070 | 26/02/11 21:07:33 INFO ShutdownHookManager: Deleting directory /tmp/artifacts-fb53621a-e6f9-4c7d-ba49-bd0039ae8305
-2026-02-11 15:07:33.073 | 26/02/11 21:07:33 INFO ShutdownHookManager: Deleting directory /tmp/spark-6045615f-51af-41a1-99a4-6d9249bf0795
-2026-02-11 15:07:33.076 | 26/02/11 21:07:33 INFO ShutdownHookManager: Deleting directory /tmp/localPyFiles-0f34a05b-62e8-4338-b757-2d8db7466b51
-2026-02-11 15:07:33.079 | 26/02/11 21:07:33 INFO ShutdownHookManager: Deleting directory /var/data/spark-789c0dc6-4e8a-4693-a337-51bc2895abb5/spark-66b7b30a-5312-4280-92e9-2505d8b058ad
-2026-02-11 15:07:33.086 | 26/02/11 21:07:33 INFO MetricsSystemImpl: Stopping s3a-file-system metrics system...
-2026-02-11 15:07:33.086 | 26/02/11 21:07:33 INFO MetricsSystemImpl: s3a-file-system metrics system stopped.
-2026-02-11 15:07:33.087 | 26/02/11 21:07:33 INFO MetricsSystemImpl: s3a-file-system metrics system shutdown complete.
+2026-02-11 17:51:31.497 | 2026-02-11 15:51:31,497	INFO cli.py:41 -- Job submission server address: http://kuberay-job-p9nvv-head-svc.ray.svc.cluster.local:8265
+2026-02-11 17:51:31.916 | 2026-02-11 15:51:31,916	SUCC cli.py:65 -- ----------------------------------------------
+2026-02-11 17:51:31.916 | 2026-02-11 15:51:31,916	SUCC cli.py:66 -- Job 'kuberay-job-bsfwj' submitted successfully
+2026-02-11 17:51:31.916 | 2026-02-11 15:51:31,916	SUCC cli.py:67 -- ----------------------------------------------
+2026-02-11 17:51:31.916 | 2026-02-11 15:51:31,916	INFO cli.py:291 -- Next steps
+2026-02-11 17:51:31.916 | 2026-02-11 15:51:31,916	INFO cli.py:292 -- Query the logs of the job:
+2026-02-11 17:51:31.916 | 2026-02-11 15:51:31,916	INFO cli.py:294 -- ray job logs kuberay-job-bsfwj
+2026-02-11 17:51:31.917 | 2026-02-11 15:51:31,916	INFO cli.py:296 -- Query the status of the job:
+2026-02-11 17:51:31.917 | 2026-02-11 15:51:31,917	INFO cli.py:298 -- ray job status kuberay-job-bsfwj
+2026-02-11 17:51:31.917 | 2026-02-11 15:51:31,917	INFO cli.py:300 -- Request the job to be stopped:
+2026-02-11 17:51:31.917 | 2026-02-11 15:51:31,917	INFO cli.py:302 -- ray job stop kuberay-job-bsfwj
+2026-02-11 17:51:33.519 | 2026-02-11 15:51:33,518	INFO cli.py:41 -- Job submission server address: http://kuberay-job-p9nvv-head-svc.ray.svc.cluster.local:8265
+2026-02-11 17:51:35.537 | 2026-02-11 15:51:31,599	INFO job_manager.py:568 -- Runtime env is setting up.
+2026-02-11 17:51:35.537 | Running entrypoint for job kuberay-job-bsfwj: python3 /home/ray/app/repo/k3s/kuberay/main.py
+2026-02-11 17:51:39.544 | 2026-02-11 15:51:38,697 - KubeRayTraining - DEBUG - Parameters retrieved from /home/ray/app/repo/k3s/params.yaml
+2026-02-11 17:51:39.544 | 2026-02-11 15:51:38,705 - KubeRayTraining - DEBUG - Parameters retrieved from /home/ray/app/repo/k3s/params.yaml
+2026-02-11 17:51:39.544 | 2026-02-11 15:51:38,712 - KubeRayTraining - INFO - Input dimension calculated from DSL: 14 features.
+2026-02-11 17:51:39.544 | 2026-02-11 15:51:38,712 - KubeRayTraining - INFO - Initializing Iceberg catalog with warehouse: s3://k8s-mlops-platform-bucket/warehouse
+2026-02-11 17:51:39.544 | Traceback (most recent call last):
+2026-02-11 17:51:39.544 |   File "/home/ray/app/repo/k3s/kuberay/main.py", line 559, in <module>
+2026-02-11 17:51:39.544 |     main()
+2026-02-11 17:51:39.544 |   File "/home/ray/app/repo/k3s/kuberay/main.py", line 552, in main
+2026-02-11 17:51:39.544 |     model = KubeRayTraining(
+2026-02-11 17:51:39.544 |             ^^^^^^^^^^^^^^^^
+2026-02-11 17:51:39.544 |   File "/home/ray/app/repo/k3s/kuberay/main.py", line 46, in __init__
+2026-02-11 17:51:39.544 |     self.catalog = self._get_iceberg_catalog()
+2026-02-11 17:51:39.544 |                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-02-11 17:51:39.544 |   File "/home/ray/app/repo/k3s/kuberay/main.py", line 59, in _get_iceberg_catalog
+2026-02-11 17:51:39.544 |     return load_catalog("iceberg", **{
+2026-02-11 17:51:39.544 |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-02-11 17:51:39.544 |   File "/home/ray/anaconda3/lib/python3.11/site-packages/pyiceberg/catalog/__init__.py", line 266, in load_catalog
+2026-02-11 17:51:39.544 |     return AVAILABLE_CATALOGS[catalog_type](name, cast(dict[str, str], conf))
+2026-02-11 17:51:39.544 |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-02-11 17:51:39.544 |   File "/home/ray/anaconda3/lib/python3.11/site-packages/pyiceberg/catalog/__init__.py", line 137, in load_glue
+2026-02-11 17:51:39.544 |     return GlueCatalog(name, **conf)
+2026-02-11 17:51:39.544 |            ^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-02-11 17:51:39.544 |   File "/home/ray/anaconda3/lib/python3.11/site-packages/pyiceberg/catalog/glue.py", line 339, in __init__
+2026-02-11 17:51:39.544 |     self.glue: GlueClient = session.client(
+2026-02-11 17:51:39.544 |                             ^^^^^^^^^^^^^^^
+2026-02-11 17:51:39.544 |   File "/home/ray/anaconda3/lib/python3.11/site-packages/boto3/session.py", line 337, in client
+2026-02-11 17:51:39.544 |     return self._session.create_client(
+2026-02-11 17:51:39.544 |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-02-11 17:51:39.544 |   File "/home/ray/anaconda3/lib/python3.11/site-packages/botocore/context.py", line 123, in wrapper
+2026-02-11 17:51:39.544 |     return func(*args, **kwargs)
+2026-02-11 17:51:39.544 |            ^^^^^^^^^^^^^^^^^^^^^
+2026-02-11 17:51:39.544 |   File "/home/ray/anaconda3/lib/python3.11/site-packages/botocore/session.py", line 1031, in create_client
+2026-02-11 17:51:39.544 |     client = client_creator.create_client(
+2026-02-11 17:51:39.544 |              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-02-11 17:51:39.544 |   File "/home/ray/anaconda3/lib/python3.11/site-packages/botocore/client.py", line 157, in create_client
+2026-02-11 17:51:39.544 |     client_args = self._get_client_args(
+2026-02-11 17:51:39.544 |                   ^^^^^^^^^^^^^^^^^^^^^^
+2026-02-11 17:51:39.544 |   File "/home/ray/anaconda3/lib/python3.11/site-packages/botocore/client.py", line 557, in _get_client_args
+2026-02-11 17:51:39.544 |     return args_creator.get_client_args(
+2026-02-11 17:51:39.544 |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-02-11 17:51:39.544 |   File "/home/ray/anaconda3/lib/python3.11/site-packages/botocore/args.py", line 121, in get_client_args
+2026-02-11 17:51:39.544 |     final_args = self.compute_client_args(
+2026-02-11 17:51:39.544 |                  ^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-02-11 17:51:39.544 |   File "/home/ray/anaconda3/lib/python3.11/site-packages/botocore/args.py", line 259, in compute_client_args
+2026-02-11 17:51:39.544 |     endpoint_config = self._compute_endpoint_config(
+2026-02-11 17:51:39.544 |                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-02-11 17:51:39.544 |   File "/home/ray/anaconda3/lib/python3.11/site-packages/botocore/args.py", line 447, in _compute_endpoint_config
+2026-02-11 17:51:39.544 |     return self._resolve_endpoint(**resolve_endpoint_kwargs)
+2026-02-11 17:51:39.544 |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-02-11 17:51:39.544 |   File "/home/ray/anaconda3/lib/python3.11/site-packages/botocore/args.py", line 552, in _resolve_endpoint
+2026-02-11 17:51:39.544 |     return endpoint_bridge.resolve(
+2026-02-11 17:51:39.544 |            ^^^^^^^^^^^^^^^^^^^^^^^^
+2026-02-11 17:51:39.544 |   File "/home/ray/anaconda3/lib/python3.11/site-packages/botocore/client.py", line 671, in resolve
+2026-02-11 17:51:39.544 |     resolved = self.endpoint_resolver.construct_endpoint(
+2026-02-11 17:51:39.544 |                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-02-11 17:51:39.544 |   File "/home/ray/anaconda3/lib/python3.11/site-packages/botocore/regions.py", line 233, in construct_endpoint
+2026-02-11 17:51:39.544 |     result = self._endpoint_for_partition(
+2026-02-11 17:51:39.544 |              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-02-11 17:51:39.544 |   File "/home/ray/anaconda3/lib/python3.11/site-packages/botocore/regions.py", line 281, in _endpoint_for_partition
+2026-02-11 17:51:39.544 |     raise NoRegionError()
+2026-02-11 17:51:40.544 | botocore.exceptions.NoRegionError: You must specify a region.
+2026-02-11 17:51:43.561 | 2026-02-11 15:51:43,561	ERR cli.py:73 -- ------------------------------
+2026-02-11 17:51:43.561 | 2026-02-11 15:51:43,561	ERR cli.py:74 -- Job 'kuberay-job-bsfwj' failed
+2026-02-11 17:51:43.561 | 2026-02-11 15:51:43,561	ERR cli.py:75 -- ------------------------------
+2026-02-11 17:51:43.561 | 2026-02-11 15:51:43,561	INFO cli.py:88 -- Status message: Job entrypoint command failed with exit code 1, last available logs (truncated to 20,000 chars):
+2026-02-11 17:51:43.561 |            ^^^^^^^^^^^^^^^^^^^^^^^^
+2026-02-11 17:51:43.561 |   File "/home/ray/anaconda3/lib/python3.11/site-packages/botocore/client.py", line 671, in resolve
+2026-02-11 17:51:43.561 |     resolved = self.endpoint_resolver.construct_endpoint(
+2026-02-11 17:51:43.561 |                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-02-11 17:51:43.561 |   File "/home/ray/anaconda3/lib/python3.11/site-packages/botocore/regions.py", line 233, in construct_endpoint
+2026-02-11 17:51:43.561 |     result = self._endpoint_for_partition(
+2026-02-11 17:51:43.562 |              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-02-11 17:51:43.562 |   File "/home/ray/anaconda3/lib/python3.11/site-packages/botocore/regions.py", line 281, in _endpoint_for_partition
+2026-02-11 17:51:43.562 |     raise NoRegionError()
+2026-02-11 17:51:43.562 | botocore.exceptions.NoRegionError: You must specify a region.
+2026-02-11 17:51:43.562 | 

@@ -59,9 +59,9 @@ class KubeRayTraining(BaseUtils):
         return load_catalog("iceberg", **{
             "type": "glue",
             "warehouse": warehouse,
-            "s3.access-key-id": os.environ.get("AWS_ACCESS_KEY_ID"),
-            "s3.secret-access-key": os.environ.get("AWS_SECRET_ACCESS_KEY"),
-            "s3.region": os.environ.get("AWS_REGION", "us-east-2"),
+            "client.access-key-id": os.environ.get("AWS_ACCESS_KEY_ID"),
+            "client.secret-access-key": os.environ.get("AWS_SECRET_ACCESS_KEY"),
+            "client.region": os.environ.get("AWS_REGION", "us-east-2"),
         })
 
     def _get_latest_artifact_set_id(self):
