@@ -1,27 +1,116 @@
-"""
-PyTorch training module using Ray Train + Ray Tune.
-Supports cheap HPT with ASHA + ResourceChangingScheduler.
-"""
+"""PyTorch tuner — concrete implementation of BaseTuner."""
+
+from __future__ import annotations
 
 import os
-import numbers
-import torch
+from typing import Any, Dict, List, Optional
+
 import ray
-from ray import tune
+import ray.data
 from ray.train.torch import TorchTrainer
-from ray.train import ScalingConfig
-from ray.tune import RunConfig
-from ray.tune.schedulers import ASHAScheduler, ResourceChangingScheduler
-from typing import Dict
 
 from schemas.model.pytorch_params import SEARCH_SPACE_PYTORCH_PARAMS, PYTORCH_TUNE_SETTINGS
 from pipeline.utils.pytorch_utils import train_func
-from ray.air.integrations.mlflow import MLflowLoggerCallback
+from pipeline.base_tuner import BaseTuner
 
 
-# --------------------------
-# Tuning entrypoint
-# --------------------------
+# ──────────────────────────────────────────────
+# Dataset helper (same as train module)
+# ──────────────────────────────────────────────
+
+def _select_model_columns(
+    ds: ray.data.Dataset, *, target: str, feature_columns: Optional[List[str]],
+) -> ray.data.Dataset:
+    if feature_columns is None:
+        return ds
+    cols = list(feature_columns) + [target]
+    return ds.select_columns(cols)
+
+
+# ──────────────────────────────────────────────
+# Concrete tuner
+# ──────────────────────────────────────────────
+
+class PyTorchModelTuner(BaseTuner):
+    """Hyperparameter tuning for PyTorch via ASHA + Ray Tune."""
+
+    @property
+    def framework_name(self) -> str:
+        return "pytorch"
+
+    @property
+    def params_key(self) -> str:
+        return "pytorch_params"
+
+    @property
+    def search_space(self) -> Dict[str, Any]:
+        return SEARCH_SPACE_PYTORCH_PARAMS
+
+    @property
+    def tune_settings(self) -> Dict[str, Any]:
+        return PYTORCH_TUNE_SETTINGS
+
+    @property
+    def tune_metric(self) -> str:
+        return "val_loss"
+
+    @property
+    def tune_mode(self) -> str:
+        return "min"
+
+    @property
+    def default_num_samples(self) -> int:
+        return 5
+
+    def _get_ray_trainer_cls(self):
+        return TorchTrainer
+
+    def _get_train_func(self):
+        return train_func
+
+    def _get_asha_max_t_key(self) -> str:
+        return "max_epochs"
+
+    def _build_trial_train_loop_config(
+        self,
+        *,
+        trial_config: Dict[str, Any],
+        target: str,
+        feature_columns: Optional[List[str]],
+        input_dim: int,
+        num_classes: int,
+        cpus_per_worker: int,
+    ) -> Dict[str, Any]:
+        return {
+            "target": target,
+            "feature_columns": feature_columns,
+            "pytorch_params": trial_config["pytorch_params"],
+            "input_dim": int(input_dim),
+            "num_classes": int(num_classes),
+            "cpus_per_worker": cpus_per_worker,
+            "is_tuning": True,
+        }
+
+    def _preprocess_datasets(
+        self,
+        train_ds: ray.data.Dataset,
+        val_ds: ray.data.Dataset,
+        *,
+        target: str,
+        feature_columns: Optional[List[str]],
+    ) -> tuple[ray.data.Dataset, ray.data.Dataset]:
+        train_ds = _select_model_columns(train_ds, target=target, feature_columns=feature_columns)
+        val_ds = _select_model_columns(val_ds, target=target, feature_columns=feature_columns)
+        return train_ds, val_ds
+
+
+# ──────────────────────────────────────────────
+# Module-level convenience (backward-compatible)
+# ──────────────────────────────────────────────
+
+_TUNER = PyTorchModelTuner()
+
+
 def tune_model(
     table_identifier: str,
     catalog_config: dict,
@@ -38,191 +127,20 @@ def tune_model(
     mlflow_experiment_name: str | None = None,
     extra_callbacks: list | None = None,
 ):
-    """
-    config: dict con 'max_epochs' para ASHA
-    """
-
-    num_workers = int(os.getenv("NUM_WORKERS_TUNE", os.getenv("NUM_WORKERS", 2)))
-    cpus_per_worker = int(os.getenv("CPUS_PER_WORKER_TUNE", os.getenv("CPUS_PER_WORKER", 1)))
-
-    scaling_config = ScalingConfig(
-        num_workers=num_workers,
-        resources_per_worker={"CPU": cpus_per_worker}
-        #use_gpu=torch.cuda.is_available(),
+    """Backward-compatible module-level entry point."""
+    return _TUNER.tune_model(
+        table_identifier=table_identifier,
+        catalog_config=catalog_config,
+        split_ranges=split_ranges,
+        target=target,
+        feature_columns=feature_columns,
+        storage_path=storage_path,
+        name=name,
+        input_dim=input_dim,
+        num_classes=num_classes,
+        sample_fraction=sample_fraction,
+        seed=seed,
+        mlflow_tracking_uri=mlflow_tracking_uri,
+        mlflow_experiment_name=mlflow_experiment_name,
+        extra_callbacks=extra_callbacks,
     )
-
-    # --- Hyperparameter search space (cheap tuning) ---
-    # Keep key aligned with main.py expectations (best_config.get("pytorch_params")).
-    param_space = {
-        "pytorch_params": SEARCH_SPACE_PYTORCH_PARAMS,
-    }
-
-    # --- Early stopping scheduler ---
-    asha = ASHAScheduler(
-        metric="val_loss",
-        mode="min",
-        max_t=PYTORCH_TUNE_SETTINGS["max_epochs"],  # <-- sincronizado con el config
-        grace_period=PYTORCH_TUNE_SETTINGS["grace_period"],
-        reduction_factor=PYTORCH_TUNE_SETTINGS["reduction_factor"],
-    )
-
-    # --- Dynamic CPU allocation (optional) ---
-    # ResourceChangingScheduler can request larger resource bundles over time.
-    # In small clusters this may produce "infeasible resource requests" warnings.
-    enable_rcs = os.getenv("ENABLE_RESOURCE_CHANGING_SCHEDULER", "false").lower() in ("1", "true", "yes")
-    scheduler = ResourceChangingScheduler(base_scheduler=asha) if enable_rcs else asha
-
-    # NOTE:
-    # Do NOT pass Ray Datasets via `tune.with_parameters(...)`.
-    # Tune stores those params via `ray.put`, and Ray Datasets are not picklable
-    # under Ray 2.52 in that code path.
-    # Workaround: pass dataset *paths* and load datasets inside each trial.
-
-    def _maybe_sample_train_ds(ds: ray.data.Dataset) -> ray.data.Dataset:
-        if sample_fraction is None:
-            return ds
-        frac = float(sample_fraction)
-        if frac >= 1.0:
-            return ds
-        if frac <= 0.0:
-            return ds
-
-        # Avoid groupby/map_groups here because it triggers shuffles that request the
-        # implicit `memory` resource, which may not be present in Tune trial placement
-        # group bundles.
-        if hasattr(ds, "random_sample"):
-            return ds.random_sample(frac, seed=seed)
-
-        return ds
-
-    def _select_model_columns(ds: ray.data.Dataset) -> ray.data.Dataset:
-        # Keep only feature columns + target to avoid torch conversion errors
-        # when metadata columns (e.g. timestamp datetime64) exist.
-        if not feature_columns:
-            return ds
-        cols = list(feature_columns) + [target]
-        try:
-            return ds.select_columns(cols)
-        except Exception:
-            return ds
-
-    # Same workaround as xgboost: build the Trainer inside a function trainable.
-    def _trainable(trial_config: Dict):
-        from pyiceberg.expressions import GreaterThanOrEqual, LessThanOrEqual, And
-        from src.utils.baseclass import BaseUtils # Import local to avoid top-level coupling
-        # Load datasets with Iceberg row filters (use centralized formatter)
-        train_range = split_ranges.get('train', {})
-        val_range = split_ranges.get('val', {})
-
-        t_s = BaseUtils.format_iceberg_ts(train_range.get('start'))
-        t_e = BaseUtils.format_iceberg_ts(train_range.get('end'))
-        v_s = BaseUtils.format_iceberg_ts(val_range.get('start'))
-        v_e = BaseUtils.format_iceberg_ts(val_range.get('end'))
-
-        train_filter = And(
-            GreaterThanOrEqual("timestamp", t_s),
-            LessThanOrEqual("timestamp", t_e)
-        ) if t_s and t_e else None
-
-        val_filter = And(
-            GreaterThanOrEqual("timestamp", v_s),
-            LessThanOrEqual("timestamp", v_e)
-        ) if v_s and v_e else None
-
-        train_dataset = _maybe_sample_train_ds(
-            ray.data.read_iceberg(table_identifier=table_identifier, catalog_kwargs=catalog_config, row_filter=train_filter)
-        )
-        val_dataset = ray.data.read_iceberg(table_identifier=table_identifier, catalog_kwargs=catalog_config, row_filter=val_filter)
-
-        train_dataset = _select_model_columns(train_dataset)
-        val_dataset = _select_model_columns(val_dataset)
-
-        max_train_rows = int(os.getenv("TUNE_MAX_TRAIN_ROWS", "0"))
-        max_val_rows = int(os.getenv("TUNE_MAX_VAL_ROWS", "0"))
-        if max_train_rows > 0:
-            train_dataset = train_dataset.limit(max_train_rows)
-        if max_val_rows > 0:
-            val_dataset = val_dataset.limit(max_val_rows)
-
-        # Optional: materialize per-trial datasets to avoid repeated `ReadParquet`
-        # executions across epochs inside the Train loop.
-        # Keep default OFF because many concurrent trials can pressure the object store.
-        if os.getenv("RAY_MATERIALIZE_DATASETS_TUNE", "0").lower() in ("1", "true", "yes"):
-            train_dataset = train_dataset.materialize()
-            val_dataset = val_dataset.materialize()
-
-        train_loop_config = {
-            "target": target,
-            "feature_columns": feature_columns,
-            "pytorch_params": trial_config["pytorch_params"],
-            "input_dim": int(input_dim),  # Ajustado a las columnas de preprocessing_001.py (3 cat + 11 num)
-            "num_classes": int(num_classes),
-            "cpus_per_worker": cpus_per_worker,
-            "is_tuning": True,  # ← Trial de tuning, deshabilitar Prometheus
-        }
-
-        # Ensure Ray Train persists checkpoints/metrics to shared storage.
-        # Without this, Ray Train falls back to local /home/ray/ray_results which
-        # is NOT shared across pods in Kubernetes, and checkpoint upload fails.
-        try:
-            trial_id = tune.get_context().get_trial_id()
-        except Exception:
-            trial_id = str(os.getpid())
-
-        trainer = TorchTrainer(
-            train_loop_per_worker=train_func,
-            train_loop_config=train_loop_config,
-            scaling_config=scaling_config,
-            datasets={"train": train_dataset, "val": val_dataset},
-            run_config=ray.train.RunConfig(
-                storage_path=storage_path,
-                name=f"{name}_train_{trial_id}",
-            ),
-        )
-        result = trainer.fit()
-        metrics = getattr(result, "metrics", None) or {}
-        report_dict: Dict[str, numbers.Real] = {}
-        for k, v in metrics.items():
-            if not isinstance(v, numbers.Real) or isinstance(v, bool):
-                continue
-            if k in ("training_iteration", "epoch", "step"):
-                report_dict[k] = int(v)
-            else:
-                report_dict[k] = float(v)
-        tune.report(report_dict)
-
-    # IMPORTANT:
-    # Do NOT reserve `num_workers * cpus_per_worker` on the Tune trial actor.
-    # The TorchTrainer will create a placement group with those resources.
-    # Reserving them here can cause fragmentation and unschedulable placement groups.
-    trainable = _trainable
-
-    callbacks = list(extra_callbacks or [])
-    if mlflow_tracking_uri and mlflow_experiment_name:
-        callbacks.append(
-            MLflowLoggerCallback(
-                tracking_uri=mlflow_tracking_uri,
-                experiment_name=mlflow_experiment_name,
-                save_artifact=False,
-                log_params_on_trial_end=True,
-            )
-        )
-
-    tuner = tune.Tuner(
-        trainable,
-        param_space=param_space,
-        tune_config=tune.TuneConfig(
-            num_samples=5,
-            scheduler=scheduler,
-            max_concurrent_trials=int(os.getenv("MAX_CONCURRENT_TRIALS", "1")),
-        ),
-        run_config=RunConfig(
-            storage_path=storage_path,
-            name=name,
-            callbacks=callbacks,
-        ),
-    )
-
-    results = tuner.fit()
-    best = results.get_best_result(metric="val_loss", mode="min")
-    return best.config

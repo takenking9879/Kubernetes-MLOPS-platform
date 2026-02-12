@@ -1,76 +1,112 @@
-"""
-XGBoost training module using Ray Train + Ray Tune.
-Supports cheap HPT with ASHA + ResourceChangingScheduler.
-"""
+"""XGBoost tuner — concrete implementation of BaseTuner."""
 
-import os
-import numbers
-import time
-from typing import Dict
+from __future__ import annotations
+
 import logging
+import os
+import time
+from typing import Any, Dict, List, Optional
+
 import ray
+import ray.data
 import ray.train
-from ray import tune
-from ray.train import ScalingConfig
-from ray.tune import RunConfig
 from ray.train.xgboost import XGBoostTrainer
-from ray.air.integrations.mlflow import MLflowLoggerCallback
-from ray.tune.schedulers import ASHAScheduler, ResourceChangingScheduler
 
 from schemas.model.xgboost_params import SEARCH_SPACE_XGBOOST_PARAMS, XGBOOST_TUNE_SETTINGS
-from pipeline.utils.xgboost_utils import get_train_val_dmatrix, run_xgboost_train, RayTrainPeriodicReportCheckpointCallback
+from pipeline.utils.xgboost_utils import (
+    train_func,
+    get_train_val_dmatrix,
+    run_xgboost_train,
+    RayTrainPeriodicReportCheckpointCallback,
+)
+from pipeline.base_tuner import BaseTuner
 
 logger = logging.getLogger(__name__)
-CHECKPOINT_FILENAME = "xgb_checkpoint.json"
 
-# --------------------------------------------------
-# Train loop (runs on each Ray Train worker)
-# --------------------------------------------------
-def train_func(config: Dict):
-    # Copy to avoid mutating the Tune search-space dict across calls.
-    params = dict(config["xgboost_params"])
-    target = config["target"]
-    num_classes = int(config.get("num_classes", 2))
 
-    num_boost_round = int(config.get("num_boost_round", 50))
+# ──────────────────────────────────────────────
+# Concrete tuner
+# ──────────────────────────────────────────────
 
-    dtrain, dval = get_train_val_dmatrix(target, feature_columns=config.get("feature_columns"))
+class XGBoostModelTuner(BaseTuner):
+    """Hyperparameter tuning for XGBoost via ASHA + Ray Tune."""
 
-    # IMPORTANT:
-    # In Ray Train integration, the train loop runs on Train workers.
-    # We keep `nthread` consistent with the CPU allocated per worker bundle.
-    cpus_per_worker = int(config.get("cpus_per_worker", os.getenv("CPUS_PER_WORKER", "1")))
-    cpus_per_worker = max(cpus_per_worker, 1)
+    @property
+    def framework_name(self) -> str:
+        return "xgboost"
 
-    # IMPORTANT (Ray docs): if num_cpus isn't set on the worker, Ray defaults
-    # to OMP_NUM_THREADS=1. We set it explicitly to actually use the allocated CPUs.
+    @property
+    def params_key(self) -> str:
+        return "xgboost_params"
 
-    params["nthread"] = cpus_per_worker
-    params["num_class"] = num_classes
+    @property
+    def search_space(self) -> Dict[str, Any]:
+        return SEARCH_SPACE_XGBOOST_PARAMS
 
-    start_time = time.perf_counter()
-    run_xgboost_train(
-        params=params,
-        dtrain=dtrain,
-        dval=dval,
-        num_boost_round=num_boost_round,
-        is_tuning=True,  # DISABLE Prometheus export during tuning
-        callbacks=[
-            RayTrainPeriodicReportCheckpointCallback(
-                metrics=["validation-mlogloss", "validation-merror"],
-                report_every=5,
-                checkpoint_every=50,
-                filename="model.ubj",
-                is_tuning=True,  # DISABLE Prometheus export during tuning
-            ),
-        ],
-    )
-    train_time_sec = time.perf_counter() - start_time
-    logger.info(f"[xgboost-tune] Worker train_time_sec={train_time_sec:.2f}")
+    @property
+    def tune_settings(self) -> Dict[str, Any]:
+        return XGBOOST_TUNE_SETTINGS
 
-# --------------------------------------------------
-# Tuning entrypoint
-# --------------------------------------------------
+    @property
+    def tune_metric(self) -> str:
+        return "validation-mlogloss"
+
+    @property
+    def tune_mode(self) -> str:
+        return "min"
+
+    @property
+    def default_num_samples(self) -> int:
+        return 3
+
+    def _get_ray_trainer_cls(self):
+        return XGBoostTrainer
+
+    def _get_train_func(self):
+        return train_func
+
+    def _get_asha_max_t_key(self) -> str:
+        return "num_boost_round"
+
+    def _build_trial_train_loop_config(
+        self,
+        *,
+        trial_config: Dict[str, Any],
+        target: str,
+        feature_columns: Optional[List[str]],
+        input_dim: int,
+        num_classes: int,
+        cpus_per_worker: int,
+    ) -> Dict[str, Any]:
+        return {
+            "target": target,
+            "feature_columns": feature_columns,
+            "num_classes": int(num_classes),
+            "cpus_per_worker": cpus_per_worker,
+            "num_boost_round": int(XGBOOST_TUNE_SETTINGS["num_boost_round"]),
+            "xgboost_params": trial_config["xgboost_params"],
+            "is_tuning": True,
+        }
+
+    def _preprocess_datasets(
+        self,
+        train_ds: ray.data.Dataset,
+        val_ds: ray.data.Dataset,
+        *,
+        target: str,
+        feature_columns: Optional[List[str]],
+    ) -> tuple[ray.data.Dataset, ray.data.Dataset]:
+        # XGBoost handles column selection inside DMatrix construction.
+        return train_ds, val_ds
+
+
+# ──────────────────────────────────────────────
+# Module-level convenience (backward-compatible)
+# ──────────────────────────────────────────────
+
+_TUNER = XGBoostModelTuner()
+
+
 def tune_model(
     table_identifier: str,
     catalog_config: dict,
@@ -79,7 +115,7 @@ def tune_model(
     feature_columns: list | None = None,
     storage_path: str = None,
     name: str = "tune",
-    input_dim: int = 14,  # Solo para mantener consistencia con otros entrenamientos
+    input_dim: int = 14,
     num_classes: int = 6,
     sample_fraction: float | None = None,
     seed: int = 42,
@@ -87,155 +123,20 @@ def tune_model(
     mlflow_experiment_name: str | None = None,
     extra_callbacks: list | None = None,
 ):
-    # Two-stage idea:
-    num_workers = int(os.getenv("NUM_WORKERS_TUNE", os.getenv("NUM_WORKERS", 2)))
-    cpus_per_worker = int(os.getenv("CPUS_PER_WORKER_TUNE", os.getenv("CPUS_PER_WORKER", 1)))
-
-    scaling_config = ScalingConfig(
-        num_workers=num_workers,
-        resources_per_worker={"CPU": cpus_per_worker},
+    """Backward-compatible module-level entry point."""
+    return _TUNER.tune_model(
+        table_identifier=table_identifier,
+        catalog_config=catalog_config,
+        split_ranges=split_ranges,
+        target=target,
+        feature_columns=feature_columns,
+        storage_path=storage_path,
+        name=name,
+        input_dim=input_dim,
+        num_classes=num_classes,
+        sample_fraction=sample_fraction,
+        seed=seed,
+        mlflow_tracking_uri=mlflow_tracking_uri,
+        mlflow_experiment_name=mlflow_experiment_name,
+        extra_callbacks=extra_callbacks,
     )
-
-    # --- Search space (cheap tuning) ---
-    param_space = {"xgboost_params": SEARCH_SPACE_XGBOOST_PARAMS}
-
-    # --- Early stopping ---
-    asha = ASHAScheduler(
-        metric="validation-mlogloss",
-        mode="min",
-        max_t=XGBOOST_TUNE_SETTINGS["num_boost_round"],
-        grace_period=XGBOOST_TUNE_SETTINGS["grace_period"],
-        reduction_factor=XGBOOST_TUNE_SETTINGS["reduction_factor"],
-    )
-
-    enable_rcs = os.getenv("ENABLE_RESOURCE_CHANGING_SCHEDULER", "false").lower() in ("1", "true", "yes")
-    scheduler = ResourceChangingScheduler(base_scheduler=asha) if enable_rcs else asha
-
-    def _maybe_sample_train_ds(ds: ray.data.Dataset) -> ray.data.Dataset:
-        if sample_fraction is None:
-            return ds
-        frac = float(sample_fraction)
-        if frac >= 1.0 or frac <= 0.0:
-            return ds
-        if hasattr(ds, "random_sample"):
-            # do sampling; repartition afterwards to control parallelism
-            ds = ds.random_sample(frac, seed=seed)
-            return ds
-        return ds
-
-    def _trainable(trial_config: Dict):
-        from pyiceberg.expressions import GreaterThanOrEqual, LessThanOrEqual, And
-        from src.utils.baseclass import BaseUtils # Import local to avoid top-level coupling
-        # Load datasets with Iceberg row filters (use centralized formatter)
-        train_range = split_ranges.get('train', {})
-        val_range = split_ranges.get('val', {})
-
-        t_s = BaseUtils.format_iceberg_ts(train_range.get('start'))
-        t_e = BaseUtils.format_iceberg_ts(train_range.get('end'))
-        v_s = BaseUtils.format_iceberg_ts(val_range.get('start'))
-        v_e = BaseUtils.format_iceberg_ts(val_range.get('end'))
-
-        train_filter = And(
-            GreaterThanOrEqual("timestamp", t_s),
-            LessThanOrEqual("timestamp", t_e)
-        ) if t_s and t_e else None
-
-        val_filter = And(
-            GreaterThanOrEqual("timestamp", v_s),
-            LessThanOrEqual("timestamp", v_e)
-        ) if v_s and v_e else None
-
-        train_ds = _maybe_sample_train_ds(
-            ray.data.read_iceberg(table_identifier=table_identifier, catalog_kwargs=catalog_config, row_filter=train_filter)
-        )
-        val_ds = ray.data.read_iceberg(table_identifier=table_identifier, catalog_kwargs=catalog_config, row_filter=val_filter)
-
-        # apply limits if configured
-        max_train_rows = int(os.getenv("TUNE_MAX_TRAIN_ROWS", "0"))
-        max_val_rows = int(os.getenv("TUNE_MAX_VAL_ROWS", "0"))
-        if max_train_rows > 0:
-            train_ds = train_ds.limit(max_train_rows)
-        if max_val_rows > 0:
-            val_ds = val_ds.limit(max_val_rows)
-
-        # optionally materialize (careful: materialize uses cluster CPUs but we've limited blocks)
-        if os.getenv("RAY_MATERIALIZE_DATASETS_TUNE", "0").lower() in ("1", "true", "yes"):
-            train_ds = train_ds.materialize()
-            val_ds = val_ds.materialize()
-
-        train_loop_config = {
-            "target": target,
-            "feature_columns": feature_columns,
-            "num_classes": int(num_classes),
-            "cpus_per_worker": cpus_per_worker,
-            "num_boost_round": int(XGBOOST_TUNE_SETTINGS["num_boost_round"]),
-            "xgboost_params": trial_config["xgboost_params"],
-            "is_tuning": True,  # ← Trial de tuning, deshabilitar Prometheus
-        }
-
-        try:
-            trial_id = tune.get_context().get_trial_id()
-        except Exception:
-            trial_id = str(os.getpid())
-
-        trainer = XGBoostTrainer(
-            train_loop_per_worker=train_func,
-            train_loop_config=train_loop_config,
-            scaling_config=scaling_config,
-            datasets={"train": train_ds, "val": val_ds},
-            run_config=ray.train.RunConfig(
-                storage_path=storage_path,
-                name=f"{name}_train_{trial_id}",
-            ),
-        )
-        result = trainer.fit()
-        metrics = getattr(result, "metrics", None) or {}
-        report_dict: Dict[str, numbers.Real] = {}
-        for k, v in metrics.items():
-            if not isinstance(v, numbers.Real) or isinstance(v, bool):
-                continue
-            # MLflow expects `step` to be an int; Ray's MLflowLoggerCallback uses
-            # `training_iteration` as the step.
-            if k in ("training_iteration", "epoch", "step"):
-                report_dict[k] = int(v)
-            else:
-                report_dict[k] = float(v)
-        tune.report(report_dict)
-
-    # IMPORTANT:
-    # Do NOT reserve `num_workers * cpus_per_worker` on the Tune trial actor.
-    # The XGBoostTrainer will create a placement group with those resources.
-    # Reserving them here causes fragmentation and unschedulable placement groups
-    # (especially with MAX_CONCURRENT_TRIALS > 1).
-    trainable = _trainable
-
-    callbacks = list(extra_callbacks or [])
-    if mlflow_tracking_uri and mlflow_experiment_name:
-        callbacks.append(
-            MLflowLoggerCallback(
-                tracking_uri=mlflow_tracking_uri,
-                experiment_name=mlflow_experiment_name,
-                save_artifact=False,
-                log_params_on_trial_end=True,
-            )
-        )
-
-    tuner = tune.Tuner(
-        trainable,
-        param_space=param_space,
-        tune_config=tune.TuneConfig(
-            num_samples=3,
-            scheduler=scheduler,
-            max_concurrent_trials=int(os.getenv("MAX_CONCURRENT_TRIALS", "1")),
-        ),
-        run_config=RunConfig(
-            storage_path=storage_path,
-            name=name,
-            callbacks=callbacks,
-        ),
-    )
-
-    results = tuner.fit()
-    best = results.get_best_result(metric="validation-mlogloss", mode="min")
-    return best.config
-

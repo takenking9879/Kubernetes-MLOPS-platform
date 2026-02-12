@@ -1,0 +1,67 @@
+graph TB
+    %% ========== PUNTO DE ENTRADA ==========
+    Main["🚀 main.py<br/>KubeRayTraining.train()"]:::main
+    
+    %% ========== DECISIÓN DE FRAMEWORK ==========
+    Main --> Framework{Framework?}:::decision
+    
+    %% ========== DECISIÓN DE MODO ==========
+    Framework -->|pytorch| TuneDecision{Tune?}:::decision
+    Framework -->|xgboost| TuneDecision
+    
+    %% ========== RAMA DE TUNING ==========
+    TuneDecision -->|Yes| GetTuner["📊 get_tuner(framework)<br/>BaseTuner"]:::common
+    GetTuner --> PTTuner["PyTorchModelTuner"]:::pytorch
+    GetTuner --> XGBTuner["XGBoostModelTuner"]:::xgboost
+    
+    PTTuner --> TuneModel["tune_model()<br/>• load Iceberg data<br/>• build ASHA<br/>• run Tuner.fit()"]:::common
+    XGBTuner --> TuneModel
+    
+    TuneModel --> Trainable["_trainable(trial_config)<br/>• read_iceberg()<br/>• materialize<br/>• create Trainer"]:::common
+    
+    Trainable --> PTWorkerTune["train_func<br/>(pytorch_utils.py)<br/>• DataLoader<br/>• optimizer.step()<br/>• report metrics"]:::pytorch
+    Trainable --> XGBWorkerTune["train_func<br/>(xgboost_utils.py)<br/>• DMatrix<br/>• xgb.train()<br/>• report metrics"]:::xgboost
+    
+    PTWorkerTune --> BestConfig["Best Config<br/>pytorch_params"]:::common
+    XGBWorkerTune --> BestConfig
+    
+    %% ========== RAMA DE TRAINING ==========
+    TuneDecision -->|No/After| GetTrainer["🎯 get_trainer(framework)<br/>BaseTrainer"]:::common
+    BestConfig --> GetTrainer
+    
+    GetTrainer --> PTTrainer["PyTorchModelTrainer"]:::pytorch
+    GetTrainer --> XGBTrainer["XGBoostModelTrainer"]:::xgboost
+    
+    PTTrainer --> TrainMethod["train()<br/>• _preprocess_datasets()<br/>• _build_train_loop_config()<br/>• _build_scaling_config()<br/>• create Trainer<br/>• trainer.fit()"]:::common
+    XGBTrainer --> TrainMethod
+    
+    TrainMethod --> PTWorker["train_func<br/>(pytorch_utils.py)<br/>• DataLoader<br/>• optimizer.step()<br/>• checkpoint"]:::pytorch
+    TrainMethod --> XGBWorker["train_func<br/>(xgboost_utils.py)<br/>• DMatrix<br/>• xgb.train()<br/>• checkpoint"]:::xgboost
+    
+    PTWorker --> Eval["_evaluate_split()<br/>• val_dataset<br/>• test_dataset<br/>• confusion matrix<br/>• classification report"]:::common
+    XGBWorker --> Eval
+    
+    %% ========== FINALIZACIÓN ==========
+    Eval --> Results["📈 Result + Metrics<br/>• extract_model()<br/>• log_training_run()<br/>• export_final_metrics()"]:::common
+    
+    Results --> S3["💾 S3 Storage<br/>model.pkl"]:::output
+    Results --> MLflow["📊 MLflow Registry<br/>experiment + model version"]:::output
+    Results --> Prometheus["📉 Prometheus<br/>val_accuracy, val_f1, etc."]:::output
+    
+    %% ========== ESTILOS ==========
+    classDef main fill:#e1bee7,stroke:#8e24aa,stroke-width:3px,color:#000
+    classDef decision fill:#fff9c4,stroke:#f57f17,stroke-width:2px,color:#000
+    classDef common fill:#c8e6c9,stroke:#388e3c,stroke-width:2px,color:#000
+    classDef pytorch fill:#bbdefb,stroke:#1976d2,stroke-width:2px,color:#000
+    classDef xgboost fill:#ffccbc,stroke:#e64a19,stroke-width:2px,color:#000
+    classDef output fill:#f8bbd0,stroke:#c2185b,stroke-width:2px,color:#000
+    
+    %% ========== LEYENDA ==========
+    subgraph Legend[" "]
+        L1["🟩 Código Común (BaseTrainer/BaseTuner)"]:::common
+        L2["🟦 Específico PyTorch"]:::pytorch
+        L3["🟧 Específico XGBoost"]:::xgboost
+        L4["🟪 Orquestador Principal"]:::main
+        L5["🟨 Puntos de Decisión"]:::decision
+        L6["🌸 Sistemas de Salida"]:::output
+    end

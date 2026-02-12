@@ -1,61 +1,115 @@
-""""
-XGBoost training module using Ray Train. It only supports RAM-based training."""
+"""XGBoost trainer — concrete implementation of BaseTrainer.
 
-import os
-import time
+It only supports RAM-based training (DMatrix-based)."""
+
+from __future__ import annotations
+
 import logging
-from typing import Any, Dict, List, Optional
+import os
+from typing import Any, Dict, List, Optional, Tuple
 
+import ray.data
 import ray.train
 from ray.train.xgboost import XGBoostTrainer
 
 from schemas.model.xgboost_params import XGBOOST_PARAMS
 from pipeline.utils.metrics_utils import xgb_multiclass_metrics_on_ds
-from pipeline.utils.xgboost_utils import get_train_val_dmatrix, run_xgboost_train, RayTrainPeriodicReportCheckpointCallback
+from pipeline.utils.xgboost_utils import (
+    train_func,
+    get_train_val_dmatrix,
+    run_xgboost_train,
+    RayTrainPeriodicReportCheckpointCallback,
+)
+from pipeline.base_trainer import BaseTrainer
 
 logger = logging.getLogger(__name__)
 
-# Training function for each worker
-def train_func(config: Dict):
-    """Runs on each Ray Train worker."""
-    # Copy params to avoid mutating shared dicts across workers/trials.
-    params = dict(config.get("xgboost_params", XGBOOST_PARAMS))
-    target = config["target"]
-    params["num_class"] = int(config.get("num_classes", 2))
 
-    # Align XGBoost threading with the CPU allocated per Ray Train worker.
-    cpus_per_worker = int(config.get("cpus_per_worker", os.getenv("CPUS_PER_WORKER", "1")))
-    cpus_per_worker = max(cpus_per_worker, 1)
-    params["nthread"] = cpus_per_worker
+# ──────────────────────────────────────────────
+# Concrete trainer
+# ──────────────────────────────────────────────
 
-    # `num_boost_round` is a top-level argument to xgboost.train, not a param.
-    # Keep it out of `params` to avoid XGBoost warnings (and keep logs clean).
-    num_boost_round = int(params.pop("num_boost_round", 100))
-    feature_columns = config.get("feature_columns")
-    dtrain, dval = get_train_val_dmatrix(target, feature_columns=feature_columns)
+class XGBoostModelTrainer(BaseTrainer):
+    """XGBoost distributed training via Ray XGBoostTrainer."""
 
-    #Aqui el tiempo de entrenamiento
-    start_time = time.perf_counter()
-    run_xgboost_train(
-        params=params,
-        dtrain=dtrain,
-        dval=dval,
-        num_boost_round=num_boost_round,
-        is_tuning=config.get("is_tuning", False),
-        callbacks=[
-            RayTrainPeriodicReportCheckpointCallback(
-                metrics=["validation-mlogloss", "validation-merror", "train-mlogloss"],
-                report_every=int(os.getenv("REPORT_FREQUENCY", "5")),  # Report every epoch for smooth Grafana visualization
-                checkpoint_every=int(os.getenv("RAY_TRAIN_CHECKPOINT_EVERY", "50")), # Checkpoint less frequently to save storage
-                filename="model.ubj",
-                is_tuning=config.get("is_tuning", False),
-                dval=dval,  # Pass dval for accuracy/F1 computation
-            )
-        ],
-    )
-    train_time_sec = time.perf_counter() - start_time
-    logger.info(f"[xgboost] Worker train_time_sec={train_time_sec:.2f}")
-    #Aqui termina el tiempo de entrenamiento
+    @property
+    def framework_name(self) -> str:
+        return "xgboost"
+
+    @property
+    def params_key(self) -> str:
+        return "xgboost_params"
+
+    @property
+    def default_params(self) -> Dict[str, Any]:
+        return XGBOOST_PARAMS
+
+    def _get_ray_trainer_cls(self):
+        return XGBoostTrainer
+
+    def _get_train_func(self):
+        return train_func
+
+    def _build_train_loop_config(
+        self,
+        *,
+        target: str,
+        feature_columns: Optional[List[str]],
+        params: Dict[str, Any],
+        input_dim: int,
+        num_classes: int,
+        cpus_per_worker: int,
+    ) -> Dict[str, Any]:
+        return {
+            "target": target,
+            "feature_columns": feature_columns,
+            "xgboost_params": params,
+            "num_classes": int(num_classes),
+            "cpus_per_worker": cpus_per_worker,
+            "is_tuning": False,
+        }
+
+    def _preprocess_datasets(
+        self,
+        train_ds: ray.data.Dataset,
+        val_ds: ray.data.Dataset,
+        test_ds: Optional[ray.data.Dataset],
+        *,
+        target: str,
+        feature_columns: Optional[List[str]],
+    ) -> Tuple[ray.data.Dataset, ray.data.Dataset, Optional[ray.data.Dataset]]:
+        # XGBoost handles column selection via logic in get_train_val_dmatrix
+        # inside the worker train_func, so no driver-side preprocessing needed.
+        return train_ds, val_ds, test_ds
+
+    def _evaluate_split(
+        self,
+        *,
+        result: ray.train.Result,
+        ds: ray.data.Dataset,
+        target: str,
+        feature_columns: Optional[List[str]],
+        num_classes: int,
+        input_dim: int,
+        params: Dict[str, Any],
+        prefix: str,
+    ) -> Dict[str, Any]:
+        return xgb_multiclass_metrics_on_ds(
+            ds=ds,
+            split=prefix,
+            target=target,
+            feature_columns=feature_columns,
+            num_classes=int(num_classes),
+            booster_checkpoint=result.checkpoint,
+        )
+
+
+# ──────────────────────────────────────────────
+# Module-level convenience (backward-compatible)
+# ──────────────────────────────────────────────
+
+_TRAINER = XGBoostModelTrainer()
+
 
 def train(
     train_dataset,
@@ -65,74 +119,22 @@ def train(
     storage_path,
     name,
     feature_columns: Optional[List[str]] = None,
-    input_dim: int = 14,  # Solo para mantener consistencia con otros entrenamientos
+    input_dim: int = 14,
     num_classes: int = 6,
     xgboost_params=None,
     callbacks: Optional[List[object]] = None,
 ):
-    scaling_config = ray.train.ScalingConfig(
-        num_workers=int(os.getenv("NUM_WORKERS", 2)),
-        resources_per_worker={"CPU": int(os.getenv("CPUS_PER_WORKER", 2))})
-
-    params = xgboost_params if xgboost_params is not None else XGBOOST_PARAMS
-    config = {
-        "target": target,
-        "feature_columns": feature_columns,
-        "num_classes": int(num_classes),
-        "xgboost_params": params,
-        "cpus_per_worker": int(os.getenv("CPUS_PER_WORKER", 2)),
-        "is_tuning": False,  # ← Entrenamiento final, NO tuning
-    }
-
-    trainer = XGBoostTrainer(
-        train_loop_per_worker=train_func, #Función de entrenamiento
-        train_loop_config=config, #Configuración del entrenamiento
-        scaling_config=scaling_config, #Configuración de recursos
-        datasets={"train": train_dataset, "val": val_dataset}, #Pasar datasets leidos
-        run_config=ray.train.RunConfig(
-            storage_path=storage_path,
-            name=name,
-            callbacks=callbacks or None,
-        ), #Donde guardar los resultados
+    """Backward-compatible module-level entry point."""
+    return _TRAINER.train(
+        train_dataset=train_dataset,
+        val_dataset=val_dataset,
+        test_dataset=test_dataset,
+        target=target,
+        storage_path=storage_path,
+        name=name,
+        feature_columns=feature_columns,
+        input_dim=input_dim,
+        num_classes=num_classes,
+        params=xgboost_params,
+        callbacks=callbacks,
     )
-
-    result = trainer.fit()
-    
-    # Métricas finales (mezcla de métricas reportadas por Ray + multiclass en val)
-    final_metrics: Dict[str, Any] = {}
-
-    if getattr(result, "metrics", None):
-        for k, v in result.metrics.items():
-            if isinstance(v, (int, float)):
-                final_metrics[k] = float(v)
-
-    # Final Evaluation (Driver-Side) for full datasets
-    mc_start = time.perf_counter()
-
-    # 1. Validation metrics (full dataset)
-    final_metrics.update(
-        xgb_multiclass_metrics_on_ds(
-            ds=val_dataset,
-            split="val",
-            target=target,
-            feature_columns=feature_columns,
-            num_classes=int(num_classes),
-            booster_checkpoint=result.checkpoint,
-        )
-    )
-
-    # 2. Test metrics (if exists)
-    if test_dataset is not None:
-        final_metrics.update(
-            xgb_multiclass_metrics_on_ds(
-                ds=test_dataset,
-                split="test",
-                target=target,
-                feature_columns=feature_columns,
-                num_classes=int(num_classes),
-                booster_checkpoint=result.checkpoint,
-            )
-        )
-    final_metrics["multiclass_metrics_time_sec"] = time.perf_counter() - mc_start
-
-    return result, final_metrics

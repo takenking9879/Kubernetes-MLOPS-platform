@@ -1,13 +1,18 @@
-from typing import Tuple
+from typing import Tuple, Dict, Optional, List
 import os
+import time
+import logging
 import tempfile
 import ray
 import xgboost
 from ray.train import Checkpoint
-from typing import Dict, Optional, List
 
 import numpy as np
 from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score
+
+from schemas.model.xgboost_params import XGBOOST_PARAMS
+
+logger = logging.getLogger(__name__)
 
 # Prometheus (optional; enabled by default for training observability)
 try:  # pragma: no cover
@@ -327,3 +332,54 @@ class RayTrainPeriodicReportCheckpointCallback(xgboost.callback.TrainingCallback
                 print(f"[xgboost_utils] Failed to clear Prometheus metrics: {e}")
         
         return model
+# ──────────────────────────────────────────────
+# Distributed Training Function (Worker side)
+# ──────────────────────────────────────────────
+
+def train_func(config: Dict):
+    """Distributed training loop for XGBoost workers.
+    
+    Used by both training and tuning pipelines.
+    """
+    params = dict(config.get("xgboost_params", XGBOOST_PARAMS))
+    target = config["target"]
+    params["num_class"] = int(config.get("num_classes", 2))
+
+    # Align XGBoost threading with Ray worker configuration
+    cpus_per_worker = int(config.get("cpus_per_worker", os.getenv("CPUS_PER_WORKER", "1")))
+    cpus_per_worker = max(cpus_per_worker, 1)
+    params["nthread"] = cpus_per_worker
+
+    # num_boost_round is passed to xgb.train, not inside params dict
+    num_boost_round = int(params.pop("num_boost_round", 100))
+    if "num_boost_round" in config:
+        num_boost_round = int(config["num_boost_round"])
+
+    feature_columns = config.get("feature_columns")
+    dtrain, dval = get_train_val_dmatrix(target, feature_columns=feature_columns)
+
+    is_tuning = config.get("is_tuning", False)
+    
+    # Checkpoint configuration
+    checkpoint_filename = "model.ubj"
+    
+    start_time = time.perf_counter()
+    run_xgboost_train(
+        params=params,
+        dtrain=dtrain,
+        dval=dval,
+        num_boost_round=num_boost_round,
+        is_tuning=is_tuning,
+        callbacks=[
+            RayTrainPeriodicReportCheckpointCallback(
+                metrics=["validation-mlogloss", "validation-merror", "train-mlogloss"],
+                report_every=int(os.getenv("REPORT_FREQUENCY", "5")),
+                checkpoint_every=int(os.getenv("RAY_TRAIN_CHECKPOINT_EVERY", "50")),
+                filename=checkpoint_filename,
+                is_tuning=is_tuning,
+                dval=dval,
+            )
+        ],
+    )
+    duration = time.perf_counter() - start_time
+    logger.info(f"[xgboost-worker] World rank {ray.train.get_context().get_world_rank()} finished in {duration:.2f}s")

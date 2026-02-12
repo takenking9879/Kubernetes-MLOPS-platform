@@ -1,137 +1,76 @@
-import os
-import time
+"""PyTorch trainer — concrete implementation of BaseTrainer."""
+
+from __future__ import annotations
+
 import logging
-import torch
-import numpy as np
+import os
+from typing import Any, Dict, List, Optional, Tuple
+
+import ray.data
 import ray.train
+import torch
 from ray.train.torch import TorchTrainer
-from torch import nn
-from typing import Any, Dict, List, Optional
-from schemas.model.pytorch_params import PYTORCH_PARAMS 
+
+from schemas.model.pytorch_params import PYTORCH_PARAMS
 from pipeline.utils.pytorch_utils import train_func
-from models.pytorch import NeuralNetwork
-from sklearn.metrics import classification_report
+from pipeline.base_trainer import BaseTrainer
 
 logger = logging.getLogger(__name__)
 
 
-def _select_model_columns(ds, *, target: str, feature_columns: Optional[List[str]]):
-    """Return a Ray Dataset with only (features + target) columns.
+# ──────────────────────────────────────────────
+# Dataset helpers (keep metadata columns out of torch)
+# ──────────────────────────────────────────────
 
-    This prevents Ray Data -> torch tensor conversion from touching metadata
-    columns like timestamps (numpy.datetime64), which PyTorch can't handle.
+def _select_model_columns(
+    ds: ray.data.Dataset, *, target: str, feature_columns: Optional[List[str]],
+) -> ray.data.Dataset:
+    """Return a Dataset with only (features + target) columns.
+
+    Prevents ``iter_torch_batches`` from touching metadata columns
+    like ``timestamp`` (numpy.datetime64), which PyTorch can't convert.
     """
     if feature_columns is None:
         return ds
-
     cols = list(feature_columns) + [target]
-    try:
-        return ds.select_columns(cols)
-    except Exception:
-        try:
-            names_attr = getattr(ds.schema(), "names", None)
-            if callable(names_attr):
-                names = names_attr()
-            else:
-                names = names_attr or []
-            present = set(names)
-            keep = [c for c in cols if c in present]
-            return ds.select_columns(keep)
-        except Exception:
-            return ds
+    return ds.select_columns(cols)
 
 
-def _metrics_from_confusion(conf: torch.Tensor, *, prefix: str) -> Dict[str, float]:
-    conf = conf.to(torch.float32)
-    support = conf.sum(dim=1)
-    tp = torch.diag(conf)
-    pred_sum = conf.sum(dim=0)
-
-    precision = tp / torch.clamp(pred_sum, min=1.0)
-    recall = tp / torch.clamp(support, min=1.0)
-    f1 = (2.0 * precision * recall) / torch.clamp(precision + recall, min=1e-12)
-
-    accuracy = tp.sum() / torch.clamp(conf.sum(), min=1.0)
-    macro_precision = precision.mean()
-    macro_recall = recall.mean()
-    macro_f1 = f1.mean()
-
-    weights = support / torch.clamp(support.sum(), min=1.0)
-    weighted_precision = (precision * weights).sum()
-    weighted_recall = (recall * weights).sum()
-    weighted_f1 = (f1 * weights).sum()
-
-    return {
-        f"{prefix}_accuracy": float(accuracy.item()),
-        f"{prefix}_precision_macro": float(macro_precision.item()),
-        f"{prefix}_recall_macro": float(macro_recall.item()),
-        f"{prefix}_f1_macro": float(macro_f1.item()),
-        # User aliases for easier interpretation
-        f"{prefix}_precision_avg": float(macro_precision.item()),
-        f"{prefix}_recall_avg": float(macro_recall.item()),
-        f"{prefix}_f1_avg": float(macro_f1.item()),
-        f"{prefix}_precision_weighted": float(weighted_precision.item()),
-        f"{prefix}_recall_weighted": float(weighted_recall.item()),
-        f"{prefix}_f1_weighted": float(weighted_f1.item()),
-    }
-
-
-def _classification_report_from_confusion(conf_np: np.ndarray, *, num_classes: int) -> str | None:
-    total = int(conf_np.sum())
-    if total <= 0:
-        return None
-
-    max_rows = int(os.getenv("MLFLOW_CLASSIFICATION_REPORT_MAX_ROWS", "200000"))
-    seed = int(os.getenv("SEED", "42"))
-    flat = conf_np.ravel()
-
-    if max_rows > 0 and total > max_rows:
-        rng = np.random.default_rng(seed)
-        p = flat / max(float(total), 1.0)
-        sampled = rng.multinomial(max_rows, p)
-        idx = np.repeat(np.arange(flat.size, dtype=np.int64), sampled)
-    else:
-        idx = np.repeat(np.arange(flat.size, dtype=np.int64), flat)
-
-    y_true = (idx // num_classes).astype(np.int64)
-    y_pred = (idx % num_classes).astype(np.int64)
-    return classification_report(
-        y_true,
-        y_pred,
-        labels=list(range(num_classes)),
-        digits=4,
-        zero_division=0,
-    )
-
+# ──────────────────────────────────────────────
+# Driver-side evaluation
+# ──────────────────────────────────────────────
 
 def _evaluate_on_dataset(
     *,
     checkpoint: ray.train.Checkpoint,
-    ds,
+    ds: ray.data.Dataset,
     target: str,
-    feature_columns: Optional[List[str]] = None,
+    feature_columns: Optional[List[str]],
     num_classes: int,
     input_dim: int,
     batch_size: int,
     prefix: str = "test",
 ) -> Dict[str, Any]:
-    # Load model weights from the final Ray Train checkpoint.
+    """Compute multiclass metrics from the final checkpoint on a full split."""
+    import numpy as np
+    from torch import nn
+    from sklearn.metrics import classification_report
+    from models.pytorch import NeuralNetwork
+
     model = NeuralNetwork(input_dim=input_dim, num_classes=num_classes)
     model.eval()
 
     with checkpoint.as_directory() as ckpt_dir:
-        model_path = os.path.join(ckpt_dir, "model.pt")
-        state = torch.load(model_path, map_location="cpu")
+        state = torch.load(os.path.join(ckpt_dir, "model.pt"), map_location="cpu")
         model.load_state_dict(state["model_state_dict"])
 
     loss_fn = nn.CrossEntropyLoss()
     conf = torch.zeros((num_classes, num_classes), dtype=torch.int64)
-    total_loss = 0.0
-    total_batches = 0
+    total_loss, total_batches = 0.0, 0
 
     ds_eval = _select_model_columns(ds, target=target, feature_columns=feature_columns)
-
     feature_cols = feature_columns
+
     for batch in ds_eval.iter_torch_batches(batch_size=batch_size, dtypes=torch.float32):
         y = batch.pop(target).long()
         if feature_cols is None:
@@ -146,21 +85,137 @@ def _evaluate_on_dataset(
             counts = torch.bincount(idx, minlength=num_classes * num_classes)
             conf += counts.reshape(num_classes, num_classes)
 
+    # Metrics from confusion matrix
+    from pipeline.utils.pytorch_utils import _metrics_from_confusion
+
     metrics: Dict[str, Any] = {}
     metrics[f"{prefix}_loss"] = total_loss / max(total_batches, 1)
     metrics.update(_metrics_from_confusion(conf, prefix=prefix))
 
     conf_np = conf.detach().cpu().numpy().astype(np.int64)
     metrics[f"{prefix}_confusion_matrix"] = conf_np.tolist()
-    cr = _classification_report_from_confusion(conf_np, num_classes=num_classes)
-    if cr is not None:
-        metrics[f"{prefix}_classification_report"] = cr
+
+    # Classification report
+    total = int(conf_np.sum())
+    if total > 0:
+        max_rows = int(os.getenv("MLFLOW_CLASSIFICATION_REPORT_MAX_ROWS", "200000"))
+        seed = int(os.getenv("SEED", "42"))
+        flat = conf_np.ravel()
+        if max_rows > 0 and total > max_rows:
+            rng = np.random.default_rng(seed)
+            p = flat / max(float(total), 1.0)
+            sampled = rng.multinomial(max_rows, p)
+            idx_arr = np.repeat(np.arange(flat.size, dtype=np.int64), sampled)
+        else:
+            idx_arr = np.repeat(np.arange(flat.size, dtype=np.int64), flat)
+        y_true = (idx_arr // num_classes).astype(np.int64)
+        y_pred_arr = (idx_arr % num_classes).astype(np.int64)
+        metrics[f"{prefix}_classification_report"] = classification_report(
+            y_true, y_pred_arr, labels=list(range(num_classes)), digits=4, zero_division=0,
+        )
 
     return metrics
 
-# =========================
-# Trainer
-# =========================
+
+# ──────────────────────────────────────────────
+# Concrete trainer
+# ──────────────────────────────────────────────
+
+class PyTorchModelTrainer(BaseTrainer):
+    """PyTorch distributed training via Ray TorchTrainer."""
+
+    @property
+    def framework_name(self) -> str:
+        return "pytorch"
+
+    @property
+    def params_key(self) -> str:
+        return "pytorch_params"
+
+    @property
+    def default_params(self) -> Dict[str, Any]:
+        return PYTORCH_PARAMS
+
+    def _get_ray_trainer_cls(self):
+        return TorchTrainer
+
+    def _get_train_func(self):
+        return train_func
+
+    def _build_train_loop_config(
+        self,
+        *,
+        target: str,
+        feature_columns: Optional[List[str]],
+        params: Dict[str, Any],
+        input_dim: int,
+        num_classes: int,
+        cpus_per_worker: int,
+    ) -> Dict[str, Any]:
+        return {
+            "target": target,
+            "feature_columns": feature_columns,
+            "pytorch_params": params,
+            "input_dim": int(input_dim),
+            "num_classes": int(num_classes),
+            "cpus_per_worker": cpus_per_worker,
+            "is_tuning": False,
+        }
+
+    def _preprocess_datasets(
+        self,
+        train_ds: ray.data.Dataset,
+        val_ds: ray.data.Dataset,
+        test_ds: Optional[ray.data.Dataset],
+        *,
+        target: str,
+        feature_columns: Optional[List[str]],
+    ) -> Tuple[ray.data.Dataset, ray.data.Dataset, Optional[ray.data.Dataset]]:
+        train_ds = _select_model_columns(train_ds, target=target, feature_columns=feature_columns)
+        val_ds = _select_model_columns(val_ds, target=target, feature_columns=feature_columns)
+        if test_ds is not None:
+            test_ds = _select_model_columns(test_ds, target=target, feature_columns=feature_columns)
+        return train_ds, val_ds, test_ds
+
+    def _evaluate_split(
+        self,
+        *,
+        result: ray.train.Result,
+        ds: ray.data.Dataset,
+        target: str,
+        feature_columns: Optional[List[str]],
+        num_classes: int,
+        input_dim: int,
+        params: Dict[str, Any],
+        prefix: str,
+    ) -> Dict[str, Any]:
+        return _evaluate_on_dataset(
+            checkpoint=result.checkpoint,
+            ds=ds,
+            target=target,
+            feature_columns=feature_columns,
+            num_classes=int(num_classes),
+            input_dim=int(input_dim),
+            batch_size=int(params.get("batch_size", 256)),
+            prefix=prefix,
+        )
+
+    def _build_scaling_config(self) -> ray.train.ScalingConfig:
+        """PyTorch adds GPU detection to the base scaling config."""
+        return ray.train.ScalingConfig(
+            num_workers=int(os.getenv("NUM_WORKERS", 2)),
+            resources_per_worker={"CPU": int(os.getenv("CPUS_PER_WORKER", 2))},
+            use_gpu=torch.cuda.is_available(),
+        )
+
+
+# ──────────────────────────────────────────────
+# Module-level convenience (backward-compatible)
+# ──────────────────────────────────────────────
+
+_TRAINER = PyTorchModelTrainer()
+
+
 def train(
     train_dataset,
     val_dataset,
@@ -174,99 +229,17 @@ def train(
     pytorch_params=None,
     callbacks: Optional[List[object]] = None,
 ):
-    scaling_config = ray.train.ScalingConfig(
-        num_workers=int(os.getenv("NUM_WORKERS", 2)),
-        resources_per_worker={"CPU": int(os.getenv("CPUS_PER_WORKER", 2))},
-        use_gpu=torch.cuda.is_available(),
+    """Backward-compatible module-level entry point."""
+    return _TRAINER.train(
+        train_dataset=train_dataset,
+        val_dataset=val_dataset,
+        test_dataset=test_dataset,
+        target=target,
+        storage_path=storage_path,
+        name=name,
+        feature_columns=feature_columns,
+        input_dim=input_dim,
+        num_classes=num_classes,
+        params=pytorch_params,
+        callbacks=callbacks,
     )
-
-    cpus_per_worker = int(os.getenv("CPUS_PER_WORKER", 2))
-
-    params = pytorch_params if pytorch_params is not None else PYTORCH_PARAMS
-
-    # Ensure Ray only converts model columns (features + target) to torch tensors.
-    # If metadata columns (e.g. timestamp datetime64) are present, iter_torch_batches
-    # would otherwise fail before we can pop/ignore them.
-    train_dataset = _select_model_columns(train_dataset, target=target, feature_columns=feature_columns)
-    val_dataset = _select_model_columns(val_dataset, target=target, feature_columns=feature_columns)
-    if test_dataset is not None:
-        test_dataset = _select_model_columns(test_dataset, target=target, feature_columns=feature_columns)
-
-    config = {
-        "target": target,
-        "feature_columns": feature_columns,
-        "pytorch_params": params,
-        "input_dim": int(input_dim),  # Ajustado a las columnas de preprocessing_001.py (3 cat + 11 num)
-        "num_classes": int(num_classes),
-        "cpus_per_worker": cpus_per_worker,
-        "is_tuning": False,  # ← Entrenamiento final, NO tuning
-        }
-
-    trainer = TorchTrainer(
-        train_loop_per_worker=train_func,
-        train_loop_config=config,
-        scaling_config=scaling_config,
-        datasets={"train": train_dataset, "val": val_dataset},
-        run_config=ray.train.RunConfig(
-            storage_path=storage_path,
-            name=name,
-            callbacks=callbacks or None,
-        ),
-        )
-
-    start_time = time.perf_counter()
-    result = trainer.fit()
-    train_time_sec = time.perf_counter() - start_time
-    print(f"[pytorch] distributed train_time_sec={train_time_sec:.2f}")
-
-    final_metrics: Dict[str, Any] = {}
-    try:
-        if getattr(result, "metrics", None):
-            for k, v in result.metrics.items():
-                if isinstance(v, (int, float)):
-                    final_metrics[k] = float(v)
-    except Exception as e:
-        logger.warning(
-            "[pytorch] No se pudieron extraer métricas numéricas de result.metrics: %s",
-            str(e),
-            exc_info=True,
-        )
-
-    # Final Evaluation (Driver-Side) for full datasets
-    mc_start = time.perf_counter()
-    
-    # 1. Validation metrics (full dataset)
-    final_metrics.update(
-        _evaluate_on_dataset(
-            checkpoint=result.checkpoint,
-            ds=val_dataset,
-            target=target,
-            feature_columns=feature_columns,
-            num_classes=int(num_classes),
-            input_dim=int(config.get("input_dim", 14)),
-            batch_size=int(params.get("batch_size", 256)),
-            prefix="val",
-        )
-    )
-
-    # 2. Test metrics (if exists)
-    if test_dataset is not None:
-        final_metrics.update(
-            _evaluate_on_dataset(
-                checkpoint=result.checkpoint,
-                ds=test_dataset,
-                target=target,
-                feature_columns=feature_columns,
-                num_classes=int(num_classes),
-                input_dim=int(config.get("input_dim", 14)),
-                batch_size=int(params.get("batch_size", 256)),
-                prefix="test",
-            )
-        )
-    
-    final_metrics["multiclass_metrics_time_sec"] = time.perf_counter() - mc_start
-
-
-    final_metrics["train_time_sec"] = train_time_sec
-
-    return result, final_metrics
