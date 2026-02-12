@@ -127,8 +127,9 @@ class KubeRayTraining(BaseUtils):
         """Loads a specific split from Iceberg using timestamp ranges from params.yaml."""
         try:
             split_cfg = self.params_full.get('splits', {}).get(split, {})
-            start_ts = split_cfg.get('start')
-            end_ts = split_cfg.get('end')
+            # Robust usage of centralized formatter from BaseUtils
+            start_ts = self.format_iceberg_ts(split_cfg.get('start'))
+            end_ts = self.format_iceberg_ts(split_cfg.get('end'))
 
             row_filter = None
             if start_ts and end_ts:

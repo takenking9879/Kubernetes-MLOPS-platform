@@ -98,20 +98,25 @@ def tune_model(
     # Same workaround as xgboost: build the Trainer inside a function trainable.
     def _trainable(trial_config: Dict):
         from pyiceberg.expressions import GreaterThanOrEqual, LessThanOrEqual, And
-        
-        # Load datasets with Iceberg row filters
+        from src.utils.baseclass import BaseUtils # Import local to avoid top-level coupling
+        # Load datasets with Iceberg row filters (use centralized formatter)
         train_range = split_ranges.get('train', {})
         val_range = split_ranges.get('val', {})
 
+        t_s = BaseUtils.format_iceberg_ts(train_range.get('start'))
+        t_e = BaseUtils.format_iceberg_ts(train_range.get('end'))
+        v_s = BaseUtils.format_iceberg_ts(val_range.get('start'))
+        v_e = BaseUtils.format_iceberg_ts(val_range.get('end'))
+
         train_filter = And(
-            GreaterThanOrEqual("timestamp", train_range['start']),
-            LessThanOrEqual("timestamp", train_range['end'])
-        ) if train_range.get('start') and train_range.get('end') else None
+            GreaterThanOrEqual("timestamp", t_s),
+            LessThanOrEqual("timestamp", t_e)
+        ) if t_s and t_e else None
 
         val_filter = And(
-            GreaterThanOrEqual("timestamp", val_range['start']),
-            LessThanOrEqual("timestamp", val_range['end'])
-        ) if val_range.get('start') and val_range.get('end') else None
+            GreaterThanOrEqual("timestamp", v_s),
+            LessThanOrEqual("timestamp", v_e)
+        ) if v_s and v_e else None
 
         train_dataset = _maybe_sample_train_ds(
             ray.data.read_iceberg(table_identifier=table_identifier, catalog_kwargs=catalog_config, row_filter=train_filter)
