@@ -1,279 +1,302 @@
-2026-02-11 18:12:00.451 | 2026-02-11 16:11:58,360 - KubeRayTraining - INFO - Latest artifact_set_id found in metadata: dsl_001_20260211_222036
-2026-02-11 18:12:00.451 | 2026-02-11 16:11:58,360 - KubeRayTraining - INFO - Using latest artifact_set_id from metadata: dsl_001_20260211_222036
-2026-02-11 18:12:00.451 | 2026-02-11 16:11:58,360 - KubeRayTraining - INFO - Starting training pipeline with Iceberg table: processed.dsl_001_20260211_222036
-2026-02-11 18:12:00.451 | 2026-02-11 16:11:58,360 - KubeRayTraining - INFO - Starting training using framework: pytorch
-2026-02-11 18:12:00.451 | 2026-02-11 16:11:58,360 - KubeRayTraining - INFO - Starting hyperparameter tuning with Iceberg row filtering...
-2026-02-11 18:12:02.456 | 2026-02-11 16:12:00,787	INFO worker.py:1696 -- Using address 10.1.10.243:6379 set in the environment variable RAY_ADDRESS
-2026-02-11 18:12:02.456 | 2026-02-11 16:12:00,791	INFO worker.py:1837 -- Connecting to existing Ray cluster at address: 10.1.10.243:6379...
-2026-02-11 18:12:02.456 | 2026-02-11 16:12:00,806	INFO worker.py:2014 -- Connected to Ray cluster. View the dashboard at http://10.1.10.243:8265 
-2026-02-11 18:12:02.456 | 2026-02-11 16:12:00,833	INFO tune.py:253 -- Initializing Ray automatically. For cluster usage or custom Ray initialization, call `ray.init(...)` before `Tuner(...)`.
-2026-02-11 18:12:02.456 | /home/ray/anaconda3/lib/python3.11/site-packages/google/rpc/__init__.py:18: UserWarning: pkg_resources is deprecated as an API. See https://setuptools.pypa.io/en/latest/pkg_resources.html. The pkg_resources package is slated for removal as early as 2025-11-30. Refrain from using this package or pin to Setuptools<81.
-2026-02-11 18:12:02.456 |   import pkg_resources
-2026-02-11 18:12:02.456 | ╭──────────────────────────────────────────────────────────╮
-2026-02-11 18:12:02.456 | │ Configuration for experiment     pytorch_tune            │
-2026-02-11 18:12:02.456 | ├──────────────────────────────────────────────────────────┤
-2026-02-11 18:12:02.456 | │ Search algorithm                 BasicVariantGenerator   │
-2026-02-11 18:12:03.457 | │ Scheduler                        AsyncHyperBandScheduler │
-2026-02-11 18:12:03.457 | │ Number of trials                 5                       │
-2026-02-11 18:12:03.457 | ╰──────────────────────────────────────────────────────────╯
-2026-02-11 18:12:03.457 | 
-2026-02-11 18:12:03.457 | View detailed results here: k8s-mlops-platform-bucket/v1/models/pytorch_tune
-2026-02-11 18:12:03.457 | To visualize your results with TensorBoard, run: `tensorboard --logdir /tmp/ray/session_2026-02-11_16-11-11_203910_1/artifacts/2026-02-11_16-12-01/pytorch_tune/driver_artifacts`
-2026-02-11 18:12:03.457 | 
-2026-02-11 18:12:03.457 | Trial status: 2 PENDING
-2026-02-11 18:12:03.457 | Current time: 2026-02-11 16:12:02. Total running time: 0s
-2026-02-11 18:12:03.457 | Logical resource usage: 0/18 CPUs, 0/0 GPUs
-2026-02-11 18:12:03.457 | ╭───────────────────────────────────────────────────────────────────────────────────────────────────────────╮
-2026-02-11 18:12:03.457 | │ Trial name               status       ...params/batch_size     pytorch_params/lr     ...rams/weight_decay │
-2026-02-11 18:12:03.457 | ├───────────────────────────────────────────────────────────────────────────────────────────────────────────┤
-2026-02-11 18:12:03.457 | │ _trainable_74736_00000   PENDING                       128           3.94587e-05              0.000239277 │
-2026-02-11 18:12:03.457 | │ _trainable_74736_00001   PENDING                       128           0.000134721              6.10508e-06 │
-2026-02-11 18:12:03.457 | ╰───────────────────────────────────────────────────────────────────────────────────────────────────────────╯
-2026-02-11 18:12:09.466 | 
-2026-02-11 18:12:09.466 | Trial _trainable_74736_00000 started with configuration:
-2026-02-11 18:12:09.466 | ╭─────────────────────────────────────────────────────╮
-2026-02-11 18:12:09.466 | │ Trial _trainable_74736_00000 config                 │
-2026-02-11 18:12:09.466 | ├─────────────────────────────────────────────────────┤
-2026-02-11 18:12:09.466 | │ pytorch_params/batch_size                       128 │
-2026-02-11 18:12:09.466 | │ pytorch_params/lr                       3.94587e-05 │
-2026-02-11 18:12:09.466 | │ pytorch_params/weight_decay             0.000239277 │
-2026-02-11 18:12:09.466 | ╰─────────────────────────────────────────────────────╯
-2026-02-11 18:12:09.466 | 
-2026-02-11 18:12:10.467 | Trial _trainable_74736_00001 started with configuration:
-2026-02-11 18:12:10.467 | ╭─────────────────────────────────────────────────────╮
-2026-02-11 18:12:10.467 | │ Trial _trainable_74736_00001 config                 │
-2026-02-11 18:12:10.467 | ├─────────────────────────────────────────────────────┤
-2026-02-11 18:12:10.467 | │ pytorch_params/batch_size                       128 │
-2026-02-11 18:12:10.467 | │ pytorch_params/lr                       0.000134721 │
-2026-02-11 18:12:10.467 | │ pytorch_params/weight_decay             6.10508e-06 │
-2026-02-11 18:12:10.467 | ╰─────────────────────────────────────────────────────╯
-2026-02-11 18:12:10.467 | 2026-02-11 16:12:10,333	ERROR tune_controller.py:1331 -- Trial task failed for trial _trainable_74736_00000
-2026-02-11 18:12:10.467 | Traceback (most recent call last):
-2026-02-11 18:12:10.467 |   File "/home/ray/anaconda3/lib/python3.11/site-packages/ray/air/execution/_internal/event_manager.py", line 110, in resolve_future
-2026-02-11 18:12:10.467 |     result = ray.get(future)
-2026-02-11 18:12:10.467 |              ^^^^^^^^^^^^^^^
-2026-02-11 18:12:10.467 |   File "/home/ray/anaconda3/lib/python3.11/site-packages/ray/_private/auto_init_hook.py", line 22, in auto_init_wrapper
-2026-02-11 18:12:10.467 |     return fn(*args, **kwargs)
-2026-02-11 18:12:10.467 |            ^^^^^^^^^^^^^^^^^^^
-2026-02-11 18:12:10.467 |   File "/home/ray/anaconda3/lib/python3.11/site-packages/ray/_private/client_mode_hook.py", line 104, in wrapper
-2026-02-11 18:12:10.467 |     return func(*args, **kwargs)
-2026-02-11 18:12:10.467 |            ^^^^^^^^^^^^^^^^^^^^^
-2026-02-11 18:12:10.467 |   File "/home/ray/anaconda3/lib/python3.11/site-packages/ray/_private/worker.py", line 2972, in get
-2026-02-11 18:12:10.467 |     values, debugger_breakpoint = worker.get_objects(
-2026-02-11 18:12:10.467 |                                   ^^^^^^^^^^^^^^^^^^^
-2026-02-11 18:12:10.467 |   File "/home/ray/anaconda3/lib/python3.11/site-packages/ray/_private/worker.py", line 1031, in get_objects
-2026-02-11 18:12:10.467 |     raise value.as_instanceof_cause()
-2026-02-11 18:12:10.467 | ray.exceptions.RayTaskError(TypeError): ray::ImplicitFunc.train() (pid=426, ip=10.1.10.242, actor_id=300eef05fabdf46975ac223902000000, repr=_trainable)
-2026-02-11 18:12:10.467 |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-2026-02-11 18:12:10.467 |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-2026-02-11 18:12:10.467 |   File "/home/ray/anaconda3/lib/python3.11/site-packages/ray/tune/trainable/trainable.py", line 331, in train
-2026-02-11 18:12:10.467 |     raise skipped from exception_cause(skipped)
-2026-02-11 18:12:10.467 |   File "/home/ray/anaconda3/lib/python3.11/site-packages/ray/air/_internal/util.py", line 98, in run
-2026-02-11 18:12:10.467 |     self._ret = self._target(*self._args, **self._kwargs)
-2026-02-11 18:12:10.467 |                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-2026-02-11 18:12:10.467 |   File "/home/ray/anaconda3/lib/python3.11/site-packages/ray/tune/trainable/function_trainable.py", line 44, in <lambda>
-2026-02-11 18:12:10.467 |     training_func=lambda: self._trainable_func(self.config),
-2026-02-11 18:12:10.467 |                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-2026-02-11 18:12:10.467 |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-2026-02-11 18:12:10.467 |   File "/home/ray/anaconda3/lib/python3.11/site-packages/ray/tune/trainable/function_trainable.py", line 249, in _trainable_func
-2026-02-11 18:12:10.467 |     output = fn()
-2026-02-11 18:12:11.468 |              ^^^^
-2026-02-11 18:12:11.468 |   File "/home/ray/app/repo/src/pipeline/tuning/pytorch.py", line 119, in _trainable
-2026-02-11 18:12:11.468 |     train_dataset = _maybe_sample_train_ds(ray.data.read_iceberg(table_identifier, catalog=catalog, row_filter=train_filter))
-2026-02-11 18:12:11.468 |                                            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-2026-02-11 18:12:11.468 | TypeError: read_iceberg() got an unexpected keyword argument 'catalog'
-2026-02-11 18:12:11.468 | 🏃 View run _trainable_74736_00000 at: http://my-mlflow/#/experiments/1/runs/10a6a9acd9bf456aa9737cfa99711a6a
-2026-02-11 18:12:11.468 | 🧪 View experiment at: http://my-mlflow/#/experiments/1
-2026-02-11 18:12:11.468 | 
-2026-02-11 18:12:11.468 | Trial _trainable_74736_00000 errored after 0 iterations at 2026-02-11 16:12:10. Total running time: 8s
-2026-02-11 18:12:11.468 | Error file: /tmp/ray/session_2026-02-11_16-11-11_203910_1/artifacts/2026-02-11_16-12-01/pytorch_tune/driver_artifacts/_trainable_74736_00000_0_batch_size=128,lr=0.0000,weight_decay=0.0002_2026-02-11_16-12-02/error.txt
-2026-02-11 18:12:11.468 | 2026-02-11 16:12:10,484	ERROR tune_controller.py:1331 -- Trial task failed for trial _trainable_74736_00001
-2026-02-11 18:12:11.468 | Traceback (most recent call last):
-2026-02-11 18:12:11.468 |   File "/home/ray/anaconda3/lib/python3.11/site-packages/ray/air/execution/_internal/event_manager.py", line 110, in resolve_future
-2026-02-11 18:12:11.468 |     result = ray.get(future)
-2026-02-11 18:12:11.468 |              ^^^^^^^^^^^^^^^
-2026-02-11 18:12:11.468 |   File "/home/ray/anaconda3/lib/python3.11/site-packages/ray/_private/auto_init_hook.py", line 22, in auto_init_wrapper
-2026-02-11 18:12:11.468 |     return fn(*args, **kwargs)
-2026-02-11 18:12:11.468 |            ^^^^^^^^^^^^^^^^^^^
-2026-02-11 18:12:11.468 |   File "/home/ray/anaconda3/lib/python3.11/site-packages/ray/_private/client_mode_hook.py", line 104, in wrapper
-2026-02-11 18:12:11.468 |     return func(*args, **kwargs)
-2026-02-11 18:12:11.468 |            ^^^^^^^^^^^^^^^^^^^^^
-2026-02-11 18:12:11.468 |   File "/home/ray/anaconda3/lib/python3.11/site-packages/ray/_private/worker.py", line 2972, in get
-2026-02-11 18:12:11.468 |     values, debugger_breakpoint = worker.get_objects(
-2026-02-11 18:12:11.468 |                                   ^^^^^^^^^^^^^^^^^^^
-2026-02-11 18:12:11.468 |   File "/home/ray/anaconda3/lib/python3.11/site-packages/ray/_private/worker.py", line 1031, in get_objects
-2026-02-11 18:12:11.468 |     raise value.as_instanceof_cause()
-2026-02-11 18:12:11.468 | ray.exceptions.RayTaskError(TypeError): ray::ImplicitFunc.train() (pid=417, ip=10.1.10.244, actor_id=709255cd6d8d60504bcb7c1c02000000, repr=_trainable)
-2026-02-11 18:12:11.468 |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-2026-02-11 18:12:11.468 |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-2026-02-11 18:12:11.468 |   File "/home/ray/anaconda3/lib/python3.11/site-packages/ray/tune/trainable/trainable.py", line 331, in train
-2026-02-11 18:12:11.468 |     raise skipped from exception_cause(skipped)
-2026-02-11 18:12:11.468 |   File "/home/ray/anaconda3/lib/python3.11/site-packages/ray/air/_internal/util.py", line 98, in run
-2026-02-11 18:12:11.468 |     self._ret = self._target(*self._args, **self._kwargs)
-2026-02-11 18:12:11.468 |                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-2026-02-11 18:12:11.468 |   File "/home/ray/anaconda3/lib/python3.11/site-packages/ray/tune/trainable/function_trainable.py", line 44, in <lambda>
-2026-02-11 18:12:11.468 |     training_func=lambda: self._trainable_func(self.config),
-2026-02-11 18:12:11.468 |                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-2026-02-11 18:12:11.468 |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-2026-02-11 18:12:11.468 |   File "/home/ray/anaconda3/lib/python3.11/site-packages/ray/tune/trainable/function_trainable.py", line 249, in _trainable_func
-2026-02-11 18:12:11.468 |     output = fn()
-2026-02-11 18:12:11.468 |              ^^^^
-2026-02-11 18:12:11.468 |   File "/home/ray/app/repo/src/pipeline/tuning/pytorch.py", line 119, in _trainable
-2026-02-11 18:12:11.468 |     train_dataset = _maybe_sample_train_ds(ray.data.read_iceberg(table_identifier, catalog=catalog, row_filter=train_filter))
-2026-02-11 18:12:11.468 |                                            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-2026-02-11 18:12:11.468 | TypeError: read_iceberg() got an unexpected keyword argument 'catalog'
-2026-02-11 18:12:11.468 | 🏃 View run _trainable_74736_00001 at: http://my-mlflow/#/experiments/1/runs/219b1abc7c3346968f021e13eda76204
-2026-02-11 18:12:11.468 | 🧪 View experiment at: http://my-mlflow/#/experiments/1
-2026-02-11 18:12:12.469 | 
-2026-02-11 18:12:12.469 | Trial _trainable_74736_00001 errored after 0 iterations at 2026-02-11 16:12:10. Total running time: 8s
-2026-02-11 18:12:12.469 | Error file: /tmp/ray/session_2026-02-11_16-11-11_203910_1/artifacts/2026-02-11_16-12-01/pytorch_tune/driver_artifacts/_trainable_74736_00001_1_batch_size=128,lr=0.0001,weight_decay=0.0000_2026-02-11_16-12-02/error.txt
-2026-02-11 18:12:14.472 | 
-2026-02-11 18:12:14.472 | Trial _trainable_74736_00002 started with configuration:
-2026-02-11 18:12:14.472 | ╭─────────────────────────────────────────────────────╮
-2026-02-11 18:12:14.472 | │ Trial _trainable_74736_00002 config                 │
-2026-02-11 18:12:14.472 | ├─────────────────────────────────────────────────────┤
-2026-02-11 18:12:14.472 | │ pytorch_params/batch_size                       256 │
-2026-02-11 18:12:14.472 | │ pytorch_params/lr                        0.00502663 │
-2026-02-11 18:12:14.472 | │ pytorch_params/weight_decay             3.01541e-05 │
-2026-02-11 18:12:14.472 | ╰─────────────────────────────────────────────────────╯
-2026-02-11 18:12:14.472 | 
-2026-02-11 18:12:14.472 | Trial _trainable_74736_00003 started with configuration:
-2026-02-11 18:12:14.472 | ╭────────────────────────────────────────────────────╮
-2026-02-11 18:12:14.472 | │ Trial _trainable_74736_00003 config                │
-2026-02-11 18:12:14.472 | ├────────────────────────────────────────────────────┤
-2026-02-11 18:12:14.472 | │ pytorch_params/batch_size                       64 │
-2026-02-11 18:12:14.472 | │ pytorch_params/lr                       0.00227785 │
-2026-02-11 18:12:14.472 | │ pytorch_params/weight_decay              0.0040082 │
-2026-02-11 18:12:14.472 | ╰────────────────────────────────────────────────────╯
-2026-02-11 18:12:14.472 | 2026-02-11 16:12:14,311	ERROR tune_controller.py:1331 -- Trial task failed for trial _trainable_74736_00002
-2026-02-11 18:12:14.472 | Traceback (most recent call last):
-2026-02-11 18:12:14.472 |   File "/home/ray/anaconda3/lib/python3.11/site-packages/ray/air/execution/_internal/event_manager.py", line 110, in resolve_future
-2026-02-11 18:12:14.472 |     result = ray.get(future)
-2026-02-11 18:12:14.472 |              ^^^^^^^^^^^^^^^
-2026-02-11 18:12:14.472 |   File "/home/ray/anaconda3/lib/python3.11/site-packages/ray/_private/auto_init_hook.py", line 22, in auto_init_wrapper
-2026-02-11 18:12:14.472 |     return fn(*args, **kwargs)
-2026-02-11 18:12:14.472 |            ^^^^^^^^^^^^^^^^^^^
-2026-02-11 18:12:14.472 |   File "/home/ray/anaconda3/lib/python3.11/site-packages/ray/_private/client_mode_hook.py", line 104, in wrapper
-2026-02-11 18:12:14.472 |     return func(*args, **kwargs)
-2026-02-11 18:12:14.472 |            ^^^^^^^^^^^^^^^^^^^^^
-2026-02-11 18:12:14.472 |   File "/home/ray/anaconda3/lib/python3.11/site-packages/ray/_private/worker.py", line 2972, in get
-2026-02-11 18:12:14.472 |     values, debugger_breakpoint = worker.get_objects(
-2026-02-11 18:12:14.472 |                                   ^^^^^^^^^^^^^^^^^^^
-2026-02-11 18:12:14.472 |   File "/home/ray/anaconda3/lib/python3.11/site-packages/ray/_private/worker.py", line 1031, in get_objects
-2026-02-11 18:12:14.472 |     raise value.as_instanceof_cause()
-2026-02-11 18:12:14.472 | ray.exceptions.RayTaskError(TypeError): ray::ImplicitFunc.train() (pid=520, ip=10.1.10.242, actor_id=36f74c9a0444ca36f2b8ac2b02000000, repr=_trainable)
-2026-02-11 18:12:14.472 |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-2026-02-11 18:12:14.472 |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-2026-02-11 18:12:14.472 |   File "/home/ray/anaconda3/lib/python3.11/site-packages/ray/tune/trainable/trainable.py", line 331, in train
-2026-02-11 18:12:14.472 |     raise skipped from exception_cause(skipped)
-2026-02-11 18:12:14.472 |   File "/home/ray/anaconda3/lib/python3.11/site-packages/ray/air/_internal/util.py", line 98, in run
-2026-02-11 18:12:14.472 |     self._ret = self._target(*self._args, **self._kwargs)
-2026-02-11 18:12:14.472 |                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-2026-02-11 18:12:14.472 |   File "/home/ray/anaconda3/lib/python3.11/site-packages/ray/tune/trainable/function_trainable.py", line 44, in <lambda>
-2026-02-11 18:12:14.472 |     training_func=lambda: self._trainable_func(self.config),
-2026-02-11 18:12:14.472 |                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-2026-02-11 18:12:14.472 |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-2026-02-11 18:12:14.472 |   File "/home/ray/anaconda3/lib/python3.11/site-packages/ray/tune/trainable/function_trainable.py", line 249, in _trainable_func
-2026-02-11 18:12:14.472 |     output = fn()
-2026-02-11 18:12:14.472 |              ^^^^
-2026-02-11 18:12:14.472 |   File "/home/ray/app/repo/src/pipeline/tuning/pytorch.py", line 119, in _trainable
-2026-02-11 18:12:15.474 |     train_dataset = _maybe_sample_train_ds(ray.data.read_iceberg(table_identifier, catalog=catalog, row_filter=train_filter))
-2026-02-11 18:12:15.474 |                                            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-2026-02-11 18:12:15.474 | TypeError: read_iceberg() got an unexpected keyword argument 'catalog'
-2026-02-11 18:12:15.474 | 🏃 View run _trainable_74736_00002 at: http://my-mlflow/#/experiments/1/runs/46967e0d862747ad9cc890f63d82b4ea
-2026-02-11 18:12:15.474 | 🧪 View experiment at: http://my-mlflow/#/experiments/1
-2026-02-11 18:12:15.474 | 
-2026-02-11 18:12:15.474 | Trial _trainable_74736_00002 errored after 0 iterations at 2026-02-11 16:12:14. Total running time: 12s
-2026-02-11 18:12:15.474 | Error file: /tmp/ray/session_2026-02-11_16-11-11_203910_1/artifacts/2026-02-11_16-12-01/pytorch_tune/driver_artifacts/_trainable_74736_00002_2_batch_size=256,lr=0.0050,weight_decay=0.0000_2026-02-11_16-12-10/error.txt
-2026-02-11 18:12:15.474 | 2026-02-11 16:12:14,535	ERROR tune_controller.py:1331 -- Trial task failed for trial _trainable_74736_00003
-2026-02-11 18:12:15.474 | Traceback (most recent call last):
-2026-02-11 18:12:15.474 |   File "/home/ray/anaconda3/lib/python3.11/site-packages/ray/air/execution/_internal/event_manager.py", line 110, in resolve_future
-2026-02-11 18:12:15.474 |     result = ray.get(future)
-2026-02-11 18:12:15.474 |              ^^^^^^^^^^^^^^^
-2026-02-11 18:12:15.474 |   File "/home/ray/anaconda3/lib/python3.11/site-packages/ray/_private/auto_init_hook.py", line 22, in auto_init_wrapper
-2026-02-11 18:12:15.474 |     return fn(*args, **kwargs)
-2026-02-11 18:12:15.474 |            ^^^^^^^^^^^^^^^^^^^
-2026-02-11 18:12:15.474 |   File "/home/ray/anaconda3/lib/python3.11/site-packages/ray/_private/client_mode_hook.py", line 104, in wrapper
-2026-02-11 18:12:15.474 |     return func(*args, **kwargs)
-2026-02-11 18:12:15.474 |            ^^^^^^^^^^^^^^^^^^^^^
-2026-02-11 18:12:15.474 |   File "/home/ray/anaconda3/lib/python3.11/site-packages/ray/_private/worker.py", line 2972, in get
-2026-02-11 18:12:15.474 |     values, debugger_breakpoint = worker.get_objects(
-2026-02-11 18:12:15.474 |                                   ^^^^^^^^^^^^^^^^^^^
-2026-02-11 18:12:15.474 |   File "/home/ray/anaconda3/lib/python3.11/site-packages/ray/_private/worker.py", line 1031, in get_objects
-2026-02-11 18:12:15.474 |     raise value.as_instanceof_cause()
-2026-02-11 18:12:15.474 | ray.exceptions.RayTaskError(TypeError): ray::ImplicitFunc.train() (pid=522, ip=10.1.10.242, actor_id=0feb82af79d0f5a6d2f1b80502000000, repr=_trainable)
-2026-02-11 18:12:15.474 |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-2026-02-11 18:12:15.474 |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-2026-02-11 18:12:15.474 |   File "/home/ray/anaconda3/lib/python3.11/site-packages/ray/tune/trainable/trainable.py", line 331, in train
-2026-02-11 18:12:15.474 |     raise skipped from exception_cause(skipped)
-2026-02-11 18:12:15.474 |   File "/home/ray/anaconda3/lib/python3.11/site-packages/ray/air/_internal/util.py", line 98, in run
-2026-02-11 18:12:15.474 |     self._ret = self._target(*self._args, **self._kwargs)
-2026-02-11 18:12:15.474 |                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-2026-02-11 18:12:15.474 |   File "/home/ray/anaconda3/lib/python3.11/site-packages/ray/tune/trainable/function_trainable.py", line 44, in <lambda>
-2026-02-11 18:12:15.474 |     training_func=lambda: self._trainable_func(self.config),
-2026-02-11 18:12:15.474 |                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-2026-02-11 18:12:15.474 |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-2026-02-11 18:12:15.474 |   File "/home/ray/anaconda3/lib/python3.11/site-packages/ray/tune/trainable/function_trainable.py", line 249, in _trainable_func
-2026-02-11 18:12:15.474 |     output = fn()
-2026-02-11 18:12:15.474 |              ^^^^
-2026-02-11 18:12:15.474 |   File "/home/ray/app/repo/src/pipeline/tuning/pytorch.py", line 119, in _trainable
-2026-02-11 18:12:15.474 |     train_dataset = _maybe_sample_train_ds(ray.data.read_iceberg(table_identifier, catalog=catalog, row_filter=train_filter))
-2026-02-11 18:12:15.474 |                                            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-2026-02-11 18:12:15.474 | TypeError: read_iceberg() got an unexpected keyword argument 'catalog'
-2026-02-11 18:12:15.474 | 🏃 View run _trainable_74736_00003 at: http://my-mlflow/#/experiments/1/runs/fef84dfd21bb4a7dacfa2d6a1f3c7d7a
-2026-02-11 18:12:15.474 | 🧪 View experiment at: http://my-mlflow/#/experiments/1
-2026-02-11 18:12:15.474 | 
-2026-02-11 18:12:15.474 | Trial _trainable_74736_00003 errored after 0 iterations at 2026-02-11 16:12:14. Total running time: 12s
-2026-02-11 18:12:15.474 | Error file: /tmp/ray/session_2026-02-11_16-11-11_203910_1/artifacts/2026-02-11_16-12-01/pytorch_tune/driver_artifacts/_trainable_74736_00003_3_batch_size=64,lr=0.0023,weight_decay=0.0040_2026-02-11_16-12-10/error.txt
-2026-02-11 18:12:18.479 | 
-2026-02-11 18:12:18.479 | Trial _trainable_74736_00004 started with configuration:
-2026-02-11 18:12:18.479 | ╭───────────────────────────────────────────────────╮
-2026-02-11 18:12:18.479 | │ Trial _trainable_74736_00004 config               │
-2026-02-11 18:12:18.479 | ├───────────────────────────────────────────────────┤
-2026-02-11 18:12:18.479 | │ pytorch_params/batch_size                     128 │
-2026-02-11 18:12:18.479 | │ pytorch_params/lr                       0.0153947 │
-2026-02-11 18:12:18.479 | │ pytorch_params/weight_decay             0.0080568 │
-2026-02-11 18:12:18.479 | ╰───────────────────────────────────────────────────╯
-2026-02-11 18:12:18.479 | 2026-02-11 16:12:18,021	ERROR tune_controller.py:1331 -- Trial task failed for trial _trainable_74736_00004
-2026-02-11 18:12:18.479 | Traceback (most recent call last):
-2026-02-11 18:12:18.479 |   File "/home/ray/anaconda3/lib/python3.11/site-packages/ray/air/execution/_internal/event_manager.py", line 110, in resolve_future
-2026-02-11 18:12:18.479 |     result = ray.get(future)
-2026-02-11 18:12:18.479 |              ^^^^^^^^^^^^^^^
-2026-02-11 18:12:18.479 |   File "/home/ray/anaconda3/lib/python3.11/site-packages/ray/_private/auto_init_hook.py", line 22, in auto_init_wrapper
-2026-02-11 18:12:18.479 |     return fn(*args, **kwargs)
-2026-02-11 18:12:18.479 |            ^^^^^^^^^^^^^^^^^^^
-2026-02-11 18:12:18.479 |   File "/home/ray/anaconda3/lib/python3.11/site-packages/ray/_private/client_mode_hook.py", line 104, in wrapper
-2026-02-11 18:12:18.479 |     return func(*args, **kwargs)
-2026-02-11 18:12:18.479 |            ^^^^^^^^^^^^^^^^^^^^^
-2026-02-11 18:12:18.479 |   File "/home/ray/anaconda3/lib/python3.11/site-packages/ray/_private/worker.py", line 2972, in get
-2026-02-11 18:12:18.479 |     values, debugger_breakpoint = worker.get_objects(
-2026-02-11 18:12:18.479 |                                   ^^^^^^^^^^^^^^^^^^^
-2026-02-11 18:12:18.479 |   File "/home/ray/anaconda3/lib/python3.11/site-packages/ray/_private/worker.py", line 1031, in get_objects
-2026-02-11 18:12:18.479 |     raise value.as_instanceof_cause()
-2026-02-11 18:12:18.479 | ray.exceptions.RayTaskError(TypeError): ray::ImplicitFunc.train() (pid=538, ip=10.1.10.244, actor_id=e09900af19add9640ec79a1402000000, repr=_trainable)
-2026-02-11 18:12:18.479 |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-2026-02-11 18:12:18.479 |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-2026-02-11 18:12:18.479 |   File "/home/ray/anaconda3/lib/python3.11/site-packages/ray/tune/trainable/trainable.py", line 331, in train
-2026-02-11 18:12:18.479 |     raise skipped from exception_cause(skipped)
-2026-02-11 18:12:18.479 |   File "/home/ray/anaconda3/lib/python3.11/site-packages/ray/air/_internal/util.py", line 98, in run
-2026-02-11 18:12:18.479 |     self._ret = self._target(*self._args, **self._kwargs)
-2026-02-11 18:12:18.479 |                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-2026-02-11 18:12:18.479 |   File "/home/ray/anaconda3/lib/python3.11/site-packages/ray/tune/trainable/function_trainable.py", line 44, in <lambda>
-2026-02-11 18:12:18.479 |     training_func=lambda: self._trainable_func(self.config),
-2026-02-11 18:12:18.479 |                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-2026-02-11 18:12:18.479 |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-2026-02-11 18:12:18.479 |   File "/home/ray/anaconda3/lib/python3.11/site-packages/ray/tune/trainable/function_trainable.py", line 249, in _trainable_func
-2026-02-11 18:12:18.479 |     output = fn()
-2026-02-11 18:12:18.479 |              ^^^^
-2026-02-11 18:12:18.479 |   File "/home/ray/app/repo/src/pipeline/tuning/pytorch.py", line 119, in _trainable
-2026-02-11 18:12:18.479 |     train_dataset = _maybe_sample_train_ds(ray.data.read_iceberg(table_identifier, catalog=catalog, row_filter=train_filter))
-2026-02-11 18:12:18.479 |                                            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-2026-02-11 18:12:18.479 | TypeError: read_iceberg() got an unexpected keyword argument 'catalog'
-2026-02-11 18:12:18.479 | 🏃 View run _trainable_74736_00004 at: http://my-mlflow/#/experiments/1/runs/00d43800700342159538d5f5f6625fee
-2026-02-11 18:12:18.479 | 🧪 View experiment at: http://my-mlflow/#/experiments/1
-2026-02-11 18:12:18.479 | 
-2026-02-11 18:12:18.479 | Trial _trainable_74736_00004 errored after 0 iterations at 2026-02-11 16:12:18. Total running time: 15s
-2026-02-11 18:12:18.479 | Error file: /tmp/ray/session_2026-02-11_16-11-11_203910_1/artifacts/2026-02-11_16-12-01/pytorch_tune/driver_artifacts/_trainable_74736_00004_4_batch_size=128,lr=0.0154,weight_decay=0.0081_2026-02-11_16-12-14/error.txt
-2026-02-11 18:12:24.616 | 2026-02-11 16:12:23,621	INFO tune.py:1009 -- Wrote the latest version of all result files and experiment state to 'k8s-mlops-platform-bucket/v1/models/pytorch_tune' in 5.5260s.
-2026-02-11 18:12:24.616 | 
-2026-02-11 18:12:24.616 | Trial status: 5 ERROR
+2026-02-11 19:28:43.689 | 2026-02-11 17:28:43,689	INFO cli.py:41 -- Job submission server address: http://kuberay-job-tqqzk-head-svc.ray.svc.cluster.local:8265
+2026-02-11 19:28:44.151 | 2026-02-11 17:28:44,150	SUCC cli.py:65 -- ----------------------------------------------
+2026-02-11 19:28:44.151 | 2026-02-11 17:28:44,151	SUCC cli.py:66 -- Job 'kuberay-job-rbxql' submitted successfully
+2026-02-11 19:28:44.151 | 2026-02-11 17:28:44,151	SUCC cli.py:67 -- ----------------------------------------------
+2026-02-11 19:28:44.151 | 2026-02-11 17:28:44,151	INFO cli.py:291 -- Next steps
+2026-02-11 19:28:44.151 | 2026-02-11 17:28:44,151	INFO cli.py:292 -- Query the logs of the job:
+2026-02-11 19:28:44.151 | 2026-02-11 17:28:44,151	INFO cli.py:294 -- ray job logs kuberay-job-rbxql
+2026-02-11 19:28:44.151 | 2026-02-11 17:28:44,151	INFO cli.py:296 -- Query the status of the job:
+2026-02-11 19:28:44.151 | 2026-02-11 17:28:44,151	INFO cli.py:298 -- ray job status kuberay-job-rbxql
+2026-02-11 19:28:44.151 | 2026-02-11 17:28:44,151	INFO cli.py:300 -- Request the job to be stopped:
+2026-02-11 19:28:44.151 | 2026-02-11 17:28:44,151	INFO cli.py:302 -- ray job stop kuberay-job-rbxql
+2026-02-11 19:28:45.901 | 2026-02-11 17:28:45,901	INFO cli.py:41 -- Job submission server address: http://kuberay-job-tqqzk-head-svc.ray.svc.cluster.local:8265
+2026-02-11 19:28:47.922 | 2026-02-11 17:28:43,788	INFO job_manager.py:568 -- Runtime env is setting up.
+2026-02-11 19:28:47.922 | Running entrypoint for job kuberay-job-rbxql: python3 /home/ray/app/repo/k3s/kuberay/main.py
+2026-02-11 19:28:52.932 | 2026-02-11 17:28:51,458 - KubeRayTraining - DEBUG - Parameters retrieved from /home/ray/app/repo/k3s/params.yaml
+2026-02-11 19:28:52.932 | 2026-02-11 17:28:51,465 - KubeRayTraining - DEBUG - Parameters retrieved from /home/ray/app/repo/k3s/params.yaml
+2026-02-11 19:28:52.932 | 2026-02-11 17:28:51,472 - KubeRayTraining - INFO - Input dimension calculated from DSL: 14 features.
+2026-02-11 19:28:52.932 | 2026-02-11 17:28:51,472 - KubeRayTraining - INFO - Using Iceberg warehouse: s3://k8s-mlops-platform-bucket/warehouse
+2026-02-11 19:28:52.932 | [main.py] Attempting to start Prometheus server on port 8002...
+2026-02-11 19:28:52.932 | 2026-02-11 17:28:51,473 - KubeRayTraining - INFO - ✓ Prometheus metrics server started on port 8002
+2026-02-11 19:28:52.932 | [main.py] ✓ Prometheus HTTP server successfully started on port 8002
+2026-02-11 19:28:53.934 | 2026-02-11 17:28:52,900 - KubeRayTraining - INFO - [RAY CLUSTER RESOURCES]
+2026-02-11 19:28:53.934 |             ────────────────────────────────
+2026-02-11 19:28:53.934 |             CPU           : 0.0 / 18.0
+2026-02-11 19:28:53.934 |             Memory        : 0B / 11.00GiB
+2026-02-11 19:28:53.934 |             Object Store  : 0B / 6.83GiB
+2026-02-11 19:28:53.934 |             ────────────────────────────────
+2026-02-11 19:28:54.934 | 2026-02-11 17:28:53,352 - KubeRayTraining - INFO - Minio connection verified. Buckets: ['frontend-crm-bucket', 'k8s-mlops-platform-bucket']
+2026-02-11 19:28:59.945 | 2026-02-11 17:28:57,903 - KubeRayTraining - INFO - Latest artifact_set_id found in metadata: dsl_001_20260211_222036
+2026-02-11 19:28:59.945 | 2026-02-11 17:28:57,904 - KubeRayTraining - INFO - Using latest artifact_set_id from metadata: dsl_001_20260211_222036
+2026-02-11 19:28:59.945 | 2026-02-11 17:28:57,904 - KubeRayTraining - INFO - Starting training pipeline with Iceberg table: processed.dsl_001_20260211_222036
+2026-02-11 19:28:59.945 | 2026-02-11 17:28:57,904 - KubeRayTraining - INFO - Starting training using framework: pytorch
+2026-02-11 19:28:59.945 | 2026-02-11 17:28:57,904 - KubeRayTraining - INFO - Starting hyperparameter tuning with Iceberg row filtering...
+2026-02-11 19:29:01.948 | 2026-02-11 17:29:00,080	INFO worker.py:1696 -- Using address 10.1.10.247:6379 set in the environment variable RAY_ADDRESS
+2026-02-11 19:29:01.948 | 2026-02-11 17:29:00,087	INFO worker.py:1837 -- Connecting to existing Ray cluster at address: 10.1.10.247:6379...
+2026-02-11 19:29:01.948 | 2026-02-11 17:29:00,104	INFO worker.py:2014 -- Connected to Ray cluster. View the dashboard at http://10.1.10.247:8265 
+2026-02-11 19:29:01.948 | 2026-02-11 17:29:00,123	INFO tune.py:253 -- Initializing Ray automatically. For cluster usage or custom Ray initialization, call `ray.init(...)` before `Tuner(...)`.
+2026-02-11 19:29:01.948 | /home/ray/anaconda3/lib/python3.11/site-packages/google/rpc/__init__.py:18: UserWarning: pkg_resources is deprecated as an API. See https://setuptools.pypa.io/en/latest/pkg_resources.html. The pkg_resources package is slated for removal as early as 2025-11-30. Refrain from using this package or pin to Setuptools<81.
+2026-02-11 19:29:01.948 |   import pkg_resources
+2026-02-11 19:29:01.948 | ╭──────────────────────────────────────────────────────────╮
+2026-02-11 19:29:01.948 | │ Configuration for experiment     pytorch_tune            │
+2026-02-11 19:29:01.948 | ├──────────────────────────────────────────────────────────┤
+2026-02-11 19:29:01.948 | │ Search algorithm                 BasicVariantGenerator   │
+2026-02-11 19:29:01.948 | │ Scheduler                        AsyncHyperBandScheduler │
+2026-02-11 19:29:01.948 | │ Number of trials                 5                       │
+2026-02-11 19:29:01.948 | ╰──────────────────────────────────────────────────────────╯
+2026-02-11 19:29:01.948 | 
+2026-02-11 19:29:01.948 | View detailed results here: k8s-mlops-platform-bucket/v1/models/pytorch_tune
+2026-02-11 19:29:01.948 | To visualize your results with TensorBoard, run: `tensorboard --logdir /tmp/ray/session_2026-02-11_17-28-07_751239_1/artifacts/2026-02-11_17-29-01/pytorch_tune/driver_artifacts`
+2026-02-11 19:29:01.948 | 
+2026-02-11 19:29:01.948 | Trial status: 2 PENDING
+2026-02-11 19:29:01.948 | Current time: 2026-02-11 17:29:01. Total running time: 0s
+2026-02-11 19:29:01.948 | Logical resource usage: 0/18 CPUs, 0/0 GPUs
+2026-02-11 19:29:02.949 | ╭───────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+2026-02-11 19:29:02.949 | │ Trial name               status       ...params/batch_size     pytorch_params/lr     ...rams/weight_decay │
+2026-02-11 19:29:02.949 | ├───────────────────────────────────────────────────────────────────────────────────────────────────────────┤
+2026-02-11 19:29:02.949 | │ _trainable_35c5f_00000   PENDING                       256           0.062022                  0.00136129 │
+2026-02-11 19:29:02.949 | │ _trainable_35c5f_00001   PENDING                        64           0.000262396               1.1576e-06 │
+2026-02-11 19:29:02.949 | ╰───────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+2026-02-11 19:29:06.955 | 
+2026-02-11 19:29:06.955 | Trial _trainable_35c5f_00001 started with configuration:
+2026-02-11 19:29:06.955 | ╭─────────────────────────────────────────────────────╮
+2026-02-11 19:29:06.955 | │ Trial _trainable_35c5f_00001 config                 │
+2026-02-11 19:29:06.955 | ├─────────────────────────────────────────────────────┤
+2026-02-11 19:29:06.955 | │ pytorch_params/batch_size                        64 │
+2026-02-11 19:29:06.955 | │ pytorch_params/lr                       0.000262396 │
+2026-02-11 19:29:06.955 | │ pytorch_params/weight_decay              1.1576e-06 │
+2026-02-11 19:29:06.955 | ╰─────────────────────────────────────────────────────╯
+2026-02-11 19:29:06.955 | 
+2026-02-11 19:29:06.955 | Trial _trainable_35c5f_00000 started with configuration:
+2026-02-11 19:29:06.955 | ╭────────────────────────────────────────────────────╮
+2026-02-11 19:29:06.955 | │ Trial _trainable_35c5f_00000 config                │
+2026-02-11 19:29:06.955 | ├────────────────────────────────────────────────────┤
+2026-02-11 19:29:06.955 | │ pytorch_params/batch_size                      256 │
+2026-02-11 19:29:06.955 | │ pytorch_params/lr                         0.062022 │
+2026-02-11 19:29:06.955 | │ pytorch_params/weight_decay             0.00136129 │
+2026-02-11 19:29:06.955 | ╰────────────────────────────────────────────────────╯
+2026-02-11 19:29:06.955 | 2026-02-11 17:29:06,915	ERROR tune_controller.py:1331 -- Trial task failed for trial _trainable_35c5f_00001
+2026-02-11 19:29:06.955 | Traceback (most recent call last):
+2026-02-11 19:29:06.955 |   File "/home/ray/anaconda3/lib/python3.11/site-packages/ray/air/execution/_internal/event_manager.py", line 110, in resolve_future
+2026-02-11 19:29:06.956 |     result = ray.get(future)
+2026-02-11 19:29:06.956 |              ^^^^^^^^^^^^^^^
+2026-02-11 19:29:06.956 |   File "/home/ray/anaconda3/lib/python3.11/site-packages/ray/_private/auto_init_hook.py", line 22, in auto_init_wrapper
+2026-02-11 19:29:06.956 |     return fn(*args, **kwargs)
+2026-02-11 19:29:06.956 |            ^^^^^^^^^^^^^^^^^^^
+2026-02-11 19:29:06.956 |   File "/home/ray/anaconda3/lib/python3.11/site-packages/ray/_private/client_mode_hook.py", line 104, in wrapper
+2026-02-11 19:29:06.956 |     return func(*args, **kwargs)
+2026-02-11 19:29:06.956 |            ^^^^^^^^^^^^^^^^^^^^^
+2026-02-11 19:29:06.956 |   File "/home/ray/anaconda3/lib/python3.11/site-packages/ray/_private/worker.py", line 2972, in get
+2026-02-11 19:29:06.956 |     values, debugger_breakpoint = worker.get_objects(
+2026-02-11 19:29:06.956 |                                   ^^^^^^^^^^^^^^^^^^^
+2026-02-11 19:29:06.956 |   File "/home/ray/anaconda3/lib/python3.11/site-packages/ray/_private/worker.py", line 1031, in get_objects
+2026-02-11 19:29:06.956 |     raise value.as_instanceof_cause()
+2026-02-11 19:29:06.956 | ray.exceptions.RayTaskError(TypeError): ray::ImplicitFunc.train() (pid=425, ip=10.1.10.246, actor_id=f273bbf37dd5ed9259865b7202000000, repr=_trainable)
+2026-02-11 19:29:06.956 |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-02-11 19:29:06.956 |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-02-11 19:29:06.956 |   File "/home/ray/anaconda3/lib/python3.11/site-packages/ray/tune/trainable/trainable.py", line 331, in train
+2026-02-11 19:29:06.956 |     raise skipped from exception_cause(skipped)
+2026-02-11 19:29:06.956 |   File "/home/ray/anaconda3/lib/python3.11/site-packages/ray/air/_internal/util.py", line 98, in run
+2026-02-11 19:29:06.956 |     self._ret = self._target(*self._args, **self._kwargs)
+2026-02-11 19:29:06.956 |                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-02-11 19:29:06.956 |   File "/home/ray/anaconda3/lib/python3.11/site-packages/ray/tune/trainable/function_trainable.py", line 44, in <lambda>
+2026-02-11 19:29:06.956 |     training_func=lambda: self._trainable_func(self.config),
+2026-02-11 19:29:06.956 |                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-02-11 19:29:06.956 |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-02-11 19:29:06.956 |   File "/home/ray/anaconda3/lib/python3.11/site-packages/ray/tune/trainable/function_trainable.py", line 249, in _trainable_func
+2026-02-11 19:29:06.956 |     output = fn()
+2026-02-11 19:29:06.956 |              ^^^^
+2026-02-11 19:29:06.956 |   File "/home/ray/app/repo/src/pipeline/tuning/pytorch.py", line 117, in _trainable
+2026-02-11 19:29:07.957 |     ray.data.read_iceberg(table_identifier, catalog_kwargs=catalog_config, row_filter=train_filter)
+2026-02-11 19:29:07.957 | TypeError: read_iceberg() takes 0 positional arguments but 1 positional argument (and 2 keyword-only arguments) were given
+2026-02-11 19:29:07.957 | 🏃 View run _trainable_35c5f_00001 at: http://my-mlflow/#/experiments/1/runs/eb249dbed0c1429e846ebf1f40714bdc
+2026-02-11 19:29:07.957 | 🧪 View experiment at: http://my-mlflow/#/experiments/1
+2026-02-11 19:29:07.957 | 
+2026-02-11 19:29:07.957 | Trial _trainable_35c5f_00001 errored after 0 iterations at 2026-02-11 17:29:07. Total running time: 5s
+2026-02-11 19:29:07.957 | Error file: /tmp/ray/session_2026-02-11_17-28-07_751239_1/artifacts/2026-02-11_17-29-01/pytorch_tune/driver_artifacts/_trainable_35c5f_00001_1_batch_size=64,lr=0.0003,weight_decay=0.0000_2026-02-11_17-29-01/error.txt
+2026-02-11 19:29:07.957 | 2026-02-11 17:29:07,143	ERROR tune_controller.py:1331 -- Trial task failed for trial _trainable_35c5f_00000
+2026-02-11 19:29:07.957 | Traceback (most recent call last):
+2026-02-11 19:29:07.957 |   File "/home/ray/anaconda3/lib/python3.11/site-packages/ray/air/execution/_internal/event_manager.py", line 110, in resolve_future
+2026-02-11 19:29:07.957 |     result = ray.get(future)
+2026-02-11 19:29:07.957 |              ^^^^^^^^^^^^^^^
+2026-02-11 19:29:07.957 |   File "/home/ray/anaconda3/lib/python3.11/site-packages/ray/_private/auto_init_hook.py", line 22, in auto_init_wrapper
+2026-02-11 19:29:07.957 |     return fn(*args, **kwargs)
+2026-02-11 19:29:07.957 |            ^^^^^^^^^^^^^^^^^^^
+2026-02-11 19:29:07.957 |   File "/home/ray/anaconda3/lib/python3.11/site-packages/ray/_private/client_mode_hook.py", line 104, in wrapper
+2026-02-11 19:29:07.957 |     return func(*args, **kwargs)
+2026-02-11 19:29:07.957 |            ^^^^^^^^^^^^^^^^^^^^^
+2026-02-11 19:29:07.957 |   File "/home/ray/anaconda3/lib/python3.11/site-packages/ray/_private/worker.py", line 2972, in get
+2026-02-11 19:29:07.957 |     values, debugger_breakpoint = worker.get_objects(
+2026-02-11 19:29:07.957 |                                   ^^^^^^^^^^^^^^^^^^^
+2026-02-11 19:29:07.957 |   File "/home/ray/anaconda3/lib/python3.11/site-packages/ray/_private/worker.py", line 1031, in get_objects
+2026-02-11 19:29:07.957 |     raise value.as_instanceof_cause()
+2026-02-11 19:29:07.957 | ray.exceptions.RayTaskError(TypeError): ray::ImplicitFunc.train() (pid=426, ip=10.1.10.248, actor_id=5438d77709e8675beb585ed602000000, repr=_trainable)
+2026-02-11 19:29:07.957 |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-02-11 19:29:07.957 |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-02-11 19:29:07.958 |   File "/home/ray/anaconda3/lib/python3.11/site-packages/ray/tune/trainable/trainable.py", line 331, in train
+2026-02-11 19:29:07.958 |     raise skipped from exception_cause(skipped)
+2026-02-11 19:29:07.958 |   File "/home/ray/anaconda3/lib/python3.11/site-packages/ray/air/_internal/util.py", line 98, in run
+2026-02-11 19:29:07.958 |     self._ret = self._target(*self._args, **self._kwargs)
+2026-02-11 19:29:07.958 |                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-02-11 19:29:07.958 |   File "/home/ray/anaconda3/lib/python3.11/site-packages/ray/tune/trainable/function_trainable.py", line 44, in <lambda>
+2026-02-11 19:29:07.958 |     training_func=lambda: self._trainable_func(self.config),
+2026-02-11 19:29:07.958 |                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-02-11 19:29:07.958 |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-02-11 19:29:07.958 |   File "/home/ray/anaconda3/lib/python3.11/site-packages/ray/tune/trainable/function_trainable.py", line 249, in _trainable_func
+2026-02-11 19:29:07.958 |     output = fn()
+2026-02-11 19:29:07.958 |              ^^^^
+2026-02-11 19:29:07.958 |   File "/home/ray/app/repo/src/pipeline/tuning/pytorch.py", line 117, in _trainable
+2026-02-11 19:29:07.958 |     ray.data.read_iceberg(table_identifier, catalog_kwargs=catalog_config, row_filter=train_filter)
+2026-02-11 19:29:07.958 | TypeError: read_iceberg() takes 0 positional arguments but 1 positional argument (and 2 keyword-only arguments) were given
+2026-02-11 19:29:07.958 | 🏃 View run _trainable_35c5f_00000 at: http://my-mlflow/#/experiments/1/runs/9f974d7d6aa04faba74016d4247e075e
+2026-02-11 19:29:08.958 | 🧪 View experiment at: http://my-mlflow/#/experiments/1
+2026-02-11 19:29:08.958 | 
+2026-02-11 19:29:08.958 | Trial _trainable_35c5f_00000 errored after 0 iterations at 2026-02-11 17:29:07. Total running time: 5s
+2026-02-11 19:29:08.958 | Error file: /tmp/ray/session_2026-02-11_17-28-07_751239_1/artifacts/2026-02-11_17-29-01/pytorch_tune/driver_artifacts/_trainable_35c5f_00000_0_batch_size=256,lr=0.0620,weight_decay=0.0014_2026-02-11_17-29-01/error.txt
+2026-02-11 19:29:10.962 | 
+2026-02-11 19:29:10.962 | Trial _trainable_35c5f_00002 started with configuration:
+2026-02-11 19:29:10.962 | ╭────────────────────────────────────────────────────╮
+2026-02-11 19:29:10.962 | │ Trial _trainable_35c5f_00002 config                │
+2026-02-11 19:29:10.962 | ├────────────────────────────────────────────────────┤
+2026-02-11 19:29:10.962 | │ pytorch_params/batch_size                      256 │
+2026-02-11 19:29:10.962 | │ pytorch_params/lr                       4.4667e-05 │
+2026-02-11 19:29:10.962 | │ pytorch_params/weight_decay             0.00550665 │
+2026-02-11 19:29:10.962 | ╰────────────────────────────────────────────────────╯
+2026-02-11 19:29:10.962 | 
+2026-02-11 19:29:10.962 | Trial _trainable_35c5f_00003 started with configuration:
+2026-02-11 19:29:10.962 | ╭────────────────────────────────────────────────────╮
+2026-02-11 19:29:10.962 | │ Trial _trainable_35c5f_00003 config                │
+2026-02-11 19:29:10.962 | ├────────────────────────────────────────────────────┤
+2026-02-11 19:29:10.962 | │ pytorch_params/batch_size                      128 │
+2026-02-11 19:29:10.962 | │ pytorch_params/lr                        0.0169964 │
+2026-02-11 19:29:10.962 | │ pytorch_params/weight_decay             0.00704554 │
+2026-02-11 19:29:10.962 | ╰────────────────────────────────────────────────────╯
+2026-02-11 19:29:10.962 | 2026-02-11 17:29:10,659	ERROR tune_controller.py:1331 -- Trial task failed for trial _trainable_35c5f_00002
+2026-02-11 19:29:10.962 | Traceback (most recent call last):
+2026-02-11 19:29:10.962 |   File "/home/ray/anaconda3/lib/python3.11/site-packages/ray/air/execution/_internal/event_manager.py", line 110, in resolve_future
+2026-02-11 19:29:10.962 |     result = ray.get(future)
+2026-02-11 19:29:10.962 |              ^^^^^^^^^^^^^^^
+2026-02-11 19:29:10.962 |   File "/home/ray/anaconda3/lib/python3.11/site-packages/ray/_private/auto_init_hook.py", line 22, in auto_init_wrapper
+2026-02-11 19:29:10.962 |     return fn(*args, **kwargs)
+2026-02-11 19:29:10.962 |            ^^^^^^^^^^^^^^^^^^^
+2026-02-11 19:29:10.962 |   File "/home/ray/anaconda3/lib/python3.11/site-packages/ray/_private/client_mode_hook.py", line 104, in wrapper
+2026-02-11 19:29:10.962 |     return func(*args, **kwargs)
+2026-02-11 19:29:10.962 |            ^^^^^^^^^^^^^^^^^^^^^
+2026-02-11 19:29:10.962 |   File "/home/ray/anaconda3/lib/python3.11/site-packages/ray/_private/worker.py", line 2972, in get
+2026-02-11 19:29:10.962 |     values, debugger_breakpoint = worker.get_objects(
+2026-02-11 19:29:10.962 |                                   ^^^^^^^^^^^^^^^^^^^
+2026-02-11 19:29:10.962 |   File "/home/ray/anaconda3/lib/python3.11/site-packages/ray/_private/worker.py", line 1031, in get_objects
+2026-02-11 19:29:10.962 |     raise value.as_instanceof_cause()
+2026-02-11 19:29:10.962 | ray.exceptions.RayTaskError(TypeError): ray::ImplicitFunc.train() (pid=508, ip=10.1.10.246, actor_id=ac82eb19eca1281927c0d52902000000, repr=_trainable)
+2026-02-11 19:29:10.962 |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-02-11 19:29:10.962 |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-02-11 19:29:10.962 |   File "/home/ray/anaconda3/lib/python3.11/site-packages/ray/tune/trainable/trainable.py", line 331, in train
+2026-02-11 19:29:10.962 |     raise skipped from exception_cause(skipped)
+2026-02-11 19:29:10.962 |   File "/home/ray/anaconda3/lib/python3.11/site-packages/ray/air/_internal/util.py", line 98, in run
+2026-02-11 19:29:10.962 |     self._ret = self._target(*self._args, **self._kwargs)
+2026-02-11 19:29:10.962 |                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-02-11 19:29:10.962 |   File "/home/ray/anaconda3/lib/python3.11/site-packages/ray/tune/trainable/function_trainable.py", line 44, in <lambda>
+2026-02-11 19:29:10.962 |     training_func=lambda: self._trainable_func(self.config),
+2026-02-11 19:29:10.962 |                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-02-11 19:29:10.962 |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-02-11 19:29:10.962 |   File "/home/ray/anaconda3/lib/python3.11/site-packages/ray/tune/trainable/function_trainable.py", line 249, in _trainable_func
+2026-02-11 19:29:10.962 |     output = fn()
+2026-02-11 19:29:10.962 |              ^^^^
+2026-02-11 19:29:10.962 |   File "/home/ray/app/repo/src/pipeline/tuning/pytorch.py", line 117, in _trainable
+2026-02-11 19:29:10.962 |     ray.data.read_iceberg(table_identifier, catalog_kwargs=catalog_config, row_filter=train_filter)
+2026-02-11 19:29:10.962 | TypeError: read_iceberg() takes 0 positional arguments but 1 positional argument (and 2 keyword-only arguments) were given
+2026-02-11 19:29:10.962 | 🏃 View run _trainable_35c5f_00002 at: http://my-mlflow/#/experiments/1/runs/eee0d1f1a2924f43a903ed3466f4c567
+2026-02-11 19:29:10.962 | 🧪 View experiment at: http://my-mlflow/#/experiments/1
+2026-02-11 19:29:10.962 | 
+2026-02-11 19:29:10.962 | Trial _trainable_35c5f_00002 errored after 0 iterations at 2026-02-11 17:29:10. Total running time: 9s
+2026-02-11 19:29:10.962 | Error file: /tmp/ray/session_2026-02-11_17-28-07_751239_1/artifacts/2026-02-11_17-29-01/pytorch_tune/driver_artifacts/_trainable_35c5f_00002_2_batch_size=256,lr=0.0000,weight_decay=0.0055_2026-02-11_17-29-07/error.txt
+2026-02-11 19:29:10.962 | 2026-02-11 17:29:10,753	ERROR tune_controller.py:1331 -- Trial task failed for trial _trainable_35c5f_00003
+2026-02-11 19:29:10.962 | Traceback (most recent call last):
+2026-02-11 19:29:10.962 |   File "/home/ray/anaconda3/lib/python3.11/site-packages/ray/air/execution/_internal/event_manager.py", line 110, in resolve_future
+2026-02-11 19:29:10.962 |     result = ray.get(future)
+2026-02-11 19:29:10.962 |              ^^^^^^^^^^^^^^^
+2026-02-11 19:29:10.962 |   File "/home/ray/anaconda3/lib/python3.11/site-packages/ray/_private/auto_init_hook.py", line 22, in auto_init_wrapper
+2026-02-11 19:29:10.962 |     return fn(*args, **kwargs)
+2026-02-11 19:29:10.962 |            ^^^^^^^^^^^^^^^^^^^
+2026-02-11 19:29:10.962 |   File "/home/ray/anaconda3/lib/python3.11/site-packages/ray/_private/client_mode_hook.py", line 104, in wrapper
+2026-02-11 19:29:10.962 |     return func(*args, **kwargs)
+2026-02-11 19:29:10.962 |            ^^^^^^^^^^^^^^^^^^^^^
+2026-02-11 19:29:10.962 |   File "/home/ray/anaconda3/lib/python3.11/site-packages/ray/_private/worker.py", line 2972, in get
+2026-02-11 19:29:10.962 |     values, debugger_breakpoint = worker.get_objects(
+2026-02-11 19:29:10.962 |                                   ^^^^^^^^^^^^^^^^^^^
+2026-02-11 19:29:10.962 |   File "/home/ray/anaconda3/lib/python3.11/site-packages/ray/_private/worker.py", line 1031, in get_objects
+2026-02-11 19:29:10.962 |     raise value.as_instanceof_cause()
+2026-02-11 19:29:10.962 | ray.exceptions.RayTaskError(TypeError): ray::ImplicitFunc.train() (pid=511, ip=10.1.10.246, actor_id=98c6ebd53d3856ea4d2c830602000000, repr=_trainable)
+2026-02-11 19:29:10.962 |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-02-11 19:29:10.962 |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-02-11 19:29:10.962 |   File "/home/ray/anaconda3/lib/python3.11/site-packages/ray/tune/trainable/trainable.py", line 331, in train
+2026-02-11 19:29:10.962 |     raise skipped from exception_cause(skipped)
+2026-02-11 19:29:10.962 |   File "/home/ray/anaconda3/lib/python3.11/site-packages/ray/air/_internal/util.py", line 98, in run
+2026-02-11 19:29:10.962 |     self._ret = self._target(*self._args, **self._kwargs)
+2026-02-11 19:29:10.962 |                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-02-11 19:29:10.962 |   File "/home/ray/anaconda3/lib/python3.11/site-packages/ray/tune/trainable/function_trainable.py", line 44, in <lambda>
+2026-02-11 19:29:10.962 |     training_func=lambda: self._trainable_func(self.config),
+2026-02-11 19:29:10.962 |                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-02-11 19:29:10.962 |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-02-11 19:29:10.962 |   File "/home/ray/anaconda3/lib/python3.11/site-packages/ray/tune/trainable/function_trainable.py", line 249, in _trainable_func
+2026-02-11 19:29:10.962 |     output = fn()
+2026-02-11 19:29:10.962 |              ^^^^
+2026-02-11 19:29:10.962 |   File "/home/ray/app/repo/src/pipeline/tuning/pytorch.py", line 117, in _trainable
+2026-02-11 19:29:10.962 |     ray.data.read_iceberg(table_identifier, catalog_kwargs=catalog_config, row_filter=train_filter)
+2026-02-11 19:29:11.963 | TypeError: read_iceberg() takes 0 positional arguments but 1 positional argument (and 2 keyword-only arguments) were given
+2026-02-11 19:29:11.963 | 🏃 View run _trainable_35c5f_00003 at: http://my-mlflow/#/experiments/1/runs/bdd7d9b81abf411890ff07011392b774
+2026-02-11 19:29:11.963 | 🧪 View experiment at: http://my-mlflow/#/experiments/1
+2026-02-11 19:29:11.963 | 
+2026-02-11 19:29:11.963 | Trial _trainable_35c5f_00003 errored after 0 iterations at 2026-02-11 17:29:10. Total running time: 9s
+2026-02-11 19:29:11.963 | Error file: /tmp/ray/session_2026-02-11_17-28-07_751239_1/artifacts/2026-02-11_17-29-01/pytorch_tune/driver_artifacts/_trainable_35c5f_00003_3_batch_size=128,lr=0.0170,weight_decay=0.0070_2026-02-11_17-29-07/error.txt
+2026-02-11 19:29:14.047 | 
+2026-02-11 19:29:14.047 | Trial _trainable_35c5f_00004 started with configuration:
+2026-02-11 19:29:14.047 | ╭─────────────────────────────────────────────────────╮
+2026-02-11 19:29:14.047 | │ Trial _trainable_35c5f_00004 config                 │
+2026-02-11 19:29:14.047 | ├─────────────────────────────────────────────────────┤
+2026-02-11 19:29:14.047 | │ pytorch_params/batch_size                        64 │
+2026-02-11 19:29:14.047 | │ pytorch_params/lr                       5.45206e-05 │
+2026-02-11 19:29:14.047 | │ pytorch_params/weight_decay             4.60722e-05 │
+2026-02-11 19:29:14.047 | ╰─────────────────────────────────────────────────────╯
+2026-02-11 19:29:14.047 | 2026-02-11 17:29:13,834	ERROR tune_controller.py:1331 -- Trial task failed for trial _trainable_35c5f_00004
+2026-02-11 19:29:14.048 | Traceback (most recent call last):
+2026-02-11 19:29:14.048 |   File "/home/ray/anaconda3/lib/python3.11/site-packages/ray/air/execution/_internal/event_manager.py", line 110, in resolve_future
+2026-02-11 19:29:14.048 |     result = ray.get(future)
+2026-02-11 19:29:14.048 |              ^^^^^^^^^^^^^^^
+2026-02-11 19:29:14.048 |   File "/home/ray/anaconda3/lib/python3.11/site-packages/ray/_private/auto_init_hook.py", line 22, in auto_init_wrapper
+2026-02-11 19:29:14.048 |     return fn(*args, **kwargs)
+2026-02-11 19:29:14.048 |            ^^^^^^^^^^^^^^^^^^^
+2026-02-11 19:29:14.048 |   File "/home/ray/anaconda3/lib/python3.11/site-packages/ray/_private/client_mode_hook.py", line 104, in wrapper
+2026-02-11 19:29:14.048 |     return func(*args, **kwargs)
+2026-02-11 19:29:14.048 |            ^^^^^^^^^^^^^^^^^^^^^
+2026-02-11 19:29:14.048 |   File "/home/ray/anaconda3/lib/python3.11/site-packages/ray/_private/worker.py", line 2972, in get
+2026-02-11 19:29:14.048 |     values, debugger_breakpoint = worker.get_objects(
+2026-02-11 19:29:14.048 |                                   ^^^^^^^^^^^^^^^^^^^
+2026-02-11 19:29:14.048 |   File "/home/ray/anaconda3/lib/python3.11/site-packages/ray/_private/worker.py", line 1031, in get_objects
+2026-02-11 19:29:14.048 |     raise value.as_instanceof_cause()
+2026-02-11 19:29:14.048 | ray.exceptions.RayTaskError(TypeError): ray::ImplicitFunc.train() (pid=521, ip=10.1.10.248, actor_id=761314fbf79cd187d83ee21a02000000, repr=_trainable)
+2026-02-11 19:29:14.048 |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-02-11 19:29:14.048 |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-02-11 19:29:14.048 |   File "/home/ray/anaconda3/lib/python3.11/site-packages/ray/tune/trainable/trainable.py", line 331, in train
+2026-02-11 19:29:14.048 |     raise skipped from exception_cause(skipped)
+2026-02-11 19:29:14.048 |   File "/home/ray/anaconda3/lib/python3.11/site-packages/ray/air/_internal/util.py", line 98, in run
+2026-02-11 19:29:14.048 |     self._ret = self._target(*self._args, **self._kwargs)
+2026-02-11 19:29:14.048 |                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-02-11 19:29:14.048 |   File "/home/ray/anaconda3/lib/python3.11/site-packages/ray/tune/trainable/function_trainable.py", line 44, in <lambda>
+2026-02-11 19:29:14.048 |     training_func=lambda: self._trainable_func(self.config),
+2026-02-11 19:29:14.048 |                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-02-11 19:29:14.048 |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-02-11 19:29:14.048 |   File "/home/ray/anaconda3/lib/python3.11/site-packages/ray/tune/trainable/function_trainable.py", line 249, in _trainable_func
+2026-02-11 19:29:14.048 |     output = fn()
+2026-02-11 19:29:14.048 |              ^^^^
+2026-02-11 19:29:15.048 |   File "/home/ray/app/repo/src/pipeline/tuning/pytorch.py", line 117, in _trainable
+2026-02-11 19:29:15.048 |     ray.data.read_iceberg(table_identifier, catalog_kwargs=catalog_config, row_filter=train_filter)
+2026-02-11 19:29:15.048 | TypeError: read_iceberg() takes 0 positional arguments but 1 positional argument (and 2 keyword-only arguments) were given
+2026-02-11 19:29:15.048 | 🏃 View run _trainable_35c5f_00004 at: http://my-mlflow/#/experiments/1/runs/33d46e84f8324602a69b9847c0454e93
+2026-02-11 19:29:15.048 | 🧪 View experiment at: http://my-mlflow/#/experiments/1
+2026-02-11 19:29:15.048 | 
+2026-02-11 19:29:15.048 | Trial _trainable_35c5f_00004 errored after 0 iterations at 2026-02-11 17:29:13. Total running time: 12s
+2026-02-11 19:29:15.048 | Error file: /tmp/ray/session_2026-02-11_17-28-07_751239_1/artifacts/2026-02-11_17-29-01/pytorch_tune/driver_artifacts/_trainable_35c5f_00004_4_batch_size=64,lr=0.0001,weight_decay=0.0000_2026-02-11_17-29-10/error.txt
+2026-02-11 19:29:23.064 | 2026-02-11 17:29:22,160	INFO tune.py:1009 -- Wrote the latest version of all result files and experiment state to 'k8s-mlops-platform-bucket/v1/models/pytorch_tune' in 8.1673s.
+2026-02-11 19:29:23.064 | 
+2026-02-11 19:29:23.064 | Trial status: 5 ERROR

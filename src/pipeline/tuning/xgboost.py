@@ -141,9 +141,9 @@ def tune_model(
         ) if val_range.get('start') and val_range.get('end') else None
 
         train_ds = _maybe_sample_train_ds(
-            ray.data.read_iceberg(table_identifier, catalog_kwargs=catalog_config, row_filter=train_filter)
+            ray.data.read_iceberg(table_identifier=table_identifier, catalog_kwargs=catalog_config, row_filter=train_filter)
         )
-        val_ds = ray.data.read_iceberg(table_identifier, catalog_kwargs=catalog_config, row_filter=val_filter)
+        val_ds = ray.data.read_iceberg(table_identifier=table_identifier, catalog_kwargs=catalog_config, row_filter=val_filter)
 
         # apply limits if configured
         max_train_rows = int(os.getenv("TUNE_MAX_TRAIN_ROWS", "0"))

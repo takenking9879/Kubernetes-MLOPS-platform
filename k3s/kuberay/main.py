@@ -140,7 +140,7 @@ class KubeRayTraining(BaseUtils):
             else:
                 self.logger.warning(f"No valid split configuration for {split}. Loading all data.")
 
-            ds = ray.data.read_iceberg(table_name, catalog_kwargs=self.catalog_kwargs, row_filter=row_filter)
+            ds = ray.data.read_iceberg(table_identifier=table_name, catalog_kwargs=self.catalog_kwargs, row_filter=row_filter)
             
             # Senior validation before heavy processing
             self._validate_schema(ds)
