@@ -109,7 +109,21 @@ class ModelRouter:
         if request.url.path == "/webhook":
             return await self._webhook_handler.handle(request)
 
-        return await self._traffic_router.route(request)
+        # Extract a JSON-serializable payload from the incoming Starlette Request
+        # and avoid sending the Request object (which is not serializable) to
+        # remote actors.
+        try:
+            payload = await request.json()
+        except Exception:
+            # If body is empty or not JSON, fallback to raw bytes or form data
+            try:
+                print("[ModelRouter] Payload is not JSON, attempting to read raw body or form data...")  # --- IGNORE ---
+                body = await request.body()
+                payload = {"body": body.decode("utf-8", errors="ignore")} if body else {}
+            except Exception:
+                payload = {}
+
+        return await self._traffic_router.route(payload)
 
 
 deployment_graph = ModelRouter.bind(StableModel.bind(), CanaryModel.bind())
