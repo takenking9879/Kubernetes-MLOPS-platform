@@ -88,7 +88,13 @@ class ModelRouter:
         self._webhook_handler = MLflowAliasWebhookHandler(self._stable, self._logger)
 
         registry = MLflowRegistry(config.model.tracking_uri, self._logger)
-        registry.ensure_webhook(config.webhook, config.model.registry_name, config.model.default_alias)
+        try:
+            registry.ensure_webhook(config.webhook, config.model.registry_name, config.model.default_alias)
+        except Exception as e:
+            self._logger.warning(
+                "Could not ensure MLflow webhook (this is expected if using HTTP and MLflow requires HTTPS): %s",
+                e,
+            )
 
     def reconfigure(self, config: Dict[str, object]) -> None:
         serving_config = ConfigLoader.load()
