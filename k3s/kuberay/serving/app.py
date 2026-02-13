@@ -17,7 +17,7 @@ from src.utils.baseclass import BaseUtils
 
 @dataclass(frozen=True)
 class ModelSpec:
-    framework: str
+    framework: Optional[str]
     registry_name: str
     alias: str
     version: Optional[str] = None
@@ -250,21 +250,14 @@ class _ModelRuntime:
     ) -> None:
         """Load model from MLflow Model Registry.
 
-        Resolution order for ``framework`` / ``registry_name`` / ``alias``:
-          1. *overrides* (per-deployment, e.g. canary section)
-          2. ``kuberay.serving`` in params.yaml
-          3. ``kuberay.model`` in params.yaml
+                Resolution behavior: registry name and alias come from config, but
+                `framework` is resolved from MLflow metadata (model version tag or run).
         """
         params = load_params()
         model_cfg = params.get("kuberay", {}).get("model", {})
         serving_cfg = params.get("kuberay", {}).get("serving", {})
         overrides = overrides or {}
 
-        framework = (
-            overrides.get("framework")
-            or serving_cfg.get("framework")
-            or model_cfg.get("framework")
-        )
 
         tracking_uri = (
             overrides.get("mlflow_tracking_uri")
@@ -290,11 +283,12 @@ class _ModelRuntime:
             or default_alias
         )
 
+        # Always resolve framework from MLflow metadata; do not rely on params.yaml
         model, version, resolved_framework = _load_model_from_registry(
             tracking_uri=tracking_uri,
             registry_name=registry_name,
             alias=alias,
-            framework=framework,
+            framework=None,
             logger=self._logger,
         )
 
@@ -414,9 +408,24 @@ class ModelRouter:
     def reconfigure(self, config: Dict[str, Any]) -> None:
         params = load_params()
         serving_cfg = params.get("kuberay", {}).get("serving", {})
-        
-        # Priority: Config > serving.canary_probability > default
-        p = float(config.get("canary_probability", serving_cfg.get("canary_probability", 0.0)))
+        canary_cfg = params.get("kuberay", {}).get("canary", {})
+        # Resolution priority for canary probability:
+        # 1. explicit `canary_probability` in `config` passed to reconfigure
+        # 2. if `config` sets `canary: true` -> use `canary.canary_probability` from params or config
+        # 3. if `serving.canary` is true -> use `kuberay.canary.canary_probability` from params
+        # 4. default = 0.0
+        if "canary_probability" in config:
+            p = float(config.get("canary_probability", 0.0))
+        elif "canary" in config:
+            # honor explicit enable/disable in config; if enabled, allow override probability
+            if bool(config.get("canary")):
+                p = float(config.get("canary_probability", canary_cfg.get("canary_probability", 0.0)))
+            else:
+                p = 0.0
+        elif bool(serving_cfg.get("canary", False)):
+            p = float(canary_cfg.get("canary_probability", 0.0))
+        else:
+            p = 0.0
         self._canary_probability = max(0.0, min(1.0, p))
         self._logger.info("Router configured: canary_probability=%s", self._canary_probability)
 
