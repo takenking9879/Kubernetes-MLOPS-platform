@@ -69,7 +69,6 @@ class CanaryModel:
 
 
 @serve.deployment(name="ModelRouter")
-@serve.ingress(None)
 class ModelRouter:
     def __init__(self, stable, canary):
         self._logger = create_logger("ModelRouter")
