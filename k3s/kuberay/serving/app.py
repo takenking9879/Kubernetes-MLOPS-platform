@@ -76,6 +76,9 @@ class ModelRouter:
         self._canary = canary
 
         config = ConfigLoader.load()
+        self._registry_name = config.model.registry_name
+        self._default_alias = config.model.default_alias
+        self._webhook_max_age = config.webhook.max_timestamp_age_seconds
         canary_probability = (
             config.canary.probability if config.canary_enabled and config.canary else 0.0
         )
@@ -106,8 +109,22 @@ class ModelRouter:
         )
 
     async def __call__(self, request: Request):
+        if request.method == "GET":
+            return {"status": "ok", "route": "/infer", "message": "Use POST with JSON payload."}
+
         if request.url.path == "/webhook":
-            return await self._webhook_handler.handle(request)
+            secret = ""
+            try:
+                secret = ConfigLoader.load().webhook.secret
+            except Exception as e:
+                self._logger.warning("Webhook secret unavailable: %s", e)
+            return await self._webhook_handler.handle(
+                request,
+                expected_registry_name=self._registry_name,
+                expected_alias=self._default_alias,
+                secret=secret,
+                max_age_seconds=self._webhook_max_age,
+            )
 
         # Extract a JSON-serializable payload from the incoming Starlette Request
         # and avoid sending the Request object (which is not serializable) to
