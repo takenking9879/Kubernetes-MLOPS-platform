@@ -12,6 +12,7 @@ artifactRoot:
   s3:
     enabled: true
     bucket: k8s-mlops-platform-bucket
+    path: mlflow-artifacts
 
 extraEnvVars:
   MLFLOW_S3_IGNORE_TLS: "true"

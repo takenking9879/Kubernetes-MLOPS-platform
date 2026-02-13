@@ -74,12 +74,12 @@ def _load_model_from_registry(
     tracking_uri: str,
     registry_name: str,
     alias: str,
-    framework: str,
+    framework: Optional[str],
     logger,
 ):
     """Load a model from MLflow Model Registry using an alias (MLflow 3.x).
 
-    Returns ``(model_object, model_version_str)``.
+    Returns ``(model_object, model_version_str, resolved_framework)``.
     """
     import mlflow
     from mlflow.tracking import MlflowClient
@@ -92,22 +92,43 @@ def _load_model_from_registry(
     version = str(mv.version)
     model_uri = f"models:/{registry_name}@{alias}"
 
+    resolved_framework = (framework or "").strip().lower() or None
+    if not resolved_framework:
+        mv_tags = getattr(mv, "tags", {}) or {}
+        resolved_framework = str(mv_tags.get("framework", "")).strip().lower() or None
+
+    if not resolved_framework and getattr(mv, "run_id", None):
+        run = client.get_run(mv.run_id)
+        run_tags = getattr(run.data, "tags", {}) or {}
+        run_params = getattr(run.data, "params", {}) or {}
+        resolved_framework = (
+            str(run_tags.get("framework", "")).strip().lower()
+            or str(run_params.get("framework", "")).strip().lower()
+            or None
+        )
+
+    if not resolved_framework:
+        raise RuntimeError(
+            "Unable to resolve model framework from configuration or MLflow metadata. "
+            "Set model version tag 'framework' (e.g. xgboost, pytorch)."
+        )
+
     logger.info(
         "Loading model from MLflow: %s @%s (v%s, framework=%s)",
-        registry_name, alias, version, framework,
+        registry_name, alias, version, resolved_framework,
     )
 
-    if framework == "xgboost":
+    if resolved_framework == "xgboost":
         import mlflow.xgboost
         model = mlflow.xgboost.load_model(model_uri)
-    elif framework == "pytorch":
+    elif resolved_framework == "pytorch":
         import mlflow.pytorch
         model = mlflow.pytorch.load_model(model_uri)
     else:
-        raise ValueError(f"Unsupported framework for MLflow loading: {framework!r}")
+        raise ValueError(f"Unsupported framework for MLflow loading: {resolved_framework!r}")
 
     logger.info("Model loaded successfully: %s @%s v%s", registry_name, alias, version)
-    return model, version
+    return model, version, resolved_framework
 
 
 class ModelAdapter(Protocol):
@@ -244,11 +265,6 @@ class _ModelRuntime:
             or serving_cfg.get("framework")
             or model_cfg.get("framework")
         )
-        if not framework:
-            raise RuntimeError(
-                "Missing required configuration: "
-                "kuberay.serving.framework or kuberay.model.framework in params.yaml"
-            )
 
         tracking_uri = (
             overrides.get("mlflow_tracking_uri")
@@ -267,9 +283,14 @@ class _ModelRuntime:
                 "kuberay.model.mlflow_registry_model_name in params.yaml"
             )
 
-        alias = overrides.get("alias") or serving_cfg.get("alias", "champion")
+        default_alias = "challenger" if self._variant == "canary" else "champion"
+        alias = (
+            overrides.get("alias")
+            or (serving_cfg.get("alias") if self._variant != "canary" else None)
+            or default_alias
+        )
 
-        model, version = _load_model_from_registry(
+        model, version, resolved_framework = _load_model_from_registry(
             tracking_uri=tracking_uri,
             registry_name=registry_name,
             alias=alias,
@@ -278,12 +299,12 @@ class _ModelRuntime:
         )
 
         self._spec = ModelSpec(
-            framework=framework,
+            framework=resolved_framework,
             registry_name=registry_name,
             alias=alias,
             version=version,
         )
-        self._adapter = _create_adapter(framework, model)
+        self._adapter = _create_adapter(resolved_framework, model)
 
         self._logger.info("Model loaded (%s): %s", self._variant, self._spec)
 

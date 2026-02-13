@@ -282,8 +282,3 @@ python -c "from k3s.kuberay.main import KubeRayTraining; m=KubeRayTraining(param
 - Evita variables globales no serializables en `train_func`.
 - Asegura que `train_loop_config` y `trial_config` incluyan la key `params_key` que tus utilidades esperan.
 - Testea con `NUM_WORKERS=1` y datasets muy pequeños antes de escalar.
-
----
-
-## ¿Quieres que genere plantillas concretas para `lightgbm` (archivos listos para pegar)?
-Si quieres, puedo crear los archivos base (`utils`, `train`, `tuning`, `schemas`) y modificar los registries automáticamente.
