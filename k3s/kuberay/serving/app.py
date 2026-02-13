@@ -69,6 +69,7 @@ class CanaryModel:
 
 
 @serve.deployment(name="ModelRouter")
+@serve.ingress(None)
 class ModelRouter:
     def __init__(self, stable, canary):
         self._logger = create_logger("ModelRouter")
@@ -99,7 +100,6 @@ class ModelRouter:
             self._traffic_router.canary_probability,
         )
 
-    @serve.ingress(None)  # Type ignore because it is handled by Ray
     async def __call__(self, request: Request):
         if request.url.path == "/webhook":
             return await self._webhook_handler.handle(request)
