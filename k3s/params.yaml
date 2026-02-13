@@ -38,6 +38,11 @@ kuberay:
   serving:
     alias: "champion"  # MLflow Model Registry alias (champion = production model)
     canary: false
+    webhook_public_base_url: "http://serving.localhost"
+    webhook_path: "/mlflow/webhook"
+    webhook_name: "rayserve-attack-detection-champion-alias"
+    webhook_require_signature: true
+    webhook_max_timestamp_age_seconds: 300
 
   # Optional per-deployment canary configuration. When present, `CanaryModel`
   # will pick these values (overrides `kuberay.serving` / `kuberay.model`).
