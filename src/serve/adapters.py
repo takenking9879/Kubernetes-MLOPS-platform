@@ -44,15 +44,12 @@ class XGBoostAdapter:
         df = pd.DataFrame(data)
 
         model_feature_names = getattr(self._model, "feature_names", None)
-        if model_feature_names:
-            if len(df.columns) != len(model_feature_names):
-                raise ValueError(
-                    f"Feature dimension mismatch. Model expects {len(model_feature_names)} features, "
-                    f"got {len(df.columns)}"
-                )
-            dmatrix = self._xgb.DMatrix(df.values, feature_names=list(model_feature_names))
-        else:
-            dmatrix = self._xgb.DMatrix(df)
+        if len(df.columns) != len(model_feature_names):
+            raise ValueError(
+                f"Feature dimension mismatch. Model expects {len(model_feature_names)} features, "
+                f"got {len(df.columns)}"
+            )
+        dmatrix = self._xgb.DMatrix(df.values, feature_names=list(model_feature_names))
 
         probs = self._model.predict(dmatrix)
 
