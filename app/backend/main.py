@@ -16,6 +16,7 @@ import traceback
 from pathlib import Path
 from typing import Any, Optional
 import io
+import csv
 
 import pandas as pd
 import yaml
@@ -157,6 +158,31 @@ def normalize_spark_columns(df):
     return renamed_df
 
 
+def detect_csv_delimiter(csv_path: Path) -> str:
+    candidates = [",", ";", "\t", "|"]
+    try:
+        with csv_path.open("r", encoding="utf-8-sig", newline="") as handle:
+            sample = handle.read(8192)
+            if not sample.strip():
+                return ","
+
+            try:
+                dialect = csv.Sniffer().sniff(sample, delimiters=";,\t|")
+                if dialect.delimiter in candidates:
+                    return dialect.delimiter
+            except csv.Error:
+                pass
+
+            first_line = next((line for line in sample.splitlines() if line.strip()), "")
+            if not first_line:
+                return ","
+
+            best = max(candidates, key=lambda delimiter: first_line.count(delimiter))
+            return best if first_line.count(best) > 0 else ","
+    except Exception:
+        return ","
+
+
 # ─── POST /api/schema/from-csv ───────────────────────────────────────
 
 
@@ -239,7 +265,7 @@ async def dry_run(request: DryRunRequest) -> dict[str, Any]:
     """
     Execute a pipeline dry-run:
     1. Parse the YAML config
-    2. Load a CSV sample
+    2. Load a dataset sample (CSV/Parquet)
     3. Execute pipeline.fit() + transform()
     4. Return output schema, preview rows, and metrics
     5. On error: return the raw Spark/Python traceback
@@ -252,8 +278,8 @@ async def dry_run(request: DryRunRequest) -> dict[str, Any]:
             "error": {"message": f"Invalid YAML: {exc}"},
         }
 
-    csv_path = Path(request.datasetPath)
-    if not csv_path.exists():
+    dataset_path = Path(request.datasetPath)
+    if not dataset_path.exists():
         return {
             "success": False,
             "error": {"message": f"Dataset file not found: {request.datasetPath}"},
@@ -279,9 +305,22 @@ async def dry_run(request: DryRunRequest) -> dict[str, Any]:
             .getOrCreate()
         )
 
-        df = spark.read.csv(
-            str(csv_path), header=True, inferSchema=True
-        ).limit(request.sampleLimit)
+        dataset_suffix = dataset_path.suffix.lower()
+        if dataset_suffix == ".parquet":
+            df = spark.read.parquet(str(dataset_path)).limit(request.sampleLimit)
+        elif dataset_suffix in {".csv", ".txt", ""}:
+            detected_delimiter = detect_csv_delimiter(dataset_path)
+            df = spark.read.option("sep", detected_delimiter).csv(
+                str(dataset_path), header=True, inferSchema=True
+            ).limit(request.sampleLimit)
+        else:
+            return {
+                "success": False,
+                "error": {
+                    "message": f"Unsupported dataset format '{dataset_suffix}'. Use CSV or Parquet."
+                },
+            }
+
         df = normalize_spark_columns(df)
 
         start_time = time.time()
