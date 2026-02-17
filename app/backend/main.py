@@ -33,6 +33,9 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
+UPLOAD_CACHE_DIR = Path("/tmp/dsl_uploaded_datasets")
+
 # ─── Request / Response Models ───────────────────────────────────────
 
 
@@ -48,6 +51,7 @@ class SparkSchemaResponse(BaseModel):
     columns: list[ColumnMeta]
     sampleRows: Optional[list[dict[str, Any]]] = None
     schemaHash: Optional[str] = None
+    uploadedPath: Optional[str] = None
 
 
 class SchemaFromCSVRequest(BaseModel):
@@ -137,6 +141,21 @@ def generate_spark_schema_from_df(df: pd.DataFrame) -> SparkSchemaResponse:
     sample_rows = df.head(10).to_dict(orient="records")
     schema_hash = compute_schema_hash(columns)
     return SparkSchemaResponse(columns=columns, sampleRows=sample_rows, schemaHash=schema_hash)
+
+
+def ensure_upload_cache_dir() -> Path:
+    UPLOAD_CACHE_DIR.mkdir(parents=True, exist_ok=True)
+    return UPLOAD_CACHE_DIR
+
+
+def persist_uploaded_dataset(file_name: str, content: bytes) -> Path:
+    cache_dir = ensure_upload_cache_dir()
+    base_name = Path(file_name).name or "uploaded_dataset"
+    digest = hashlib.sha256(content).hexdigest()[:12]
+    stored_name = f"{digest}__{base_name}"
+    target = cache_dir / stored_name
+    target.write_bytes(content)
+    return target.resolve()
 
 
 def normalize_spark_columns(df):
@@ -232,6 +251,38 @@ def detect_dataset_format(dataset_path: Path) -> Optional[str]:
         return None
 
 
+def resolve_dataset_path(dataset_ref: str) -> Optional[Path]:
+    requested = Path(dataset_ref.strip())
+
+    candidates: list[Path] = []
+    if requested.is_absolute():
+        candidates.append(requested)
+    else:
+        candidates.extend([
+            Path.cwd() / requested,
+            Path(__file__).resolve().parent / requested,
+            PROJECT_ROOT / requested,
+        ])
+
+    cache_dir = ensure_upload_cache_dir()
+    candidates.append(cache_dir / requested.name)
+
+    for candidate in candidates:
+        if candidate.exists() and candidate.is_file():
+            return candidate.resolve()
+
+    if requested.name:
+        uploaded_matches = sorted(
+            cache_dir.glob(f"*__{requested.name}"),
+            key=lambda path: path.stat().st_mtime,
+            reverse=True,
+        )
+        if uploaded_matches:
+            return uploaded_matches[0].resolve()
+
+    return None
+
+
 # ─── POST /api/schema/from-csv ───────────────────────────────────────
 
 
@@ -276,6 +327,7 @@ async def upload_schema_file(
 
     try:
         content = await file.read()
+        stored_path = persist_uploaded_dataset(file.filename or "uploaded_dataset", content)
         if filename.endswith('.csv'):
             df = pd.read_csv(
                 io.BytesIO(content),
@@ -291,7 +343,13 @@ async def upload_schema_file(
     except Exception as exc:
         raise HTTPException(status_code=400, detail=f"Failed to parse uploaded file: {exc}") from exc
 
-    return generate_spark_schema_from_df(df)
+    schema = generate_spark_schema_from_df(df)
+    return SparkSchemaResponse(
+        columns=schema.columns,
+        sampleRows=schema.sampleRows,
+        schemaHash=schema.schemaHash,
+        uploadedPath=str(stored_path),
+    )
 
 
 # ─── GET /api/schema/from-iceberg ────────────────────────────────────
@@ -327,8 +385,8 @@ async def dry_run(request: DryRunRequest) -> dict[str, Any]:
             "error": {"message": f"Invalid YAML: {exc}"},
         }
 
-    dataset_path = Path(request.datasetPath)
-    if not dataset_path.exists():
+    dataset_path = resolve_dataset_path(request.datasetPath)
+    if not dataset_path:
         return {
             "success": False,
             "error": {"message": f"Dataset file not found: {request.datasetPath}"},
@@ -338,7 +396,7 @@ async def dry_run(request: DryRunRequest) -> dict[str, Any]:
         import sys
 
         # Add project root to sys.path so we can import src.dsl
-        project_root = str(Path(__file__).resolve().parent.parent.parent)
+        project_root = str(PROJECT_ROOT)
         if project_root not in sys.path:
             sys.path.insert(0, project_root)
 

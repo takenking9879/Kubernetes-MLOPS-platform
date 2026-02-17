@@ -73,11 +73,6 @@ export function NodePropertiesForm({ node }: Props) {
                 const file = e.target.files?.[0];
                 if (file) {
                   uploadSchemaFromCSV(file).catch(() => {});
-                  // Optionally update path show file name
-                  updateNodeData(node.id, (prev) => ({
-                    ...prev,
-                    path: file.name,
-                  } as DatasetNodeData));
                 }
               }}
               className="w-full text-xs text-slate-400 file:mr-2 file:rounded-md file:border-0 

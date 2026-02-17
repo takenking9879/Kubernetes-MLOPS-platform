@@ -52,6 +52,7 @@ export const CARDINALITY_BINS = [
 export interface SparkSchema {
   readonly columns: readonly ColumnMeta[];
   readonly sampleRows?: readonly Record<string, unknown>[];
+  readonly uploadedPath?: string;
 }
 
 /**

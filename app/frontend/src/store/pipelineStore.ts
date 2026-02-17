@@ -246,8 +246,26 @@ export const usePipelineStore = create<PipelineState>()(
       uploadSchemaFromCSV: async (file) => {
         try {
           const schema = await uploadSchemaFromCSV(file);
-          set({ datasetSchema: schema });
-          get().log(`Schema loaded: ${schema.columns.length} columns from uploaded file: ${file.name}`, 'info');
+          set((state) => ({
+            datasetSchema: schema,
+            nodes: state.nodes.map((node) => {
+              if (node.data.type !== 'dataset') return node;
+              if (!schema.uploadedPath) return node;
+              return {
+                ...node,
+                data: {
+                  ...node.data,
+                  path: schema.uploadedPath,
+                },
+              };
+            }),
+          }));
+
+          const pathInfo = schema.uploadedPath ? ` (${schema.uploadedPath})` : '';
+          get().log(
+            `Schema loaded: ${schema.columns.length} columns from uploaded file: ${file.name}${pathInfo}`,
+            'info',
+          );
         } catch (err) {
           const msg = err instanceof Error ? err.message : String(err);
           get().log(`Failed to upload CSV: ${msg}`, 'error');
