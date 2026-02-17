@@ -122,4 +122,6 @@ RUN wget -P /opt/spark/jars/ https://repo.maven.apache.org/maven2/org/apache/ice
     && wget -P /opt/spark/jars/ https://repo1.maven.org/maven2/org/apache/iceberg/iceberg-aws-bundle/1.10.1/iceberg-aws-bundle-1.10.1.jar \
     && wget -P /opt/spark/jars/ https://repo1.maven.org/maven2/org/apache/iceberg/iceberg-spark-extensions-4.0_2.13/1.10.1/iceberg-spark-extensions-4.0_2.13-1.10.1.jar
 
+RUN chown -R spark:spark /workspace && chmod -R 775 /workspace
+
 USER spark

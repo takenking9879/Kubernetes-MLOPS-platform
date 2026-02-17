@@ -17,6 +17,7 @@ from pathlib import Path
 from typing import Any, Optional
 import io
 import csv
+import os
 
 import pandas as pd
 import yaml
@@ -34,7 +35,8 @@ app.add_middleware(
 )
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
-UPLOAD_CACHE_DIR = Path("/tmp/dsl_uploaded_datasets")
+# Default to /tmp for broad compatibility, but allow override (e.g., .uploaded_datasets)
+UPLOAD_CACHE_DIR = Path(os.getenv("UPLOAD_CACHE_DIR", "/tmp/dsl_uploaded_datasets"))
 
 # ─── Request / Response Models ───────────────────────────────────────
 
