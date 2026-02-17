@@ -457,10 +457,30 @@ export const usePipelineStore = create<PipelineState>()(
 
       importYAML: (yamlString) => {
         try {
+          const { datasetSchema, nodes: oldNodes } = get();
           const result = importFromYAML(yamlString);
 
+          // Preserve dataset path and schema if they were already loaded in the session
+          const oldDataset = oldNodes.find((n) => n.data.type === 'dataset');
+          const nodes = result.nodes.map((node) => {
+            if (node.data.type === 'dataset') {
+              const prevPath = oldDataset?.data.type === 'dataset' ? oldDataset.data.path : '';
+              const prevSource = oldDataset?.data.type === 'dataset' ? oldDataset.data.source : 'csv';
+              return {
+                ...node,
+                data: {
+                  ...node.data,
+                  path: node.data.path || prevPath,
+                  source: node.data.path ? node.data.source : prevSource,
+                  schema: node.data.schema || datasetSchema,
+                },
+              };
+            }
+            return node;
+          });
+
           set({
-            nodes: result.nodes,
+            nodes,
             edges: result.edges,
             pipelineName: result.pipelineName,
             pipelineVersion: result.pipelineVersion,

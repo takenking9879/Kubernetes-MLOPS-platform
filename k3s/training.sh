@@ -9,6 +9,7 @@
 # ============================================================
 
 # Usage: ./k3s/training.sh
+# Set ENABLE_INGESTION=false to skip Spark ingestion step
 # Set ENABLE_PREPROCESS=false to skip Spark preprocessing
 # Set ENABLE_TRAINING=false to skip Ray training
 # Set ENABLE_DELETION=false to keep resources after completion

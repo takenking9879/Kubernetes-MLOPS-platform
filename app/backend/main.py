@@ -34,7 +34,12 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
+# Detect project root (K3s git-sync or local)
+if Path("/git-data/repo").exists():
+    PROJECT_ROOT = Path("/git-data/repo")
+else:
+    PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
+
 # Default to /tmp for broad compatibility, but allow override (e.g., .uploaded_datasets)
 UPLOAD_CACHE_DIR = Path(os.getenv("UPLOAD_CACHE_DIR", "/tmp/dsl_uploaded_datasets"))
 
@@ -254,6 +259,9 @@ def detect_dataset_format(dataset_path: Path) -> Optional[str]:
 
 
 def resolve_dataset_path(dataset_ref: str) -> Optional[Path]:
+    if not dataset_ref or not dataset_ref.strip():
+        return None
+    
     requested = Path(dataset_ref.strip())
 
     candidates: list[Path] = []
@@ -293,13 +301,13 @@ async def get_schema_from_csv(request: SchemaFromCSVRequest):
     """
     Read a CSV file from local path, infer types, and return the schema.
     """
-    csv_path = Path(request.path)
-    if not csv_path.exists():
+    resolved_path = resolve_dataset_path(request.path)
+    if not resolved_path:
         raise HTTPException(status_code=400, detail=f"File not found: {request.path}")
 
     try:
         df = pd.read_csv(
-            csv_path,
+            resolved_path,
             delimiter=request.delimiter,
             header=0 if request.header else None,
             nrows=request.sample_rows,
@@ -389,9 +397,14 @@ async def dry_run(request: DryRunRequest) -> dict[str, Any]:
 
     dataset_path = resolve_dataset_path(request.datasetPath)
     if not dataset_path:
+        # Check if the path was actually empty or just not found
+        msg = f"Dataset file not found: '{request.datasetPath}'"
+        if not request.datasetPath:
+            msg = "No dataset path provided. Please upload a file or specify a path in the Dataset node."
+        
         return {
             "success": False,
-            "error": {"message": f"Dataset file not found: {request.datasetPath}"},
+            "error": {"message": msg},
         }
 
     try:

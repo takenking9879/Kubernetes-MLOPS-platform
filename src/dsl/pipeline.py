@@ -65,7 +65,13 @@ class Pipeline:
         Returns:
             Pipeline instance
         """
-        pipeline_config = config.get("pipeline", {})
+        pipeline_config = dict(config.get("pipeline", {}))
+
+        # DSL v2 compatibility: some generators place final_features at root level.
+        # Preserve them in pipeline config so PipelineModel.select_features works.
+        if "final_features" in config and "final_features" not in pipeline_config:
+            pipeline_config["final_features"] = config["final_features"]
+
         stages_config = pipeline_config.get("stages", [])
         
         registry = StageRegistry()
