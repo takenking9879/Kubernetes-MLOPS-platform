@@ -183,6 +183,55 @@ def detect_csv_delimiter(csv_path: Path) -> str:
         return ","
 
 
+def is_parquet_file(file_path: Path) -> bool:
+    """
+    Detect Parquet by magic bytes, independent of file extension.
+    Parquet files start and end with the bytes: PAR1
+    """
+    try:
+        if not file_path.exists() or not file_path.is_file() or file_path.stat().st_size < 8:
+            return False
+
+        with file_path.open("rb") as handle:
+            header = handle.read(4)
+            handle.seek(-4, 2)
+            footer = handle.read(4)
+
+        return header == b"PAR1" and footer == b"PAR1"
+    except Exception:
+        return False
+
+
+def detect_dataset_format(dataset_path: Path) -> Optional[str]:
+    """
+    Detect dataset format robustly.
+
+    Priority:
+    1. Known extension
+    2. Parquet magic bytes
+    3. Text-like file => CSV/TXT
+    """
+    suffix = dataset_path.suffix.lower()
+    if suffix == ".parquet":
+        return "parquet"
+    if suffix in {".csv", ".txt", ".tsv"}:
+        return "csv"
+
+    if is_parquet_file(dataset_path):
+        return "parquet"
+
+    try:
+        with dataset_path.open("rb") as handle:
+            sample = handle.read(8192)
+        if not sample:
+            return "csv"
+
+        sample.decode("utf-8-sig")
+        return "csv"
+    except Exception:
+        return None
+
+
 # ─── POST /api/schema/from-csv ───────────────────────────────────────
 
 
@@ -305,10 +354,11 @@ async def dry_run(request: DryRunRequest) -> dict[str, Any]:
             .getOrCreate()
         )
 
-        dataset_suffix = dataset_path.suffix.lower()
-        if dataset_suffix == ".parquet":
+        detected_format = detect_dataset_format(dataset_path)
+
+        if detected_format == "parquet":
             df = spark.read.parquet(str(dataset_path)).limit(request.sampleLimit)
-        elif dataset_suffix in {".csv", ".txt", ""}:
+        elif detected_format == "csv":
             detected_delimiter = detect_csv_delimiter(dataset_path)
             df = spark.read.option("sep", detected_delimiter).csv(
                 str(dataset_path), header=True, inferSchema=True
@@ -317,7 +367,10 @@ async def dry_run(request: DryRunRequest) -> dict[str, Any]:
             return {
                 "success": False,
                 "error": {
-                    "message": f"Unsupported dataset format '{dataset_suffix}'. Use CSV or Parquet."
+                    "message": (
+                        "Could not detect dataset format. "
+                        "Provide a valid CSV or Parquet file (or use .csv/.parquet extension)."
+                    )
                 },
             }
 
