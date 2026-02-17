@@ -1,0 +1,152 @@
+import { useRef } from 'react';
+import { usePipelineStore } from '../../store/pipelineStore';
+import type { Node } from 'reactflow';
+import type { NodeData } from '../../types/nodes';
+import { DATASET_NODE_CONTRACT } from '../../registry/NodeRegistry';
+
+export function Header() {
+  const validate = usePipelineStore((s) => s.validate);
+  const exportYAML = usePipelineStore((s) => s.exportYAML);
+  const importYAML = usePipelineStore((s) => s.importYAML);
+  const dryRun = usePipelineStore((s) => s.dryRun);
+  const isValidating = usePipelineStore((s) => s.isValidating);
+  const isDryRunning = usePipelineStore((s) => s.isDryRunning);
+  const validationResult = usePipelineStore((s) => s.validationResult);
+
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleImport = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const text = e.target?.result;
+      if (typeof text === 'string') {
+        importYAML(text);
+      }
+    };
+    reader.readAsText(file);
+
+    // Reset so the same file can be re-imported
+    event.target.value = '';
+  };
+
+  const handleExport = () => {
+    const yaml = exportYAML();
+    if (!yaml) return;
+
+    const blob = new Blob([yaml], { type: 'text/yaml' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'pipeline.yaml';
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  return (
+    <header className="flex h-12 items-center justify-between border-b border-slate-800 bg-slate-900 px-4">
+      {/* Title */}
+      <div className="flex items-center gap-3">
+        <h1 className="text-sm font-bold text-slate-200">Spark Feature Designer</h1>
+        {validationResult && (
+          <span
+            className={`rounded-full px-2 py-0.5 text-[10px] font-medium ${
+              validationResult.valid
+                ? 'bg-emerald-900/40 text-emerald-400'
+                : 'bg-red-900/40 text-red-400'
+            }`}
+          >
+            {validationResult.valid
+              ? `Valid (${validationResult.topologicalOrder.length} stages)`
+              : `${validationResult.errors.length} error(s)`}
+          </span>
+        )}
+      </div>
+
+      {/* Actions */}
+      <div className="flex items-center gap-2">
+        <button
+          onClick={() => {
+            const nodes = usePipelineStore.getState().nodes as Node<NodeData>[];
+            const addNode = usePipelineStore.getState().addNode;
+            const selectNode = usePipelineStore.getState().selectNode;
+            const log = usePipelineStore.getState().log;
+
+            // If a dataset node already exists, select it instead of creating another
+            const existing = nodes.find((n) => n.data.type === 'dataset');
+            if (existing) {
+              selectNode(existing.id);
+              log('Dataset node already exists. Reusing existing singleton.', 'warning');
+              return;
+            }
+
+            const id = DATASET_NODE_CONTRACT.id;
+            const datasetNode: Node<NodeData> = {
+              id,
+              type: 'dataset',
+              position: { x: 40, y: 80 },
+              data: {
+                id,
+                label: 'Dataset',
+                type: 'dataset',
+                source: 'csv',
+                path: '',
+                schema: null,
+              },
+            } as Node<NodeData>;
+
+            addNode(datasetNode);
+            // select after a tick to ensure ReactFlow has rendered
+            setTimeout(() => selectNode(id), 50);
+          }}
+          className="rounded-md bg-slate-700 px-3 py-1.5 text-xs font-medium text-white hover:bg-slate-600"
+        >
+          Add Dataset
+        </button>
+
+        <button
+          onClick={() => validate()}
+          disabled={isValidating}
+          className="rounded-md bg-slate-800 px-3 py-1.5 text-xs font-medium text-slate-300
+                     hover:bg-slate-700 disabled:opacity-40"
+        >
+          {isValidating ? 'Validating...' : 'Validate'}
+        </button>
+
+        <button
+          onClick={() => { dryRun().catch(() => {}); }}
+          disabled={isDryRunning}
+          className="rounded-md bg-blue-700 px-3 py-1.5 text-xs font-medium text-white
+                     hover:bg-blue-600 disabled:opacity-40"
+        >
+          {isDryRunning ? 'Running...' : 'Dry-Run'}
+        </button>
+
+        <button
+          onClick={handleExport}
+          className="rounded-md bg-emerald-700 px-3 py-1.5 text-xs font-medium text-white
+                     hover:bg-emerald-600"
+        >
+          Export YAML
+        </button>
+
+        <button
+          onClick={() => fileInputRef.current?.click()}
+          className="rounded-md bg-amber-700 px-3 py-1.5 text-xs font-medium text-white
+                     hover:bg-amber-600"
+        >
+          Import YAML
+        </button>
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept=".yaml,.yml"
+          className="hidden"
+          onChange={handleImport}
+        />
+      </div>
+    </header>
+  );
+}

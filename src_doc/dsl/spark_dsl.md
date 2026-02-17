@@ -127,6 +127,7 @@ Pipeline
 - `standard_scaler`: Z-score normalization (learns mean/std)
 - `minmax_scaler`: Min-max scaling (learns min/max)
 - `imputer`: Fill missing with learned statistics (mean/median/mode)
+- `frequency_encoder`: Categorical encoding based on frequency (learns frequencies)
 
 ## 📋 YAML Configuration Example
 

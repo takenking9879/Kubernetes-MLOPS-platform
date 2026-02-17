@@ -214,3 +214,4 @@ notebooks/processed/
 
 # Zone identifier files
 *:Zone.Identifier
+app/frontend/node_modules/

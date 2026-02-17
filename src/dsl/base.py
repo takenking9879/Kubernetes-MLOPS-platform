@@ -145,20 +145,30 @@ class PipelineModel:
         Keeps target and metadata columns if present.
         """
         final_features = self.config.get("final_features", {})
+
+        if not isinstance(final_features, dict):
+            raise ValueError("Invalid final_features config: expected object with features/target/metadata")
+
+        selected_feature_cols = list(final_features.get("features", []))
+        target_cols = list(final_features.get("target", []))
+        metadata_cols = list(final_features.get("metadata", []))
+        passthrough_cols = list(final_features.get("passthrough", []))
         
         selected_cols = []
-        selected_cols.extend(final_features.get("categorical", []))
-        selected_cols.extend(final_features.get("numerical", []))
+        selected_cols.extend(selected_feature_cols)
         
         # Add target if present in both config and DataFrame
-        target_cols = final_features.get("target", [])
         for col in target_cols:
             if col in df.columns:
                 selected_cols.append(col)
         
         # Add metadata if present in both config and DataFrame
-        metadata_cols = final_features.get("metadata", [])
         for col in metadata_cols:
+            if col in df.columns:
+                selected_cols.append(col)
+        
+        # Add passthrough if present in both config and DataFrame
+        for col in passthrough_cols:
             if col in df.columns:
                 selected_cols.append(col)
         

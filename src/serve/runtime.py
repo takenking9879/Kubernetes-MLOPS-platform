@@ -58,11 +58,12 @@ class ModelRuntime:
             with open(path, "r") as f:
                 dsl = yaml.safe_load(f)
 
-            features = dsl["pipeline"]["final_features"]
-            categorical = features.get("categorical", [])
-            numerical = features.get("numerical", [])
+            final_features = dsl.get("final_features", {})
+            if not isinstance(final_features, dict):
+                raise ValueError("DSL final_features must be an object with key 'features'")
 
-            dim = len(categorical) + len(numerical)
+            dim = len(final_features.get("features", []))
+
             self._logger.info("Input dimension resolved from DSL: %d", dim)
             return dim
         except Exception as e:

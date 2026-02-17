@@ -284,16 +284,16 @@ class PipelineBuilder:
         """Add an estimator stage."""
         return self.add_stage(stage_type, name, inputs, outputs, params)
     
-    def set_final_features(self, categorical: List[str] = None, 
-                          numerical: List[str] = None,
+    def set_final_features(self, features: List[str] = None,
                           target: List[str] = None,
-                          metadata: List[str] = None) -> 'PipelineBuilder':
-        """Set the final feature selection configuration."""
+                          metadata: List[str] = None,
+                          passthrough: List[str] = None) -> 'PipelineBuilder':
+        """Set final feature selection configuration."""
         self.config["final_features"] = {
-            "categorical": categorical or [],
-            "numerical": numerical or [],
+            "features": features or [],
             "target": target or [],
-            "metadata": metadata or []
+            "metadata": metadata or [],
+            "passthrough": passthrough or []
         }
         return self
     

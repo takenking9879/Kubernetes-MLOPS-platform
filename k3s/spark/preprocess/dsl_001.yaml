@@ -1,179 +1,163 @@
+meta:
+  dslVersion: "2.0"
+  generatedAt: 2026-02-17T16:53:56.253Z
+  schemaHash: 274730cd
+
 pipeline:
-  name: "network_traffic_feature_pipeline"
+  name: network_traffic_feature_pipeline
   version: "1.0"
-  
+
   stages:
-    # ==========================================
-    # 1. TIMESTAMP PARSING & TEMPORAL FEATURES
-    # ==========================================
-      # Convert timestamp string to timestamp type
-    - type: "cast_transformer"
-      name: "timestamp_parser"
-      inputs: ["timestamp"]
-      outputs: "timestamp_ts"
+    - type: cast_transformer
+      name: timestamp_parser
+      inputs: timestamp
+      outputs: timestamp_ts
       params:
-        target_type: "timestamp"
-    
-    - type: "temporal_extractor"
-      name: "hour_extractor"
-      inputs: ["timestamp_ts"]
-      outputs: "hour"
+        target_type: timestamp
+
+    - type: log_transformer
+      name: bytes_log
+      inputs: bytes_transferred
+      outputs: bytes_log
       params:
-        component: "hour"
-    
-    - type: "temporal_extractor"
-      name: "dayofweek_extractor"
-      inputs: ["timestamp_ts"]
-      outputs: "dayofweek_raw"
+        log_type: log1p
+
+    - type: log_transformer
+      name: packet_log
+      inputs: packet_count
+      outputs: packet_log
       params:
-        component: "dayofweek"
-    
-    - type: "arithmetic_transformer"
-      name: "dayofweek_adjuster"
-      inputs: ["dayofweek_raw"]
-      outputs: "dayofweek"
+        log_type: log1p
+
+    - type: concat_transformer
+      name: protocol_conn_concat
+      inputs:
+        - protocol
+        - conn_state
+      outputs: protocol_conn
       params:
-        operation: "subtract"
+        separator: _
+
+    - type: string_indexer
+      name: protocol_encoder
+      inputs: protocol
+      outputs: protocol_idx
+      params:
+        handle_invalid: keep
+
+    - type: string_indexer
+      name: conn_state_encoder
+      inputs: conn_state
+      outputs: conn_state_idx
+      params:
+        handle_invalid: keep
+
+    - type: temporal_extractor
+      name: hour_extractor
+      inputs: timestamp_ts
+      outputs: hour
+      params:
+        component: hour
+
+    - type: temporal_extractor
+      name: dayofweek_extractor
+      inputs: timestamp_ts
+      outputs: dayofweek_raw
+      params:
+        component: dayofweek
+
+    - type: string_indexer
+      name: protocol_conn_encoder
+      inputs: protocol_conn
+      outputs: protocol_conn_idx
+      params:
+        handle_invalid: keep
+
+    - type: cyclic_transformer
+      name: hour_cyclic_sin
+      inputs: hour
+      outputs: hour_sin
+      params:
+        function: sin
+        period: 24
+
+    - type: cyclic_transformer
+      name: hour_cyclic_cos
+      inputs: hour
+      outputs: hour_cos
+      params:
+        function: cos
+        period: 24
+
+    - type: arithmetic_transformer
+      name: dayofweek_adjuster
+      inputs: dayofweek_raw
+      outputs: dayofweek
+      params:
+        operation: subtract
         value: 1
-    
-    # ==========================================
-    # 2. CONDITIONAL FEATURES
-    # ==========================================
-    - type: "conditional_transformer"
-      name: "weekend_flag"
-      inputs: ["dayofweek"]
-      outputs: "is_weekend"
+
+    - type: conditional_transformer
+      name: weekend_flag
+      inputs: dayofweek
+      outputs: is_weekend
       params:
-        condition: "isin"
-        values: [5, 6]
+        condition: isin
+        values:
+          - 5
+          - 6
         true_value: 1
         false_value: 0
-    
-    # ==========================================
-    # 3. CYCLIC ENCODING (SIN/COS)
-    # ==========================================
-    - type: "cyclic_transformer"
-      name: "hour_cyclic_sin"
-      inputs: ["hour"]
-      outputs: "hour_sin"
-      params:
-        function: "sin"
-        period: 24.0
-    
-    - type: "cyclic_transformer"
-      name: "hour_cyclic_cos"
-      inputs: ["hour"]
-      outputs: "hour_cos"
-      params:
-        function: "cos"
-        period: 24.0
-    
-    # ==========================================
-    # 4. LOG TRANSFORMATIONS
-    # ==========================================
-    - type: "log_transformer"
-      name: "bytes_log"
-      inputs: ["bytes_transferred"]
-      outputs: "bytes_log"
-      params:
-        log_type: "log1p"
-    
-    - type: "log_transformer"
-      name: "packet_log"
-      inputs: ["packet_count"]
-      outputs: "packet_log"
-      params:
-        log_type: "log1p"
-    
-    # ==========================================
-    # 5. STRING CONCATENATION
-    # ==========================================
-    - type: "concat_transformer"
-      name: "protocol_conn_concat"
-      inputs: ["protocol", "conn_state"]
-      outputs: "protocol_conn"
-      params:
-        separator: "_"
-    
-    # ==========================================
-    # 6. CATEGORICAL ENCODING (LEARNS FROM DATA)
-    # ==========================================
-    - type: "string_indexer"
-      name: "protocol_encoder"
-      inputs: ["protocol"]
-      outputs: "protocol_idx"
-      params:
-        handle_invalid: "keep"  # -1 for unknowns
-    
-    - type: "string_indexer"
-      name: "conn_state_encoder"
-      inputs: ["conn_state"]
-      outputs: "conn_state_idx"
-      params:
-        handle_invalid: "keep"
-    
-    - type: "string_indexer"
-      name: "protocol_conn_encoder"
-      inputs: ["protocol_conn"]
-      outputs: "protocol_conn_idx"
-      params:
-        handle_invalid: "keep"
-    
-    # ==========================================
-    # 7. NUMERICAL SCALING (LEARNS FROM DATA)
-    # ==========================================
-    - type: "standard_scaler"
-      name: "numerical_scaler"
+
+    - type: standard_scaler
+      name: numerical_scaler
       inputs:
-        - "src_port"
-        - "dst_port"
-        - "packet_count"
-        - "bytes_transferred"
-        - "bytes_log"
-        - "packet_log"
-        - "hour"
-        - "dayofweek"
-        - "is_weekend"
-        - "hour_sin"
-        - "hour_cos"
+        - src_port
+        - dst_port
+        - packet_count
+        - bytes_transferred
+        - bytes_log
+        - packet_log
+        - hour
+        - dayofweek
+        - is_weekend
+        - hour_sin
+        - hour_cos
       outputs:
-        - "src_port_norm"
-        - "dst_port_norm"
-        - "packet_count_norm"
-        - "bytes_transferred_norm"
-        - "bytes_log_norm"
-        - "packet_log_norm"
-        - "hour_norm"
-        - "dayofweek_norm"
-        - "is_weekend_norm"
-        - "hour_sin_norm"
-        - "hour_cos_norm"
+        - src_port_norm
+        - dst_port_norm
+        - packet_count_norm
+        - bytes_transferred_norm
+        - bytes_log_norm
+        - packet_log_norm
+        - hour_norm
+        - dayofweek_norm
+        - is_weekend_norm
+        - hour_sin_norm
+        - hour_cos_norm
       params:
         with_mean: true
         with_std: true
 
-  # ==========================================
-  # FINAL FEATURE SELECTION
-  # ==========================================
-  final_features:
-    categorical:
-      - "protocol_idx"
-      - "conn_state_idx"
-      - "protocol_conn_idx"
-    numerical:
-      - "src_port_norm"
-      - "dst_port_norm"
-      - "packet_count_norm"
-      - "bytes_transferred_norm"
-      - "bytes_log_norm"
-      - "packet_log_norm"
-      - "hour_norm"
-      - "dayofweek_norm"
-      - "is_weekend_norm"
-      - "hour_sin_norm"
-      - "hour_cos_norm"
-    target:
-      - "attack"
-    metadata:
-      - "timestamp"
-      - "event_id"
+final_features:
+  features:
+    - protocol_idx
+    - conn_state_idx
+    - protocol_conn_idx
+    - src_port_norm
+    - dst_port_norm
+    - packet_count_norm
+    - bytes_transferred_norm
+    - bytes_log_norm
+    - packet_log_norm
+    - hour_norm
+    - dayofweek_norm
+    - is_weekend_norm
+    - hour_sin_norm
+    - hour_cos_norm
+  target:
+    - attack
+  metadata:
+    - timestamp
+  passthrough:
+    - event_id

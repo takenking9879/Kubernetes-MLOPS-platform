@@ -21,35 +21,40 @@ class StringIndexerEstimator(Estimator):
     """
     Learn a mapping from categorical strings to integer indices.
     Similar to Spark ML's StringIndexer but outputs a regular column.
+    Supports N→N: each input column gets its own vocabulary.
     """
-    
+
     def get_type(self) -> str:
         return "string_indexer"
-    
+
     def fit(self, df: DataFrame) -> 'StringIndexerFittedTransformer':
-        """Learn the vocabulary from the input column."""
-        input_col = self.inputs[0]
-        
-        # Collect distinct values and sort them
-        values = (
-            df.select(input_col)
-              .distinct()
-              .rdd
-              .map(lambda r: r[0])
-              .collect()
-        )
-        
-        # Create mapping: value -> index
-        sorted_values = sorted([v for v in values if v is not None])
-        mapping = {v: i for i, v in enumerate(sorted_values)}
-        
-        learned_params = {
-            "mapping": mapping,
-            "num_labels": len(mapping)
-        }
-        
+        """Learn the vocabulary from each input column."""
+        if len(self.inputs) != len(self.outputs):
+            raise ValueError(
+                f"StringIndexerEstimator '{self.name}': inputs ({len(self.inputs)}) "
+                f"and outputs ({len(self.outputs)}) must have the same length"
+            )
+
+        mappings = {}
+        for input_col in self.inputs:
+            values = (
+                df.select(input_col)
+                  .distinct()
+                  .rdd
+                  .map(lambda r: r[0])
+                  .collect()
+            )
+            sorted_values = sorted([v for v in values if v is not None])
+            mapping = {v: i for i, v in enumerate(sorted_values)}
+            mappings[input_col] = {
+                "mapping": mapping,
+                "num_labels": len(mapping)
+            }
+
+        learned_params = {"mappings": mappings}
+
         self._fitted = True
-        
+
         return StringIndexerFittedTransformer(
             name=self.name,
             inputs=self.inputs,
@@ -60,54 +65,61 @@ class StringIndexerEstimator(Estimator):
 
 
 class StringIndexerFittedTransformer(FittedTransformer):
-    """Applies learned string-to-index mapping."""
-    
+    """Applies learned string-to-index mapping. Supports N→N."""
+
     def get_type(self) -> str:
         return "string_indexer"
-    
+
     def transform(self, df: DataFrame) -> DataFrame:
-        input_col = self.inputs[0]
-        output_col = self.outputs[0]
-        mapping = self.learned_params["mapping"]
+        if len(self.inputs) != len(self.outputs):
+            raise ValueError(
+                f"StringIndexerFittedTransformer '{self.name}': inputs ({len(self.inputs)}) "
+                f"and outputs ({len(self.outputs)}) must have the same length"
+            )
         handle_invalid = self.params.get("handle_invalid", "keep")
-        
-        # If mapping is empty (e.g., fitted on an empty DF), handle gracefully
-        if not mapping:
-            raise ValueError("StringIndexerFittedTransformer has empty mapping. Cannot transform data.")
+        all_mappings = self.learned_params["mappings"]
 
-        # Create a Spark map expression from the learned mapping
-        mapping_items = []
-        for k, v in mapping.items():
-            mapping_items.append(F.lit(k))
-            mapping_items.append(F.lit(v))
+        for in_col, out_col in zip(self.inputs, self.outputs):
+            col_data = all_mappings[in_col]
+            mapping = col_data["mapping"]
 
-        mapping_expr = F.create_map(*mapping_items)
+            if not mapping:
+                raise ValueError(
+                    f"StringIndexerFittedTransformer has empty mapping for column '{in_col}'. "
+                    f"Cannot transform data."
+                )
 
-        # Apply mapping, use -1 for unknowns if handle_invalid='keep'
-        if handle_invalid == "keep":
-            return df.withColumn(
-                output_col,
-                F.coalesce(mapping_expr[F.col(input_col)], F.lit(-1))
-            )
-        elif handle_invalid == "skip":
-            # Filter out rows with unknown values
-            known_values = list(mapping.keys())
-            return df.filter(F.col(input_col).isin(known_values)).withColumn(
-                output_col,
-                mapping_expr[F.col(input_col)]
-            )
-        elif handle_invalid == "error":
-            # Raise if unknown values encountered during transform
-            unknown_check = F.when(mapping_expr[F.col(input_col)].isNull(), F.lit(True)).otherwise(F.lit(False))
-            if df.filter(unknown_check).limit(1).count() > 0:
-                raise ValueError(f"Unknown category found in column '{input_col}' while handle_invalid='error'")
-            return df.withColumn(
-                output_col,
-                mapping_expr[F.col(input_col)]
-            )
-        else:
-            raise ValueError(f"Unknown handle_invalid: {handle_invalid}")
-    
+            mapping_items = []
+            for k, v in mapping.items():
+                mapping_items.append(F.lit(k))
+                mapping_items.append(F.lit(v))
+            mapping_expr = F.create_map(*mapping_items)
+
+            if handle_invalid == "keep":
+                df = df.withColumn(
+                    out_col,
+                    F.coalesce(mapping_expr[F.col(in_col)], F.lit(-1))
+                )
+            elif handle_invalid == "skip":
+                known_values = list(mapping.keys())
+                df = df.filter(F.col(in_col).isin(known_values)).withColumn(
+                    out_col,
+                    mapping_expr[F.col(in_col)]
+                )
+            elif handle_invalid == "error":
+                unknown_check = F.when(
+                    mapping_expr[F.col(in_col)].isNull(), F.lit(True)
+                ).otherwise(F.lit(False))
+                if df.filter(unknown_check).limit(1).count() > 0:
+                    raise ValueError(
+                        f"Unknown category found in column '{in_col}' while handle_invalid='error'"
+                    )
+                df = df.withColumn(out_col, mapping_expr[F.col(in_col)])
+            else:
+                raise ValueError(f"Unknown handle_invalid: {handle_invalid}")
+
+        return df
+
     @classmethod
     def from_dict(cls, config: Dict[str, Any]) -> 'StringIndexerFittedTransformer':
         """Reconstruct from saved configuration."""
@@ -135,6 +147,11 @@ class StandardScalerEstimator(Estimator):
     
     def fit(self, df: DataFrame) -> 'StandardScalerFittedTransformer':
         """Learn mean and std for each input column."""
+        if len(self.inputs) != len(self.outputs):
+            raise ValueError(
+                f"StandardScalerEstimator '{self.name}': inputs ({len(self.inputs)}) "
+                f"and outputs ({len(self.outputs)}) must have the same length"
+            )
         with_mean = self.params.get("with_mean", True)
         with_std = self.params.get("with_std", True)
         
@@ -174,6 +191,11 @@ class StandardScalerFittedTransformer(FittedTransformer):
         return "standard_scaler"
     
     def transform(self, df: DataFrame) -> DataFrame:
+        if len(self.inputs) != len(self.outputs):
+            raise ValueError(
+                f"StandardScalerFittedTransformer '{self.name}': inputs ({len(self.inputs)}) "
+                f"and outputs ({len(self.outputs)}) must have the same length"
+            )
         stats = self.learned_params["stats"]
         
         # Apply standardization to each column
@@ -223,6 +245,11 @@ class MinMaxScalerEstimator(Estimator):
     
     def fit(self, df: DataFrame) -> 'MinMaxScalerFittedTransformer':
         """Learn min and max for each input column."""
+        if len(self.inputs) != len(self.outputs):
+            raise ValueError(
+                f"MinMaxScalerEstimator '{self.name}': inputs ({len(self.inputs)}) "
+                f"and outputs ({len(self.outputs)}) must have the same length"
+            )
         feature_range = self.params.get("feature_range", (0, 1))
         
         stats = {}
@@ -263,6 +290,11 @@ class MinMaxScalerFittedTransformer(FittedTransformer):
         return "minmax_scaler"
     
     def transform(self, df: DataFrame) -> DataFrame:
+        if len(self.inputs) != len(self.outputs):
+            raise ValueError(
+                f"MinMaxScalerFittedTransformer '{self.name}': inputs ({len(self.inputs)}) "
+                f"and outputs ({len(self.outputs)}) must have the same length"
+            )
         stats = self.learned_params["stats"]
         
         for input_col, output_col in zip(self.inputs, self.outputs):
@@ -310,6 +342,11 @@ class ImputerEstimator(Estimator):
 
     def fit(self, df: DataFrame) -> 'ImputerFittedTransformer':
         """Learn imputation values for each column."""
+        if len(self.inputs) != len(self.outputs):
+            raise ValueError(
+                f"ImputerEstimator '{self.name}': inputs ({len(self.inputs)}) "
+                f"and outputs ({len(self.outputs)}) must have the same length"
+            )
         strategy = self.params.get("strategy", "mean")
         schema = df.schema
         imputation_values = {}
@@ -384,6 +421,11 @@ class ImputerFittedTransformer(FittedTransformer):
         return "imputer"
     
     def transform(self, df: DataFrame) -> DataFrame:
+        if len(self.inputs) != len(self.outputs):
+            raise ValueError(
+                f"ImputerFittedTransformer '{self.name}': inputs ({len(self.inputs)}) "
+                f"and outputs ({len(self.outputs)}) must have the same length"
+            )
         imputation_values = self.learned_params["imputation_values"]
         
         for input_col, output_col in zip(self.inputs, self.outputs):
@@ -416,7 +458,8 @@ class ImputerFittedTransformer(FittedTransformer):
 
 class FrequencyEncoderEstimator(Estimator):
     """
-    Learn frequency / count encoding for a categorical column.
+    Learn frequency / count encoding for categorical columns.
+    Supports N→N: each input column gets its own frequency mapping.
 
     Params supported (via self.params):
       - encoding: "count" | "freq"   (default: "freq")
@@ -426,14 +469,19 @@ class FrequencyEncoderEstimator(Estimator):
       - other_key: value to use as the 'other' category label (default "__OTHER__")
       - create_map_threshold: int (<= this size we use F.create_map, default 1000)
       - broadcast_threshold: int (<= this size we broadcast join, default 10000)
-      - fill_value: numeric value to use for unknowns (default 0.0 for freq, or  -1 for counts if encoding == "count")
+      - fill_value: numeric value to use for unknowns (default 0.0 for freq, or -1 for counts)
       - handle_invalid: "keep" | "skip" | "error" (default "keep")
     """
     def get_type(self) -> str:
         return "frequency_encoder"
 
     def fit(self, df: DataFrame) -> 'FrequencyFittedTransformer':
-        input_col = self.inputs[0]
+        if len(self.inputs) != len(self.outputs):
+            raise ValueError(
+                f"FrequencyEncoderEstimator '{self.name}': inputs ({len(self.inputs)}) "
+                f"and outputs ({len(self.outputs)}) must have the same length"
+            )
+
         encoding = self.params.get("encoding", "freq")
         smoothing = float(self.params.get("smoothing", 0.0))
         top_k = self.params.get("top_k", None)
@@ -442,81 +490,62 @@ class FrequencyEncoderEstimator(Estimator):
         create_map_threshold = int(self.params.get("create_map_threshold", 1000))
         broadcast_threshold = int(self.params.get("broadcast_threshold", 10000))
 
-        # 1) compute counts per category
-        counts_df = df.groupBy(input_col).count()
+        mappings = {}
 
-        # collect counts to driver (fit is expected to run in batch)
-        # structure: list of (category_value, count)
-        # Convert category values to python types (keep None if present)
-        collected = counts_df.rdd.map(lambda r: (r[0], int(r[1]))).collect()
+        for input_col in self.inputs:
+            counts_df = df.groupBy(input_col).count()
+            collected = counts_df.rdd.map(lambda r: (r[0], int(r[1]))).collect()
 
-        # total rows for relative frequency
-        total_count = int(df.count()) if encoding == "freq" or smoothing > 0.0 else None
+            total_count = int(df.count()) if encoding == "freq" or smoothing > 0.0 else None
 
-        # Apply min_count and top_k:
-        # Build initial list sorted by count desc
-        sorted_by_count = sorted(collected, key=lambda kv: kv[1], reverse=True)
+            sorted_by_count = sorted(collected, key=lambda kv: kv[1], reverse=True)
 
-        # If min_count specified, mark small categories for other
-        keep_set = set()
-        if min_count is not None:
-            for k, c in sorted_by_count:
-                if c >= int(min_count):
-                    keep_set.add(k)
-            # keep_set currently contains categories passing min_count (may be large)
-        else:
-            # default keep all
-            keep_set = set(k for k, _ in sorted_by_count)
-
-        # If top_k specified, limit keep_set to top_k entries
-        if top_k is not None:
-            top_k_int = int(top_k)
-            top_items = [k for k, _ in sorted_by_count[:top_k_int]]
-            keep_set = set(top_items)
-
-        # Now compute aggregated "other" count and prepare final mapping counts
-        other_count = 0
-        final_counts: Dict[Any, int] = {}
-        for k, c in sorted_by_count:
-            if k in keep_set:
-                final_counts[k] = c
+            if min_count is not None:
+                keep_set = {k for k, c in sorted_by_count if c >= int(min_count)}
             else:
-                other_count += c
+                keep_set = {k for k, _ in sorted_by_count}
 
-        if other_count > 0:
-            # include other_key as a category
-            final_counts[other_key] = other_count
+            if top_k is not None:
+                top_items = [k for k, _ in sorted_by_count[:int(top_k)]]
+                keep_set = set(top_items)
 
-        # Now compute encoding values (count or frequency) with smoothing if requested
-        mapping_values: Dict[Any, float] = {}
-        V = len(final_counts)  # number of categories after grouping
-        if encoding == "count":
-            # optionally smoothing: add alpha to counts (less common), we'll support it
-            for k, c in final_counts.items():
-                val = float(c + smoothing) if smoothing > 0.0 else float(c)
-                mapping_values[k] = val
-            # decide default fill for unknowns
-            default_fill = float(self.params.get("fill_value", -1.0))
-        elif encoding == "freq":
-            # freq = (count + alpha) / (total + alpha * V)
-            if total_count is None:
-                total_count = int(df.count())
-            denom = (total_count + smoothing * V) if smoothing > 0.0 else float(total_count)
-            for k, c in final_counts.items():
-                num = (c + smoothing) if smoothing > 0.0 else float(c)
-                mapping_values[k] = float(num) / float(denom) if denom != 0 else 0.0
-            default_fill = float(self.params.get("fill_value", 0.0))
-        else:
-            raise ValueError(f"Unknown encoding: {encoding}")
+            other_count = 0
+            final_counts: Dict[Any, int] = {}
+            for k, c in sorted_by_count:
+                if k in keep_set:
+                    final_counts[k] = c
+                else:
+                    other_count += c
 
-        # Create learned_params
+            if other_count > 0:
+                final_counts[other_key] = other_count
+
+            mapping_values: Dict[Any, float] = {}
+            V = len(final_counts)
+            if encoding == "count":
+                for k, c in final_counts.items():
+                    mapping_values[k] = float(c + smoothing) if smoothing > 0.0 else float(c)
+            elif encoding == "freq":
+                if total_count is None:
+                    total_count = int(df.count())
+                denom = (total_count + smoothing * V) if smoothing > 0.0 else float(total_count)
+                for k, c in final_counts.items():
+                    num = (c + smoothing) if smoothing > 0.0 else float(c)
+                    mapping_values[k] = float(num) / float(denom) if denom != 0 else 0.0
+            else:
+                raise ValueError(f"Unknown encoding: {encoding}")
+
+            mappings[input_col] = {
+                "mapping": mapping_values,
+                "other_key": other_key,
+                "encoding": encoding,
+                "smoothing": smoothing,
+                "cardinality": len(mapping_values),
+                "total_count": total_count,
+            }
+
         learned_params = {
-            "mapping": mapping_values,            # python dict: category -> encoded numeric value
-            "other_key": other_key,
-            "encoding": encoding,
-            "smoothing": smoothing,
-            "cardinality": len(mapping_values),
-            "total_count": total_count,
+            "mappings": mappings,
             "create_map_threshold": create_map_threshold,
             "broadcast_threshold": broadcast_threshold,
             "params_snapshot": {k: self.params.get(k) for k in ["top_k", "min_count", "handle_invalid"]}
@@ -535,7 +564,7 @@ class FrequencyEncoderEstimator(Estimator):
 
 class FrequencyFittedTransformer(FittedTransformer):
     """
-    Applies learned frequency / count mapping.
+    Applies learned frequency / count mapping. Supports N→N.
     The transformer chooses between:
       - F.create_map mapping expression (fast for small mappings)
       - broadcast(join) against a small static DataFrame (recommended for larger mappings)
@@ -545,93 +574,84 @@ class FrequencyFittedTransformer(FittedTransformer):
         return "frequency_encoder"
 
     def transform(self, df: DataFrame) -> DataFrame:
+        if len(self.inputs) != len(self.outputs):
+            raise ValueError(
+                f"FrequencyFittedTransformer '{self.name}': inputs ({len(self.inputs)}) "
+                f"and outputs ({len(self.outputs)}) must have the same length"
+            )
         spark = SparkSession.builder.getOrCreate()
-        input_col = self.inputs[0]
-        output_col = self.outputs[0]
-        mapping: Dict[Any, float] = self.learned_params["mapping"]
+        all_mappings = self.learned_params["mappings"]
         create_map_threshold = int(self.learned_params.get("create_map_threshold", 1000))
         broadcast_threshold = int(self.learned_params.get("broadcast_threshold", 10000))
-        encoding = self.learned_params.get("encoding", "freq")
         handle_invalid = self.params.get("handle_invalid", "keep")
-        other_key = self.learned_params.get("other_key", "__OTHER__")
-        default_fill = float(self.params.get("fill_value",
-                                           0.0 if encoding == "freq" else -1.0))
 
-        map_size = len(mapping)
+        for in_col, out_col in zip(self.inputs, self.outputs):
+            col_data = all_mappings[in_col]
+            mapping: Dict[Any, float] = col_data["mapping"]
+            encoding = col_data.get("encoding", "freq")
+            default_fill = float(self.params.get(
+                "fill_value", 0.0 if encoding == "freq" else -1.0
+            ))
 
-        # Helper: build create_map expression safely
-        def _create_map_expr(m: Dict[Any, float]):
-            # produce sequence: key1, val1, key2, val2, ...
-            lit_seq = []
-            for k, v in m.items():
-                # use F.lit for both key and value
-                lit_seq.append(F.lit(k))
-                lit_seq.append(F.lit(v))
-            return F.create_map(*lit_seq)
+            map_size = len(mapping)
 
-        # Choose strategy:
-        # 1) If mapping small enough => create_map
-        # 2) else => build static DataFrame from mapping and join (broadcast if mapping <= broadcast_threshold)
-        if map_size <= create_map_threshold:
-            mapping_expr = _create_map_expr(mapping)
-            # mapping_expr[...] returns the encoded value or null
-            if handle_invalid == "keep":
-                return df.withColumn(
-                    output_col,
-                    F.coalesce(mapping_expr[F.col(input_col)], F.lit(default_fill))
-                )
-            elif handle_invalid == "skip":
-                known_values = list(mapping.keys())
-                return df.filter(F.col(input_col).isin(known_values)).withColumn(
-                    output_col,
-                    mapping_expr[F.col(input_col)]
-                )
-            elif handle_invalid == "error":
-                # apply mapping; if null appears, let user handle it downstream
-                return df.withColumn(
-                    output_col,
-                    mapping_expr[F.col(input_col)]
-                )
+            if map_size <= create_map_threshold:
+                lit_seq = []
+                for k, v in mapping.items():
+                    lit_seq.append(F.lit(k))
+                    lit_seq.append(F.lit(v))
+                mapping_expr = F.create_map(*lit_seq)
+
+                if handle_invalid == "keep":
+                    df = df.withColumn(
+                        out_col,
+                        F.coalesce(mapping_expr[F.col(in_col)], F.lit(default_fill))
+                    )
+                elif handle_invalid == "skip":
+                    known_values = list(mapping.keys())
+                    df = df.filter(F.col(in_col).isin(known_values)).withColumn(
+                        out_col, mapping_expr[F.col(in_col)]
+                    )
+                elif handle_invalid == "error":
+                    df = df.withColumn(out_col, mapping_expr[F.col(in_col)])
+                else:
+                    raise ValueError(f"Unknown handle_invalid: {handle_invalid}")
+
             else:
-                raise ValueError(f"Unknown handle_invalid: {handle_invalid}")
+                mapping_items: List[Tuple[Any, float]] = list(mapping.items())
+                key_col_name = f"{in_col}__freq_key"
+                val_col_name = f"{in_col}__freq_val"
+                map_df = spark.createDataFrame(
+                    mapping_items, schema=[key_col_name, val_col_name]
+                )
 
-        else:
-            # Build static lookup DataFrame
-            # mapping_items = [(k, float(v)), ...]
-            mapping_items: List[Tuple[Any, float]] = list(mapping.items())
-            map_schema = [input_col + "_key", "encoded_value"]
-            map_df = spark.createDataFrame(mapping_items, schema=map_schema)
+                do_broadcast = map_size <= broadcast_threshold
+                join_cond = F.col(in_col) == F.col(key_col_name)
 
-            # If mapping size <= broadcast_threshold, broadcast it
-            do_broadcast = (map_size <= broadcast_threshold)
+                if do_broadcast:
+                    joined = df.join(F.broadcast(map_df), join_cond, how="left")
+                else:
+                    joined = df.join(map_df, join_cond, how="left")
 
-            # Join: left join so original rows are preserved; then coalesce with default_fill
-            join_col_map = F.col(input_col) == F.col(map_schema[0])
+                if handle_invalid == "keep":
+                    df = joined.withColumn(
+                        out_col,
+                        F.coalesce(F.col(val_col_name), F.lit(default_fill))
+                    ).drop(key_col_name, val_col_name)
+                elif handle_invalid == "skip":
+                    df = joined.filter(
+                        F.col(val_col_name).isNotNull()
+                    ).withColumn(
+                        out_col, F.col(val_col_name)
+                    ).drop(key_col_name, val_col_name)
+                elif handle_invalid == "error":
+                    df = joined.withColumn(
+                        out_col, F.col(val_col_name)
+                    ).drop(key_col_name, val_col_name)
+                else:
+                    raise ValueError(f"Unknown handle_invalid: {handle_invalid}")
 
-            if do_broadcast:
-                joined = df.join(F.broadcast(map_df), join_col_map, how="left")
-            else:
-                joined = df.join(map_df, join_col_map, how="left")
-
-            if handle_invalid == "keep":
-                return joined.withColumn(
-                    output_col,
-                    F.coalesce(F.col("encoded_value"), F.lit(default_fill))
-                ).drop(map_schema[0], "encoded_value")
-            elif handle_invalid == "skip":
-                # filter rows that didn't find a match (encoded_value is null)
-                return joined.filter(F.col("encoded_value").isNotNull()).withColumn(
-                    output_col,
-                    F.col("encoded_value")
-                ).drop(map_schema[0], "encoded_value")
-            elif handle_invalid == "error":
-                # just return with encoded_value (may be null)
-                return joined.withColumn(
-                    output_col,
-                    F.col("encoded_value")
-                ).drop(map_schema[0], "encoded_value")
-            else:
-                raise ValueError(f"Unknown handle_invalid: {handle_invalid}")
+        return df
 
     @classmethod
     def from_dict(cls, config: Dict[str, Any]) -> 'FrequencyFittedTransformer':

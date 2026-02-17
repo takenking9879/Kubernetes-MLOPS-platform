@@ -165,7 +165,7 @@ class KubeRayTraining(BaseUtils):
                 self.schema = SchemaRegistry.get_schema('schema_preprocessed')
 
             expected = {
-                self.params.get('target', 'attack'),
+                self.target_col,
                 *self.schema
             }
 
@@ -222,21 +222,33 @@ class KubeRayTraining(BaseUtils):
             self.logger.error(f"Error en el export del modelo (S3 direct): {str(e)}", exc_info=True)
 
     def _load_schema_features(self) -> list:
-        """Count input features dynamically from the DSL file."""
+        """Count input features and extract target from the DSL file."""
         dsl_path = self.load_params().get('spark', {}).get('preprocessing', {}).get(
             'dsl_path', '/app/repo/k3s/spark/preprocess/dsl_001.yaml'
         )
         dsl_path = os.path.join('/home/ray/', dsl_path.lstrip('/'))
+        
         with open(dsl_path, 'r') as f:
             dsl = yaml.safe_load(f)
-        final_features = dsl['pipeline']['final_features']
+            
+        final_features = dsl.get('final_features', {})
+        if not isinstance(final_features, dict):
+            raise ValueError("DSL final_features must be an object with keys 'features' and 'target'")
 
-        categorical = final_features.get("categorical", [])
-        numerical = final_features.get("numerical", [])
+        features = final_features.get("features", [])
+        
+        # Override target if present in DSL
+        dsl_target = final_features.get("target", [])
+        if dsl_target and isinstance(dsl_target, list):
+            self.target_col = dsl_target[0]
+            self.logger.info(f"Target column from DSL: {self.target_col}")
+        else:
+            self.target_col = self.params.get('target', 'attack')
+            self.logger.info(f"Target column using fallback: {self.target_col}")
 
-        self.input_dim = len(categorical) + len(numerical)
+        self.input_dim = len(features)
         self.logger.info(f"Input dimension calculated from DSL: {self.input_dim} features.")
-        return categorical + numerical
+        return features
 
     def _log_final_to_mlflow(
         self,
@@ -381,7 +393,7 @@ class KubeRayTraining(BaseUtils):
                     table_identifier=table_identifier,
                     catalog_config=catalog_config,
                     split_ranges=self.params_full.get('splits', {}),
-                    target=self.params['target'],
+                    target=self.target_col,
                     feature_columns=self.schema,
                     sample_fraction=self.params.get('sample_fraction_for_tuning'),
                     seed=int(self.params.get('seed', 42)),
@@ -432,7 +444,7 @@ class KubeRayTraining(BaseUtils):
                 test_dataset=test_ds,
                 storage_path=self.output_dir,
                 name=self.params.get('name', framework),
-                target=self.params.get('target', 'attack'),
+                target=self.target_col,
                 feature_columns=self.schema,
                 input_dim=input_dim,
                 num_classes=num_classes,
