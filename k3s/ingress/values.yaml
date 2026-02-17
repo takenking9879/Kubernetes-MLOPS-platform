@@ -33,6 +33,7 @@ ingress:
     - mlops-fraud
     - spark
     - ray
+    - apps
   resources:
     # Uncomment these when you deploy the corresponding services.
     # - name: airflow
@@ -77,5 +78,17 @@ ingress:
       subdomain: grafana
       serviceName: grafana
       servicePort: 3000
+      path: /
+      pathType: Prefix
+
+    # =============================
+    # App (mismo subdominio, paths)
+    # =============================
+    # Frontend en http://app.localhost/
+    - name: app-frontend
+      namespace: apps
+      subdomain: app
+      serviceName: app-frontend
+      servicePort: 5173
       path: /
       pathType: Prefix

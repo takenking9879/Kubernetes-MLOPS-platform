@@ -1,0 +1,31 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: app-backend
+  namespace: apps
+  labels:
+    app: dsl-app
+spec:
+  type: ClusterIP
+  selector:
+    app: dsl-app
+  ports:
+    - name: http
+      port: 8000
+      targetPort: backend
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: app-frontend
+  namespace: apps
+  labels:
+    app: dsl-app
+spec:
+  type: ClusterIP
+  selector:
+    app: dsl-app
+  ports:
+    - name: http
+      port: 5173
+      targetPort: frontend

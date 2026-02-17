@@ -1,4 +1,4 @@
-docker build -t ml-designer:latest ./app/
+docker build -t dsl-app:latest ./app/
 
 uvicorn main:app --host 0.0.0.0 --port 8000 --reload
 

@@ -14,6 +14,33 @@ from typing import Dict, Any
 from .base import Transformer
 
 
+def _normalize_column_name(name: str) -> str:
+    return str(name).lstrip("\ufeff").strip().strip('"').strip("'").strip("`").strip().casefold()
+
+
+def _resolve_input_column(df: DataFrame, requested: str, stage_name: str) -> str:
+    if requested in df.columns:
+        return requested
+
+    normalized_requested = _normalize_column_name(requested)
+    normalized_map: dict[str, str] = {}
+    collisions: set[str] = set()
+
+    for current in df.columns:
+        norm = _normalize_column_name(current)
+        if norm in normalized_map and normalized_map[norm] != current:
+            collisions.add(norm)
+        else:
+            normalized_map[norm] = current
+
+    if normalized_requested in normalized_map and normalized_requested not in collisions:
+        return normalized_map[normalized_requested]
+
+    raise ValueError(
+        f"{stage_name}: input column '{requested}' not found. Available columns: {df.columns[:30]}"
+    )
+
+
 class CastTransformer(Transformer):
     """Cast a column to a different data type."""
 
@@ -38,7 +65,8 @@ class CastTransformer(Transformer):
 
         spark_type = type_mapping.get(target_type, StringType())
         for in_col, out_col in zip(self.inputs, self.outputs):
-            df = df.withColumn(out_col, F.col(in_col).cast(spark_type))
+            resolved_col = _resolve_input_column(df, in_col, f"CastTransformer '{self.name}'")
+            df = df.withColumn(out_col, F.col(resolved_col).cast(spark_type))
         return df
 
 

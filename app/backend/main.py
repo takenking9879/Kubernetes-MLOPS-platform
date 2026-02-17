@@ -138,6 +138,25 @@ def generate_spark_schema_from_df(df: pd.DataFrame) -> SparkSchemaResponse:
     return SparkSchemaResponse(columns=columns, sampleRows=sample_rows, schemaHash=schema_hash)
 
 
+def normalize_spark_columns(df):
+    seen: dict[str, int] = {}
+    renamed_df = df
+
+    for index, original in enumerate(df.columns):
+        candidate = str(original).lstrip("\ufeff").strip().strip('"').strip("'").strip("`").strip()
+        if not candidate:
+            candidate = f"col_{index}"
+
+        duplicate_count = seen.get(candidate, 0)
+        final_name = candidate if duplicate_count == 0 else f"{candidate}_{duplicate_count}"
+        seen[candidate] = duplicate_count + 1
+
+        if final_name != original:
+            renamed_df = renamed_df.withColumnRenamed(original, final_name)
+
+    return renamed_df
+
+
 # ─── POST /api/schema/from-csv ───────────────────────────────────────
 
 
@@ -263,6 +282,7 @@ async def dry_run(request: DryRunRequest) -> dict[str, Any]:
         df = spark.read.csv(
             str(csv_path), header=True, inferSchema=True
         ).limit(request.sampleLimit)
+        df = normalize_spark_columns(df)
 
         start_time = time.time()
         pipeline = Pipeline.from_config(config)

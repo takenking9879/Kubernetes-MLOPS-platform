@@ -11,6 +11,7 @@ ENABLE_KAFKA=false
 ENABLE_RAY=true
 ENABLE_MLFLOW=true
 ENABLE_SPARK=true
+ENABLE_APP=true
 ENABLE_MONITORING=true
 
 # ============================================================
@@ -30,6 +31,7 @@ NS_KAFKA="kafka"
 NS_RAY="ray"
 NS_SPARK="spark"
 NS_MONITORING="monitoring"
+NS_APPS="apps"
 ENV_FILE=".env"
 
 # ============================================================
@@ -62,12 +64,14 @@ kubectl create namespace kafka || true
 kubectl create namespace ray || true
 kubectl create namespace spark || true
 kubectl create namespace monitoring || true
+kubectl create namespace apps || true
 
 info "Creating secrets from .env"
 kubectl create secret generic kafka-secret -n kafka --from-env-file=.env || true
 kubectl create secret generic env-secret -n ray --from-env-file=.env || true
 kubectl create secret generic env-secret -n spark --from-env-file=.env || true
 kubectl create secret generic env-secret -n monitoring --from-env-file=.env || true
+kubectl create secret generic env-secret -n apps --from-env-file=.env || true
 ok "Namespaces and secrets ready"
 
 # ============================================================
@@ -207,6 +211,19 @@ deploy_spark() {
 }
 
 # ============================================================
+# DSL APP (PARALLEL)
+# ============================================================
+deploy_dsl_app() {
+  sep
+  info "Deploying DSL App"
+
+  kubectl apply -f k3s/app/deployment.yaml
+  kubectl apply -f k3s/app/services.yaml
+
+  ok "DSL App deployed"
+}
+
+# ============================================================
 # MONITORING (Prometheus + Grafana + kube-state-metrics)
 # ============================================================
 deploy_monitoring() {
@@ -289,7 +306,7 @@ if [ "${ENABLE_KAFKA}" = true ]; then
 fi
 
 sep
-info "Launching PARALLEL workloads (Ray / MLflow / Spark)"
+info "Launching PARALLEL workloads (Ray / MLflow / Spark / App)"
 
 PIDS=()
 
@@ -303,6 +320,10 @@ fi
 
 if [ "${ENABLE_SPARK}" = true ]; then
   deploy_spark & PIDS+=($!)
+fi
+
+if [ "${ENABLE_APP}" = true ]; then
+  deploy_dsl_app & PIDS+=($!)
 fi
 
 info "Waiting for parallel jobs to finish"
