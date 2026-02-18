@@ -112,7 +112,7 @@ class ModelRouter:
         if request.method == "GET":
             return {"status": "ok", "route": "/infer", "message": "Use POST with JSON payload."}
 
-        if request.url.path == "/webhook":
+        if request.url.path.rstrip("/").endswith("/webhook"):
             secret = ""
             try:
                 secret = ConfigLoader.load().webhook.secret

@@ -39,7 +39,7 @@ kuberay:
     alias: "champion"  # MLflow Model Registry alias (champion = production model)
     canary: false
     webhook_public_base_url: "http://serving.localhost"
-    webhook_path: "/mlflow/webhook"
+    webhook_path: "/infer/webhook"
     webhook_name: "rayserve-attack-detection-champion-alias"
     webhook_require_signature: true
     webhook_max_timestamp_age_seconds: 300

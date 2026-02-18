@@ -84,7 +84,7 @@ class MLflowAliasWebhookHandler:
                 status_code=202,
             )
 
-        if action != "created":
+        if action not in {"created", "updated", "set"}:
             return JSONResponse(
                 {"status": "ignored", "reason": "unsupported_action"},
                 status_code=202,

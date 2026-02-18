@@ -74,42 +74,58 @@ class MLflowRegistry:
         raise ValueError(f"Unsupported framework: {framework}")
 
     def ensure_webhook(self, webhook_config: WebhookConfig, registry_name: str, alias: str) -> None:
-        events = ["model_version_alias.created", "model_version_alias.deleted"]
+        preferred_events = [
+            "model_version_alias.created",
+            "model_version_alias.updated",
+            "model_version_alias.set",
+            "model_version_alias.deleted",
+        ]
+        fallback_events = ["model_version_alias.created", "model_version_alias.deleted"]
         description = f"Ray Serve sync for {registry_name}@{alias}"
 
         existing = self._find_webhook_by_name(webhook_config.name)
 
-        if existing is None:
-            created = self._client.create_webhook(
-                name=webhook_config.name,
-                url=webhook_config.url,
-                events=events,
-                description=description,
-                secret=webhook_config.secret,
-            )
-            self._logger.info(
-                "Created webhook: id=%s name=%s",
-                getattr(created, "webhook_id", "unknown"),
-                webhook_config.name,
-            )
-            return
+        def _upsert(events):
+            if existing is None:
+                created = self._client.create_webhook(
+                    name=webhook_config.name,
+                    url=webhook_config.url,
+                    events=events,
+                    description=description,
+                    secret=webhook_config.secret,
+                )
+                self._logger.info(
+                    "Created webhook: id=%s name=%s",
+                    getattr(created, "webhook_id", "unknown"),
+                    webhook_config.name,
+                )
+                return
 
-        current_events = sorted(getattr(existing, "events", []) or [])
-        if (
-            getattr(existing, "url", None) != webhook_config.url
-            or current_events != sorted(events)
-            or getattr(existing, "status", "ACTIVE") != "ACTIVE"
-        ):
-            self._client.update_webhook(
-                webhook_id=existing.webhook_id,
-                url=webhook_config.url,
-                events=events,
-                description=description,
-                status="ACTIVE",
+            current_events = sorted(getattr(existing, "events", []) or [])
+            if (
+                getattr(existing, "url", None) != webhook_config.url
+                or current_events != sorted(events)
+                or getattr(existing, "status", "ACTIVE") != "ACTIVE"
+            ):
+                self._client.update_webhook(
+                    webhook_id=existing.webhook_id,
+                    url=webhook_config.url,
+                    events=events,
+                    description=description,
+                    status="ACTIVE",
+                )
+                self._logger.info("Updated webhook: id=%s", existing.webhook_id)
+            else:
+                self._logger.info("Webhook already configured: id=%s", existing.webhook_id)
+
+        try:
+            _upsert(preferred_events)
+        except Exception as e:
+            self._logger.warning(
+                "Preferred webhook events unsupported or failed (%s). Falling back to legacy events.",
+                e,
             )
-            self._logger.info("Updated webhook: id=%s", existing.webhook_id)
-        else:
-            self._logger.info("Webhook already configured: id=%s", existing.webhook_id)
+            _upsert(fallback_events)
 
     def _find_webhook_by_name(self, name: str):
         page_token = None

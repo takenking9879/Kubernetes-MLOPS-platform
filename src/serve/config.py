@@ -105,7 +105,7 @@ class ConfigLoader:
 
         webhook = WebhookConfig(
             public_base_url=cls._require_str(serving_cfg, "webhook_public_base_url", "kuberay.serving"),
-            path=cls._get_str(serving_cfg, "webhook_path", "/mlflow/webhook"),
+            path=cls._get_str(serving_cfg, "webhook_path", "/infer/webhook"),
             name=cls._get_str(serving_cfg, "webhook_name", f"rayserve-{model.registry_name}-webhook"),
             max_timestamp_age_seconds=cls._get_int(serving_cfg, "webhook_max_timestamp_age_seconds", 300),
         )
