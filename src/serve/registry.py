@@ -52,6 +52,10 @@ class MLflowRegistry:
             alias=alias,
         )
 
+    def resolve_alias_version(self, registry_name: str, alias: str) -> str:
+        mv = self._client.get_model_version_by_alias(registry_name, alias)
+        return str(mv.version)
+
     def _resolve_framework(self, model_version) -> Optional[Framework]:
         mv_tags = getattr(model_version, "tags", {}) or {}
         fw_str = str(mv_tags.get("framework", "")).strip().lower()

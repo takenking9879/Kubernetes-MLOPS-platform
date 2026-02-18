@@ -31,6 +31,8 @@ class ModelRuntime:
         self._num_classes = num_classes
         self._adapter: Optional[ModelAdapter] = None
         self._artifact: Optional[ModelArtifact] = None
+        self._last_alias_check_epoch = 0.0
+        self._alias_refresh_seconds = self._resolve_alias_refresh_seconds()
 
         self._requests_total = Counter(
             "serve_infer_requests_total",
@@ -48,6 +50,18 @@ class ModelRuntime:
             boundaries=[1, 2, 5, 10, 25, 50, 100, 250, 500, 1000, 2000, 5000],
             tag_keys=("application", "variant", "framework"),
         )
+
+    def _resolve_alias_refresh_seconds(self) -> float:
+        raw_value = os.getenv("MODEL_ALIAS_REFRESH_SECONDS", "15")
+        try:
+            value = float(raw_value)
+            return max(0.0, value)
+        except ValueError:
+            self._logger.warning(
+                "Invalid MODEL_ALIAS_REFRESH_SECONDS=%s; using default 15s",
+                raw_value,
+            )
+            return 15.0
 
     def _resolve_input_dim(self, dsl_path: str, fallback: int) -> int:
         try:
@@ -86,9 +100,48 @@ class ModelRuntime:
             artifact.framework.value,
         )
 
+    def _maybe_refresh_alias_target(self) -> None:
+        if self._adapter is None or self._artifact is None:
+            return
+
+        if self._alias_refresh_seconds <= 0:
+            return
+
+        now_epoch = time.time()
+        if (now_epoch - self._last_alias_check_epoch) < self._alias_refresh_seconds:
+            return
+
+        self._last_alias_check_epoch = now_epoch
+        alias = self._artifact.alias
+
+        try:
+            latest_version = self._registry.resolve_alias_version(self._registry_name, alias)
+        except Exception as e:
+            self._logger.warning(
+                "Alias refresh check failed (%s@%s): %s",
+                self._registry_name,
+                alias,
+                e,
+            )
+            return
+
+        if latest_version == self._artifact.version:
+            return
+
+        self._logger.info(
+            "Alias target changed for %s@%s: v%s -> v%s. Reloading runtime.",
+            self._registry_name,
+            alias,
+            self._artifact.version,
+            latest_version,
+        )
+        self.load(alias_override=alias)
+
     def predict(self, payload: Dict[str, Any]) -> Dict[str, Any]:
         if self._adapter is None or self._artifact is None:
             raise RuntimeError("Model not initialized")
+
+        self._maybe_refresh_alias_target()
 
         tags = {
             "application": "inference",
