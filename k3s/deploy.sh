@@ -310,12 +310,12 @@ info "Launching PARALLEL workloads (Ray / MLflow / Spark / App)"
 
 PIDS=()
 
-if [ "${ENABLE_RAY}" = true ]; then
-  deploy_ray & PIDS+=($!)
-fi
-
 if [ "${ENABLE_MLFLOW}" = true ]; then
   deploy_mlflow & PIDS+=($!)
+fi
+
+if [ "${ENABLE_RAY}" = true ]; then
+  deploy_ray & PIDS+=($!)
 fi
 
 if [ "${ENABLE_SPARK}" = true ]; then
