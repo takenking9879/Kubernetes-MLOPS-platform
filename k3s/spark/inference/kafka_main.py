@@ -311,13 +311,34 @@ class KafkaSparkInference(BaseUtils):
             return None
 
         try:
-            rows = (
-                self.spark.table(self.metadata_table)
-                .select('artifact_set_id', 'pipeline_hash')
-                .where(col('artifact_set_id') == artifact_set_id)
-                .limit(1)
-                .collect()
-            )
+            safe_artifact_set_id = artifact_set_id.replace("'", "''")
+
+            table_candidates = [self.metadata_table]
+            parts = self.metadata_table.split('.')
+            if len(parts) >= 3:
+                catalog, namespace = parts[0], parts[1]
+                table_name = '.'.join(parts[2:])
+                table_candidates.append(f"{catalog}.`{namespace}.db`.{table_name}")
+
+            rows = []
+            last_error: Optional[Exception] = None
+            used_table: Optional[str] = None
+            for candidate in table_candidates:
+                try:
+                    query = (
+                        f"SELECT artifact_set_id, pipeline_hash FROM {candidate} "
+                        f"WHERE artifact_set_id = '{safe_artifact_set_id}' LIMIT 1"
+                    )
+                    rows = self.spark.sql(query).collect()
+                    used_table = candidate
+                    break
+                except Exception as query_error:
+                    last_error = query_error
+
+            if used_table:
+                self.logger.info("Metadata lookup table resolved as: %s", used_table)
+            elif last_error:
+                raise last_error
 
             if not rows:
                 self.logger.warning(
@@ -549,6 +570,10 @@ class KafkaSparkInference(BaseUtils):
         try:
             self.logger.info("Creating SparkSession with Kafka and S3 support")            
             builder = SparkSession.builder.appName(self.params['app_name'])
+            iceberg_warehouse = self.params_full.get('iceberg_tables', {}).get(
+                'warehouse',
+                's3://k8s-mlops-platform-bucket/warehouse'
+            ).replace('s3://', 's3a://')
             
             # Configuración S3
             builder = (
@@ -564,6 +589,12 @@ class KafkaSparkInference(BaseUtils):
                 .config("spark.hadoop.fs.s3a.committer.magic.enabled", "true")
                 .config("spark.sql.streaming.schemaInference", "false")
                 .config("spark.sql.adaptive.enabled", "false")
+                # Iceberg catalog (required to resolve metadata table and pipeline_hash)
+                .config("spark.sql.extensions", "org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions")
+                .config("spark.sql.catalog.iceberg", "org.apache.iceberg.spark.SparkCatalog")
+                .config("spark.sql.catalog.iceberg.catalog-impl", "org.apache.iceberg.aws.glue.GlueCatalog")
+                .config("spark.sql.catalog.iceberg.io-impl", "org.apache.iceberg.aws.s3.S3FileIO")
+                .config("spark.sql.catalog.iceberg.warehouse", iceberg_warehouse)
             )
             
             spark = builder.getOrCreate()

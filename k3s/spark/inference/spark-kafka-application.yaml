@@ -49,6 +49,8 @@ spec:
     # driver/executor mount the shared volume at /app while git-sync writes to /git/repo
     spark.kubernetes.driverEnv.PYTHONPATH: "/app:/app/repo:/app/repo/k3s:/opt/spark/work-dir:/opt/spark/work-dir/k3s"
     spark.kubernetes.executorEnv.PYTHONPATH: "/app:/app/repo:/app/repo/k3s:/opt/spark/work-dir:/opt/spark/work-dir/k3s"
+    spark.kubernetes.driverEnv.MLFLOW_TRACKING_URI: "http://my-mlflow.ray.svc.cluster.local"
+    spark.kubernetes.executorEnv.MLFLOW_TRACKING_URI: "http://my-mlflow.ray.svc.cluster.local"
     spark.kubernetes.driverEnv.RAY_SERVE_URL: "http://model-serving-serve-svc.ray.svc.cluster.local:8000/infer"
     spark.kubernetes.executorEnv.RAY_SERVE_URL: "http://model-serving-serve-svc.ray.svc.cluster.local:8000/infer"
     spark.kubernetes.driverEnv.PROMETHEUS_PORT: "8000"
