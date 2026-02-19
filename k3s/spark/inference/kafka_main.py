@@ -296,13 +296,15 @@ class KafkaSparkInference(BaseUtils):
             mv = client.get_model_version_by_alias(self.registry_model_name, self.registry_alias)
             model_tags = getattr(mv, 'tags', {}) or {}
             artifact_set_id = model_tags.get('artifact_set_id')
+            framework = model_tags.get('framework', 'unknown')
 
             if artifact_set_id:
                 self.logger.info(
-                    "✅ MLflow %s@%s v%s -> artifact_set_id=%s",
+                    "✅ MLflow %s@%s v%s [Framework: %s] -> artifact_set_id=%s",
                     self.registry_model_name,
                     self.registry_alias,
                     mv.version,
+                    framework,
                     artifact_set_id,
                 )
                 self._cached_artifact_set_id = str(artifact_set_id)
