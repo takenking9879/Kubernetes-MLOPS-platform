@@ -9,6 +9,7 @@ import time
 from typing import Dict, Optional, Iterator, List, Any
 from urllib.parse import urlparse
 from src.dsl import PipelineModel
+from botocore.exceptions import ClientError
 from confluent_kafka import Consumer, KafkaException
 from pyspark.sql import SparkSession, Row, DataFrame
 from pyspark.sql.functions import from_json, col, to_json, struct
@@ -229,8 +230,10 @@ class KafkaSparkInference(BaseUtils):
             self.artifacts_source = artifacts_config.get('source', 's3')
             self.artifacts_bucket = artifacts_config.get('bucket', 'k8s-mlops-platform-bucket')
             self.artifacts_key = artifacts_config.get('key', 'pipelines')
+            self.dynamic_artifacts_prefix = artifacts_config.get('dynamic_key_prefix', 'pipelines')
             self.artifacts_list = artifacts_config.get('archives', ['config.json', 'stages.json'])
             self.dynamic_pipeline_resolution = bool(artifacts_config.get('resolve_from_mlflow', True))
+            self.mlflow_http_timeout_seconds = int(artifacts_config.get('mlflow_timeout_seconds', 5))
 
             # MLflow + Metadata config
             kuberay_model_cfg = self.params_full.get('kuberay', {}).get('model', {})
@@ -268,6 +271,10 @@ class KafkaSparkInference(BaseUtils):
             return None
 
         try:
+            # Evita bloqueos largos cuando MLflow no responde.
+            os.environ.setdefault('MLFLOW_HTTP_REQUEST_TIMEOUT', str(self.mlflow_http_timeout_seconds))
+            os.environ.setdefault('MLFLOW_HTTP_REQUEST_MAX_RETRIES', '1')
+
             import mlflow
             from mlflow.tracking import MlflowClient
 
@@ -340,20 +347,65 @@ class KafkaSparkInference(BaseUtils):
             return None
 
     def _resolve_dynamic_artifact_key(self) -> str:
-        """Resuelve key dinámico pipelines/{pipeline_hash} con fallback a key estático."""
-        fallback_key = str(self.artifacts_key).strip('/')
+        """Resuelve key dinámico pipelines/{pipeline_hash}."""
         artifact_set_id = self._resolve_artifact_set_id_from_mlflow()
         if not artifact_set_id:
-            return fallback_key
+            return ''
 
         pipeline_hash = self._resolve_pipeline_hash_from_metadata(artifact_set_id)
         if not pipeline_hash:
-            return fallback_key
+            return ''
 
-        base_prefix = str(self.artifacts_key).strip('/')
+        base_prefix = str(self.dynamic_artifacts_prefix).strip('/')
         dynamic_key = f"{base_prefix}/{pipeline_hash}" if base_prefix else str(pipeline_hash)
         self.logger.info("✅ Dynamic pipeline key resolved: s3://%s/%s", self.artifacts_bucket, dynamic_key)
         return dynamic_key
+
+    def _build_artifact_key_candidates(self) -> List[str]:
+        """Construye lista ordenada de keys candidatos para encontrar artifacts en S3."""
+        candidates: List[str] = []
+
+        dynamic_key = self._resolve_dynamic_artifact_key().strip('/')
+        static_key = str(self.artifacts_key).strip('/')
+
+        if dynamic_key:
+            candidates.append(dynamic_key)
+        if static_key:
+            candidates.append(static_key)
+
+        # Fallbacks legacy para compatibilidad hacia atrás.
+        candidates.extend(['v1/artifacts', 'pipelines'])
+
+        seen = set()
+        unique_candidates = []
+        for candidate in candidates:
+            if candidate and candidate not in seen:
+                seen.add(candidate)
+                unique_candidates.append(candidate)
+        return unique_candidates
+
+    def _download_pipeline_from_key(self, key_prefix: str, tmpdir: str) -> bool:
+        """Intenta descargar todos los artifacts desde un key_prefix. Devuelve False si no existe."""
+        for archive_name in self.artifacts_list:
+            s3_key = os.path.join(key_prefix, archive_name)
+            try:
+                self.s3.download_file(
+                    self.artifacts_bucket,
+                    s3_key,
+                    os.path.join(tmpdir, archive_name)
+                )
+            except ClientError as e:
+                error_code = str(e.response.get('Error', {}).get('Code', ''))
+                if error_code in {'404', 'NotFound', 'NoSuchKey'}:
+                    self.logger.warning(
+                        "Artifact not found at s3://%s/%s (code=%s)",
+                        self.artifacts_bucket,
+                        s3_key,
+                        error_code,
+                    )
+                    return False
+                raise
+        return True
 
     def _normalize_serve_url(self, raw_url: str) -> str:
         """Normaliza URL de Ray Serve para tolerar http implícito y /infer/ trailing slash."""
@@ -533,13 +585,19 @@ class KafkaSparkInference(BaseUtils):
 
             os.makedirs(tmpdir, exist_ok=True)
 
-            resolved_key = self._resolve_dynamic_artifact_key()
+            candidate_keys = self._build_artifact_key_candidates()
+            self.logger.info("Trying pipeline artifact keys: %s", candidate_keys)
 
-            for i in self.artifacts_list:
-                self.s3.download_file(
-                    self.artifacts_bucket,
-                    os.path.join(resolved_key, i),
-                    os.path.join(tmpdir, i)
+            resolved_key = None
+            for key_prefix in candidate_keys:
+                if self._download_pipeline_from_key(key_prefix, tmpdir):
+                    resolved_key = key_prefix
+                    break
+
+            if not resolved_key:
+                raise FileNotFoundError(
+                    f"Pipeline artifacts not found in bucket {self.artifacts_bucket}. "
+                    f"Tried keys: {candidate_keys}"
                 )
 
             pipeline = PipelineModel.load(tmpdir)
