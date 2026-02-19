@@ -7,6 +7,7 @@ Refactorizado desde KafkaSparkInference para soportar múltiples datasets y mode
 import os
 import time
 from typing import Dict, Optional, Iterator, List, Any
+from urllib.parse import urlparse
 from src.dsl import PipelineModel
 from confluent_kafka import Consumer, KafkaException
 from pyspark.sql import SparkSession, Row, DataFrame
@@ -122,7 +123,8 @@ class KafkaSparkInference(BaseUtils):
     def __init__(self, params_path: str):
         logger = create_logger('kafka_spark_inference', 'kafka_spark_inference.log')
         super().__init__(logger, params_path)
-        self.params = self.load_params()['spark']
+        self.params_full = self.load_params()
+        self.params = self.params_full.get('spark', {})
         # ===== START PROMETHEUS METRICS SERVER =====
         self._start_prometheus_server()
         
@@ -149,11 +151,12 @@ class KafkaSparkInference(BaseUtils):
         if operational_config.get('check_minio_connection', True):
             self._check_minio_connection()
         
+        # Crear Spark session
+        self.spark = self._create_spark_session()
+
         # Cargar módulos y funciones
         self.pipeline = self.load_pipeline_artifact()
         self._load_converter_function()
-        # Crear Spark session
-        self.spark = self._create_spark_session()
     
     # ===== PROMETHEUS SERVER =====
     
@@ -220,17 +223,164 @@ class KafkaSparkInference(BaseUtils):
     def _load_artifacts_config(self):
         try:
             """Carga configuración de artifacts desde params."""
-            artifacts_config = self.params.get('artifacts', {})
+            artifacts_config = self.params.get('artifacts') or self.params.get('preprocessing', {}).get('artifacts', {})
             
             # Configuración de artifacts
             self.artifacts_source = artifacts_config.get('source', 's3')
             self.artifacts_bucket = artifacts_config.get('bucket', 'k8s-mlops-platform-bucket')
-            self.artifacts_key = artifacts_config.get('key', 'v1/artifacts')
+            self.artifacts_key = artifacts_config.get('key', 'pipelines')
             self.artifacts_list = artifacts_config.get('archives', ['config.json', 'stages.json'])
+            self.dynamic_pipeline_resolution = bool(artifacts_config.get('resolve_from_mlflow', True))
+
+            # MLflow + Metadata config
+            kuberay_model_cfg = self.params_full.get('kuberay', {}).get('model', {})
+            kuberay_serving_cfg = self.params_full.get('kuberay', {}).get('serving', {})
+            self.mlflow_tracking_uri = os.getenv(
+                'MLFLOW_TRACKING_URI',
+                kuberay_model_cfg.get('mlflow_tracking_uri')
+            )
+            self.registry_model_name = os.getenv(
+                'MLFLOW_REGISTRY_MODEL_NAME',
+                kuberay_model_cfg.get('mlflow_registry_model_name')
+            )
+            self.registry_alias = os.getenv(
+                'MLFLOW_MODEL_ALIAS',
+                kuberay_serving_cfg.get('alias', 'champion')
+            )
+
+            metadata_cfg = self.params_full.get('iceberg_tables', {}).get('metadata', {})
+            self.metadata_table = metadata_cfg.get('full_name', 'iceberg.metadata.preprocessing_artifacts')
+
             self.logger.info(f"✅ Artifacts configured: archives={self.artifacts_list} from {self.artifacts_source}")
         except Exception as e:
             self.logger.error('Failed loading artifacts config: %s', str(e), exc_info=True)
             raise
+
+    def _resolve_artifact_set_id_from_mlflow(self) -> Optional[str]:
+        """Obtiene artifact_set_id del modelo con alias (champion/challenger) en MLflow."""
+        if not self.dynamic_pipeline_resolution:
+            return None
+
+        if not self.mlflow_tracking_uri or not self.registry_model_name:
+            self.logger.info(
+                "MLflow dynamic pipeline resolution disabled: missing tracking_uri or registry_model_name"
+            )
+            return None
+
+        try:
+            import mlflow
+            from mlflow.tracking import MlflowClient
+
+            mlflow.set_tracking_uri(self.mlflow_tracking_uri)
+            client = MlflowClient()
+            mv = client.get_model_version_by_alias(self.registry_model_name, self.registry_alias)
+            model_tags = getattr(mv, 'tags', {}) or {}
+            artifact_set_id = model_tags.get('artifact_set_id')
+
+            if artifact_set_id:
+                self.logger.info(
+                    "✅ MLflow %s@%s v%s -> artifact_set_id=%s",
+                    self.registry_model_name,
+                    self.registry_alias,
+                    mv.version,
+                    artifact_set_id,
+                )
+                return str(artifact_set_id)
+
+            self.logger.warning(
+                "MLflow model %s@%s v%s has no tag 'artifact_set_id'",
+                self.registry_model_name,
+                self.registry_alias,
+                mv.version,
+            )
+            return None
+        except Exception as e:
+            self.logger.warning("Could not resolve artifact_set_id from MLflow: %s", e)
+            return None
+
+    def _resolve_pipeline_hash_from_metadata(self, artifact_set_id: str) -> Optional[str]:
+        """Consulta Iceberg metadata table para resolver pipeline_hash por artifact_set_id."""
+        if not artifact_set_id:
+            return None
+
+        try:
+            rows = (
+                self.spark.table(self.metadata_table)
+                .select('artifact_set_id', 'pipeline_hash')
+                .where(col('artifact_set_id') == artifact_set_id)
+                .limit(1)
+                .collect()
+            )
+
+            if not rows:
+                self.logger.warning(
+                    "No rows found in %s for artifact_set_id=%s",
+                    self.metadata_table,
+                    artifact_set_id,
+                )
+                return None
+
+            pipeline_hash = rows[0]['pipeline_hash']
+            if not pipeline_hash:
+                self.logger.warning(
+                    "metadata row found but pipeline_hash is empty for artifact_set_id=%s",
+                    artifact_set_id,
+                )
+                return None
+
+            self.logger.info(
+                "✅ Metadata %s -> artifact_set_id=%s pipeline_hash=%s",
+                self.metadata_table,
+                artifact_set_id,
+                pipeline_hash,
+            )
+            return str(pipeline_hash)
+        except Exception as e:
+            self.logger.warning("Could not resolve pipeline_hash from Iceberg metadata: %s", e)
+            return None
+
+    def _resolve_dynamic_artifact_key(self) -> str:
+        """Resuelve key dinámico pipelines/{pipeline_hash} con fallback a key estático."""
+        fallback_key = str(self.artifacts_key).strip('/')
+        artifact_set_id = self._resolve_artifact_set_id_from_mlflow()
+        if not artifact_set_id:
+            return fallback_key
+
+        pipeline_hash = self._resolve_pipeline_hash_from_metadata(artifact_set_id)
+        if not pipeline_hash:
+            return fallback_key
+
+        base_prefix = str(self.artifacts_key).strip('/')
+        dynamic_key = f"{base_prefix}/{pipeline_hash}" if base_prefix else str(pipeline_hash)
+        self.logger.info("✅ Dynamic pipeline key resolved: s3://%s/%s", self.artifacts_bucket, dynamic_key)
+        return dynamic_key
+
+    def _normalize_serve_url(self, raw_url: str) -> str:
+        """Normaliza URL de Ray Serve para tolerar http implícito y /infer/ trailing slash."""
+        candidate = (raw_url or '').strip()
+        if not candidate:
+            return 'http://model-serving-serve-svc.ray.svc.cluster.local:8000/infer'
+
+        if '://' not in candidate:
+            candidate = f"http://{candidate}"
+
+        parsed = urlparse(candidate)
+        scheme = parsed.scheme or 'http'
+        netloc = parsed.netloc
+        path = parsed.path or ''
+
+        if not netloc and path:
+            netloc = path
+            path = ''
+
+        path = path.rstrip('/')
+        if path in ('', '/'):
+            path = '/infer'
+
+        normalized = f"{scheme}://{netloc}{path}"
+        if parsed.query:
+            normalized = f"{normalized}?{parsed.query}"
+        return normalized
     
     def _load_prediction_config(self):
         """Carga configuración de predicción desde params."""
@@ -241,10 +391,11 @@ class KafkaSparkInference(BaseUtils):
         # Configuración Ray Serve
         if self.prediction_type == 'ray_serve':
             ray_config = pred_config.get('ray_serve', {})
-            self.ray_url = os.getenv(
+            raw_ray_url = os.getenv(
                 'RAY_SERVE_URL',
                 ray_config.get('url', 'http://model-serving-serve-svc.ray.svc.cluster.local:8000/infer')
             )
+            self.ray_url = self._normalize_serve_url(raw_ray_url)
             self.ray_batch_size = int(ray_config.get('batch_size', 100))
             self.ray_timeout = int(ray_config.get('timeout', 30))
             self.ray_max_retries = ray_config.get('max_retries', 3)
@@ -382,15 +533,21 @@ class KafkaSparkInference(BaseUtils):
 
             os.makedirs(tmpdir, exist_ok=True)
 
+            resolved_key = self._resolve_dynamic_artifact_key()
+
             for i in self.artifacts_list:
                 self.s3.download_file(
                     self.artifacts_bucket,
-                    os.path.join(self.artifacts_key, i),
+                    os.path.join(resolved_key, i),
                     os.path.join(tmpdir, i)
                 )
 
             pipeline = PipelineModel.load(tmpdir)
-            self.logger.info("Pipeline artifact downloaded from S3 and loaded")
+            self.logger.info(
+                "Pipeline artifact downloaded from s3://%s/%s and loaded",
+                self.artifacts_bucket,
+                resolved_key,
+            )
             return pipeline
         except Exception:
             self.logger.error("Failed loading pipeline artifact", exc_info=True)
