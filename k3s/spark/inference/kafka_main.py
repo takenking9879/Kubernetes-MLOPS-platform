@@ -418,27 +418,14 @@ class KafkaSparkInference(BaseUtils):
         return dynamic_key
 
     def _build_artifact_key_candidates(self) -> List[str]:
-        """Construye lista ordenada de keys candidatos para encontrar artifacts en S3."""
-        candidates: List[str] = []
-
+        """Construye key único de artifacts usando metadata: pipelines/{pipeline_hash}."""
         dynamic_key = self._resolve_dynamic_artifact_key().strip('/')
-        static_key = str(self.artifacts_key).strip('/')
-
-        if dynamic_key:
-            candidates.append(dynamic_key)
-        if static_key:
-            candidates.append(static_key)
-
-        # Fallbacks legacy para compatibilidad hacia atrás.
-        candidates.extend(['v1/artifacts', 'pipelines'])
-
-        seen = set()
-        unique_candidates = []
-        for candidate in candidates:
-            if candidate and candidate not in seen:
-                seen.add(candidate)
-                unique_candidates.append(candidate)
-        return unique_candidates
+        if not dynamic_key:
+            raise FileNotFoundError(
+                "Could not resolve dynamic pipeline key from metadata. "
+                "Expected flow: MLflow tag artifact_set_id -> metadata.preprocessing_artifacts -> pipeline_hash"
+            )
+        return [dynamic_key]
 
     def _download_pipeline_from_key(self, key_prefix: str, tmpdir: str) -> bool:
         """Intenta descargar todos los artifacts desde un key_prefix. Devuelve False si no existe."""
