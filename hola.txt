@@ -1,121 +1,49 @@
-2026-02-18 19:06:22.940 | WARNING: Using incubator modules: jdk.incubator.vector
-2026-02-18 19:06:24.347 | Files local:///app/repo/k3s/spark/inference/kafka_main.py from /app/.worktrees/e2e64794be4626a693bbcc5f0504166c4ec9f201/k3s/spark/inference/kafka_main.py to /opt/spark/work-dir/kafka_main.py
-2026-02-18 19:06:24.449 | 26/02/19 01:06:24 WARN NativeCodeLoader: Unable to load native-hadoop library for your platform... using builtin-java classes where applicable
-2026-02-18 19:06:25.371 | 2026-02-19 01:06:25,370 - kafka_spark_inference - DEBUG - Parameters retrieved and sanitized from /app/repo/k3s/params.yaml
-2026-02-18 19:06:25.371 | 2026-02-19 01:06:25,371 - kafka_spark_inference - INFO - ✅ Prometheus metrics server started on port 8000
-2026-02-18 19:06:25.371 | 2026-02-19 01:06:25,371 - kafka_spark_inference - INFO - ✅ Kafka config: topic-traffic → topic-prediction
-2026-02-18 19:06:25.371 | 2026-02-19 01:06:25,371 - kafka_spark_inference - INFO - ✅ Schemas loaded: input=kafka_schema_features, output=prediction_schema
-2026-02-18 19:06:25.371 | 2026-02-19 01:06:25,371 - kafka_spark_inference - INFO - ✅ Converter configured: kafka_to_schema_features
-2026-02-18 19:06:25.371 | 2026-02-19 01:06:25,371 - kafka_spark_inference - INFO - ✅ Artifacts configured: archives=['config.json', 'stages.json'] from s3
-2026-02-18 19:06:25.372 | 2026-02-19 01:06:25,371 - kafka_spark_inference - INFO - ✅ Prediction: ray_serve at http://model-serving-serve-svc.ray.svc.cluster.local:8000/infer
-2026-02-18 19:06:25.372 | 2026-02-19 01:06:25,372 - kafka_spark_inference - INFO - ✅ Output: format=json
-2026-02-18 19:06:25.372 | 2026-02-19 01:06:25,372 - kafka_spark_inference - INFO - ✅ Checkpoint: s3a://k8s-mlops-platform-bucket/checkpoints/kafka-spark-inference
-2026-02-18 19:06:25.372 | 2026-02-19 01:06:25,372 - kafka_spark_inference - INFO - Checking Kafka connection: host.docker.internal:9094
-2026-02-18 19:06:25.427 | 2026-02-19 01:06:25,427 - kafka_spark_inference - INFO - ✅ Kafka connected: 2 topics available
-2026-02-18 19:06:25.841 | 2026-02-19 01:06:25,841 - kafka_spark_inference - INFO - ✅ S3 connected: 2 buckets
-2026-02-18 19:06:25.841 | 2026-02-19 01:06:25,841 - kafka_spark_inference - INFO - Creating SparkSession with Kafka and S3 support
-2026-02-18 19:06:26.296 | Using Spark's default log4j profile: org/apache/spark/log4j2-defaults.properties
-2026-02-18 19:06:26.300 | 26/02/19 01:06:26 INFO SparkContext: Running Spark version 4.0.1
-2026-02-18 19:06:26.301 | 26/02/19 01:06:26 INFO SparkContext: OS info Linux, 6.6.87.2-microsoft-standard-WSL2, amd64
-2026-02-18 19:06:26.302 | 26/02/19 01:06:26 INFO SparkContext: Java version 17.0.17
-2026-02-18 19:06:26.321 | 26/02/19 01:06:26 INFO ResourceUtils: ==============================================================
-2026-02-18 19:06:26.322 | 26/02/19 01:06:26 INFO ResourceUtils: No custom resources configured for spark.driver.
-2026-02-18 19:06:26.322 | 26/02/19 01:06:26 INFO ResourceUtils: ==============================================================
-2026-02-18 19:06:26.324 | 26/02/19 01:06:26 INFO SparkContext: Submitted application: spark-preprocessing
-2026-02-18 19:06:26.345 | 26/02/19 01:06:26 INFO ResourceProfile: Default ResourceProfile created, executor resources: Map(cores -> name: cores, amount: 2, script: , vendor: , memory -> name: memory, amount: 512, script: , vendor: , offHeap -> name: offHeap, amount: 0, script: , vendor: ), task resources: Map(cpus -> name: cpus, amount: 1.0)
-2026-02-18 19:06:26.350 | 26/02/19 01:06:26 INFO ResourceProfile: Limiting resource is cpus at 2 tasks per executor
-2026-02-18 19:06:26.352 | 26/02/19 01:06:26 INFO ResourceProfileManager: Added ResourceProfile id: 0
-2026-02-18 19:06:26.410 | 26/02/19 01:06:26 INFO SecurityManager: Changing view acls to: spark
-2026-02-18 19:06:26.411 | 26/02/19 01:06:26 INFO SecurityManager: Changing modify acls to: spark
-2026-02-18 19:06:26.412 | 26/02/19 01:06:26 INFO SecurityManager: Changing view acls groups to: spark
-2026-02-18 19:06:26.413 | 26/02/19 01:06:26 INFO SecurityManager: Changing modify acls groups to: spark
-2026-02-18 19:06:26.415 | 26/02/19 01:06:26 INFO SecurityManager: SecurityManager: authentication disabled; ui acls disabled; users with view permissions: spark groups with view permissions: EMPTY; users with modify permissions: spark; groups with modify permissions: EMPTY; RPC SSL disabled
-2026-02-18 19:06:26.613 | 26/02/19 01:06:26 INFO Utils: Successfully started service 'sparkDriver' on port 7078.
-2026-02-18 19:06:26.637 | 26/02/19 01:06:26 INFO SparkEnv: Registering MapOutputTracker
-2026-02-18 19:06:26.646 | 26/02/19 01:06:26 INFO SparkEnv: Registering BlockManagerMaster
-2026-02-18 19:06:26.665 | 26/02/19 01:06:26 INFO BlockManagerMasterEndpoint: Using org.apache.spark.storage.DefaultTopologyMapper for getting topology information
-2026-02-18 19:06:26.666 | 26/02/19 01:06:26 INFO BlockManagerMasterEndpoint: BlockManagerMasterEndpoint up
-2026-02-18 19:06:26.668 | 26/02/19 01:06:26 INFO SparkEnv: Registering BlockManagerMasterHeartbeat
-2026-02-18 19:06:26.684 | 26/02/19 01:06:26 INFO DiskBlockManager: Created local directory at /var/data/spark-30a51d85-de99-476d-9414-31966b006d76/blockmgr-f2d8b150-c6c8-448d-90b8-d8ba833f06ce
-2026-02-18 19:06:26.702 | 26/02/19 01:06:26 INFO SparkEnv: Registering OutputCommitCoordinator
-2026-02-18 19:06:26.830 | 26/02/19 01:06:26 INFO JettyUtils: Start Jetty 0.0.0.0:4040 for SparkUI
-2026-02-18 19:06:26.921 | 26/02/19 01:06:26 INFO Utils: Successfully started service 'SparkUI' on port 4040.
-2026-02-18 19:06:26.955 | 26/02/19 01:06:26 WARN SparkContext: File with 'local' scheme local:/app/repo/k3s/spark/inference/kafka_main.py is not supported to add to file server, since it is already available on every node.
-2026-02-18 19:06:26.972 | 26/02/19 01:06:26 INFO SecurityManager: Changing view acls to: spark
-2026-02-18 19:06:26.972 | 26/02/19 01:06:26 INFO SecurityManager: Changing modify acls to: spark
-2026-02-18 19:06:26.972 | 26/02/19 01:06:26 INFO SecurityManager: Changing view acls groups to: spark
-2026-02-18 19:06:26.973 | 26/02/19 01:06:26 INFO SecurityManager: Changing modify acls groups to: spark
-2026-02-18 19:06:26.973 | 26/02/19 01:06:26 INFO SecurityManager: SecurityManager: authentication disabled; ui acls disabled; users with view permissions: spark groups with view permissions: EMPTY; users with modify permissions: spark; groups with modify permissions: EMPTY; RPC SSL disabled
-2026-02-18 19:06:27.020 | 26/02/19 01:06:27 INFO SparkKubernetesClientFactory: Auto-configuring K8S client using current context from users K8S config file
-2026-02-18 19:06:28.225 | 26/02/19 01:06:28 WARN Utils: spark.executor.instances less than spark.dynamicAllocation.minExecutors is invalid, ignoring its setting, please update your configs.
-2026-02-18 19:06:28.228 | 26/02/19 01:06:28 INFO Utils: Using initial executors = 2, max of spark.dynamicAllocation.initialExecutors,spark.dynamicAllocation.minExecutors and spark.executor.instances
-2026-02-18 19:06:28.363 | 26/02/19 01:06:28 INFO ExecutorPodsAllocator: Going to request 2 executors from Kubernetes for ResourceProfile Id: 0, target: 2, known: 0, sharedSlotFromPendingPods: 2147483647.
-2026-02-18 19:06:28.420 | 26/02/19 01:06:28 INFO KubernetesClientUtils: Spark configuration files loaded from Some(/opt/spark/conf) : spark.kubernetes.namespace
-2026-02-18 19:06:28.676 | 26/02/19 01:06:28 INFO ExecutorPodsAllocator: Found 0 reusable PVCs from 0 PVCs
-2026-02-18 19:06:28.734 | 26/02/19 01:06:28 INFO KubernetesClientUtils: Spark configuration files loaded from Some(/opt/spark/conf) : spark.kubernetes.namespace
-2026-02-18 19:06:28.736 | 26/02/19 01:06:28 INFO Utils: Successfully started service 'org.apache.spark.network.netty.NettyBlockTransferService' on port 7079.
-2026-02-18 19:06:28.741 | 26/02/19 01:06:28 INFO NettyBlockTransferService: Server created on spark-kafka-app-0-driver-svc.spark.svc 10.1.12.99:7079
-2026-02-18 19:06:28.743 | 26/02/19 01:06:28 INFO BlockManager: Using org.apache.spark.storage.RandomBlockReplicationPolicy for block replication policy
-2026-02-18 19:06:28.745 | 26/02/19 01:06:28 INFO BasicExecutorFeatureStep: Decommissioning not enabled, skipping shutdown script
-2026-02-18 19:06:28.758 | 26/02/19 01:06:28 INFO BlockManagerMaster: Registering BlockManager BlockManagerId(driver, spark-kafka-app-0-driver-svc.spark.svc, 7079, None)
-2026-02-18 19:06:28.764 | 26/02/19 01:06:28 INFO BlockManagerMasterEndpoint: Registering block manager spark-kafka-app-0-driver-svc.spark.svc:7079 with 117.0 MiB RAM, BlockManagerId(driver, spark-kafka-app-0-driver-svc.spark.svc, 7079, None)
-2026-02-18 19:06:28.767 | 26/02/19 01:06:28 INFO BlockManagerMaster: Registered BlockManager BlockManagerId(driver, spark-kafka-app-0-driver-svc.spark.svc, 7079, None)
-2026-02-18 19:06:28.768 | 26/02/19 01:06:28 INFO BlockManager: Initialized BlockManager: BlockManagerId(driver, spark-kafka-app-0-driver-svc.spark.svc, 7079, None)
-2026-02-18 19:06:28.786 | 26/02/19 01:06:28 WARN Utils: spark.executor.instances less than spark.dynamicAllocation.minExecutors is invalid, ignoring its setting, please update your configs.
-2026-02-18 19:06:28.787 | 26/02/19 01:06:28 INFO Utils: Using initial executors = 2, max of spark.dynamicAllocation.initialExecutors,spark.dynamicAllocation.minExecutors and spark.executor.instances
-2026-02-18 19:06:28.787 | 26/02/19 01:06:28 INFO ExecutorAllocationManager: Dynamic allocation is enabled without a shuffle service.
-2026-02-18 19:06:28.827 | 26/02/19 01:06:28 INFO KubernetesClientUtils: Spark configuration files loaded from Some(/opt/spark/conf) : spark.kubernetes.namespace
-2026-02-18 19:06:28.830 | 26/02/19 01:06:28 INFO BasicExecutorFeatureStep: Decommissioning not enabled, skipping shutdown script
-2026-02-18 19:06:35.074 | 26/02/19 01:06:35 INFO KubernetesClusterSchedulerBackend$KubernetesDriverEndpoint: Registered executor NettyRpcEndpointRef(spark-client://Executor) (10.1.12.101:36602) with ID 2, ResourceProfileId 0
-2026-02-18 19:06:35.080 | 26/02/19 01:06:35 INFO ExecutorMonitor: New executor 2 has registered (new total is 1)
-2026-02-18 19:06:35.085 | 26/02/19 01:06:35 INFO KubernetesClusterSchedulerBackend$KubernetesDriverEndpoint: Registered executor NettyRpcEndpointRef(spark-client://Executor) (10.1.12.100:34328) with ID 1, ResourceProfileId 0
-2026-02-18 19:06:35.086 | 26/02/19 01:06:35 INFO ExecutorMonitor: New executor 1 has registered (new total is 2)
-2026-02-18 19:06:35.179 | 26/02/19 01:06:35 INFO KubernetesClusterSchedulerBackend: SchedulerBackend is ready for scheduling beginning after reached minRegisteredResourcesRatio: 0.8
-2026-02-18 19:06:35.253 | 26/02/19 01:06:35 INFO BlockManagerMasterEndpoint: Registering block manager 10.1.12.101:33895 with 117.0 MiB RAM, BlockManagerId(2, 10.1.12.101, 33895, None)
-2026-02-18 19:06:35.255 | 26/02/19 01:06:35 INFO BlockManagerMasterEndpoint: Registering block manager 10.1.12.100:41395 with 117.0 MiB RAM, BlockManagerId(1, 10.1.12.100, 41395, None)
-2026-02-18 19:06:37.205 | 2026-02-19 01:06:37,205 - kafka_spark_inference - INFO - ✅ SparkSession created
-2026-02-18 19:06:37.909 | 26/02/19 01:06:37 INFO SharedState: Setting hive.metastore.warehouse.dir ('null') to the value of spark.sql.warehouse.dir.
-2026-02-18 19:06:37.917 | 26/02/19 01:06:37 INFO SharedState: Warehouse path is 'file:/opt/spark/work-dir/spark-warehouse'.
-2026-02-18 19:06:38.161 | 2026-02-19 01:06:38,161 - kafka_spark_inference - INFO - ✅ MLflow attack-detection@champion v1 -> artifact_set_id=dsl_001_20260217_231736
-2026-02-18 19:06:39.246 | 26/02/19 01:06:39 INFO CatalogUtil: Loading custom FileIO implementation: org.apache.iceberg.aws.s3.S3FileIO
-2026-02-18 19:06:40.093 | 2026-02-19 01:06:40,092 - kafka_spark_inference - WARNING - Metadata table does not exist (tried variants): iceberg.metadata.preprocessing_artifacts
-2026-02-18 19:06:40.093 | 2026-02-19 01:06:40,092 - kafka_spark_inference - INFO - Trying pipeline artifact keys: ['v1/artifacts', 'pipelines']
-2026-02-18 19:06:40.180 | 2026-02-19 01:06:40,179 - kafka_spark_inference - WARNING - Artifact not found at s3://k8s-mlops-platform-bucket/v1/artifacts/config.json (code=404)
-2026-02-18 19:06:40.260 | 2026-02-19 01:06:40,259 - kafka_spark_inference - WARNING - Artifact not found at s3://k8s-mlops-platform-bucket/pipelines/config.json (code=404)
-2026-02-18 19:06:40.260 | 2026-02-19 01:06:40,259 - kafka_spark_inference - ERROR - Failed loading pipeline artifact
-2026-02-18 19:06:40.260 | Traceback (most recent call last):
-2026-02-18 19:06:40.260 |   File "/app/repo/k3s/spark/inference/kafka_main.py", line 664, in load_pipeline_artifact
-2026-02-18 19:06:40.260 |     raise FileNotFoundError(
-2026-02-18 19:06:40.260 | FileNotFoundError: Pipeline artifacts not found in bucket k8s-mlops-platform-bucket. Tried keys: ['v1/artifacts', 'pipelines']
-2026-02-18 19:06:40.261 | Traceback (most recent call last):
-2026-02-18 19:06:40.261 |   File "/app/repo/k3s/spark/inference/kafka_main.py", line 927, in <module>
-2026-02-18 19:06:40.261 |     main()
-2026-02-18 19:06:40.261 |   File "/app/repo/k3s/spark/inference/kafka_main.py", line 923, in main
-2026-02-18 19:06:40.262 |     pipeline = KafkaSparkInference(params_path=params_path)
-2026-02-18 19:06:40.262 |                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-2026-02-18 19:06:40.262 |   File "/app/repo/k3s/spark/inference/kafka_main.py", line 159, in __init__
-2026-02-18 19:06:40.262 |     self.pipeline = self.load_pipeline_artifact()
-2026-02-18 19:06:40.262 |                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-2026-02-18 19:06:40.262 |   File "/app/repo/k3s/spark/inference/kafka_main.py", line 664, in load_pipeline_artifact
-2026-02-18 19:06:40.262 |     raise FileNotFoundError(
-2026-02-18 19:06:40.262 | FileNotFoundError: Pipeline artifacts not found in bucket k8s-mlops-platform-bucket. Tried keys: ['v1/artifacts', 'pipelines']
-2026-02-18 19:06:40.533 | 26/02/19 01:06:40 INFO SparkContext: SparkContext is stopping with exitCode 0 from stop at SparkSubmit.scala:1036.
-2026-02-18 19:06:40.545 | 26/02/19 01:06:40 INFO SparkUI: Stopped Spark web UI at http://spark-kafka-app-0-driver-svc.spark.svc:4040
-2026-02-18 19:06:40.550 | 26/02/19 01:06:40 INFO KubernetesClusterSchedulerBackend: Shutting down all executors
-2026-02-18 19:06:40.551 | 26/02/19 01:06:40 INFO KubernetesClusterSchedulerBackend$KubernetesDriverEndpoint: Asking each executor to shut down
-2026-02-18 19:06:40.558 | 26/02/19 01:06:40 INFO ExecutorPodsWatchSnapshotSource: Kubernetes client has been closed.
-2026-02-18 19:06:40.700 | 26/02/19 01:06:40 INFO MapOutputTrackerMasterEndpoint: MapOutputTrackerMasterEndpoint stopped!
-2026-02-18 19:06:40.715 | 26/02/19 01:06:40 INFO MemoryStore: MemoryStore started with capacity 117.0 MiB
-2026-02-18 19:06:40.716 | 26/02/19 01:06:40 INFO MemoryStore: MemoryStore cleared
-2026-02-18 19:06:40.717 | 26/02/19 01:06:40 INFO BlockManager: BlockManager stopped
-2026-02-18 19:06:40.729 | 26/02/19 01:06:40 INFO BlockManagerMaster: BlockManagerMaster stopped
-2026-02-18 19:06:40.733 | 26/02/19 01:06:40 INFO OutputCommitCoordinator$OutputCommitCoordinatorEndpoint: OutputCommitCoordinator stopped!
-2026-02-18 19:06:40.750 | 26/02/19 01:06:40 INFO SparkContext: Successfully stopped SparkContext
-2026-02-18 19:06:40.753 | 26/02/19 01:06:40 INFO ShutdownHookManager: Shutdown hook called
-2026-02-18 19:06:40.753 | 26/02/19 01:06:40 INFO ShutdownHookManager: Deleting directory /var/data/spark-30a51d85-de99-476d-9414-31966b006d76/spark-89072042-4f95-4a06-b5bb-fe5d1f74a196/pyspark-953883ba-aecc-45cd-b54b-5a46fdaf53a0
-2026-02-18 19:06:40.757 | 26/02/19 01:06:40 INFO ShutdownHookManager: Deleting directory /tmp/spark-5b9b66c6-c1b4-4dbf-aaf7-b14ac1fad64e
-2026-02-18 19:06:40.761 | 26/02/19 01:06:40 INFO ShutdownHookManager: Deleting directory /tmp/spark-2c4a7ce8-cdcc-4228-9801-3a46e95333f6
-2026-02-18 19:06:40.765 | 26/02/19 01:06:40 INFO ShutdownHookManager: Deleting directory /tmp/spark-cbef033b-4fad-4514-8d2b-da0983a9420a
-2026-02-18 19:06:40.769 | 26/02/19 01:06:40 INFO ShutdownHookManager: Deleting directory /var/data/spark-30a51d85-de99-476d-9414-31966b006d76/spark-89072042-4f95-4a06-b5bb-fe5d1f74a196
-2026-02-18 19:06:40.773 | 26/02/19 01:06:40 INFO ShutdownHookManager: Deleting directory /tmp/localPyFiles-26343eef-0f94-481c-9ac5-ba6829550cea
-2026-02-18 19:06:40.776 | 26/02/19 01:06:40 INFO ShutdownHookManager: Deleting directory /tmp/spark-c559957c-323a-4fb3-bfcd-0036a1b893cd
+2026-02-18 19:14:13.302 | 2026-02-19 01:14:13,301 - kafka_spark_inference - INFO - ✅ SparkSession created
+2026-02-18 19:14:14.242 | 26/02/19 01:14:14 INFO SharedState: Setting hive.metastore.warehouse.dir ('null') to the value of spark.sql.warehouse.dir.
+2026-02-18 19:14:14.253 | 26/02/19 01:14:14 INFO SharedState: Warehouse path is 'file:/opt/spark/work-dir/spark-warehouse'.
+2026-02-18 19:14:14.506 | 2026-02-19 01:14:14,506 - kafka_spark_inference - INFO - ✅ MLflow attack-detection@champion v1 -> artifact_set_id=dsl_001_20260217_231736
+2026-02-18 19:14:15.588 | 26/02/19 01:14:15 INFO CatalogUtil: Loading custom FileIO implementation: org.apache.iceberg.aws.s3.S3FileIO
+2026-02-18 19:14:16.367 | 2026-02-19 01:14:16,367 - kafka_spark_inference - WARNING - Metadata table does not exist (tried variants): iceberg.metadata.preprocessing_artifacts
+2026-02-18 19:14:16.368 | 2026-02-19 01:14:16,367 - kafka_spark_inference - ERROR - Failed loading pipeline artifact
+2026-02-18 19:14:16.368 | Traceback (most recent call last):
+2026-02-18 19:14:16.368 |   File "/app/repo/k3s/spark/inference/kafka_main.py", line 641, in load_pipeline_artifact
+2026-02-18 19:14:16.368 |     candidate_keys = self._build_artifact_key_candidates()
+2026-02-18 19:14:16.368 |                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-02-18 19:14:16.368 |   File "/app/repo/k3s/spark/inference/kafka_main.py", line 424, in _build_artifact_key_candidates
+2026-02-18 19:14:16.368 |     raise FileNotFoundError(
+2026-02-18 19:14:16.368 | FileNotFoundError: Could not resolve dynamic pipeline key from metadata. Expected flow: MLflow tag artifact_set_id -> metadata.preprocessing_artifacts -> pipeline_hash
+2026-02-18 19:14:16.368 | Traceback (most recent call last):
+2026-02-18 19:14:16.368 |   File "/app/repo/k3s/spark/inference/kafka_main.py", line 914, in <module>
+2026-02-18 19:14:16.368 |     main()
+2026-02-18 19:14:16.368 |   File "/app/repo/k3s/spark/inference/kafka_main.py", line 910, in main
+2026-02-18 19:14:16.368 |     pipeline = KafkaSparkInference(params_path=params_path)
+2026-02-18 19:14:16.368 |                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-02-18 19:14:16.368 |   File "/app/repo/k3s/spark/inference/kafka_main.py", line 159, in __init__
+2026-02-18 19:14:16.368 |     self.pipeline = self.load_pipeline_artifact()
+2026-02-18 19:14:16.368 |                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-02-18 19:14:16.368 |   File "/app/repo/k3s/spark/inference/kafka_main.py", line 641, in load_pipeline_artifact
+2026-02-18 19:14:16.369 |     candidate_keys = self._build_artifact_key_candidates()
+2026-02-18 19:14:16.369 |                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-02-18 19:14:16.369 |   File "/app/repo/k3s/spark/inference/kafka_main.py", line 424, in _build_artifact_key_candidates
+2026-02-18 19:14:16.369 |     raise FileNotFoundError(
+2026-02-18 19:14:16.369 | FileNotFoundError: Could not resolve dynamic pipeline key from metadata. Expected flow: MLflow tag artifact_set_id -> metadata.preprocessing_artifacts -> pipeline_hash
+2026-02-18 19:14:16.631 | 26/02/19 01:14:16 INFO SparkContext: SparkContext is stopping with exitCode 0 from stop at SparkSubmit.scala:1036.
+2026-02-18 19:14:16.648 | 26/02/19 01:14:16 INFO SparkUI: Stopped Spark web UI at http://spark-kafka-app-0-driver-svc.spark.svc:4040
+2026-02-18 19:14:16.652 | 26/02/19 01:14:16 INFO KubernetesClusterSchedulerBackend: Shutting down all executors
+2026-02-18 19:14:16.653 | 26/02/19 01:14:16 INFO KubernetesClusterSchedulerBackend$KubernetesDriverEndpoint: Asking each executor to shut down
+2026-02-18 19:14:16.664 | 26/02/19 01:14:16 INFO ExecutorPodsWatchSnapshotSource: Kubernetes client has been closed.
+2026-02-18 19:14:16.807 | 26/02/19 01:14:16 INFO MapOutputTrackerMasterEndpoint: MapOutputTrackerMasterEndpoint stopped!
+2026-02-18 19:14:16.826 | 26/02/19 01:14:16 INFO MemoryStore: MemoryStore started with capacity 117.0 MiB
+2026-02-18 19:14:16.827 | 26/02/19 01:14:16 INFO MemoryStore: MemoryStore cleared
+2026-02-18 19:14:16.827 | 26/02/19 01:14:16 INFO BlockManager: BlockManager stopped
+2026-02-18 19:14:16.834 | 26/02/19 01:14:16 INFO BlockManagerMaster: BlockManagerMaster stopped
+2026-02-18 19:14:16.838 | 26/02/19 01:14:16 INFO OutputCommitCoordinator$OutputCommitCoordinatorEndpoint: OutputCommitCoordinator stopped!
+2026-02-18 19:14:16.850 | 26/02/19 01:14:16 INFO SparkContext: Successfully stopped SparkContext
+2026-02-18 19:14:16.852 | 26/02/19 01:14:16 INFO ShutdownHookManager: Shutdown hook called
+2026-02-18 19:14:16.853 | 26/02/19 01:14:16 INFO ShutdownHookManager: Deleting directory /var/data/spark-ee69383d-f40a-41da-b587-9c3743623b71/spark-e9d2d5cd-e050-454a-8bd1-3e1b124f87a0
+2026-02-18 19:14:16.857 | 26/02/19 01:14:16 INFO ShutdownHookManager: Deleting directory /tmp/spark-7aba9d6b-fedd-4301-bd46-3a1576d0993e
+2026-02-18 19:14:16.860 | 26/02/19 01:14:16 INFO ShutdownHookManager: Deleting directory /tmp/spark-8fb64ac3-a8f7-4290-ac31-8295dec75d58
+2026-02-18 19:14:16.864 | 26/02/19 01:14:16 INFO ShutdownHookManager: Deleting directory /tmp/spark-d680c802-62cc-4899-bc92-83a83d30e999
+2026-02-18 19:14:16.867 | 26/02/19 01:14:16 INFO ShutdownHookManager: Deleting directory /tmp/localPyFiles-dbda1113-930f-4d2e-bb5c-1eb5b83f0b21
+2026-02-18 19:14:16.870 | 26/02/19 01:14:16 INFO ShutdownHookManager: Deleting directory /tmp/spark-468bda4a-d7a9-4e5d-b9d5-d0d15681cc69
+2026-02-18 19:14:16.874 | 26/02/19 01:14:16 INFO ShutdownHookManager: Deleting directory /var/data/spark-ee69383d-f40a-41da-b587-9c3743623b71/spark-e9d2d5cd-e050-454a-8bd1-3e1b124f87a0/pyspark-a8b21e44-9b87-4e01-9a04-ca3abd0c1b55

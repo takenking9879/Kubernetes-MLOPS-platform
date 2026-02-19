@@ -357,50 +357,32 @@ class KafkaSparkInference(BaseUtils):
 
     def _resolve_table_name(self, table_full_name: str) -> Optional[str]:
         """
-        Resuelve variantes de namespace para Iceberg/Glue (e.g. metadata vs metadata.db).
+        Resuelve variantes de namespace para Iceberg/Glue probando queries SQL directas.
+        spark.catalog.tableExists() no es fiable con GlueCatalog, así que se prueba
+        ejecutando SELECT directamente sobre cada candidato.
         """
-        try:
+        parts = table_full_name.split('.')
+        catalog = parts[0] if len(parts) >= 3 else None
+        namespace = parts[1] if len(parts) >= 3 else None
+        table_name = '.'.join(parts[2:]) if len(parts) >= 3 else None
+
+        candidates: List[str] = [table_full_name]
+
+        if catalog and namespace and table_name:
+            # Variante con sufijo .db que usa Glue a veces (e.g. metadata.db)
+            candidates.append(f"{catalog}.`{namespace}.db`.{table_name}")
+            # Sin catalog explícito
+            candidates.append(f"{namespace}.{table_name}")
+
+        for candidate in candidates:
             try:
-                if self.spark.catalog.tableExists(table_full_name):
-                    return table_full_name
-            except Exception:
-                pass
+                self.spark.sql(f"SELECT 1 FROM {candidate} LIMIT 1")
+                self.logger.info("Metadata table reachable via SQL: %s", candidate)
+                return candidate
+            except Exception as e:
+                self.logger.debug("Candidate %s not reachable: %s", candidate, e)
 
-            parts = table_full_name.split('.')
-            if len(parts) >= 3:
-                catalog = parts[0]
-                namespace = parts[1]
-                table_name = '.'.join(parts[2:])
-
-                alt_namespace = f"{namespace}.db"
-                candidate = f"{catalog}.`{alt_namespace}`.{table_name}"
-                try:
-                    if self.spark.catalog.tableExists(candidate):
-                        return candidate
-                except Exception:
-                    try:
-                        ns_rows = [r[0] for r in self.spark.sql(f"SHOW NAMESPACES IN {catalog}").collect()]
-                        if alt_namespace in ns_rows:
-                            fallback_candidate = f"{catalog}.`{alt_namespace}`.{table_name}"
-                            try:
-                                if self.spark.catalog.tableExists(fallback_candidate):
-                                    return fallback_candidate
-                            except Exception:
-                                pass
-                    except Exception:
-                        pass
-
-                try:
-                    unqualified = f"{namespace}.{table_name}"
-                    if self.spark.catalog.tableExists(unqualified):
-                        return unqualified
-                except Exception:
-                    pass
-
-            return None
-        except Exception as e:
-            self.logger.debug(f"_resolve_table_name error: {e}")
-            return None
+        return None
 
     def _resolve_dynamic_artifact_key(self) -> str:
         """Resuelve key dinámico pipelines/{pipeline_hash}."""
