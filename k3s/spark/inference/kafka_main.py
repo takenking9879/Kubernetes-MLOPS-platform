@@ -81,10 +81,16 @@ def _predict_partition_ray(
             for batch_id in batch_ids:
                 yield Row(**{id_column: batch_id, pred_column: 0})
     
+    # Only the first num_features columns are sent to the model.
+    # metadata and passthrough columns follow features in the DF but are never
+    # included in the inference payload.
+    # id_column is read by name from the Spark Row — no positional assumptions needed.
+    num_features: int = config['num_features']
+
     for row in partition:
-        # Asume que event_id es la última columna (agregada por preprocessing)
-        event_id = row[-1]
-        payload_row = list(row)[:-1]
+        # Use named access: works regardless of how many metadata/passthrough cols exist.
+        event_id = row[id_column]
+        payload_row = list(row)[:num_features]
         
         batch_ids.append(event_id)
         
@@ -156,6 +162,7 @@ class KafkaSparkInference(BaseUtils):
         self.spark = self._create_spark_session()
 
         # Cargar módulos y funciones
+        self._load_dsl_config()                   # reads DSL YAML → feature/metadata/passthrough cols
         self.pipeline = self.load_pipeline_artifact()
         self._load_converter_function()
     
@@ -260,8 +267,14 @@ class KafkaSparkInference(BaseUtils):
             raise
 
     def _resolve_artifact_set_id_from_mlflow(self) -> Optional[str]:
-        """Obtiene artifact_set_id del modelo con alias (champion/challenger) en MLflow."""
+        """Obtiene artifact_set_id del modelo con alias (champion/challenger) en MLflow.
+        Result is cached in self._cached_artifact_set_id to avoid duplicate API calls.
+        """
+        if getattr(self, '_cached_artifact_set_id', 'UNSET') != 'UNSET':
+            return self._cached_artifact_set_id
+
         if not self.dynamic_pipeline_resolution:
+            self._cached_artifact_set_id = None
             return None
 
         if not self.mlflow_tracking_uri or not self.registry_model_name:
@@ -292,7 +305,8 @@ class KafkaSparkInference(BaseUtils):
                     mv.version,
                     artifact_set_id,
                 )
-                return str(artifact_set_id)
+                self._cached_artifact_set_id = str(artifact_set_id)
+                return self._cached_artifact_set_id
 
             self.logger.warning(
                 "MLflow model %s@%s v%s has no tag 'artifact_set_id'",
@@ -300,9 +314,11 @@ class KafkaSparkInference(BaseUtils):
                 self.registry_alias,
                 mv.version,
             )
+            self._cached_artifact_set_id = None
             return None
         except Exception as e:
             self.logger.warning("Could not resolve artifact_set_id from MLflow: %s", e)
+            self._cached_artifact_set_id = None
             return None
 
     def _resolve_pipeline_hash_from_metadata(self, artifact_set_id: str) -> Optional[str]:
@@ -383,6 +399,79 @@ class KafkaSparkInference(BaseUtils):
                 self.logger.debug("Candidate %s not reachable: %s", candidate, e)
 
         return None
+
+    def _resolve_dsl_name_from_artifact_set_id(self, artifact_set_id: str) -> Optional[str]:
+        """Extracts the DSL file name (e.g. 'dsl_001') from an artifact_set_id.
+
+        Expected format: 'dsl_001_20260217_231736'  ->  'dsl_001'
+        """
+        import re
+        m = re.match(r'^(dsl_\d+)', artifact_set_id)
+        return m.group(1) if m else None
+
+    def _load_dsl_config(self) -> None:
+        """Loads the DSL YAML and extracts final_features column groups.
+
+        Resolution:
+          Reads artifact_set_id tag from the MLflow champion model
+          → extracts dsl name (e.g. 'dsl_001' from 'dsl_001_20260217_231736')
+          → loads /app/repo/k3s/spark/preprocess/{dsl_name}.yaml
+
+        Sets:
+          self.dsl_feature_cols     – columns sent to the model (first num_features cols)
+          self.dsl_metadata_cols    – context columns kept but NOT sent to model (middle)
+          self.dsl_passthrough_cols – id columns that must be last in the DF (e.g. event_id)
+          self.num_features         – len(dsl_feature_cols)
+        """
+        import yaml as _yaml
+
+        artifact_set_id = self._resolve_artifact_set_id_from_mlflow()
+        if not artifact_set_id:
+            raise RuntimeError(
+                "_load_dsl_config: could not resolve artifact_set_id from MLflow. "
+                "Ensure the champion model has the tag 'artifact_set_id' set."
+            )
+
+        dsl_name = self._resolve_dsl_name_from_artifact_set_id(artifact_set_id)
+        if not dsl_name:
+            raise ValueError(
+                f"_load_dsl_config: could not extract DSL name from "
+                f"artifact_set_id='{artifact_set_id}'. "
+                f"Expected format: 'dsl_NNN_YYYYMMDD_HHMMSS'."
+            )
+
+        dsl_path = f"/app/repo/k3s/spark/preprocess/{dsl_name}.yaml"
+        if not os.path.exists(dsl_path):
+            raise FileNotFoundError(
+                f"DSL file not found: '{dsl_path}' "
+                f"(artifact_set_id='{artifact_set_id}', dsl_name='{dsl_name}')."
+            )
+
+        self.logger.info(
+            "✅ DSL resolved from artifact_set_id '%s' -> %s",
+            artifact_set_id, dsl_path,
+        )
+
+        with open(dsl_path, 'r') as fh:
+            dsl = _yaml.safe_load(fh)
+
+        final_features = dsl.get('final_features', {})
+        if not isinstance(final_features, dict):
+            raise ValueError(f"DSL '{dsl_path}': 'final_features' must be a mapping.")
+
+        self.dsl_feature_cols: List[str] = list(final_features.get('features', []))
+        self.dsl_metadata_cols: List[str] = list(final_features.get('metadata', []))
+        self.dsl_passthrough_cols: List[str] = list(final_features.get('passthrough', []))
+        self.num_features: int = len(self.dsl_feature_cols)
+
+        if self.num_features == 0:
+            raise ValueError(f"DSL '{dsl_path}': 'final_features.features' is empty.")
+
+        self.logger.info(
+            "✅ DSL loaded from %s: %d features, metadata=%s, passthrough=%s",
+            dsl_path, self.num_features,
+            self.dsl_metadata_cols, self.dsl_passthrough_cols,
+        )
 
     def _resolve_dynamic_artifact_key(self) -> str:
         """Resuelve key dinámico pipelines/{pipeline_hash}."""
@@ -691,10 +780,45 @@ class KafkaSparkInference(BaseUtils):
             raise
     
     def preprocess(self, df: DataFrame) -> DataFrame:
-        """Aplica preprocesamiento usando función configurada."""
+        """Applies the DSL pipeline and returns a DataFrame ordered as:
+
+            [*feature_cols, *metadata_cols, *passthrough_cols]
+
+        Column groups come from the DSL final_features loaded in _load_dsl_config().
+        Both metadata and passthrough are optional (included only if present in the DF).
+
+          - feature_cols     → sent to the model; cols 0..num_features-1
+          - metadata_cols    → context columns kept for downstream use (e.g. timestamp);
+                               NOT sent to the model; optional
+          - passthrough_cols → columns passed through unchanged (e.g. event_id);
+                               NOT sent to the model; optional
+
+        _predict_partition_ray reads features as row[:num_features] and the id column
+        by name (row[id_column]), so column count and position of non-feature cols
+        does not matter.
+        """
         try:
             df_processed = self.pipeline.transform(df)
-            return self.pipeline.select_features(df_processed)
+
+            # Build ordered column list from DSL config; skip cols absent in the DF.
+            feature_cols     = [c for c in self.dsl_feature_cols     if c in df_processed.columns]
+            metadata_cols    = [c for c in self.dsl_metadata_cols     if c in df_processed.columns]
+            passthrough_cols = [c for c in self.dsl_passthrough_cols  if c in df_processed.columns]
+
+            ordered_cols = feature_cols + metadata_cols + passthrough_cols
+            if not ordered_cols:
+                raise ValueError(
+                    "preprocess: no columns selected. Check DSL final_features config."
+                )
+
+            missing_features = [c for c in self.dsl_feature_cols if c not in df_processed.columns]
+            if missing_features:
+                self.logger.warning(
+                    "preprocess: %d feature column(s) not found in DataFrame: %s",
+                    len(missing_features), missing_features,
+                )
+
+            return df_processed.select(*ordered_cols)
         except Exception as e:
             self.logger.error(f"Preprocessing failed: {e}")
             raise
@@ -711,6 +835,10 @@ class KafkaSparkInference(BaseUtils):
                 'prediction_column': str(self.prediction_column),
                 'payload_format': str(self.ray_payload_format),
                 'prediction_key': str(self.ray_pred_key),
+                # Only the first num_features columns are sent to the model.
+                # The rest (metadata, passthrough) are along for the ride but
+                # must not be included in the inference payload.
+                'num_features': int(self.num_features),
             }
             
             predictions_rdd = df_preprocessed.rdd.mapPartitions(
