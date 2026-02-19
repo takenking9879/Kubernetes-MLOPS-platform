@@ -26,6 +26,13 @@ spec:
     spark.speculation.interval: "30"
     spark.kubernetes.authenticate.driver.serviceAccountName: "spark"
 
+    # ===== ICEBERG CONFIG (needed to query metadata table for pipeline_hash) =====
+    spark.sql.extensions: org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions
+    spark.sql.catalog.iceberg: org.apache.iceberg.spark.SparkCatalog
+    spark.sql.catalog.iceberg.catalog-impl: org.apache.iceberg.aws.glue.GlueCatalog
+    spark.sql.catalog.iceberg.io-impl: org.apache.iceberg.aws.s3.S3FileIO
+    spark.sql.catalog.iceberg.warehouse: s3a://k8s-mlops-platform-bucket/warehouse
+
     # ===== PROMETHEUS METRICS =====
     spark.ui.prometheus.enabled: "true"
     spark.metrics.conf.*.sink.prometheusServlet.class: "org.apache.spark.metrics.sink.PrometheusServlet"
@@ -49,6 +56,8 @@ spec:
     # driver/executor mount the shared volume at /app while git-sync writes to /git/repo
     spark.kubernetes.driverEnv.PYTHONPATH: "/app:/app/repo:/app/repo/k3s:/opt/spark/work-dir:/opt/spark/work-dir/k3s"
     spark.kubernetes.executorEnv.PYTHONPATH: "/app:/app/repo:/app/repo/k3s:/opt/spark/work-dir:/opt/spark/work-dir/k3s"
+    spark.kubernetes.driverEnv.AWS_ENDPOINT_URL: "https://s3.us-east-2.amazonaws.com"
+    spark.kubernetes.executorEnv.AWS_ENDPOINT_URL: "https://s3.us-east-2.amazonaws.com"
     spark.kubernetes.driverEnv.MLFLOW_TRACKING_URI: "http://my-mlflow.ray.svc.cluster.local"
     spark.kubernetes.executorEnv.MLFLOW_TRACKING_URI: "http://my-mlflow.ray.svc.cluster.local"
     spark.kubernetes.driverEnv.RAY_SERVE_URL: "http://model-serving-serve-svc.ray.svc.cluster.local:8000/infer"

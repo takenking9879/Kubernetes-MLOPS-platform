@@ -313,32 +313,20 @@ class KafkaSparkInference(BaseUtils):
         try:
             safe_artifact_set_id = artifact_set_id.replace("'", "''")
 
-            table_candidates = [self.metadata_table]
-            parts = self.metadata_table.split('.')
-            if len(parts) >= 3:
-                catalog, namespace = parts[0], parts[1]
-                table_name = '.'.join(parts[2:])
-                table_candidates.append(f"{catalog}.`{namespace}.db`.{table_name}")
+            resolved_table = self._resolve_table_name(self.metadata_table)
+            if not resolved_table:
+                self.logger.warning(
+                    "Metadata table does not exist (tried variants): %s",
+                    self.metadata_table,
+                )
+                return None
 
-            rows = []
-            last_error: Optional[Exception] = None
-            used_table: Optional[str] = None
-            for candidate in table_candidates:
-                try:
-                    query = (
-                        f"SELECT artifact_set_id, pipeline_hash FROM {candidate} "
-                        f"WHERE artifact_set_id = '{safe_artifact_set_id}' LIMIT 1"
-                    )
-                    rows = self.spark.sql(query).collect()
-                    used_table = candidate
-                    break
-                except Exception as query_error:
-                    last_error = query_error
+            rows = self.spark.sql(
+                f"SELECT artifact_set_id, pipeline_hash FROM {resolved_table} "
+                f"WHERE artifact_set_id = '{safe_artifact_set_id}' LIMIT 1"
+            ).collect()
 
-            if used_table:
-                self.logger.info("Metadata lookup table resolved as: %s", used_table)
-            elif last_error:
-                raise last_error
+            self.logger.info("Metadata lookup table resolved as: %s", resolved_table)
 
             if not rows:
                 self.logger.warning(
@@ -365,6 +353,53 @@ class KafkaSparkInference(BaseUtils):
             return str(pipeline_hash)
         except Exception as e:
             self.logger.warning("Could not resolve pipeline_hash from Iceberg metadata: %s", e)
+            return None
+
+    def _resolve_table_name(self, table_full_name: str) -> Optional[str]:
+        """
+        Resuelve variantes de namespace para Iceberg/Glue (e.g. metadata vs metadata.db).
+        """
+        try:
+            try:
+                if self.spark.catalog.tableExists(table_full_name):
+                    return table_full_name
+            except Exception:
+                pass
+
+            parts = table_full_name.split('.')
+            if len(parts) >= 3:
+                catalog = parts[0]
+                namespace = parts[1]
+                table_name = '.'.join(parts[2:])
+
+                alt_namespace = f"{namespace}.db"
+                candidate = f"{catalog}.`{alt_namespace}`.{table_name}"
+                try:
+                    if self.spark.catalog.tableExists(candidate):
+                        return candidate
+                except Exception:
+                    try:
+                        ns_rows = [r[0] for r in self.spark.sql(f"SHOW NAMESPACES IN {catalog}").collect()]
+                        if alt_namespace in ns_rows:
+                            fallback_candidate = f"{catalog}.`{alt_namespace}`.{table_name}"
+                            try:
+                                if self.spark.catalog.tableExists(fallback_candidate):
+                                    return fallback_candidate
+                            except Exception:
+                                pass
+                    except Exception:
+                        pass
+
+                try:
+                    unqualified = f"{namespace}.{table_name}"
+                    if self.spark.catalog.tableExists(unqualified):
+                        return unqualified
+                except Exception:
+                    pass
+
+            return None
+        except Exception as e:
+            self.logger.debug(f"_resolve_table_name error: {e}")
             return None
 
     def _resolve_dynamic_artifact_key(self) -> str:
