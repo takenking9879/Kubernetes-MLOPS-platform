@@ -42,7 +42,7 @@ kuberay:
     #                  Pipeline artifacts are resolved via MLflow → Iceberg → S3.
     #                  MLflow webhook is registered for fast model + executor reload.
     # online: false → Ray Serve only runs the ML model; Spark preprocesses upstream.
-    online: false
+    online: true
     webhook_public_base_url: "http://serving.localhost"
     webhook_path: "/infer/webhook"
     webhook_name: "rayserve-attack-detection-champion-alias"
