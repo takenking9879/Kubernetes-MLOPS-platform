@@ -1,95 +1,53 @@
-"""
-Declarative Feature Engineering Pipeline for PySpark
+"""Declarative Feature Engineering Pipeline package.
 
-A production-ready, YAML-driven feature engineering framework that:
-- Supports both Transformers (deterministic) and Estimators (learned)
-- Maintains explicit columns (no VectorAssembler)
-- Scales efficiently with Spark's lazy evaluation
-- Serializes and loads complete pipelines
-
-Usage:
-    from spark_feature_pipeline import Pipeline
-    
-    # From YAML
-    pipeline = Pipeline.from_yaml("config.yaml")
-    model = pipeline.fit(train_df)
-    
-    # Transform new data
-    test_transformed = model.transform(test_df)
-    
-    # Save and load
-    model.save("./pipeline_artifacts")
-    loaded_model = PipelineModel.load("./pipeline_artifacts")
+This module intentionally uses lazy imports so non-Spark runtimes (e.g. Ray
+Serve online inference) can import ``src.dsl.numpy_executor`` without requiring
+``pyspark`` at package import time.
 """
 
-from .base import (
-    PipelineStage,
-    Transformer,
-    Estimator,
-    FittedTransformer,
-    PipelineModel
-)
-
-from .pipeline import (
-    Pipeline,
-    PipelineBuilder,
-    PipelineModel
-)
-
-from .state_registry import StageRegistry
-
-from .transformers import (
-    CastTransformer,
-    TemporalExtractor,
-    ArithmeticTransformer,
-    ConditionalTransformer,
-    CyclicTransformer,
-    LogTransformer,
-    ConcatTransformer,
-    RatioTransformer,
-    BinningTransformer,
-    ClipTransformer,
-    FillNATransformer
-)
-
-from .estimators import (
-    StringIndexerEstimator,
-    StandardScalerEstimator,
-    MinMaxScalerEstimator,
-    ImputerEstimator
-)
+from importlib import import_module
 
 __version__ = "1.0.0"
 
-__all__ = [
+_EXPORTS = {
     # Core abstractions
-    "PipelineStage",
-    "Transformer",
-    "Estimator",
-    "FittedTransformer",
-    "PipelineModel",
-    
+    "PipelineStage": (".base", "PipelineStage"),
+    "Transformer": (".base", "Transformer"),
+    "Estimator": (".base", "Estimator"),
+    "FittedTransformer": (".base", "FittedTransformer"),
+    "PipelineModel": (".pipeline", "PipelineModel"),
     # Pipeline
-    "Pipeline",
-    "PipelineBuilder",
-    "StageRegistry",
-    
+    "Pipeline": (".pipeline", "Pipeline"),
+    "PipelineBuilder": (".pipeline", "PipelineBuilder"),
+    "StageRegistry": (".state_registry", "StageRegistry"),
     # Transformers
-    "CastTransformer",
-    "TemporalExtractor",
-    "ArithmeticTransformer",
-    "ConditionalTransformer",
-    "CyclicTransformer",
-    "LogTransformer",
-    "ConcatTransformer",
-    "RatioTransformer",
-    "BinningTransformer",
-    "ClipTransformer",
-    "FillNATransformer",
-    
+    "CastTransformer": (".transformers", "CastTransformer"),
+    "TemporalExtractor": (".transformers", "TemporalExtractor"),
+    "ArithmeticTransformer": (".transformers", "ArithmeticTransformer"),
+    "ConditionalTransformer": (".transformers", "ConditionalTransformer"),
+    "CyclicTransformer": (".transformers", "CyclicTransformer"),
+    "LogTransformer": (".transformers", "LogTransformer"),
+    "ConcatTransformer": (".transformers", "ConcatTransformer"),
+    "RatioTransformer": (".transformers", "RatioTransformer"),
+    "BinningTransformer": (".transformers", "BinningTransformer"),
+    "ClipTransformer": (".transformers", "ClipTransformer"),
+    "FillNATransformer": (".transformers", "FillNATransformer"),
     # Estimators
-    "StringIndexerEstimator",
-    "StandardScalerEstimator",
-    "MinMaxScalerEstimator",
-    "ImputerEstimator",
-]
+    "StringIndexerEstimator": (".estimators", "StringIndexerEstimator"),
+    "StandardScalerEstimator": (".estimators", "StandardScalerEstimator"),
+    "MinMaxScalerEstimator": (".estimators", "MinMaxScalerEstimator"),
+    "ImputerEstimator": (".estimators", "ImputerEstimator"),
+}
+
+__all__ = list(_EXPORTS)
+
+
+def __getattr__(name):
+    if name not in _EXPORTS:
+        raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+
+    module_name, attr_name = _EXPORTS[name]
+    module = import_module(module_name, __name__)
+    value = getattr(module, attr_name)
+    globals()[name] = value
+    return value

@@ -6,9 +6,13 @@ Follows Spark ML Pipeline architecture but without VectorAssembler dependency.
 """
 
 from abc import ABC, abstractmethod
-from typing import Dict, Any, Optional
-from pyspark.sql import DataFrame
+from typing import Dict, Any, Optional, TYPE_CHECKING
 import json
+
+if TYPE_CHECKING:
+    from pyspark.sql import DataFrame
+else:
+    DataFrame = Any
 
 
 class PipelineStage(ABC):
