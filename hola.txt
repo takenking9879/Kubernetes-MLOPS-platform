@@ -1,0 +1,208 @@
+2026-02-20 22:47:59.220 | 26/02/21 04:47:59 INFO TaskSetManager: Finished task 199.0 in stage 6.0 (TID 424) in 23 ms on 10.1.12.236 (executor 2) (200/200)
+2026-02-20 22:47:59.220 | 26/02/21 04:47:59 INFO TaskSchedulerImpl: Removed TaskSet 6.0 whose tasks have all completed, from pool 
+2026-02-20 22:47:59.222 | 26/02/21 04:47:59 INFO DAGScheduler: ResultStage 6 (save at NativeMethodAccessorImpl.java:0) finished in 2397 ms
+2026-02-20 22:47:59.222 | 26/02/21 04:47:59 INFO DAGScheduler: Job 2 is finished. Cancelling potential speculative or zombie tasks for this job
+2026-02-20 22:47:59.222 | 26/02/21 04:47:59 INFO TaskSchedulerImpl: Canceling stage 6
+2026-02-20 22:47:59.222 | 26/02/21 04:47:59 INFO TaskSchedulerImpl: Killing all running tasks in stage 6: Stage finished
+2026-02-20 22:47:59.222 | 26/02/21 04:47:59 INFO DAGScheduler: Job 2 finished: save at NativeMethodAccessorImpl.java:0, took 6531.095994 ms
+2026-02-20 22:47:59.230 | 2026-02-21 04:47:59,228 - kafka_spark_inference - ERROR - ❌ Batch 7 failed: cannot access local variable 'preprocess_latency' where it is not associated with a value
+2026-02-20 22:47:59.230 | Traceback (most recent call last):
+2026-02-20 22:47:59.230 |   File "/app/repo/k3s/spark/inference/kafka_main.py", line 1014, in process_batch
+2026-02-20 22:47:59.230 |     f"Preprocess: {preprocess_latency:.3f}s | Inference: {inference_latency:.3f}s | "
+2026-02-20 22:47:59.230 |                    ^^^^^^^^^^^^^^^^^^
+2026-02-20 22:47:59.230 | UnboundLocalError: cannot access local variable 'preprocess_latency' where it is not associated with a value
+2026-02-20 22:47:59.244 | 26/02/21 04:47:59 ERROR MicroBatchExecution: Query [id = 838f40e3-6288-4929-9ac1-2bea9c2e866c, runId = 761bb9d1-d378-4273-9c10-1905a75ef0c4] terminated with error
+2026-02-20 22:47:59.244 | org.apache.spark.sql.execution.streaming.sources.ForeachBatchUserFuncException: [FOREACH_BATCH_USER_FUNCTION_ERROR] An error occurred in the user provided function in foreach batch sink. Reason: An exception was raised by the Python Proxy. Return Message: Traceback (most recent call last):
+2026-02-20 22:47:59.244 |   File "/opt/spark/python/lib/py4j-0.10.9.9-src.zip/py4j/clientserver.py", line 644, in _call_proxy
+2026-02-20 22:47:59.244 |     return_value = getattr(self.pool[obj_id], method)(*params)
+2026-02-20 22:47:59.244 |                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-02-20 22:47:59.244 |   File "/opt/spark/python/lib/pyspark.zip/pyspark/sql/utils.py", line 165, in call
+2026-02-20 22:47:59.244 |     raise e
+2026-02-20 22:47:59.244 |   File "/opt/spark/python/lib/pyspark.zip/pyspark/sql/utils.py", line 162, in call
+2026-02-20 22:47:59.244 |     self.func(DataFrame(jdf, wrapped_session_jdf), batch_id)
+2026-02-20 22:47:59.244 |   File "/app/repo/k3s/spark/inference/kafka_main.py", line 1014, in process_batch
+2026-02-20 22:47:59.244 |     f"Preprocess: {preprocess_latency:.3f}s | Inference: {inference_latency:.3f}s | "
+2026-02-20 22:47:59.244 |                    ^^^^^^^^^^^^^^^^^^
+2026-02-20 22:47:59.244 | UnboundLocalError: cannot access local variable 'preprocess_latency' where it is not associated with a value
+2026-02-20 22:47:59.244 |  SQLSTATE: 39000
+2026-02-20 22:47:59.244 | 	at org.apache.spark.sql.execution.streaming.sources.ForeachBatchSink.callBatchWriter(ForeachBatchSink.scala:60)
+2026-02-20 22:47:59.244 | 	at org.apache.spark.sql.execution.streaming.sources.ForeachBatchSink.addBatch(ForeachBatchSink.scala:49)
+2026-02-20 22:47:59.245 | 	at org.apache.spark.sql.execution.streaming.MicroBatchExecution.$anonfun$runBatch$17(MicroBatchExecution.scala:879)
+2026-02-20 22:47:59.245 | 	at org.apache.spark.sql.execution.SQLExecution$.$anonfun$withNewExecutionId0$8(SQLExecution.scala:163)
+2026-02-20 22:47:59.245 | 	at org.apache.spark.sql.execution.SQLExecution$.withSessionTagsApplied(SQLExecution.scala:272)
+2026-02-20 22:47:59.245 | 	at org.apache.spark.sql.execution.SQLExecution$.$anonfun$withNewExecutionId0$7(SQLExecution.scala:125)
+2026-02-20 22:47:59.245 | 	at org.apache.spark.JobArtifactSet$.withActiveJobArtifactState(JobArtifactSet.scala:94)
+2026-02-20 22:47:59.245 | 	at org.apache.spark.sql.artifact.ArtifactManager.$anonfun$withResources$1(ArtifactManager.scala:112)
+2026-02-20 22:47:59.245 | 	at org.apache.spark.sql.artifact.ArtifactManager.withClassLoaderIfNeeded(ArtifactManager.scala:106)
+2026-02-20 22:47:59.245 | 	at org.apache.spark.sql.artifact.ArtifactManager.withResources(ArtifactManager.scala:111)
+2026-02-20 22:47:59.245 | 	at org.apache.spark.sql.execution.SQLExecution$.$anonfun$withNewExecutionId0$6(SQLExecution.scala:125)
+2026-02-20 22:47:59.245 | 	at org.apache.spark.sql.execution.SQLExecution$.withSQLConfPropagated(SQLExecution.scala:295)
+2026-02-20 22:47:59.245 | 	at org.apache.spark.sql.execution.SQLExecution$.$anonfun$withNewExecutionId0$1(SQLExecution.scala:124)
+2026-02-20 22:47:59.245 | 	at org.apache.spark.sql.SparkSession.withActive(SparkSession.scala:804)
+2026-02-20 22:47:59.245 | 	at org.apache.spark.sql.execution.SQLExecution$.withNewExecutionId0(SQLExecution.scala:78)
+2026-02-20 22:47:59.245 | 	at org.apache.spark.sql.execution.SQLExecution$.withNewExecutionId(SQLExecution.scala:237)
+2026-02-20 22:47:59.245 | 	at org.apache.spark.sql.execution.streaming.MicroBatchExecution.$anonfun$runBatch$16(MicroBatchExecution.scala:876)
+2026-02-20 22:47:59.245 | 	at org.apache.spark.sql.execution.streaming.ProgressContext.reportTimeTaken(ProgressReporter.scala:186)
+2026-02-20 22:47:59.245 | 	at org.apache.spark.sql.execution.streaming.MicroBatchExecution.runBatch(MicroBatchExecution.scala:876)
+2026-02-20 22:47:59.245 | 	at org.apache.spark.sql.execution.streaming.MicroBatchExecution.$anonfun$executeOneBatch$2(MicroBatchExecution.scala:394)
+2026-02-20 22:47:59.245 | 	at scala.runtime.java8.JFunction0$mcV$sp.apply(JFunction0$mcV$sp.scala:18)
+2026-02-20 22:47:59.245 | 	at org.apache.spark.sql.execution.streaming.ProgressContext.reportTimeTaken(ProgressReporter.scala:186)
+2026-02-20 22:47:59.245 | 	at org.apache.spark.sql.execution.streaming.MicroBatchExecution.executeOneBatch(MicroBatchExecution.scala:364)
+2026-02-20 22:47:59.245 | 	at org.apache.spark.sql.execution.streaming.MicroBatchExecution.$anonfun$runActivatedStream$1(MicroBatchExecution.scala:344)
+2026-02-20 22:47:59.245 | 	at org.apache.spark.sql.execution.streaming.MicroBatchExecution.$anonfun$runActivatedStream$1$adapted(MicroBatchExecution.scala:344)
+2026-02-20 22:47:59.245 | 	at org.apache.spark.sql.execution.streaming.TriggerExecutor.runOneBatch(TriggerExecutor.scala:39)
+2026-02-20 22:47:59.245 | 	at org.apache.spark.sql.execution.streaming.TriggerExecutor.runOneBatch$(TriggerExecutor.scala:37)
+2026-02-20 22:47:59.245 | 	at org.apache.spark.sql.execution.streaming.ProcessingTimeExecutor.runOneBatch(TriggerExecutor.scala:70)
+2026-02-20 22:47:59.245 | 	at org.apache.spark.sql.execution.streaming.ProcessingTimeExecutor.execute(TriggerExecutor.scala:82)
+2026-02-20 22:47:59.245 | 	at org.apache.spark.sql.execution.streaming.MicroBatchExecution.runActivatedStream(MicroBatchExecution.scala:344)
+2026-02-20 22:47:59.245 | 	at org.apache.spark.sql.execution.streaming.StreamExecution.$anonfun$runStream$1(StreamExecution.scala:337)
+2026-02-20 22:47:59.245 | 	at scala.runtime.java8.JFunction0$mcV$sp.apply(JFunction0$mcV$sp.scala:18)
+2026-02-20 22:47:59.245 | 	at org.apache.spark.sql.SparkSession.withActive(SparkSession.scala:804)
+2026-02-20 22:47:59.245 | 	at org.apache.spark.sql.execution.streaming.StreamExecution.org$apache$spark$sql$execution$streaming$StreamExecution$$runStream(StreamExecution.scala:311)
+2026-02-20 22:47:59.245 | 	at org.apache.spark.sql.execution.streaming.StreamExecution$$anon$1.run(StreamExecution.scala:226)
+2026-02-20 22:47:59.245 | Caused by: py4j.Py4JException: An exception was raised by the Python Proxy. Return Message: Traceback (most recent call last):
+2026-02-20 22:47:59.245 |   File "/opt/spark/python/lib/py4j-0.10.9.9-src.zip/py4j/clientserver.py", line 644, in _call_proxy
+2026-02-20 22:47:59.245 |     return_value = getattr(self.pool[obj_id], method)(*params)
+2026-02-20 22:47:59.245 |                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-02-20 22:47:59.245 |   File "/opt/spark/python/lib/pyspark.zip/pyspark/sql/utils.py", line 165, in call
+2026-02-20 22:47:59.245 |     raise e
+2026-02-20 22:47:59.245 |   File "/opt/spark/python/lib/pyspark.zip/pyspark/sql/utils.py", line 162, in call
+2026-02-20 22:47:59.245 |     self.func(DataFrame(jdf, wrapped_session_jdf), batch_id)
+2026-02-20 22:47:59.245 |   File "/app/repo/k3s/spark/inference/kafka_main.py", line 1014, in process_batch
+2026-02-20 22:47:59.245 |     f"Preprocess: {preprocess_latency:.3f}s | Inference: {inference_latency:.3f}s | "
+2026-02-20 22:47:59.245 |                    ^^^^^^^^^^^^^^^^^^
+2026-02-20 22:47:59.245 | UnboundLocalError: cannot access local variable 'preprocess_latency' where it is not associated with a value
+2026-02-20 22:47:59.245 | 
+2026-02-20 22:47:59.245 | 	at py4j.Protocol.getReturnValue(Protocol.java:476)
+2026-02-20 22:47:59.245 | 	at py4j.reflection.PythonProxyHandler.invoke(PythonProxyHandler.java:108)
+2026-02-20 22:47:59.245 | 	at jdk.proxy3/jdk.proxy3.$Proxy52.call(Unknown Source)
+2026-02-20 22:47:59.245 | 	at org.apache.spark.sql.execution.streaming.sources.PythonForeachBatchHelper$.$anonfun$callForeachBatch$1(ForeachBatchSink.scala:87)
+2026-02-20 22:47:59.245 | 	at org.apache.spark.sql.execution.streaming.sources.PythonForeachBatchHelper$.$anonfun$callForeachBatch$1$adapted(ForeachBatchSink.scala:87)
+2026-02-20 22:47:59.245 | 	at org.apache.spark.sql.execution.streaming.sources.ForeachBatchSink.callBatchWriter(ForeachBatchSink.scala:56)
+2026-02-20 22:47:59.245 | 	... 34 more
+2026-02-20 22:47:59.259 | 26/02/21 04:47:59 INFO MicroBatchExecution: Async log purge executor pool for query [id = 838f40e3-6288-4929-9ac1-2bea9c2e866c, runId = 761bb9d1-d378-4273-9c10-1905a75ef0c4] has been shutdown
+2026-02-20 22:47:59.457 | 2026-02-21 04:47:59,449 - kafka_spark_inference - ERROR - ❌ Pipeline failed: [STREAM_FAILED] Query [id = 838f40e3-6288-4929-9ac1-2bea9c2e866c, runId = 761bb9d1-d378-4273-9c10-1905a75ef0c4] terminated with exception: [FOREACH_BATCH_USER_FUNCTION_ERROR] An error occurred in the user provided function in foreach batch sink. Reason: An exception was raised by the Python Proxy. Return Message: Traceback (most recent call last):
+2026-02-20 22:47:59.457 |   File "/opt/spark/python/lib/py4j-0.10.9.9-src.zip/py4j/clientserver.py", line 644, in _call_proxy
+2026-02-20 22:47:59.457 |     return_value = getattr(self.pool[obj_id], method)(*params)
+2026-02-20 22:47:59.457 |                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-02-20 22:47:59.457 |   File "/opt/spark/python/lib/pyspark.zip/pyspark/sql/utils.py", line 165, in call
+2026-02-20 22:47:59.457 |     raise e
+2026-02-20 22:47:59.457 |   File "/opt/spark/python/lib/pyspark.zip/pyspark/sql/utils.py", line 162, in call
+2026-02-20 22:47:59.457 |     self.func(DataFrame(jdf, wrapped_session_jdf), batch_id)
+2026-02-20 22:47:59.457 |   File "/app/repo/k3s/spark/inference/kafka_main.py", line 1014, in process_batch
+2026-02-20 22:47:59.457 |     f"Preprocess: {preprocess_latency:.3f}s | Inference: {inference_latency:.3f}s | "
+2026-02-20 22:47:59.457 |                    ^^^^^^^^^^^^^^^^^^
+2026-02-20 22:47:59.457 | UnboundLocalError: cannot access local variable 'preprocess_latency' where it is not associated with a value
+2026-02-20 22:47:59.457 |  SQLSTATE: 39000 SQLSTATE: XXKST
+2026-02-20 22:47:59.457 | === Streaming Query ===
+2026-02-20 22:47:59.457 | Identifier: [id = 838f40e3-6288-4929-9ac1-2bea9c2e866c, runId = 761bb9d1-d378-4273-9c10-1905a75ef0c4]
+2026-02-20 22:47:59.457 | Current Committed Offsets: {KafkaV2[Subscribe[topic-traffic]]: {"topic-traffic":{"0":845,"1":830,"2":883,"3":853,"4":841,"5":834}}}
+2026-02-20 22:47:59.457 | Current Available Offsets: {KafkaV2[Subscribe[topic-traffic]]: {"topic-traffic":{"0":886,"1":888,"2":927,"3":898,"4":874,"5":877}}}
+2026-02-20 22:47:59.457 | 
+2026-02-20 22:47:59.457 | Current State: ACTIVE
+2026-02-20 22:47:59.457 | Thread State: RUNNABLE
+2026-02-20 22:47:59.457 | 
+2026-02-20 22:47:59.457 | Logical Plan:
+2026-02-20 22:47:59.457 | ~WriteToMicroBatchDataSourceV1 ForeachBatchSink, 838f40e3-6288-4929-9ac1-2bea9c2e866c, [checkpointLocation=s3a://k8s-mlops-platform-bucket/checkpoints/kafka-spark-inference], Append
+2026-02-20 22:47:59.457 | +- ~Project [data#15.timestamp AS timestamp#16, data#15.event_id AS event_id#17, data#15.properties AS properties#18]
+2026-02-20 22:47:59.457 |    +- ~Project [from_json(StructField(timestamp,StringType,true), StructField(event_id,StringType,true), StructField(properties,StructType(StructField(src_port,LongType,true),StructField(dst_port,LongType,true),StructField(protocol,StringType,true),StructField(packet_count,LongType,true),StructField(conn_state,StringType,true),StructField(bytes_transferred,DoubleType,true)),true), value#14, Some(Etc/UTC), false) AS data#15]
+2026-02-20 22:47:59.457 |       +- ~Project [cast(value#8 as string) AS value#14]
+2026-02-20 22:47:59.457 |          +- ~StreamingDataSourceV2ScanRelation[key#7, value#8, topic#9, partition#10, offset#11L, timestamp#12, timestampType#13] KafkaTable
+2026-02-20 22:47:59.457 | Traceback (most recent call last):
+2026-02-20 22:47:59.457 |   File "/app/repo/k3s/spark/inference/kafka_main.py", line 1097, in run_inference
+2026-02-20 22:47:59.458 |     query.awaitTermination()
+2026-02-20 22:47:59.458 |   File "/opt/spark/python/lib/pyspark.zip/pyspark/sql/streaming/query.py", line 225, in awaitTermination
+2026-02-20 22:47:59.458 |     return self._jsq.awaitTermination()
+2026-02-20 22:47:59.458 |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-02-20 22:47:59.458 |   File "/opt/spark/python/lib/py4j-0.10.9.9-src.zip/py4j/java_gateway.py", line 1362, in __call__
+2026-02-20 22:47:59.458 |     return_value = get_return_value(
+2026-02-20 22:47:59.458 |                    ^^^^^^^^^^^^^^^^^
+2026-02-20 22:47:59.458 |   File "/opt/spark/python/lib/pyspark.zip/pyspark/errors/exceptions/captured.py", line 288, in deco
+2026-02-20 22:47:59.458 |     raise converted from None
+2026-02-20 22:47:59.458 | pyspark.errors.exceptions.captured.StreamingQueryException: [STREAM_FAILED] Query [id = 838f40e3-6288-4929-9ac1-2bea9c2e866c, runId = 761bb9d1-d378-4273-9c10-1905a75ef0c4] terminated with exception: [FOREACH_BATCH_USER_FUNCTION_ERROR] An error occurred in the user provided function in foreach batch sink. Reason: An exception was raised by the Python Proxy. Return Message: Traceback (most recent call last):
+2026-02-20 22:47:59.458 |   File "/opt/spark/python/lib/py4j-0.10.9.9-src.zip/py4j/clientserver.py", line 644, in _call_proxy
+2026-02-20 22:47:59.458 |     return_value = getattr(self.pool[obj_id], method)(*params)
+2026-02-20 22:47:59.458 |                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-02-20 22:47:59.458 |   File "/opt/spark/python/lib/pyspark.zip/pyspark/sql/utils.py", line 165, in call
+2026-02-20 22:47:59.458 |     raise e
+2026-02-20 22:47:59.458 |   File "/opt/spark/python/lib/pyspark.zip/pyspark/sql/utils.py", line 162, in call
+2026-02-20 22:47:59.458 |     self.func(DataFrame(jdf, wrapped_session_jdf), batch_id)
+2026-02-20 22:47:59.458 |   File "/app/repo/k3s/spark/inference/kafka_main.py", line 1014, in process_batch
+2026-02-20 22:47:59.458 |     f"Preprocess: {preprocess_latency:.3f}s | Inference: {inference_latency:.3f}s | "
+2026-02-20 22:47:59.458 |                    ^^^^^^^^^^^^^^^^^^
+2026-02-20 22:47:59.458 | UnboundLocalError: cannot access local variable 'preprocess_latency' where it is not associated with a value
+2026-02-20 22:47:59.458 |  SQLSTATE: 39000 SQLSTATE: XXKST
+2026-02-20 22:47:59.458 | === Streaming Query ===
+2026-02-20 22:47:59.458 | Identifier: [id = 838f40e3-6288-4929-9ac1-2bea9c2e866c, runId = 761bb9d1-d378-4273-9c10-1905a75ef0c4]
+2026-02-20 22:47:59.458 | Current Committed Offsets: {KafkaV2[Subscribe[topic-traffic]]: {"topic-traffic":{"0":845,"1":830,"2":883,"3":853,"4":841,"5":834}}}
+2026-02-20 22:47:59.458 | Current Available Offsets: {KafkaV2[Subscribe[topic-traffic]]: {"topic-traffic":{"0":886,"1":888,"2":927,"3":898,"4":874,"5":877}}}
+2026-02-20 22:47:59.458 | 
+2026-02-20 22:47:59.458 | Current State: ACTIVE
+2026-02-20 22:47:59.458 | Thread State: RUNNABLE
+2026-02-20 22:47:59.458 | 
+2026-02-20 22:47:59.458 | Logical Plan:
+2026-02-20 22:47:59.458 | ~WriteToMicroBatchDataSourceV1 ForeachBatchSink, 838f40e3-6288-4929-9ac1-2bea9c2e866c, [checkpointLocation=s3a://k8s-mlops-platform-bucket/checkpoints/kafka-spark-inference], Append
+2026-02-20 22:47:59.458 | +- ~Project [data#15.timestamp AS timestamp#16, data#15.event_id AS event_id#17, data#15.properties AS properties#18]
+2026-02-20 22:47:59.458 |    +- ~Project [from_json(StructField(timestamp,StringType,true), StructField(event_id,StringType,true), StructField(properties,StructType(StructField(src_port,LongType,true),StructField(dst_port,LongType,true),StructField(protocol,StringType,true),StructField(packet_count,LongType,true),StructField(conn_state,StringType,true),StructField(bytes_transferred,DoubleType,true)),true), value#14, Some(Etc/UTC), false) AS data#15]
+2026-02-20 22:47:59.458 |       +- ~Project [cast(value#8 as string) AS value#14]
+2026-02-20 22:47:59.458 |          +- ~StreamingDataSourceV2ScanRelation[key#7, value#8, topic#9, partition#10, offset#11L, timestamp#12, timestampType#13] KafkaTable
+2026-02-20 22:47:59.458 | 
+2026-02-20 22:47:59.458 | Traceback (most recent call last):
+2026-02-20 22:47:59.458 |   File "/app/repo/k3s/spark/inference/kafka_main.py", line 1111, in <module>
+2026-02-20 22:47:59.459 |     main()
+2026-02-20 22:47:59.459 |   File "/app/repo/k3s/spark/inference/kafka_main.py", line 1108, in main
+2026-02-20 22:47:59.461 |     pipeline.run_inference()
+2026-02-20 22:47:59.461 |   File "/app/repo/k3s/spark/inference/kafka_main.py", line 1097, in run_inference
+2026-02-20 22:47:59.463 |     query.awaitTermination()
+2026-02-20 22:47:59.463 |   File "/opt/spark/python/lib/pyspark.zip/pyspark/sql/streaming/query.py", line 225, in awaitTermination
+2026-02-20 22:47:59.464 |   File "/opt/spark/python/lib/py4j-0.10.9.9-src.zip/py4j/java_gateway.py", line 1362, in __call__
+2026-02-20 22:47:59.464 |   File "/opt/spark/python/lib/pyspark.zip/pyspark/errors/exceptions/captured.py", line 288, in deco
+2026-02-20 22:47:59.470 | pyspark.errors.exceptions.captured.StreamingQueryException: [STREAM_FAILED] Query [id = 838f40e3-6288-4929-9ac1-2bea9c2e866c, runId = 761bb9d1-d378-4273-9c10-1905a75ef0c4] terminated with exception: [FOREACH_BATCH_USER_FUNCTION_ERROR] An error occurred in the user provided function in foreach batch sink. Reason: An exception was raised by the Python Proxy. Return Message: Traceback (most recent call last):
+2026-02-20 22:47:59.470 |   File "/opt/spark/python/lib/py4j-0.10.9.9-src.zip/py4j/clientserver.py", line 644, in _call_proxy
+2026-02-20 22:47:59.470 |     return_value = getattr(self.pool[obj_id], method)(*params)
+2026-02-20 22:47:59.470 |                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-02-20 22:47:59.470 |   File "/opt/spark/python/lib/pyspark.zip/pyspark/sql/utils.py", line 165, in call
+2026-02-20 22:47:59.470 |     raise e
+2026-02-20 22:47:59.470 |   File "/opt/spark/python/lib/pyspark.zip/pyspark/sql/utils.py", line 162, in call
+2026-02-20 22:47:59.470 |     self.func(DataFrame(jdf, wrapped_session_jdf), batch_id)
+2026-02-20 22:47:59.470 |   File "/app/repo/k3s/spark/inference/kafka_main.py", line 1014, in process_batch
+2026-02-20 22:47:59.470 |     f"Preprocess: {preprocess_latency:.3f}s | Inference: {inference_latency:.3f}s | "
+2026-02-20 22:47:59.470 |                    ^^^^^^^^^^^^^^^^^^
+2026-02-20 22:47:59.470 | UnboundLocalError: cannot access local variable 'preprocess_latency' where it is not associated with a value
+2026-02-20 22:47:59.470 |  SQLSTATE: 39000 SQLSTATE: XXKST
+2026-02-20 22:47:59.470 | === Streaming Query ===
+2026-02-20 22:47:59.470 | Identifier: [id = 838f40e3-6288-4929-9ac1-2bea9c2e866c, runId = 761bb9d1-d378-4273-9c10-1905a75ef0c4]
+2026-02-20 22:47:59.470 | Current Committed Offsets: {KafkaV2[Subscribe[topic-traffic]]: {"topic-traffic":{"0":845,"1":830,"2":883,"3":853,"4":841,"5":834}}}
+2026-02-20 22:47:59.470 | Current Available Offsets: {KafkaV2[Subscribe[topic-traffic]]: {"topic-traffic":{"0":886,"1":888,"2":927,"3":898,"4":874,"5":877}}}
+2026-02-20 22:47:59.470 | 
+2026-02-20 22:47:59.470 | Current State: ACTIVE
+2026-02-20 22:47:59.470 | Thread State: RUNNABLE
+2026-02-20 22:47:59.470 | 
+2026-02-20 22:47:59.470 | Logical Plan:
+2026-02-20 22:47:59.470 | ~WriteToMicroBatchDataSourceV1 ForeachBatchSink, 838f40e3-6288-4929-9ac1-2bea9c2e866c, [checkpointLocation=s3a://k8s-mlops-platform-bucket/checkpoints/kafka-spark-inference], Append
+2026-02-20 22:47:59.470 | +- ~Project [data#15.timestamp AS timestamp#16, data#15.event_id AS event_id#17, data#15.properties AS properties#18]
+2026-02-20 22:47:59.470 |    +- ~Project [from_json(StructField(timestamp,StringType,true), StructField(event_id,StringType,true), StructField(properties,StructType(StructField(src_port,LongType,true),StructField(dst_port,LongType,true),StructField(protocol,StringType,true),StructField(packet_count,LongType,true),StructField(conn_state,StringType,true),StructField(bytes_transferred,DoubleType,true)),true), value#14, Some(Etc/UTC), false) AS data#15]
+2026-02-20 22:47:59.470 |       +- ~Project [cast(value#8 as string) AS value#14]
+2026-02-20 22:47:59.470 |          +- ~StreamingDataSourceV2ScanRelation[key#7, value#8, topic#9, partition#10, offset#11L, timestamp#12, timestampType#13] KafkaTable
+2026-02-20 22:47:59.470 | 
+2026-02-20 22:47:59.806 | 26/02/21 04:47:59 INFO SparkContext: SparkContext is stopping with exitCode 0 from stop at SparkSubmit.scala:1036.
+2026-02-20 22:47:59.827 | 26/02/21 04:47:59 INFO SparkUI: Stopped Spark web UI at http://spark-kafka-app-0-driver-svc.spark.svc:4040
+2026-02-20 22:47:59.836 | 26/02/21 04:47:59 INFO KubernetesClusterSchedulerBackend: Shutting down all executors
+2026-02-20 22:47:59.837 | 26/02/21 04:47:59 INFO KubernetesClusterSchedulerBackend$KubernetesDriverEndpoint: Asking each executor to shut down
+2026-02-20 22:47:59.847 | 26/02/21 04:47:59 INFO ExecutorPodsWatchSnapshotSource: Kubernetes client has been closed.
+2026-02-20 22:48:00.085 | 26/02/21 04:48:00 INFO MapOutputTrackerMasterEndpoint: MapOutputTrackerMasterEndpoint stopped!
+2026-02-20 22:48:00.114 | 26/02/21 04:48:00 INFO MemoryStore: MemoryStore cleared
+2026-02-20 22:48:00.116 | 26/02/21 04:48:00 INFO BlockManager: BlockManager stopped
+2026-02-20 22:48:00.121 | 26/02/21 04:48:00 INFO BlockManagerMaster: BlockManagerMaster stopped
+2026-02-20 22:48:00.127 | 26/02/21 04:48:00 INFO OutputCommitCoordinator$OutputCommitCoordinatorEndpoint: OutputCommitCoordinator stopped!
+2026-02-20 22:48:00.161 | 26/02/21 04:48:00 INFO SparkContext: Successfully stopped SparkContext
+2026-02-20 22:48:00.165 | 26/02/21 04:48:00 INFO ShutdownHookManager: Shutdown hook called
+2026-02-20 22:48:00.166 | 26/02/21 04:48:00 INFO ShutdownHookManager: Deleting directory /tmp/spark-15e63257-75ac-4f1f-ae98-e687627838d3
+2026-02-20 22:48:00.172 | 26/02/21 04:48:00 INFO ShutdownHookManager: Deleting directory /var/data/spark-4be48e22-2784-4f59-8355-a537bcd43964/spark-7d77b24f-32b4-404d-b0f0-f3fef2e8126b
+2026-02-20 22:48:00.179 | 26/02/21 04:48:00 INFO ShutdownHookManager: Deleting directory /var/data/spark-4be48e22-2784-4f59-8355-a537bcd43964/spark-7d77b24f-32b4-404d-b0f0-f3fef2e8126b/pyspark-20b6986d-4131-4b62-a92f-e839ba70aadf
+2026-02-20 22:48:00.185 | 26/02/21 04:48:00 INFO ShutdownHookManager: Deleting directory /tmp/spark-658a0bcc-5c45-430e-b02a-e793af075fd7
+2026-02-20 22:48:00.191 | 26/02/21 04:48:00 INFO ShutdownHookManager: Deleting directory /tmp/spark-04f67f47-0170-47d5-aeb3-67df84b268bd
+2026-02-20 22:48:00.196 | 26/02/21 04:48:00 INFO ShutdownHookManager: Deleting directory /tmp/spark-defc646c-e0ee-47eb-93b2-3af4f2c5706b
+2026-02-20 22:48:00.202 | 26/02/21 04:48:00 INFO ShutdownHookManager: Deleting directory /tmp/localPyFiles-45471dcd-2344-469a-97ea-de9b398b00db
+2026-02-20 22:48:00.207 | 26/02/21 04:48:00 INFO ShutdownHookManager: Deleting directory /tmp/artifacts-9278fad1-2d7a-4a38-8d22-8afb68ffd494
+2026-02-20 22:48:00.214 | 26/02/21 04:48:00 INFO ShutdownHookManager: Deleting directory /tmp/spark-51dc5ab5-d93f-40cd-88b6-2315184792f4

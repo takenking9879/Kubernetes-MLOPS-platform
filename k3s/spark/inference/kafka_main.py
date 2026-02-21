@@ -144,6 +144,41 @@ def _predict_partition_ray(
         yield from send_batch()
 
 
+def _rtm_predict_pandas(
+    pdf_iter,
+    config: Dict[str, Any],
+):
+    """
+    RTM (Real-Time Mode): función para mapInPandas con Trigger.Continuous (Spark 4.1).
+    Stateless — un request HTTP por fila, compatible con procesamiento continuo.
+    Mismo patrón que _predict_partition_ray_online, adaptado a Iterator[pd.DataFrame].
+    """
+    import pandas as pd
+    import requests
+
+    url      = config['url']
+    timeout  = config['timeout']
+    id_col   = config['id_column']
+    pred_col = config['prediction_column']
+    pred_key = config.get('prediction_key', 'predictions')
+
+    with requests.Session() as session:
+        for pdf in pdf_iter:
+            rows_out = []
+            for _, row in pdf.iterrows():
+                raw_dict = row.to_dict()
+                event_id = raw_dict.get(id_col)
+                try:
+                    resp = session.post(url, json={"raw": raw_dict}, timeout=timeout)
+                    resp.raise_for_status()
+                    pred = resp.json().get(pred_key, [0])[0]
+                except Exception as e:
+                    print(f"[RTM] Error event {event_id!r}: {e}")
+                    pred = 0
+                rows_out.append({id_col: event_id, pred_col: int(pred)})
+            yield pd.DataFrame(rows_out)
+
+
 # ===== PIPELINE GENÉRICO =====
 
 class KafkaSparkInference(BaseUtils):
@@ -252,6 +287,7 @@ class KafkaSparkInference(BaseUtils):
         streaming_config = self.params.get('streaming', {})
         self.max_offsets_per_trigger = streaming_config.get('max_offsets_per_trigger', 10000)
         self.processing_time = streaming_config.get('processing_time', '10 seconds')
+        self.continuous_trigger_interval = streaming_config.get('continuous_trigger_interval', '1 second')
         self.starting_offsets = streaming_config.get('starting_offsets', 'latest')
         self.fail_on_data_loss = streaming_config.get('fail_on_data_loss', False)
         
@@ -310,9 +346,6 @@ class KafkaSparkInference(BaseUtils):
                 'MLFLOW_MODEL_ALIAS',
                 kuberay_serving_cfg.get('alias', 'champion')
             )
-
-            metadata_cfg = self.params_full.get('iceberg_tables', {}).get('metadata', {})
-            self.metadata_table = metadata_cfg.get('full_name', 'iceberg.metadata.preprocessing_artifacts')
 
             self.logger.info(f"✅ Artifacts configured: archives={self.artifacts_list} from {self.artifacts_source}")
         except Exception as e:
@@ -376,84 +409,67 @@ class KafkaSparkInference(BaseUtils):
             self._cached_artifact_set_id = None
             return None
 
-    def _resolve_pipeline_hash_from_metadata(self, artifact_set_id: str) -> Optional[str]:
-        """Consulta Iceberg metadata table para resolver pipeline_hash por artifact_set_id."""
-        if not artifact_set_id:
-            return None
+    def _get_iceberg_catalog_kwargs(self) -> dict:
+        """Construye kwargs para PyIceberg load_catalog. Patrón idéntico a PipelineArtifactLoader."""
+        warehouse = (
+            self.params_full.get("iceberg_tables", {})
+            .get("warehouse", "s3://k8s-mlops-platform-bucket/warehouse")
+            .replace("s3a://", "s3://")
+        )
+        return {
+            "type": "glue",
+            "warehouse": warehouse,
+            "client.access-key-id":     os.environ.get("AWS_ACCESS_KEY_ID"),
+            "client.secret-access-key": os.environ.get("AWS_SECRET_ACCESS_KEY"),
+            "client.region":            os.environ.get("AWS_REGION", "us-east-2"),
+        }
 
-        try:
-            safe_artifact_set_id = artifact_set_id.replace("'", "''")
+    def _resolve_pipeline_hash_from_metadata(self, artifact_set_id: str) -> str:
+        """
+        Resuelve pipeline_hash desde la tabla Iceberg de metadatos.
+        Usa PyIceberg directamente — sin Spark.
+        Reutiliza el mismo patrón que PipelineArtifactLoader (src/serve/pipeline_loader.py).
+        Solo debe llamarse en modo batch (online=False).
 
-            resolved_table = self._resolve_table_name(self.metadata_table)
-            if not resolved_table:
-                self.logger.warning(
-                    "Metadata table does not exist (tried variants): %s",
-                    self.metadata_table,
-                )
-                return None
+        Raises:
+            RuntimeError: si no se encuentra registro para artifact_set_id.
+        """
+        from pyiceberg.catalog import load_catalog
 
-            rows = self.spark.sql(
-                f"SELECT artifact_set_id, pipeline_hash FROM {resolved_table} "
-                f"WHERE artifact_set_id = '{safe_artifact_set_id}' LIMIT 1"
-            ).collect()
+        catalog_kwargs = self._get_iceberg_catalog_kwargs()
+        meta_cfg = self.params_full.get("iceberg_tables", {}).get("metadata", {})
+        identifier = (
+            f"{meta_cfg.get('namespace', 'metadata')}."
+            f"{meta_cfg.get('table', 'preprocessing_artifacts')}"
+        )
 
-            self.logger.info("Metadata lookup table resolved as: %s", resolved_table)
+        self.logger.info(
+            "Querying Iceberg table %r for artifact_set_id=%s", identifier, artifact_set_id
+        )
+        catalog = load_catalog("iceberg", **catalog_kwargs)
+        table   = catalog.load_table(identifier)
+        df      = table.scan().to_pandas()
 
-            if not rows:
-                self.logger.warning(
-                    "No rows found in %s for artifact_set_id=%s",
-                    self.metadata_table,
-                    artifact_set_id,
-                )
-                return None
-
-            pipeline_hash = rows[0]['pipeline_hash']
-            if not pipeline_hash:
-                self.logger.warning(
-                    "metadata row found but pipeline_hash is empty for artifact_set_id=%s",
-                    artifact_set_id,
-                )
-                return None
-
-            self.logger.info(
-                "✅ Metadata %s -> artifact_set_id=%s pipeline_hash=%s",
-                self.metadata_table,
-                artifact_set_id,
-                pipeline_hash,
+        rows = df[df["artifact_set_id"] == artifact_set_id]
+        if rows.empty:
+            raise RuntimeError(
+                f"No row found in Iceberg table {identifier!r} "
+                f"for artifact_set_id={artifact_set_id!r}. "
+                f"Run preprocessing first."
             )
-            return str(pipeline_hash)
-        except Exception as e:
-            self.logger.warning("Could not resolve pipeline_hash from Iceberg metadata: %s", e)
-            return None
 
-    def _resolve_table_name(self, table_full_name: str) -> Optional[str]:
-        """
-        Resuelve variantes de namespace para Iceberg/Glue probando queries SQL directas.
-        spark.catalog.tableExists() no es fiable con GlueCatalog, así que se prueba
-        ejecutando SELECT directamente sobre cada candidato.
-        """
-        parts = table_full_name.split('.')
-        catalog = parts[0] if len(parts) >= 3 else None
-        namespace = parts[1] if len(parts) >= 3 else None
-        table_name = '.'.join(parts[2:]) if len(parts) >= 3 else None
+        pipeline_hash = str(rows.iloc[0]["pipeline_hash"])
+        if not pipeline_hash:
+            raise RuntimeError(
+                f"pipeline_hash is empty for artifact_set_id={artifact_set_id!r} "
+                f"in table {identifier!r}."
+            )
 
-        candidates: List[str] = [table_full_name]
-
-        if catalog and namespace and table_name:
-            # Variante con sufijo .db que usa Glue a veces (e.g. metadata.db)
-            candidates.append(f"{catalog}.`{namespace}.db`.{table_name}")
-            # Sin catalog explícito
-            candidates.append(f"{namespace}.{table_name}")
-
-        for candidate in candidates:
-            try:
-                self.spark.sql(f"SELECT 1 FROM {candidate} LIMIT 1")
-                self.logger.info("Metadata table reachable via SQL: %s", candidate)
-                return candidate
-            except Exception as e:
-                self.logger.debug("Candidate %s not reachable: %s", candidate, e)
-
-        return None
+        self.logger.info(
+            "Iceberg %s: artifact_set_id=%s → pipeline_hash=%s",
+            identifier, artifact_set_id, pipeline_hash,
+        )
+        return pipeline_hash
 
     def _resolve_dsl_name_from_artifact_set_id(self, artifact_set_id: str) -> Optional[str]:
         """Extracts the DSL file name (e.g. 'dsl_001') from an artifact_set_id.
@@ -534,8 +550,10 @@ class KafkaSparkInference(BaseUtils):
         if not artifact_set_id:
             return ''
 
-        pipeline_hash = self._resolve_pipeline_hash_from_metadata(artifact_set_id)
-        if not pipeline_hash:
+        try:
+            pipeline_hash = self._resolve_pipeline_hash_from_metadata(artifact_set_id)
+        except RuntimeError as e:
+            self.logger.warning("Could not resolve pipeline_hash from Iceberg: %s", e)
             return ''
 
         base_prefix = str(self.dynamic_artifacts_prefix).strip('/')
@@ -718,17 +736,13 @@ class KafkaSparkInference(BaseUtils):
         try:
             self.logger.info("Creating SparkSession with Kafka and S3 support")            
             builder = SparkSession.builder.appName(self.params['app_name'])
-            iceberg_warehouse = self.params_full.get('iceberg_tables', {}).get(
-                'warehouse',
-                's3://k8s-mlops-platform-bucket/warehouse'
-            ).replace('s3://', 's3a://')
-            
+
             # Configuración S3
             builder = (
                 builder
                 .config("spark.hadoop.fs.s3a.access.key", os.getenv("AWS_ACCESS_KEY_ID"))
                 .config("spark.hadoop.fs.s3a.secret.key", os.getenv("AWS_SECRET_ACCESS_KEY"))
-                .config("spark.hadoop.fs.s3a.aws.credentials.provider", 
+                .config("spark.hadoop.fs.s3a.aws.credentials.provider",
                         "org.apache.hadoop.fs.s3a.SimpleAWSCredentialsProvider")
                 .config("spark.hadoop.fs.s3a.path.style.access", "false")
                 .config("spark.hadoop.fs.s3a.connection.ssl.enabled", "true")
@@ -737,12 +751,6 @@ class KafkaSparkInference(BaseUtils):
                 .config("spark.hadoop.fs.s3a.committer.magic.enabled", "true")
                 .config("spark.sql.streaming.schemaInference", "false")
                 .config("spark.sql.adaptive.enabled", "false")
-                # Iceberg catalog (required to resolve metadata table and pipeline_hash)
-                .config("spark.sql.extensions", "org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions")
-                .config("spark.sql.catalog.iceberg", "org.apache.iceberg.spark.SparkCatalog")
-                .config("spark.sql.catalog.iceberg.catalog-impl", "org.apache.iceberg.aws.glue.GlueCatalog")
-                .config("spark.sql.catalog.iceberg.io-impl", "org.apache.iceberg.aws.s3.S3FileIO")
-                .config("spark.sql.catalog.iceberg.warehouse", iceberg_warehouse)
             )
             
             spark = builder.getOrCreate()
@@ -820,11 +828,42 @@ class KafkaSparkInference(BaseUtils):
             
             self.logger.info("✅ Kafka stream configured with explicit schema")
             return parsed_df
-            
+
         except Exception as e:
             self.logger.error(f"Failed to read from Kafka: {e}")
             raise
-    
+
+    def read_from_kafka_continuous(self) -> DataFrame:
+        """
+        Lee Kafka stream para RTM (Real-Time Mode, online=True).
+        Igual que read_from_kafka() pero sin maxOffsetsPerTrigger,
+        que es incompatible con Trigger.Continuous.
+        """
+        try:
+            self.logger.info("Reading from Kafka (RTM continuous mode): %s", self.kafka_input_topic)
+            df = (
+                self.spark.readStream
+                .format("kafka")
+                .option("kafka.bootstrap.servers", self.kafka_bootstrap_servers)
+                .option("subscribe", self.kafka_input_topic)
+                .option("startingOffsets", self.starting_offsets)
+                .option("kafka.security.protocol", self.kafka_security_protocol)
+                .option("kafka.sasl.mechanism", self.kafka_sasl_mechanism)
+                .option("kafka.sasl.jaas.config", self.kafka_sasl_jaas_config)
+                .option("failOnDataLoss", str(self.fail_on_data_loss).lower())
+                .load()
+            )
+            parsed_df = (
+                df.selectExpr("CAST(value AS STRING)")
+                .select(from_json(col("value"), self.input_schema).alias("data"))
+                .select("data.*")
+            )
+            self.logger.info("✅ Kafka RTM stream configured (no maxOffsetsPerTrigger)")
+            return parsed_df
+        except Exception as e:
+            self.logger.error("Failed to read from Kafka (RTM): %s", e)
+            raise
+
     def convert_schema(self, df: DataFrame) -> DataFrame:
         """Convierte schema usando el conversor configurado."""
         try:
@@ -956,6 +995,7 @@ class KafkaSparkInference(BaseUtils):
             if self.online:
                 # online=true: schema-converted rows go directly to Ray Serve.
                 # Ray Serve runs DSL preprocessing (NumPy) + prediction.
+                preprocess_latency = 0.0  # No Spark preprocessing in online mode
                 inference_start = time.time()
                 predictions_df = self.predict_batch_online(df_features)
                 inference_latency = time.time() - inference_start
@@ -1058,46 +1098,93 @@ class KafkaSparkInference(BaseUtils):
             raise
     
     # ===== MAIN PIPELINE =====
-    
+
+    def run_inference_continuous(self):
+        """
+        Pipeline RTM para online=True. Usa Trigger.Continuous (Spark 4.1).
+        Latencia objetivo: < 1 ms p99 por evento.
+
+        Reemplaza foreachBatch (incompatible con RTM) con:
+          read_from_kafka_continuous → convert_schema → mapInPandas → Kafka sink
+        Sin join: el output es {id_column, prediction_column}.
+        """
+        rtm_config = {
+            'url':               str(self.ray_url),
+            'timeout':           int(self.ray_timeout),
+            'id_column':         str(self.id_column),
+            'prediction_column': str(self.prediction_column),
+            'prediction_key':    str(self.ray_pred_key),
+        }
+
+        df_stream      = self.read_from_kafka_continuous()
+        df_features    = self.convert_schema(df_stream)
+        df_predictions = df_features.mapInPandas(
+            lambda pdf_iter: _rtm_predict_pandas(pdf_iter, rtm_config),
+            schema=self.output_schema,
+        )
+        df_kafka_out = df_predictions.selectExpr(
+            f"CAST({self.id_column} AS STRING) AS key",
+            "to_json(struct(*)) AS value",
+        )
+
+        query = (
+            df_kafka_out
+            .writeStream
+            .format("kafka")
+            .option("kafka.bootstrap.servers",  self.kafka_bootstrap_servers)
+            .option("topic",                     self.kafka_output_topic)
+            .option("kafka.security.protocol",   self.kafka_security_protocol)
+            .option("kafka.sasl.mechanism",      self.kafka_sasl_mechanism)
+            .option("kafka.sasl.jaas.config",    self.kafka_sasl_jaas_config)
+            .option("checkpointLocation",        self.checkpoint_location)
+            .trigger(continuous=self.continuous_trigger_interval)
+            .start()
+        )
+
+        self.logger.info("🚀 RTM Continuous streaming started (online=True)")
+        self.logger.info("📍 Checkpoint: %s", self.checkpoint_location)
+        self.logger.info("📥 %s → 📤 %s", self.kafka_input_topic, self.kafka_output_topic)
+        self.logger.info("⚡ Trigger.Continuous(%s)", self.continuous_trigger_interval)
+        self.logger.info("🧮 online=true: schema conversion + Ray Serve call in mapInPandas (RTM)")
+        self.logger.info("⏳ Awaiting termination...")
+        query.awaitTermination()
+
     def run_inference(self):
         """
         Ejecuta el pipeline de inferencia.
-        Pipeline completo: Kafka → Parse → Convert → Preprocess → Predict → Write
+
+        online=True  → RTM: Trigger.Continuous + mapInPandas + Kafka sink (ms latency).
+        online=False → micro-batch: foreachBatch + processingTime trigger.
         """
         try:
             self.logger.info("🚀 Starting Generic Kafka-Spark Inference Pipeline")
-            
-            # Leer stream de Kafka
-            df_stream = self.read_from_kafka()
-            
-            # Configurar streaming query con foreachBatch
-            query = (
-                df_stream
-                .writeStream
-                .foreachBatch(self.process_batch)
-                .option("checkpointLocation", self.checkpoint_location)
-                .outputMode("append")
-                .trigger(processingTime=self.processing_time)
-                .start()
-            )
-            
-            self.logger.info(f"✅ Streaming query started")
-            self.logger.info(f"📍 Checkpoint: {self.checkpoint_location}")
-            self.logger.info(f"📥 Input topic: {self.kafka_input_topic}")
-            self.logger.info(f"📤 Output topic: {self.kafka_output_topic}")
-            self.logger.info(f"⚙️  Schema: {self.input_schema_name} → {self.output_schema_name}")
-            self.logger.info(f"🔄 Converter: {self.converter_name}")
+
             if self.online:
-                self.logger.info("🧮 online=true: schema conversion in Spark → DSL + prediction in Ray Serve")
+                # online=True → Real-Time Mode: Trigger.Continuous, mapInPandas, Kafka sink
+                self.run_inference_continuous()
             else:
-                self.logger.info("🧮 online=false: full DSL preprocessing in Spark → prediction in Ray Serve")
-            self.logger.info("⏳ Waiting for termination...")
-            
-            # Esperar terminación
-            query.awaitTermination()
-            
+                # online=False → micro-batch: foreachBatch + processingTime trigger
+                df_stream = self.read_from_kafka()
+                query = (
+                    df_stream
+                    .writeStream
+                    .foreachBatch(self.process_batch)
+                    .option("checkpointLocation", self.checkpoint_location)
+                    .outputMode("append")
+                    .trigger(processingTime=self.processing_time)
+                    .start()
+                )
+                self.logger.info("✅ Streaming query started")
+                self.logger.info("📍 Checkpoint: %s", self.checkpoint_location)
+                self.logger.info("📥 Input: %s  📤 Output: %s", self.kafka_input_topic, self.kafka_output_topic)
+                self.logger.info("⚙️  Schema: %s → %s", self.input_schema_name, self.output_schema_name)
+                self.logger.info("🔄 Converter: %s", self.converter_name)
+                self.logger.info("🧮 online=false: full DSL in Spark → prediction in Ray Serve")
+                self.logger.info("⏳ Waiting for termination...")
+                query.awaitTermination()
+
         except Exception as e:
-            self.logger.error(f"❌ Pipeline failed: {e}", exc_info=True)
+            self.logger.error("❌ Pipeline failed: %s", e, exc_info=True)
             raise
 
 # ===== ENTRY POINT =====

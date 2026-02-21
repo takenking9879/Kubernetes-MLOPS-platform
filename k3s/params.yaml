@@ -139,6 +139,7 @@ spark:
   streaming:
     max_offsets_per_trigger: 10000
     processing_time: "10 seconds"
+    continuous_trigger_interval: "1 second"  # checkpoint commit interval for RTM (online=True)
     starting_offsets: "latest"
     fail_on_data_loss: false
 

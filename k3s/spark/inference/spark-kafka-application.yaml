@@ -26,13 +26,6 @@ spec:
     spark.speculation.interval: "30"
     spark.kubernetes.authenticate.driver.serviceAccountName: "spark"
 
-    # ===== ICEBERG CONFIG (needed to query metadata table for pipeline_hash) =====
-    spark.sql.extensions: org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions
-    spark.sql.catalog.iceberg: org.apache.iceberg.spark.SparkCatalog
-    spark.sql.catalog.iceberg.catalog-impl: org.apache.iceberg.aws.glue.GlueCatalog
-    spark.sql.catalog.iceberg.io-impl: org.apache.iceberg.aws.s3.S3FileIO
-    spark.sql.catalog.iceberg.warehouse: s3a://k8s-mlops-platform-bucket/warehouse
-
     # ===== PROMETHEUS METRICS =====
     spark.ui.prometheus.enabled: "true"
     spark.metrics.conf.*.sink.prometheusServlet.class: "org.apache.spark.metrics.sink.PrometheusServlet"
