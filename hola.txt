@@ -1,65 +1,109 @@
-2026-02-21 00:22:39.501 | 2026-02-21 06:22:39,500 - kafka_spark_inference - INFO - ✅ Kafka RTM stream configured (no maxOffsetsPerTrigger)
-2026-02-21 00:22:39.772 | 26/02/21 06:22:39 INFO StateStoreCoordinatorRef: Registered StateStoreCoordinator endpoint
-2026-02-21 00:22:41.053 | 26/02/21 06:22:41 INFO ResolveWriteToStream: Checkpoint root s3a://k8s-mlops-platform-bucket/checkpoints/kafka-spark-inference resolved to s3a://k8s-mlops-platform-bucket/checkpoints/kafka-spark-inference.
-2026-02-21 00:22:41.143 | 2026-02-21 06:22:41,140 - kafka_spark_inference - ERROR - ❌ Pipeline failed: Continuous processing does not support MapInPandas operations.;
-2026-02-21 00:22:41.143 | ~MapInPandas <lambda>(event_id#17, src_port#19L, dst_port#20L, protocol#21, packet_count#22L, conn_state#23, bytes_transferred#24, timestamp#25L)#32, [event_id#33, label#34L], false
-2026-02-21 00:22:41.143 | +- ~Project [event_id#17, cast(properties#18.src_port as bigint) AS src_port#19L, cast(properties#18.dst_port as bigint) AS dst_port#20L, properties#18.protocol AS protocol#21, cast(properties#18.packet_count as bigint) AS packet_count#22L, properties#18.conn_state AS conn_state#23, cast(properties#18.bytes_transferred as double) AS bytes_transferred#24, cast(to_timestamp(timestamp#16, None, TimestampType, Some(Etc/UTC), true) as bigint) AS timestamp#25L]
-2026-02-21 00:22:41.143 |    +- ~Project [data#15.timestamp AS timestamp#16, data#15.event_id AS event_id#17, data#15.properties AS properties#18]
-2026-02-21 00:22:41.143 |       +- ~Project [from_json(StructField(timestamp,StringType,true), StructField(event_id,StringType,true), StructField(properties,StructType(StructField(src_port,LongType,true),StructField(dst_port,LongType,true),StructField(protocol,StringType,true),StructField(packet_count,LongType,true),StructField(conn_state,StringType,true),StructField(bytes_transferred,DoubleType,true)),true), value#14, Some(Etc/UTC), false) AS data#15]
-2026-02-21 00:22:41.143 |          +- ~Project [cast(value#8 as string) AS value#14]
-2026-02-21 00:22:41.143 |             +- ~StreamingRelationV2 org.apache.spark.sql.kafka010.KafkaSourceProvider@562994cc, kafka, org.apache.spark.sql.kafka010.KafkaSourceProvider$KafkaTable@d58c8a5, [kafka.sasl.mechanism=SCRAM-SHA-512, subscribe=topic-traffic, kafka.bootstrap.servers=host.docker.internal:9094, startingOffsets=latest, kafka.security.protocol=SASL_PLAINTEXT, failOnDataLoss=false, kafka.sasl.jaas.config=*********(redacted)], [key#7, value#8, topic#9, partition#10, offset#11L, timestamp#12, timestampType#13], ~StreamingRelation DataSource(org.apache.spark.sql.classic.SparkSession@104efd35,kafka,List(),None,List(),None,HashMap(kafka.sasl.mechanism -> SCRAM-SHA-512, subscribe -> topic-traffic, kafka.bootstrap.servers -> host.docker.internal:9094, startingOffsets -> latest, kafka.security.protocol -> SASL_PLAINTEXT, failOnDataLoss -> false, kafka.sasl.jaas.config -> org.apache.kafka.common.security.scram.ScramLoginModule required username="ml-platform" password="password";),None), kafka, [key#0, value#1, topic#2, partition#3, offset#4L, timestamp#5, timestampType#6]
-2026-02-21 00:22:41.143 | Traceback (most recent call last):
-2026-02-21 00:22:41.143 |   File "/app/repo/k3s/spark/inference/kafka_main.py", line 1164, in run_inference
-2026-02-21 00:22:41.143 |     self.run_inference_continuous()
-2026-02-21 00:22:41.143 |   File "/app/repo/k3s/spark/inference/kafka_main.py", line 1141, in run_inference_continuous
-2026-02-21 00:22:41.143 |     .start()
-2026-02-21 00:22:41.143 |      ^^^^^^^
-2026-02-21 00:22:41.143 |   File "/opt/spark/python/lib/pyspark.zip/pyspark/sql/streaming/readwriter.py", line 1704, in start
-2026-02-21 00:22:41.143 |     return self._sq(self._jwrite.start())
-2026-02-21 00:22:41.143 |                     ^^^^^^^^^^^^^^^^^^^^
-2026-02-21 00:22:41.143 |   File "/opt/spark/python/lib/py4j-0.10.9.9-src.zip/py4j/java_gateway.py", line 1362, in __call__
-2026-02-21 00:22:41.143 |     return_value = get_return_value(
-2026-02-21 00:22:41.143 |                    ^^^^^^^^^^^^^^^^^
-2026-02-21 00:22:41.143 |   File "/opt/spark/python/lib/pyspark.zip/pyspark/errors/exceptions/captured.py", line 269, in deco
-2026-02-21 00:22:41.143 |     raise converted from None
-2026-02-21 00:22:41.143 | pyspark.errors.exceptions.captured.AnalysisException: Continuous processing does not support MapInPandas operations.;
-2026-02-21 00:22:41.143 | ~MapInPandas <lambda>(event_id#17, src_port#19L, dst_port#20L, protocol#21, packet_count#22L, conn_state#23, bytes_transferred#24, timestamp#25L)#32, [event_id#33, label#34L], false
-2026-02-21 00:22:41.143 | +- ~Project [event_id#17, cast(properties#18.src_port as bigint) AS src_port#19L, cast(properties#18.dst_port as bigint) AS dst_port#20L, properties#18.protocol AS protocol#21, cast(properties#18.packet_count as bigint) AS packet_count#22L, properties#18.conn_state AS conn_state#23, cast(properties#18.bytes_transferred as double) AS bytes_transferred#24, cast(to_timestamp(timestamp#16, None, TimestampType, Some(Etc/UTC), true) as bigint) AS timestamp#25L]
-2026-02-21 00:22:41.143 |    +- ~Project [data#15.timestamp AS timestamp#16, data#15.event_id AS event_id#17, data#15.properties AS properties#18]
-2026-02-21 00:22:41.143 |       +- ~Project [from_json(StructField(timestamp,StringType,true), StructField(event_id,StringType,true), StructField(properties,StructType(StructField(src_port,LongType,true),StructField(dst_port,LongType,true),StructField(protocol,StringType,true),StructField(packet_count,LongType,true),StructField(conn_state,StringType,true),StructField(bytes_transferred,DoubleType,true)),true), value#14, Some(Etc/UTC), false) AS data#15]
-2026-02-21 00:22:41.143 |          +- ~Project [cast(value#8 as string) AS value#14]
-2026-02-21 00:22:41.143 |             +- ~StreamingRelationV2 org.apache.spark.sql.kafka010.KafkaSourceProvider@562994cc, kafka, org.apache.spark.sql.kafka010.KafkaSourceProvider$KafkaTable@d58c8a5, [kafka.sasl.mechanism=SCRAM-SHA-512, subscribe=topic-traffic, kafka.bootstrap.servers=host.docker.internal:9094, startingOffsets=latest, kafka.security.protocol=SASL_PLAINTEXT, failOnDataLoss=false, kafka.sasl.jaas.config=*********(redacted)], [key#7, value#8, topic#9, partition#10, offset#11L, timestamp#12, timestampType#13], ~StreamingRelation DataSource(org.apache.spark.sql.classic.SparkSession@104efd35,kafka,List(),None,List(),None,HashMap(kafka.sasl.mechanism -> SCRAM-SHA-512, subscribe -> topic-traffic, kafka.bootstrap.servers -> host.docker.internal:9094, startingOffsets -> latest, kafka.security.protocol -> SASL_PLAINTEXT, failOnDataLoss -> false, kafka.sasl.jaas.config -> org.apache.kafka.common.security.scram.ScramLoginModule required username="ml-platform" password="password";),None), kafka, [key#0, value#1, topic#2, partition#3, offset#4L, timestamp#5, timestampType#6]
-2026-02-21 00:22:41.143 | 
-2026-02-21 00:22:41.144 | Traceback (most recent call last):
-2026-02-21 00:22:41.144 |   File "/app/repo/k3s/spark/inference/kafka_main.py", line 1198, in <module>
-2026-02-21 00:22:41.144 |     main()
-2026-02-21 00:22:41.145 |   File "/app/repo/k3s/spark/inference/kafka_main.py", line 1195, in main
-2026-02-21 00:22:41.145 |     pipeline.run_inference()
-2026-02-21 00:22:41.145 |   File "/app/repo/k3s/spark/inference/kafka_main.py", line 1164, in run_inference
-2026-02-21 00:22:41.145 |     self.run_inference_continuous()
-2026-02-21 00:22:41.145 |   File "/app/repo/k3s/spark/inference/kafka_main.py", line 1141, in run_inference_continuous
-2026-02-21 00:22:41.145 |     .start()
-2026-02-21 00:22:41.145 |      ^^^^^^^
-2026-02-21 00:22:41.145 |   File "/opt/spark/python/lib/pyspark.zip/pyspark/sql/streaming/readwriter.py", line 1704, in start
-2026-02-21 00:22:41.145 |   File "/opt/spark/python/lib/py4j-0.10.9.9-src.zip/py4j/java_gateway.py", line 1362, in __call__
-2026-02-21 00:22:41.145 |   File "/opt/spark/python/lib/pyspark.zip/pyspark/errors/exceptions/captured.py", line 269, in deco
-2026-02-21 00:22:41.146 | pyspark.errors.exceptions.captured.AnalysisException: Continuous processing does not support MapInPandas operations.;
-2026-02-21 00:22:41.146 | ~MapInPandas <lambda>(event_id#17, src_port#19L, dst_port#20L, protocol#21, packet_count#22L, conn_state#23, bytes_transferred#24, timestamp#25L)#32, [event_id#33, label#34L], false
-2026-02-21 00:22:41.146 | +- ~Project [event_id#17, cast(properties#18.src_port as bigint) AS src_port#19L, cast(properties#18.dst_port as bigint) AS dst_port#20L, properties#18.protocol AS protocol#21, cast(properties#18.packet_count as bigint) AS packet_count#22L, properties#18.conn_state AS conn_state#23, cast(properties#18.bytes_transferred as double) AS bytes_transferred#24, cast(to_timestamp(timestamp#16, None, TimestampType, Some(Etc/UTC), true) as bigint) AS timestamp#25L]
-2026-02-21 00:22:41.146 |    +- ~Project [data#15.timestamp AS timestamp#16, data#15.event_id AS event_id#17, data#15.properties AS properties#18]
-2026-02-21 00:22:41.146 |       +- ~Project [from_json(StructField(timestamp,StringType,true), StructField(event_id,StringType,true), StructField(properties,StructType(StructField(src_port,LongType,true),StructField(dst_port,LongType,true),StructField(protocol,StringType,true),StructField(packet_count,LongType,true),StructField(conn_state,StringType,true),StructField(bytes_transferred,DoubleType,true)),true), value#14, Some(Etc/UTC), false) AS data#15]
-2026-02-21 00:22:41.146 |          +- ~Project [cast(value#8 as string) AS value#14]
-2026-02-21 00:22:41.146 |             +- ~StreamingRelationV2 org.apache.spark.sql.kafka010.KafkaSourceProvider@562994cc, kafka, org.apache.spark.sql.kafka010.KafkaSourceProvider$KafkaTable@d58c8a5, [kafka.sasl.mechanism=SCRAM-SHA-512, subscribe=topic-traffic, kafka.bootstrap.servers=host.docker.internal:9094, startingOffsets=latest, kafka.security.protocol=SASL_PLAINTEXT, failOnDataLoss=false, kafka.sasl.jaas.config=*********(redacted)], [key#7, value#8, topic#9, partition#10, offset#11L, timestamp#12, timestampType#13], ~StreamingRelation DataSource(org.apache.spark.sql.classic.SparkSession@104efd35,kafka,List(),None,List(),None,HashMap(kafka.sasl.mechanism -> SCRAM-SHA-512, subscribe -> topic-traffic, kafka.bootstrap.servers -> host.docker.internal:9094, startingOffsets -> latest, kafka.security.protocol -> SASL_PLAINTEXT, failOnDataLoss -> false, kafka.sasl.jaas.config -> org.apache.kafka.common.security.scram.ScramLoginModule required username="ml-platform" password="password";),None), kafka, [key#0, value#1, topic#2, partition#3, offset#4L, timestamp#5, timestampType#6]
-2026-02-21 00:22:41.147 | 
-2026-02-21 00:22:41.331 | 26/02/21 06:22:41 INFO SparkContext: SparkContext is stopping with exitCode 0 from stop at SparkSubmit.scala:1050.
-2026-02-21 00:22:41.359 | 26/02/21 06:22:41 INFO SparkUI: Stopped Spark web UI at http://spark-kafka-app-0-driver-svc.spark.svc:4040
-2026-02-21 00:22:41.363 | 26/02/21 06:22:41 INFO KubernetesClusterSchedulerBackend: Shutting down all executors
-2026-02-21 00:22:41.364 | 26/02/21 06:22:41 INFO KubernetesClusterSchedulerBackend$KubernetesDriverEndpoint: Asking each executor to shut down
-2026-02-21 00:22:41.370 | 26/02/21 06:22:41 INFO ExecutorPodsWatchSnapshotSource: Kubernetes client has been closed.
-2026-02-21 00:22:41.507 | 26/02/21 06:22:41 INFO MapOutputTrackerMasterEndpoint: MapOutputTrackerMasterEndpoint stopped!
-2026-02-21 00:22:41.533 | 26/02/21 06:22:41 INFO MemoryStore: MemoryStore started with capacity 117.0 MiB
-2026-02-21 00:22:41.534 | 26/02/21 06:22:41 INFO MemoryStore: MemoryStore cleared
-2026-02-21 00:22:41.534 | 26/02/21 06:22:41 INFO BlockManager: BlockManager stopped
-2026-02-21 00:22:41.541 | 26/02/21 06:22:41 INFO BlockManagerMaster: BlockManagerMaster stopped
-2026-02-21 00:22:41.544 | 26/02/21 06:22:41 INFO OutputCommitCoordinator$OutputCommitCoordinatorEndpoint: OutputCommitCoordinator stopped!
-2026-02-21 00:22:41.556 | 26/02/21 06:22:41 INFO SparkContext: Successfully stopped SparkContext (Uptime: 14864 ms)
+2026-02-21 01:32:08.351 | 2026-02-21 07:32:08,351 - kafka_spark_inference - INFO - ⏭️ Batch 7 is empty, skipping
+2026-02-21 01:32:09.168 | 26/02/21 07:32:09 INFO CheckpointFileManager: Writing atomically to s3a://k8s-mlops-platform-bucket/checkpoints/kafka-spark-inference/commits/7 using temp file s3a://k8s-mlops-platform-bucket/checkpoints/kafka-spark-inference/commits/.7.8fead2b0-931b-4ac1-9093-2f309fdf1f13.tmp
+2026-02-21 01:32:11.216 | 26/02/21 07:32:11 INFO CheckpointFileManager: Renamed temp file s3a://k8s-mlops-platform-bucket/checkpoints/kafka-spark-inference/commits/.7.8fead2b0-931b-4ac1-9093-2f309fdf1f13.tmp to s3a://k8s-mlops-platform-bucket/checkpoints/kafka-spark-inference/commits/7
+2026-02-21 01:32:11.235 | 26/02/21 07:32:11 ERROR MicroBatchExecution: Query [id = 838f40e3-6288-4929-9ac1-2bea9c2e866c, runId = 57f24b1f-595e-42dd-b1cd-bb56a830b3af] terminated with error
+2026-02-21 01:32:11.235 | java.lang.NullPointerException: Cannot invoke "scala.collection.IterableOps.map(scala.Function1)" because the return value of "scala.Option.get()" is null
+2026-02-21 01:32:11.235 | 	at org.apache.spark.sql.kafka010.KafkaMicroBatchStream$.metrics(KafkaMicroBatchStream.scala:520)
+2026-02-21 01:32:11.235 | 	at org.apache.spark.sql.kafka010.KafkaMicroBatchStream.metrics(KafkaMicroBatchStream.scala:363)
+2026-02-21 01:32:11.235 | 	at org.apache.spark.sql.execution.streaming.runtime.ProgressContext.$anonfun$extractSourceProgress$2(ProgressReporter.scala:384)
+2026-02-21 01:32:11.235 | 	at org.apache.spark.util.Utils$.timeTakenMs(Utils.scala:496)
+2026-02-21 01:32:11.235 | 	at org.apache.spark.sql.execution.streaming.runtime.ProgressContext.$anonfun$extractSourceProgress$1(ProgressReporter.scala:380)
+2026-02-21 01:32:11.235 | 	at scala.collection.immutable.List.map(List.scala:236)
+2026-02-21 01:32:11.235 | 	at scala.collection.immutable.List.map(List.scala:79)
+2026-02-21 01:32:11.235 | 	at org.apache.spark.sql.execution.streaming.runtime.ProgressContext.extractSourceProgress(ProgressReporter.scala:379)
+2026-02-21 01:32:11.235 | 	at org.apache.spark.sql.execution.streaming.runtime.ProgressContext.constructNewProgress(ProgressReporter.scala:348)
+2026-02-21 01:32:11.235 | 	at org.apache.spark.sql.execution.streaming.runtime.ProgressContext.finishTrigger(ProgressReporter.scala:312)
+2026-02-21 01:32:11.235 | 	at org.apache.spark.sql.execution.streaming.runtime.ProgressContext.finishTrigger(ProgressReporter.scala:429)
+2026-02-21 01:32:11.235 | 	at org.apache.spark.sql.execution.streaming.runtime.MicroBatchExecution.executeOneBatch(MicroBatchExecution.scala:525)
+2026-02-21 01:32:11.235 | 	at org.apache.spark.sql.execution.streaming.runtime.MicroBatchExecution.$anonfun$runActivatedStream$1(MicroBatchExecution.scala:461)
+2026-02-21 01:32:11.235 | 	at org.apache.spark.sql.execution.streaming.runtime.MicroBatchExecution.$anonfun$runActivatedStream$1$adapted(MicroBatchExecution.scala:461)
+2026-02-21 01:32:11.235 | 	at org.apache.spark.sql.execution.streaming.runtime.TriggerExecutor.runOneBatch(TriggerExecutor.scala:40)
+2026-02-21 01:32:11.235 | 	at org.apache.spark.sql.execution.streaming.runtime.TriggerExecutor.runOneBatch$(TriggerExecutor.scala:38)
+2026-02-21 01:32:11.235 | 	at org.apache.spark.sql.execution.streaming.runtime.ProcessingTimeExecutor.runOneBatch(TriggerExecutor.scala:71)
+2026-02-21 01:32:11.235 | 	at org.apache.spark.sql.execution.streaming.runtime.ProcessingTimeExecutor.execute(TriggerExecutor.scala:83)
+2026-02-21 01:32:11.235 | 	at org.apache.spark.sql.execution.streaming.runtime.MicroBatchExecution.runActivatedStream(MicroBatchExecution.scala:461)
+2026-02-21 01:32:11.235 | 	at org.apache.spark.sql.execution.streaming.runtime.StreamExecution.$anonfun$runStream$1(StreamExecution.scala:347)
+2026-02-21 01:32:11.235 | 	at scala.runtime.java8.JFunction0$mcV$sp.apply(JFunction0$mcV$sp.scala:18)
+2026-02-21 01:32:11.235 | 	at org.apache.spark.sql.SparkSession.withActive(SparkSession.scala:804)
+2026-02-21 01:32:11.235 | 	at org.apache.spark.sql.execution.streaming.runtime.StreamExecution.org$apache$spark$sql$execution$streaming$runtime$StreamExecution$$runStream(StreamExecution.scala:307)
+2026-02-21 01:32:11.235 | 	at org.apache.spark.sql.execution.streaming.runtime.StreamExecution$$anon$1.run(StreamExecution.scala:230)
+2026-02-21 01:32:11.237 | 26/02/21 07:32:11 INFO MicroBatchExecution: Async log purge executor pool for query [id = 838f40e3-6288-4929-9ac1-2bea9c2e866c, runId = 57f24b1f-595e-42dd-b1cd-bb56a830b3af] has been shutdown
+2026-02-21 01:32:11.302 | 2026-02-21 07:32:11,298 - kafka_spark_inference - ERROR - ❌ Pipeline failed: [STREAM_FAILED] Query [id = 838f40e3-6288-4929-9ac1-2bea9c2e866c, runId = 57f24b1f-595e-42dd-b1cd-bb56a830b3af] terminated with exception: Cannot invoke "scala.collection.IterableOps.map(scala.Function1)" because the return value of "scala.Option.get()" is null SQLSTATE: XXKST
+2026-02-21 01:32:11.302 | === Streaming Query ===
+2026-02-21 01:32:11.302 | Identifier: [id = 838f40e3-6288-4929-9ac1-2bea9c2e866c, runId = 57f24b1f-595e-42dd-b1cd-bb56a830b3af]
+2026-02-21 01:32:11.302 | Current Committed Offsets: {KafkaV2[Subscribe[topic-traffic]]: {"topic-traffic":{"0":845,"1":830,"2":883,"3":853,"4":841,"5":834}}}
+2026-02-21 01:32:11.302 | Current Available Offsets: {KafkaV2[Subscribe[topic-traffic]]: {"topic-traffic":{"0":886,"1":888,"2":927,"3":898,"4":874,"5":877}}}
+2026-02-21 01:32:11.302 | 
+2026-02-21 01:32:11.302 | Current State: ACTIVE
+2026-02-21 01:32:11.302 | Thread State: RUNNABLE
+2026-02-21 01:32:11.302 | 
+2026-02-21 01:32:11.302 | Logical Plan:
+2026-02-21 01:32:11.302 | ~WriteToMicroBatchDataSourceV1 ForeachBatchSink, 838f40e3-6288-4929-9ac1-2bea9c2e866c, [checkpointLocation=s3a://k8s-mlops-platform-bucket/checkpoints/kafka-spark-inference], Append
+2026-02-21 01:32:11.302 | +- ~Project [data#15.timestamp AS timestamp#16, data#15.event_id AS event_id#17, data#15.properties AS properties#18]
+2026-02-21 01:32:11.302 |    +- ~Project [from_json(StructField(timestamp,StringType,true), StructField(event_id,StringType,true), StructField(properties,StructType(StructField(src_port,LongType,true),StructField(dst_port,LongType,true),StructField(protocol,StringType,true),StructField(packet_count,LongType,true),StructField(conn_state,StringType,true),StructField(bytes_transferred,DoubleType,true)),true), value#14, Some(Etc/UTC), false) AS data#15]
+2026-02-21 01:32:11.302 |       +- ~Project [cast(value#8 as string) AS value#14]
+2026-02-21 01:32:11.302 |          +- ~StreamingDataSourceV2ScanRelation[key#7, value#8, topic#9, partition#10, offset#11L, timestamp#12, timestampType#13] KafkaTable
+2026-02-21 01:32:11.302 | Traceback (most recent call last):
+2026-02-21 01:32:11.302 |   File "/app/repo/k3s/spark/inference/kafka_main.py", line 518, in run_inference
+2026-02-21 01:32:11.302 |     query.awaitTermination()
+2026-02-21 01:32:11.302 |   File "/opt/spark/python/lib/pyspark.zip/pyspark/sql/streaming/query.py", line 225, in awaitTermination
+2026-02-21 01:32:11.302 |     return self._jsq.awaitTermination()
+2026-02-21 01:32:11.302 |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-02-21 01:32:11.302 |   File "/opt/spark/python/lib/py4j-0.10.9.9-src.zip/py4j/java_gateway.py", line 1362, in __call__
+2026-02-21 01:32:11.302 |     return_value = get_return_value(
+2026-02-21 01:32:11.302 |                    ^^^^^^^^^^^^^^^^^
+2026-02-21 01:32:11.303 |   File "/opt/spark/python/lib/pyspark.zip/pyspark/errors/exceptions/captured.py", line 269, in deco
+2026-02-21 01:32:11.303 |     raise converted from None
+2026-02-21 01:32:11.303 | pyspark.errors.exceptions.captured.StreamingQueryException: [STREAM_FAILED] Query [id = 838f40e3-6288-4929-9ac1-2bea9c2e866c, runId = 57f24b1f-595e-42dd-b1cd-bb56a830b3af] terminated with exception: Cannot invoke "scala.collection.IterableOps.map(scala.Function1)" because the return value of "scala.Option.get()" is null SQLSTATE: XXKST
+2026-02-21 01:32:11.303 | === Streaming Query ===
+2026-02-21 01:32:11.303 | Identifier: [id = 838f40e3-6288-4929-9ac1-2bea9c2e866c, runId = 57f24b1f-595e-42dd-b1cd-bb56a830b3af]
+2026-02-21 01:32:11.303 | Current Committed Offsets: {KafkaV2[Subscribe[topic-traffic]]: {"topic-traffic":{"0":845,"1":830,"2":883,"3":853,"4":841,"5":834}}}
+2026-02-21 01:32:11.303 | Current Available Offsets: {KafkaV2[Subscribe[topic-traffic]]: {"topic-traffic":{"0":886,"1":888,"2":927,"3":898,"4":874,"5":877}}}
+2026-02-21 01:32:11.303 | 
+2026-02-21 01:32:11.303 | Current State: ACTIVE
+2026-02-21 01:32:11.303 | Thread State: RUNNABLE
+2026-02-21 01:32:11.303 | 
+2026-02-21 01:32:11.303 | Logical Plan:
+2026-02-21 01:32:11.303 | ~WriteToMicroBatchDataSourceV1 ForeachBatchSink, 838f40e3-6288-4929-9ac1-2bea9c2e866c, [checkpointLocation=s3a://k8s-mlops-platform-bucket/checkpoints/kafka-spark-inference], Append
+2026-02-21 01:32:11.303 | +- ~Project [data#15.timestamp AS timestamp#16, data#15.event_id AS event_id#17, data#15.properties AS properties#18]
+2026-02-21 01:32:11.303 |    +- ~Project [from_json(StructField(timestamp,StringType,true), StructField(event_id,StringType,true), StructField(properties,StructType(StructField(src_port,LongType,true),StructField(dst_port,LongType,true),StructField(protocol,StringType,true),StructField(packet_count,LongType,true),StructField(conn_state,StringType,true),StructField(bytes_transferred,DoubleType,true)),true), value#14, Some(Etc/UTC), false) AS data#15]
+2026-02-21 01:32:11.303 |       +- ~Project [cast(value#8 as string) AS value#14]
+2026-02-21 01:32:11.303 |          +- ~StreamingDataSourceV2ScanRelation[key#7, value#8, topic#9, partition#10, offset#11L, timestamp#12, timestampType#13] KafkaTable
+2026-02-21 01:32:11.303 | 
+2026-02-21 01:32:11.304 | Traceback (most recent call last):
+2026-02-21 01:32:11.304 |   File "/app/repo/k3s/spark/inference/kafka_main.py", line 532, in <module>
+2026-02-21 01:32:11.305 |     main()
+2026-02-21 01:32:11.305 |   File "/app/repo/k3s/spark/inference/kafka_main.py", line 529, in main
+2026-02-21 01:32:11.305 |     pipeline.run_inference()
+2026-02-21 01:32:11.305 |   File "/app/repo/k3s/spark/inference/kafka_main.py", line 518, in run_inference
+2026-02-21 01:32:11.305 |     query.awaitTermination()
+2026-02-21 01:32:11.305 |   File "/opt/spark/python/lib/pyspark.zip/pyspark/sql/streaming/query.py", line 225, in awaitTermination
+2026-02-21 01:32:11.306 |   File "/opt/spark/python/lib/py4j-0.10.9.9-src.zip/py4j/java_gateway.py", line 1362, in __call__
+2026-02-21 01:32:11.306 |   File "/opt/spark/python/lib/pyspark.zip/pyspark/errors/exceptions/captured.py", line 269, in deco
+2026-02-21 01:32:11.307 | pyspark.errors.exceptions.captured.StreamingQueryException: [STREAM_FAILED] Query [id = 838f40e3-6288-4929-9ac1-2bea9c2e866c, runId = 57f24b1f-595e-42dd-b1cd-bb56a830b3af] terminated with exception: Cannot invoke "scala.collection.IterableOps.map(scala.Function1)" because the return value of "scala.Option.get()" is null SQLSTATE: XXKST
+2026-02-21 01:32:11.307 | === Streaming Query ===
+2026-02-21 01:32:11.307 | Identifier: [id = 838f40e3-6288-4929-9ac1-2bea9c2e866c, runId = 57f24b1f-595e-42dd-b1cd-bb56a830b3af]
+2026-02-21 01:32:11.307 | Current Committed Offsets: {KafkaV2[Subscribe[topic-traffic]]: {"topic-traffic":{"0":845,"1":830,"2":883,"3":853,"4":841,"5":834}}}
+2026-02-21 01:32:11.307 | Current Available Offsets: {KafkaV2[Subscribe[topic-traffic]]: {"topic-traffic":{"0":886,"1":888,"2":927,"3":898,"4":874,"5":877}}}
+2026-02-21 01:32:11.307 | 
+2026-02-21 01:32:11.307 | Current State: ACTIVE
+2026-02-21 01:32:11.307 | Thread State: RUNNABLE
+2026-02-21 01:32:11.307 | 
+2026-02-21 01:32:11.307 | Logical Plan:
+2026-02-21 01:32:11.307 | ~WriteToMicroBatchDataSourceV1 ForeachBatchSink, 838f40e3-6288-4929-9ac1-2bea9c2e866c, [checkpointLocation=s3a://k8s-mlops-platform-bucket/checkpoints/kafka-spark-inference], Append
+2026-02-21 01:32:11.307 | +- ~Project [data#15.timestamp AS timestamp#16, data#15.event_id AS event_id#17, data#15.properties AS properties#18]
+2026-02-21 01:32:11.307 |    +- ~Project [from_json(StructField(timestamp,StringType,true), StructField(event_id,StringType,true), StructField(properties,StructType(StructField(src_port,LongType,true),StructField(dst_port,LongType,true),StructField(protocol,StringType,true),StructField(packet_count,LongType,true),StructField(conn_state,StringType,true),StructField(bytes_transferred,DoubleType,true)),true), value#14, Some(Etc/UTC), false) AS data#15]
+2026-02-21 01:32:11.307 |       +- ~Project [cast(value#8 as string) AS value#14]
+2026-02-21 01:32:11.307 |          +- ~StreamingDataSourceV2ScanRelation[key#7, value#8, topic#9, partition#10, offset#11L, timestamp#12, timestampType#13] KafkaTable
+2026-02-21 01:32:11.307 | 
+2026-02-21 01:32:11.413 | 26/02/21 07:32:11 INFO SparkContext: SparkContext is stopping with exitCode 0 from stop at SparkSubmit.scala:1050.
+2026-02-21 01:32:11.425 | 26/02/21 07:32:11 INFO SparkUI: Stopped Spark web UI at http://spark-kafka-app-0-driver-svc.spark.svc:4040
+2026-02-21 01:32:11.428 | 26/02/21 07:32:11 INFO KubernetesClusterSchedulerBackend: Shutting down all executors
+2026-02-21 01:32:11.429 | 26/02/21 07:32:11 INFO KubernetesClusterSchedulerBackend$KubernetesDriverEndpoint: Asking each executor to shut down
+2026-02-21 01:32:11.436 | 26/02/21 07:32:11 INFO ExecutorPodsWatchSnapshotSource: Kubernetes client has been closed.
+2026-02-21 01:32:11.589 | 26/02/21 07:32:11 INFO MapOutputTrackerMasterEndpoint: MapOutputTrackerMasterEndpoint stopped!
+2026-02-21 01:32:11.608 | 26/02/21 07:32:11 INFO MemoryStore: MemoryStore cleared
+2026-02-21 01:32:11.608 | 26/02/21 07:32:11 INFO BlockManager: BlockManager stopped
+2026-02-21 01:32:11.615 | 26/02/21 07:32:11 INFO BlockManagerMaster: BlockManagerMaster stopped
+2026-02-21 01:32:11.618 | 26/02/21 07:32:11 INFO OutputCommitCoordinator$OutputCommitCoordinatorEndpoint: OutputCommitCoordinator stopped!
+2026-02-21 01:32:11.629 | 26/02/21 07:32:11 INFO SparkContext: Successfully stopped SparkContext (Uptime: 28541 ms)

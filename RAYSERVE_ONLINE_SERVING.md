@@ -145,7 +145,7 @@ Las 14 posiciones siguen el orden de `final_features.features` en `dsl_001.yaml`
 Spark solo hizo `kafka_to_schema_features` (sin DSL). El dict está ya plano y tipado:
 
 ```bash
-curl -s -X POST http://localhost:8000/infer \
+curl -s -X POST http://serving.localhost/infer \
   -H "Content-Type: application/json" \
   -d '{
     "raw": {
@@ -190,7 +190,7 @@ curl http://localhost:8000/infer
 ### Webhook MLflow (solo `online: true`)
 
 ```bash
-curl -s -X POST http://localhost:8000/infer/webhook \
+curl -s -X POST http://serving.localhost/infer/webhook \
   -H "Content-Type: application/json" \
   -H "X-Mlflow-Event-Timestamp: 1735691403000" \
   -H "X-Mlflow-Signature: sha256=..." \

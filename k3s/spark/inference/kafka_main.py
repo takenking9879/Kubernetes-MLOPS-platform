@@ -314,6 +314,7 @@ class KafkaSparkInference(BaseUtils):
                 .config("spark.hadoop.fs.s3a.committer.magic.enabled", "true")
                 .config("spark.sql.streaming.schemaInference", "false")
                 .config("spark.sql.adaptive.enabled", "false")
+                .config("spark.sql.streaming.metricsEnabled", "false")
             )
             
             spark = builder.getOrCreate()
