@@ -52,18 +52,19 @@ def _predict_partition_ray_online(
     pred_column = config['prediction_column']
     pred_key = config.get('prediction_key', 'predictions')
 
-    for row in partition:
-        event_id = row[id_column]
-        raw_dict = row.asDict()
-        try:
-            response = requests.post(url, json={"raw": raw_dict}, timeout=timeout)
-            response.raise_for_status()
-            preds = response.json().get(pred_key, [0])
-            pred = preds[0] if preds else 0
-            yield Row(**{id_column: event_id, pred_column: int(pred)})
-        except Exception as e:
-            print(f"[online] Error sending event {event_id!r} to Ray Serve: {e}")
-            yield Row(**{id_column: event_id, pred_column: 0})
+    with requests.Session() as session:
+        for row in partition:
+            event_id = row[id_column]
+            raw_dict = row.asDict()
+            try:
+                response = session.post(url, json={"raw": raw_dict}, timeout=timeout)
+                response.raise_for_status()
+                preds = response.json().get(pred_key, [0])
+                pred = preds[0] if preds else 0
+                yield Row(**{id_column: event_id, pred_column: int(pred)})
+            except Exception as e:
+                print(f"[online] Error sending event {event_id!r} to Ray Serve: {e}")
+                yield Row(**{id_column: event_id, pred_column: 0})
 
 
 def _predict_partition_ray(
