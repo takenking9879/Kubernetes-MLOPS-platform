@@ -1,3 +1,4 @@
+import asyncio
 import os
 from typing import Dict
 
@@ -68,7 +69,7 @@ class StableModel:
         self._rt.set_executor(executor)
 
     async def predict(self, payload: Dict[str, object]):
-        return self._rt.predict(payload)
+        return await asyncio.to_thread(self._rt.predict, payload)
 
 
 @serve.deployment(name="CanaryModel")
@@ -118,7 +119,7 @@ class CanaryModel:
         self._rt.set_executor(executor)
 
     async def predict(self, payload: Dict[str, object]):
-        return self._rt.predict(payload)
+        return await asyncio.to_thread(self._rt.predict, payload)
 
 
 @serve.deployment(name="ModelRouter")
