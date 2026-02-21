@@ -15,6 +15,7 @@ PREPROCESS_CURRENT_DATASET = Gauge('preprocess_current_dataset_progress', 'Curre
 LATENCY_PREPROCESS = Gauge('latency_preprocess_seconds', 'Time spent in Spark preprocessing per batch')
 LATENCY_INFERENCE = Gauge('latency_inference_seconds', 'Time spent calling Ray Serve per batch')
 LATENCY_TOTAL_BATCH = Gauge('latency_total_batch_seconds', 'Total roundtrip time Kafka->Spark->Ray->Kafka per batch')
+LATENCY_KAFKA_WRITE = Gauge('latency_kafka_write_seconds', 'Time spent writing results to the output Kafka topic per batch')
 BATCH_RECORDS_TOTAL = Gauge('spark_batch_records_total', 'Number of records processed in the last batch')
 BATCH_ERRORS_TOTAL = Counter('spark_batch_errors_total', 'Total number of batch processing errors')
 INFERENCE_LATENCY_SUMMARY = Summary('inference_latency_summary_seconds', 'Summary of inference latencies')

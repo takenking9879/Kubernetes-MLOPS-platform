@@ -1,19 +1,19 @@
 """
-Generic Kafka-Spark Inference Pipeline.
-Completamente configurable vía params.yaml sin hardcodear lógica específica.
+Kafka-Spark Inference Pipeline — router mode.
 
-Refactorizado desde KafkaSparkInference para soportar múltiples datasets y modelos.
+Spark actúa como router de alta velocidad entre Kafka y Ray Serve:
+  Kafka → Spark (schema conversion only) → Ray Serve (DSL NumPy + inferencia) → Kafka
+
+Ray Serve carga el NumpyPipelineExecutor + modelo vía MLflow alias.
+Spark no descarga artifacts, no ejecuta DSL, no hace preprocessing.
 """
 import os
 import time
 from typing import Dict, Optional, Iterator, List, Any
 from urllib.parse import urlparse
-from src.dsl import PipelineModel
-from botocore.exceptions import ClientError
 from confluent_kafka import Consumer, KafkaException
 from pyspark.sql import SparkSession, Row, DataFrame
 from pyspark.sql.functions import from_json, col, to_json, struct
-import boto3
 import requests
 from src.utils.baseclass import BaseUtils
 from src.utils.logger import create_logger
@@ -23,9 +23,9 @@ from src.converters.spark_kafka_helper import get_converter
 # ===== PROMETHEUS METRICS =====
 from prometheus_client import start_http_server
 from src.prometheus import (
-    LATENCY_PREPROCESS,
     LATENCY_INFERENCE,
     LATENCY_TOTAL_BATCH,
+    LATENCY_KAFKA_WRITE,
     BATCH_RECORDS_TOTAL,
     BATCH_ERRORS_TOTAL,
     INFERENCE_LATENCY_SUMMARY,
@@ -67,133 +67,17 @@ def _predict_partition_ray_online(
                 yield Row(**{id_column: event_id, pred_column: 0})
 
 
-def _predict_partition_ray(
-    partition: Iterator[Row],
-    config: Dict[str, Any]
-) -> Iterator[Row]:
-    """
-    Función standalone para procesar particiones con predicciones Ray Serve.
-    Extraída para evitar PicklingError.
-    
-    Args:
-        partition: Iterador de Rows de Spark
-        config: Diccionario con configuración (primitivos, no objetos)
-    """
-    url = config['url']
-    batch_size = config['batch_size']
-    timeout = config['timeout']
-    id_column = config['id_column']
-    pred_column = config['prediction_column']
-    payload_format = config.get('payload_format', 'list')
-    pred_key = config.get('prediction_key', 'predictions')
-    
-    batch_ids: List[Any] = []
-    batch_payload: List[Any] = []
-    
-    def send_batch():
-        """Helper para enviar batch y generar resultados."""
-        if not batch_payload:
-            return
-        
-        try:
-            response = requests.post(url, json={"data": batch_payload}, timeout=timeout)
-            response.raise_for_status()
-            preds = response.json()[pred_key]
-            
-            if len(preds) != len(batch_ids):
-                raise ValueError(f"Prediction count mismatch: {len(preds)} != {len(batch_ids)}")
-            
-            for i, pred in enumerate(preds):
-                yield Row(**{id_column: batch_ids[i], pred_column: int(pred)})
-        
-        except requests.exceptions.RequestException as e:
-            # Log error pero continuar procesamiento
-            print(f"Error sending batch to Ray Serve: {e}")
-            # Retornar predicciones por defecto (0)
-            for batch_id in batch_ids:
-                yield Row(**{id_column: batch_id, pred_column: 0})
-    
-    # Only the first num_features columns are sent to the model.
-    # metadata and passthrough columns follow features in the DF but are never
-    # included in the inference payload.
-    # id_column is read by name from the Spark Row — no positional assumptions needed.
-    num_features: int = config['num_features']
-
-    for row in partition:
-        # Use named access: works regardless of how many metadata/passthrough cols exist.
-        event_id = row[id_column]
-        payload_row = list(row)[:num_features]
-        
-        batch_ids.append(event_id)
-        
-        if payload_format == 'list':
-            batch_payload.append(payload_row)
-        elif payload_format == 'dict':
-            # Convertir a dict si es necesario (menos eficiente)
-            batch_payload.append({f"f{i}": v for i, v in enumerate(payload_row)})
-        else:
-            batch_payload.append(payload_row)
-        
-        if len(batch_payload) >= batch_size:
-            yield from send_batch()
-            batch_ids = []
-            batch_payload = []
-    
-    # Procesar batch restante
-    if batch_ids:
-        yield from send_batch()
-
-
-def _rtm_predict_pandas(
-    pdf_iter,
-    config: Dict[str, Any],
-):
-    """
-    RTM (Real-Time Mode): función para mapInPandas con Trigger.Continuous (Spark 4.1).
-    Stateless — un request HTTP por fila, compatible con procesamiento continuo.
-    Mismo patrón que _predict_partition_ray_online, adaptado a Iterator[pd.DataFrame].
-    """
-    import pandas as pd
-    import requests
-
-    url      = config['url']
-    timeout  = config['timeout']
-    id_col   = config['id_column']
-    pred_col = config['prediction_column']
-    pred_key = config.get('prediction_key', 'predictions')
-
-    with requests.Session() as session:
-        for pdf in pdf_iter:
-            rows_out = []
-            for _, row in pdf.iterrows():
-                raw_dict = row.to_dict()
-                event_id = raw_dict.get(id_col)
-                try:
-                    resp = session.post(url, json={"raw": raw_dict}, timeout=timeout)
-                    resp.raise_for_status()
-                    pred = resp.json().get(pred_key, [0])[0]
-                except Exception as e:
-                    print(f"[RTM] Error event {event_id!r}: {e}")
-                    pred = 0
-                rows_out.append({id_col: event_id, pred_col: int(pred)})
-            yield pd.DataFrame(rows_out)
-
 
 # ===== PIPELINE GENÉRICO =====
 
 class KafkaSparkInference(BaseUtils):
     """
-    Pipeline genérico de inferencia Kafka-Spark.
-    Todo configurable vía params.yaml.
-    
-    Cambios vs versión original:
-    - Schemas cargados dinámicamente por nombre
-    - Conversores cargados dinámicamente
-    - Preprocessing module configurable
-    - Output configurable
-    - Artifacts configurable
+    Kafka-Spark router: schema conversion only, all ML work in Ray Serve.
+
+    Pipeline:
+      Kafka → convert_schema() → predict_batch_online() [HTTP → Ray Serve] → Kafka
     """
-    
+
     def __init__(self, params_path: str):
         logger = create_logger('kafka_spark_inference', 'kafka_spark_inference.log')
         super().__init__(logger, params_path)
@@ -201,34 +85,21 @@ class KafkaSparkInference(BaseUtils):
         self.params = self.params_full.get('spark', {})
         # ===== START PROMETHEUS METRICS SERVER =====
         self._start_prometheus_server()
-        
+
         # Cargar configuraciones desde params
         self._load_kafka_config()
         self._load_schema_config()
         self._load_converter_config()
-        self._load_artifacts_config()
         self._load_prediction_config()
         self._load_output_config()
         self._load_checkpoint_config()
-        
-        # Estado interno
-        self.s3 = None
-        self.artifacts = None
-        self.preprocessing_function = None
+
         self.converter_function = None
-        
+
         # Validaciones opcionales
         operational_config = self.params.get('operational', {})
         if operational_config.get('check_kafka_connection', True):
             self._check_kafka_connection()
-        
-        if operational_config.get('check_minio_connection', True):
-            self._check_minio_connection()
-        
-        # Serving mode: read once here so __init__ branches correctly.
-        self.online = bool(
-            self.params_full.get('kuberay', {}).get('serving', {}).get('online', False)
-        )
 
         # Crear Spark session
         self.spark = self._create_spark_session()
@@ -236,23 +107,10 @@ class KafkaSparkInference(BaseUtils):
         # Cargar módulos y funciones
         self._load_converter_function()
 
-        if self.online:
-            # online=true: Spark only does schema conversion (kafka_to_schema_features).
-            # DSL preprocessing + prediction run entirely in Ray Serve (NumPy executor).
-            self.pipeline = None
-            self.num_features = 0        # unused in online mode
-            self.dsl_feature_cols = []
-            self.dsl_metadata_cols = []
-            self.dsl_passthrough_cols = []
-            self.logger.info(
-                "online=true: DSL preprocessing delegated to Ray Serve. "
-                "Spark will only convert schema and forward events."
-            )
-        else:
-            # online=false: Spark runs the full DSL pipeline, then sends
-            # pre-processed feature vectors to Ray Serve.
-            self._load_dsl_config()       # reads DSL YAML → feature/metadata/passthrough cols
-            self.pipeline = self.load_pipeline_artifact()
+        self.logger.info(
+            "Router mode: Spark converts schema and forwards events to Ray Serve. "
+            "DSL preprocessing + prediction run in Ray Serve (NumpyPipelineExecutor)."
+        )
     
     # ===== PROMETHEUS SERVER =====
     
@@ -285,9 +143,7 @@ class KafkaSparkInference(BaseUtils):
         
         # Streaming options
         streaming_config = self.params.get('streaming', {})
-        self.max_offsets_per_trigger = streaming_config.get('max_offsets_per_trigger', 10000)
-        self.processing_time = streaming_config.get('processing_time', '10 seconds')
-        self.continuous_trigger_interval = streaming_config.get('continuous_trigger_interval', '1 second')
+        self.online_processing_time = streaming_config.get('online_processing_time', '100 milliseconds')
         self.starting_offsets = streaming_config.get('starting_offsets', 'latest')
         self.fail_on_data_loss = streaming_config.get('fail_on_data_loss', False)
         
@@ -317,283 +173,6 @@ class KafkaSparkInference(BaseUtils):
         self.converter_name = converter_config.get('kafka_to_features', 'kafka_to_schema_features')
         self.logger.info(f"✅ Converter configured: {self.converter_name}")
     
-    def _load_artifacts_config(self):
-        try:
-            """Carga configuración de artifacts desde params."""
-            artifacts_config = self.params.get('artifacts') or self.params.get('preprocessing', {}).get('artifacts', {})
-            
-            # Configuración de artifacts
-            self.artifacts_source = artifacts_config.get('source', 's3')
-            self.artifacts_bucket = artifacts_config.get('bucket', 'k8s-mlops-platform-bucket')
-            self.artifacts_key = artifacts_config.get('key', 'pipelines')
-            self.dynamic_artifacts_prefix = artifacts_config.get('dynamic_key_prefix', 'pipelines')
-            self.artifacts_list = artifacts_config.get('archives', ['config.json', 'stages.json'])
-            self.dynamic_pipeline_resolution = bool(artifacts_config.get('resolve_from_mlflow', True))
-            self.mlflow_http_timeout_seconds = int(artifacts_config.get('mlflow_timeout_seconds', 5))
-
-            # MLflow + Metadata config
-            kuberay_model_cfg = self.params_full.get('kuberay', {}).get('model', {})
-            kuberay_serving_cfg = self.params_full.get('kuberay', {}).get('serving', {})
-            self.mlflow_tracking_uri = os.getenv(
-                'MLFLOW_TRACKING_URI',
-                kuberay_model_cfg.get('mlflow_tracking_uri')
-            )
-            self.registry_model_name = os.getenv(
-                'MLFLOW_REGISTRY_MODEL_NAME',
-                kuberay_model_cfg.get('mlflow_registry_model_name')
-            )
-            self.registry_alias = os.getenv(
-                'MLFLOW_MODEL_ALIAS',
-                kuberay_serving_cfg.get('alias', 'champion')
-            )
-
-            self.logger.info(f"✅ Artifacts configured: archives={self.artifacts_list} from {self.artifacts_source}")
-        except Exception as e:
-            self.logger.error('Failed loading artifacts config: %s', str(e), exc_info=True)
-            raise
-
-    def _resolve_artifact_set_id_from_mlflow(self) -> Optional[str]:
-        """Obtiene artifact_set_id del modelo con alias (champion/challenger) en MLflow.
-        Result is cached in self._cached_artifact_set_id to avoid duplicate API calls.
-        """
-        if getattr(self, '_cached_artifact_set_id', 'UNSET') != 'UNSET':
-            return self._cached_artifact_set_id
-
-        if not self.dynamic_pipeline_resolution:
-            self._cached_artifact_set_id = None
-            return None
-
-        if not self.mlflow_tracking_uri or not self.registry_model_name:
-            self.logger.info(
-                "MLflow dynamic pipeline resolution disabled: missing tracking_uri or registry_model_name"
-            )
-            return None
-
-        try:
-            # Evita bloqueos largos cuando MLflow no responde.
-            os.environ.setdefault('MLFLOW_HTTP_REQUEST_TIMEOUT', str(self.mlflow_http_timeout_seconds))
-            os.environ.setdefault('MLFLOW_HTTP_REQUEST_MAX_RETRIES', '1')
-
-            import mlflow
-            from mlflow.tracking import MlflowClient
-
-            mlflow.set_tracking_uri(self.mlflow_tracking_uri)
-            client = MlflowClient()
-            mv = client.get_model_version_by_alias(self.registry_model_name, self.registry_alias)
-            model_tags = getattr(mv, 'tags', {}) or {}
-            artifact_set_id = model_tags.get('artifact_set_id')
-            framework = model_tags.get('framework', 'unknown')
-
-            if artifact_set_id:
-                self.logger.info(
-                    "✅ MLflow %s@%s v%s [Framework: %s] -> artifact_set_id=%s",
-                    self.registry_model_name,
-                    self.registry_alias,
-                    mv.version,
-                    framework,
-                    artifact_set_id,
-                )
-                self._cached_artifact_set_id = str(artifact_set_id)
-                return self._cached_artifact_set_id
-
-            self.logger.warning(
-                "MLflow model %s@%s v%s has no tag 'artifact_set_id'",
-                self.registry_model_name,
-                self.registry_alias,
-                mv.version,
-            )
-            self._cached_artifact_set_id = None
-            return None
-        except Exception as e:
-            self.logger.warning("Could not resolve artifact_set_id from MLflow: %s", e)
-            self._cached_artifact_set_id = None
-            return None
-
-    def _get_iceberg_catalog_kwargs(self) -> dict:
-        """Construye kwargs para PyIceberg load_catalog. Patrón idéntico a PipelineArtifactLoader."""
-        warehouse = (
-            self.params_full.get("iceberg_tables", {})
-            .get("warehouse", "s3://k8s-mlops-platform-bucket/warehouse")
-            .replace("s3a://", "s3://")
-        )
-        return {
-            "type": "glue",
-            "warehouse": warehouse,
-            "client.access-key-id":     os.environ.get("AWS_ACCESS_KEY_ID"),
-            "client.secret-access-key": os.environ.get("AWS_SECRET_ACCESS_KEY"),
-            "client.region":            os.environ.get("AWS_REGION", "us-east-2"),
-        }
-
-    def _resolve_pipeline_hash_from_metadata(self, artifact_set_id: str) -> str:
-        """
-        Resuelve pipeline_hash desde la tabla Iceberg de metadatos.
-        Usa PyIceberg directamente — sin Spark.
-        Reutiliza el mismo patrón que PipelineArtifactLoader (src/serve/pipeline_loader.py).
-        Solo debe llamarse en modo batch (online=False).
-
-        Raises:
-            RuntimeError: si no se encuentra registro para artifact_set_id.
-        """
-        from pyiceberg.catalog import load_catalog
-
-        catalog_kwargs = self._get_iceberg_catalog_kwargs()
-        meta_cfg = self.params_full.get("iceberg_tables", {}).get("metadata", {})
-        identifier = (
-            f"{meta_cfg.get('namespace', 'metadata')}."
-            f"{meta_cfg.get('table', 'preprocessing_artifacts')}"
-        )
-
-        self.logger.info(
-            "Querying Iceberg table %r for artifact_set_id=%s", identifier, artifact_set_id
-        )
-        catalog = load_catalog("iceberg", **catalog_kwargs)
-        table   = catalog.load_table(identifier)
-        df      = table.scan().to_pandas()
-
-        rows = df[df["artifact_set_id"] == artifact_set_id]
-        if rows.empty:
-            raise RuntimeError(
-                f"No row found in Iceberg table {identifier!r} "
-                f"for artifact_set_id={artifact_set_id!r}. "
-                f"Run preprocessing first."
-            )
-
-        pipeline_hash = str(rows.iloc[0]["pipeline_hash"])
-        if not pipeline_hash:
-            raise RuntimeError(
-                f"pipeline_hash is empty for artifact_set_id={artifact_set_id!r} "
-                f"in table {identifier!r}."
-            )
-
-        self.logger.info(
-            "Iceberg %s: artifact_set_id=%s → pipeline_hash=%s",
-            identifier, artifact_set_id, pipeline_hash,
-        )
-        return pipeline_hash
-
-    def _resolve_dsl_name_from_artifact_set_id(self, artifact_set_id: str) -> Optional[str]:
-        """Extracts the DSL file name (e.g. 'dsl_001') from an artifact_set_id.
-
-        Expected format: 'dsl_001_20260217_231736'  ->  'dsl_001'
-        """
-        import re
-        m = re.match(r'^(dsl_\d+)', artifact_set_id)
-        return m.group(1) if m else None
-
-    def _load_dsl_config(self) -> None:
-        """Loads the DSL YAML and extracts final_features column groups.
-
-        Resolution:
-          Reads artifact_set_id tag from the MLflow champion model
-          → extracts dsl name (e.g. 'dsl_001' from 'dsl_001_20260217_231736')
-          → loads /app/repo/k3s/spark/preprocess/{dsl_name}.yaml
-
-        Sets:
-          self.dsl_feature_cols     – columns sent to the model (first num_features cols)
-          self.dsl_metadata_cols    – context columns kept but NOT sent to model (middle)
-          self.dsl_passthrough_cols – id columns that must be last in the DF (e.g. event_id)
-          self.num_features         – len(dsl_feature_cols)
-        """
-        import yaml as _yaml
-
-        artifact_set_id = self._resolve_artifact_set_id_from_mlflow()
-        if not artifact_set_id:
-            raise RuntimeError(
-                "_load_dsl_config: could not resolve artifact_set_id from MLflow. "
-                "Ensure the champion model has the tag 'artifact_set_id' set."
-            )
-
-        dsl_name = self._resolve_dsl_name_from_artifact_set_id(artifact_set_id)
-        if not dsl_name:
-            raise ValueError(
-                f"_load_dsl_config: could not extract DSL name from "
-                f"artifact_set_id='{artifact_set_id}'. "
-                f"Expected format: 'dsl_NNN_YYYYMMDD_HHMMSS'."
-            )
-
-        dsl_path = f"/app/repo/k3s/spark/preprocess/{dsl_name}.yaml"
-        if not os.path.exists(dsl_path):
-            raise FileNotFoundError(
-                f"DSL file not found: '{dsl_path}' "
-                f"(artifact_set_id='{artifact_set_id}', dsl_name='{dsl_name}')."
-            )
-
-        self.logger.info(
-            "✅ DSL resolved from artifact_set_id '%s' -> %s",
-            artifact_set_id, dsl_path,
-        )
-
-        with open(dsl_path, 'r') as fh:
-            dsl = _yaml.safe_load(fh)
-
-        final_features = dsl.get('final_features', {})
-        if not isinstance(final_features, dict):
-            raise ValueError(f"DSL '{dsl_path}': 'final_features' must be a mapping.")
-
-        self.dsl_feature_cols: List[str] = list(final_features.get('features', []))
-        self.dsl_metadata_cols: List[str] = list(final_features.get('metadata', []))
-        self.dsl_passthrough_cols: List[str] = list(final_features.get('passthrough', []))
-        self.num_features: int = len(self.dsl_feature_cols)
-
-        if self.num_features == 0:
-            raise ValueError(f"DSL '{dsl_path}': 'final_features.features' is empty.")
-
-        self.logger.info(
-            "✅ DSL loaded from %s: %d features, metadata=%s, passthrough=%s",
-            dsl_path, self.num_features,
-            self.dsl_metadata_cols, self.dsl_passthrough_cols,
-        )
-
-    def _resolve_dynamic_artifact_key(self) -> str:
-        """Resuelve key dinámico pipelines/{pipeline_hash}."""
-        artifact_set_id = self._resolve_artifact_set_id_from_mlflow()
-        if not artifact_set_id:
-            return ''
-
-        try:
-            pipeline_hash = self._resolve_pipeline_hash_from_metadata(artifact_set_id)
-        except RuntimeError as e:
-            self.logger.warning("Could not resolve pipeline_hash from Iceberg: %s", e)
-            return ''
-
-        base_prefix = str(self.dynamic_artifacts_prefix).strip('/')
-        dynamic_key = f"{base_prefix}/{pipeline_hash}" if base_prefix else str(pipeline_hash)
-        self.logger.info("✅ Dynamic pipeline key resolved: s3://%s/%s", self.artifacts_bucket, dynamic_key)
-        return dynamic_key
-
-    def _build_artifact_key_candidates(self) -> List[str]:
-        """Construye key único de artifacts usando metadata: pipelines/{pipeline_hash}."""
-        dynamic_key = self._resolve_dynamic_artifact_key().strip('/')
-        if not dynamic_key:
-            raise FileNotFoundError(
-                "Could not resolve dynamic pipeline key from metadata. "
-                "Expected flow: MLflow tag artifact_set_id -> metadata.preprocessing_artifacts -> pipeline_hash"
-            )
-        return [dynamic_key]
-
-    def _download_pipeline_from_key(self, key_prefix: str, tmpdir: str) -> bool:
-        """Intenta descargar todos los artifacts desde un key_prefix. Devuelve False si no existe."""
-        for archive_name in self.artifacts_list:
-            s3_key = os.path.join(key_prefix, archive_name)
-            try:
-                self.s3.download_file(
-                    self.artifacts_bucket,
-                    s3_key,
-                    os.path.join(tmpdir, archive_name)
-                )
-            except ClientError as e:
-                error_code = str(e.response.get('Error', {}).get('Code', ''))
-                if error_code in {'404', 'NotFound', 'NoSuchKey'}:
-                    self.logger.warning(
-                        "Artifact not found at s3://%s/%s (code=%s)",
-                        self.artifacts_bucket,
-                        s3_key,
-                        error_code,
-                    )
-                    return False
-                raise
-        return True
-
     def _normalize_serve_url(self, raw_url: str) -> str:
         """Normaliza URL de Ray Serve para tolerar http implícito y /infer/ trailing slash."""
         candidate = (raw_url or '').strip()
@@ -713,22 +292,6 @@ class KafkaSparkInference(BaseUtils):
             self.logger.error(f"Unexpected error during Kafka check: {e}")
             raise
     
-    def _check_minio_connection(self):
-        """Validación de conectividad S3/MinIO."""
-        try:
-            self.s3 = boto3.client(
-                's3',
-                aws_access_key_id=os.getenv('AWS_ACCESS_KEY_ID'),
-                aws_secret_access_key=os.getenv('AWS_SECRET_ACCESS_KEY'),
-                region_name=os.getenv('AWS_REGION', 'us-east-2'),
-            )
-            buckets = self.s3.list_buckets()
-            bucket_names = [b['Name'] for b in buckets.get('Buckets', [])]
-            self.logger.info(f"✅ S3 connected: {len(bucket_names)} buckets")
-        except Exception as e:
-            self.logger.error(f"S3 connection failed: {e}")
-            raise
-    
     # ===== SPARK SESSION =====
     
     def _create_spark_session(self):
@@ -761,86 +324,15 @@ class KafkaSparkInference(BaseUtils):
             self.logger.error(f"Failed to create SparkSession: {e}")
             raise
     
-    # ===== ARTIFACT LOADING =====
-    def load_pipeline_artifact(self):
-        """Carga el PipelineModel desde local; si no existe, lo descarga de S3."""
-        try:
-
-            tmpdir = os.path.join("/tmp", "pipeline_model")
-            if self.s3 is None:
-                self._check_minio_connection()
-
-            os.makedirs(tmpdir, exist_ok=True)
-
-            candidate_keys = self._build_artifact_key_candidates()
-            self.logger.info("Trying pipeline artifact keys: %s", candidate_keys)
-
-            resolved_key = None
-            for key_prefix in candidate_keys:
-                if self._download_pipeline_from_key(key_prefix, tmpdir):
-                    resolved_key = key_prefix
-                    break
-
-            if not resolved_key:
-                raise FileNotFoundError(
-                    f"Pipeline artifacts not found in bucket {self.artifacts_bucket}. "
-                    f"Tried keys: {candidate_keys}"
-                )
-
-            pipeline = PipelineModel.load(tmpdir)
-            self.logger.info(
-                "Pipeline artifact downloaded from s3://%s/%s and loaded",
-                self.artifacts_bucket,
-                resolved_key,
-            )
-            return pipeline
-        except Exception:
-            self.logger.error("Failed loading pipeline artifact", exc_info=True)
-            raise
-    
     # ===== PIPELINE STEPS =====
-    
-    def read_from_kafka(self) -> DataFrame:
-        """Lee stream de Kafka con schema configurado."""
-        try:
-            self.logger.info(f"Reading from Kafka: {self.kafka_input_topic}")
-            
-            df = (
-                self.spark.readStream
-                .format("kafka")
-                .option("kafka.bootstrap.servers", self.kafka_bootstrap_servers)
-                .option("subscribe", self.kafka_input_topic)
-                .option("startingOffsets", self.starting_offsets)
-                .option("kafka.security.protocol", self.kafka_security_protocol)
-                .option("kafka.sasl.mechanism", self.kafka_sasl_mechanism)
-                .option("kafka.sasl.jaas.config", self.kafka_sasl_jaas_config)
-                .option("maxOffsetsPerTrigger", str(self.max_offsets_per_trigger))
-                .option("failOnDataLoss", str(self.fail_on_data_loss).lower())
-                .load()
-            )
-            
-            # Parsear con schema configurado
-            parsed_df = (
-                df.selectExpr("CAST(value AS STRING)")
-                .select(from_json(col("value"), self.input_schema).alias("data"))
-                .select("data.*")
-            )
-            
-            self.logger.info("✅ Kafka stream configured with explicit schema")
-            return parsed_df
 
-        except Exception as e:
-            self.logger.error(f"Failed to read from Kafka: {e}")
-            raise
-
-    def read_from_kafka_continuous(self) -> DataFrame:
+    def read_from_kafka_online(self) -> DataFrame:
         """
-        Lee Kafka stream para RTM (Real-Time Mode, online=True).
-        Igual que read_from_kafka() pero sin maxOffsetsPerTrigger,
-        que es incompatible con Trigger.Continuous.
+        Lee Kafka stream para online=True (micro-batch de baja latencia).
+        Sin maxOffsetsPerTrigger para drenar la cola tan rápido como sea posible.
         """
         try:
-            self.logger.info("Reading from Kafka (RTM continuous mode): %s", self.kafka_input_topic)
+            self.logger.info("Reading from Kafka (online mode): %s", self.kafka_input_topic)
             df = (
                 self.spark.readStream
                 .format("kafka")
@@ -858,10 +350,10 @@ class KafkaSparkInference(BaseUtils):
                 .select(from_json(col("value"), self.input_schema).alias("data"))
                 .select("data.*")
             )
-            self.logger.info("✅ Kafka RTM stream configured (no maxOffsetsPerTrigger)")
+            self.logger.info("✅ Kafka online stream configured (no maxOffsetsPerTrigger)")
             return parsed_df
         except Exception as e:
-            self.logger.error("Failed to read from Kafka (RTM): %s", e)
+            self.logger.error("Failed to read from Kafka (online): %s", e)
             raise
 
     def convert_schema(self, df: DataFrame) -> DataFrame:
@@ -871,83 +363,6 @@ class KafkaSparkInference(BaseUtils):
             return df_converted
         except Exception as e:
             self.logger.error(f"Schema conversion failed: {e}")
-            raise
-    
-    def preprocess(self, df: DataFrame) -> DataFrame:
-        """Applies the DSL pipeline and returns a DataFrame ordered as:
-
-            [*feature_cols, *metadata_cols, *passthrough_cols]
-
-        Column groups come from the DSL final_features loaded in _load_dsl_config().
-        Both metadata and passthrough are optional (included only if present in the DF).
-
-          - feature_cols     → sent to the model; cols 0..num_features-1
-          - metadata_cols    → context columns kept for downstream use (e.g. timestamp);
-                               NOT sent to the model; optional
-          - passthrough_cols → columns passed through unchanged (e.g. event_id);
-                               NOT sent to the model; optional
-
-        _predict_partition_ray reads features as row[:num_features] and the id column
-        by name (row[id_column]), so column count and position of non-feature cols
-        does not matter.
-        """
-        try:
-            df_processed = self.pipeline.transform(df)
-
-            # Build ordered column list from DSL config; skip cols absent in the DF.
-            feature_cols     = [c for c in self.dsl_feature_cols     if c in df_processed.columns]
-            metadata_cols    = [c for c in self.dsl_metadata_cols     if c in df_processed.columns]
-            passthrough_cols = [c for c in self.dsl_passthrough_cols  if c in df_processed.columns]
-
-            ordered_cols = feature_cols + metadata_cols + passthrough_cols
-            if not ordered_cols:
-                raise ValueError(
-                    "preprocess: no columns selected. Check DSL final_features config."
-                )
-
-            missing_features = [c for c in self.dsl_feature_cols if c not in df_processed.columns]
-            if missing_features:
-                self.logger.warning(
-                    "preprocess: %d feature column(s) not found in DataFrame: %s",
-                    len(missing_features), missing_features,
-                )
-
-            return df_processed.select(*ordered_cols)
-        except Exception as e:
-            self.logger.error(f"Preprocessing failed: {e}")
-            raise
-    
-    def predict_batch(self, df_preprocessed: DataFrame) -> DataFrame:
-        """Realiza predicciones sobre un batch."""
-        try:
-            # Configuración para la función standalone (solo primitivos)
-            pred_config = {
-                'url': str(self.ray_url),
-                'batch_size': int(self.ray_batch_size),
-                'timeout': int(self.ray_timeout),
-                'id_column': str(self.id_column),
-                'prediction_column': str(self.prediction_column),
-                'payload_format': str(self.ray_payload_format),
-                'prediction_key': str(self.ray_pred_key),
-                # Only the first num_features columns are sent to the model.
-                # The rest (metadata, passthrough) are along for the ride but
-                # must not be included in the inference payload.
-                'num_features': int(self.num_features),
-            }
-            
-            predictions_rdd = df_preprocessed.rdd.mapPartitions(
-                lambda p: _predict_partition_ray(p, pred_config)
-            )
-            
-            predictions_df = self.spark.createDataFrame(
-                predictions_rdd, 
-                schema=self.output_schema
-            )
-            
-            return predictions_df
-            
-        except Exception as e:
-            self.logger.error(f"Prediction failed: {e}")
             raise
     
     def predict_batch_online(self, df_converted: DataFrame) -> DataFrame:
@@ -972,53 +387,34 @@ class KafkaSparkInference(BaseUtils):
     def process_batch(self, batch_df: DataFrame, batch_id: int):
         """
         Procesa un micro-batch completo.
-        Pipeline: convert → preprocess → predict → join → write
-        
+        Pipeline: convert_schema → predict_batch_online [Ray Serve] → join → write
+
         Includes Prometheus metrics for latency tracking.
         """
         batch_start_time = time.time()
-        
+
         try:
             self.logger.info(f"Processing batch {batch_id}")
-            
-            # Count records in batch
+
             record_count = batch_df.count()
             BATCH_RECORDS_TOTAL.set(record_count)
-            
+
             if record_count == 0:
                 self.logger.info(f"⏭️ Batch {batch_id} is empty, skipping")
                 return
-            
-            # 1. Convertir schema de Kafka a features (always done in both modes)
+
+            # 1. Schema conversion (kafka_to_schema_features)
             df_features = self.convert_schema(batch_df)
 
-            if self.online:
-                # online=true: schema-converted rows go directly to Ray Serve.
-                # Ray Serve runs DSL preprocessing (NumPy) + prediction.
-                preprocess_latency = 0.0  # No Spark preprocessing in online mode
-                inference_start = time.time()
-                predictions_df = self.predict_batch_online(df_features)
-                inference_latency = time.time() - inference_start
-                LATENCY_INFERENCE.set(inference_latency)
-                INFERENCE_LATENCY_SUMMARY.observe(inference_latency)
-            else:
-                # online=false: full DSL preprocessing in Spark, then prediction.
-                # 2. Preprocesar (with latency tracking)
-                preprocess_start = time.time()
-                df_preprocessed = self.preprocess(df_features)
-                preprocess_latency = time.time() - preprocess_start
-                LATENCY_PREPROCESS.set(preprocess_latency)
+            # 2. Predict via Ray Serve (DSL NumPy + model inference)
+            inference_start = time.time()
+            predictions_df = self.predict_batch_online(df_features)
+            inference_latency = time.time() - inference_start
+            LATENCY_INFERENCE.set(inference_latency)
+            INFERENCE_LATENCY_SUMMARY.observe(inference_latency)
 
-                # 3. Predecir (with latency tracking)
-                inference_start = time.time()
-                predictions_df = self.predict_batch(df_preprocessed)
-                inference_latency = time.time() - inference_start
-                LATENCY_INFERENCE.set(inference_latency)
-                INFERENCE_LATENCY_SUMMARY.observe(inference_latency)
-
-            # 3.1 Distribution of predicted classes (for attack monitoring)
+            # 3. Distribution of predicted classes (for attack monitoring)
             try:
-                # Force a compact aggregation: at most 6 rows.
                 rows = (
                     predictions_df
                     .selectExpr(f"CAST({self.prediction_column} AS INT) AS cls")
@@ -1034,27 +430,25 @@ class KafkaSparkInference(BaseUtils):
                         PREDICTIONS_BY_CLASS_TOTAL.labels(str(cls)).inc(cnt)
             except Exception as e:
                 self.logger.warning(f"⚠️ Could not compute prediction class distribution: {e}")
-            
+
             # 4. Join con datos originales
-            output_df = batch_df.join(
-                predictions_df,
-                on=self.id_column,
-                how='inner'
-            )
-            
+            output_df = batch_df.join(predictions_df, on=self.id_column, how='inner')
+
             # 5. Escribir a Kafka
+            kafka_write_start = time.time()
             self._write_to_kafka(output_df)
-            
-            # Total batch latency (roundtrip)
+            kafka_write_latency = time.time() - kafka_write_start
+            LATENCY_KAFKA_WRITE.set(kafka_write_latency)
+
             total_latency = time.time() - batch_start_time
             LATENCY_TOTAL_BATCH.set(total_latency)
-            
+
             self.logger.info(
                 f"✅ Batch {batch_id} completed | Records: {record_count} | "
-                f"Preprocess: {preprocess_latency:.3f}s | Inference: {inference_latency:.3f}s | "
+                f"Inference: {inference_latency:.3f}s | Kafka write: {kafka_write_latency:.3f}s | "
                 f"Total: {total_latency:.3f}s"
             )
-            
+
         except Exception as e:
             BATCH_ERRORS_TOTAL.inc()
             self.logger.error(f"❌ Batch {batch_id} failed: {e}", exc_info=True)
@@ -1099,89 +493,29 @@ class KafkaSparkInference(BaseUtils):
     
     # ===== MAIN PIPELINE =====
 
-    def run_inference_continuous(self):
-        """
-        Pipeline RTM para online=True. Usa Trigger.Continuous (Spark 4.1).
-        Latencia objetivo: < 1 ms p99 por evento.
-
-        Reemplaza foreachBatch (incompatible con RTM) con:
-          read_from_kafka_continuous → convert_schema → mapInPandas → Kafka sink
-        Sin join: el output es {id_column, prediction_column}.
-        """
-        rtm_config = {
-            'url':               str(self.ray_url),
-            'timeout':           int(self.ray_timeout),
-            'id_column':         str(self.id_column),
-            'prediction_column': str(self.prediction_column),
-            'prediction_key':    str(self.ray_pred_key),
-        }
-
-        df_stream      = self.read_from_kafka_continuous()
-        df_features    = self.convert_schema(df_stream)
-        df_predictions = df_features.mapInPandas(
-            lambda pdf_iter: _rtm_predict_pandas(pdf_iter, rtm_config),
-            schema=self.output_schema,
-        )
-        df_kafka_out = df_predictions.selectExpr(
-            f"CAST({self.id_column} AS STRING) AS key",
-            "to_json(struct(*)) AS value",
-        )
-
-        query = (
-            df_kafka_out
-            .writeStream
-            .format("kafka")
-            .option("kafka.bootstrap.servers",  self.kafka_bootstrap_servers)
-            .option("topic",                     self.kafka_output_topic)
-            .option("kafka.security.protocol",   self.kafka_security_protocol)
-            .option("kafka.sasl.mechanism",      self.kafka_sasl_mechanism)
-            .option("kafka.sasl.jaas.config",    self.kafka_sasl_jaas_config)
-            .option("checkpointLocation",        self.checkpoint_location)
-            .trigger(continuous=self.continuous_trigger_interval)
-            .start()
-        )
-
-        self.logger.info("🚀 RTM Continuous streaming started (online=True)")
-        self.logger.info("📍 Checkpoint: %s", self.checkpoint_location)
-        self.logger.info("📥 %s → 📤 %s", self.kafka_input_topic, self.kafka_output_topic)
-        self.logger.info("⚡ Trigger.Continuous(%s)", self.continuous_trigger_interval)
-        self.logger.info("🧮 online=true: schema conversion + Ray Serve call in mapInPandas (RTM)")
-        self.logger.info("⏳ Awaiting termination...")
-        query.awaitTermination()
-
     def run_inference(self):
         """
-        Ejecuta el pipeline de inferencia.
-
-        online=True  → RTM: Trigger.Continuous + mapInPandas + Kafka sink (ms latency).
-        online=False → micro-batch: foreachBatch + processingTime trigger.
+        Ejecuta el pipeline de inferencia como router de alta velocidad.
+        Fast micro-batch: foreachBatch + short processingTime, sin maxOffsetsPerTrigger.
         """
         try:
-            self.logger.info("🚀 Starting Generic Kafka-Spark Inference Pipeline")
-
-            if self.online:
-                # online=True → Real-Time Mode: Trigger.Continuous, mapInPandas, Kafka sink
-                self.run_inference_continuous()
-            else:
-                # online=False → micro-batch: foreachBatch + processingTime trigger
-                df_stream = self.read_from_kafka()
-                query = (
-                    df_stream
-                    .writeStream
-                    .foreachBatch(self.process_batch)
-                    .option("checkpointLocation", self.checkpoint_location)
-                    .outputMode("append")
-                    .trigger(processingTime=self.processing_time)
-                    .start()
-                )
-                self.logger.info("✅ Streaming query started")
-                self.logger.info("📍 Checkpoint: %s", self.checkpoint_location)
-                self.logger.info("📥 Input: %s  📤 Output: %s", self.kafka_input_topic, self.kafka_output_topic)
-                self.logger.info("⚙️  Schema: %s → %s", self.input_schema_name, self.output_schema_name)
-                self.logger.info("🔄 Converter: %s", self.converter_name)
-                self.logger.info("🧮 online=false: full DSL in Spark → prediction in Ray Serve")
-                self.logger.info("⏳ Waiting for termination...")
-                query.awaitTermination()
+            self.logger.info("🚀 Kafka-Spark Inference Pipeline — router mode")
+            df_stream = self.read_from_kafka_online()
+            query = (
+                df_stream
+                .writeStream
+                .foreachBatch(self.process_batch)
+                .option("checkpointLocation", self.checkpoint_location)
+                .outputMode("append")
+                .trigger(processingTime=self.online_processing_time)
+                .start()
+            )
+            self.logger.info("📍 Checkpoint: %s", self.checkpoint_location)
+            self.logger.info("📥 %s → 📤 %s", self.kafka_input_topic, self.kafka_output_topic)
+            self.logger.info("⚡ processingTime=%s", self.online_processing_time)
+            self.logger.info("🧮 Spark router: schema conversion → Ray Serve (DSL + inference)")
+            self.logger.info("⏳ Awaiting termination...")
+            query.awaitTermination()
 
         except Exception as e:
             self.logger.error("❌ Pipeline failed: %s", e, exc_info=True)

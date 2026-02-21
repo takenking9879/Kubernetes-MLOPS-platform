@@ -44,35 +44,28 @@ class StableModel:
         )
         self._rt.load()
 
-        self._online        = config.online
         self._registry_name = config.model.registry_name
         self._default_alias = config.model.default_alias
 
-        if self._online:
-            # Online mode: Spark sends schema-converted events; Ray Serve runs
-            # full DSL preprocessing (NumPy executor) + prediction.
-            # Pipeline artifacts resolved from: MLflow alias → Iceberg → S3.
-            from src.serve.pipeline_loader import PipelineArtifactLoader
-            params_path  = os.getenv("PARAMS_PATH", "/home/ray/app/repo/k3s/params.yaml")
-            self._loader = PipelineArtifactLoader(params_path, logger)
-            executor     = _load_executor(self._loader, self._registry_name, self._default_alias, logger)
-            self._rt.set_executor(executor)
-        else:
-            self._loader = None
+        # Always load NumpyPipelineExecutor: Ray Serve runs DSL preprocessing + inference.
+        from src.serve.pipeline_loader import PipelineArtifactLoader
+        params_path  = os.getenv("PARAMS_PATH", "/home/ray/app/repo/k3s/params.yaml")
+        self._loader = PipelineArtifactLoader(params_path, logger)
+        executor     = _load_executor(self._loader, self._registry_name, self._default_alias, logger)
+        self._rt.set_executor(executor)
 
     def reconfigure(self, config: Dict[str, str]) -> None:
         alias = config.get("alias") if config else None
         self._rt.load(alias_override=alias)
 
-        if self._online:
-            # Reload executor: the new model version may point to different pipeline artifacts.
-            executor = _load_executor(
-                self._loader,
-                self._registry_name,
-                alias or self._default_alias,
-                self._rt._logger,
-            )
-            self._rt.set_executor(executor)
+        # Reload executor: the new model version may point to different pipeline artifacts.
+        executor = _load_executor(
+            self._loader,
+            self._registry_name,
+            alias or self._default_alias,
+            self._rt._logger,
+        )
+        self._rt.set_executor(executor)
 
     async def predict(self, payload: Dict[str, object]):
         return self._rt.predict(payload)
@@ -99,18 +92,15 @@ class CanaryModel:
         canary_alias = config.canary.alias if config.canary else "challenger"
         self._rt.load(alias_override=canary_alias)
 
-        self._online        = config.online
         self._registry_name = config.model.registry_name
         self._canary_alias  = canary_alias
 
-        if self._online:
-            from src.serve.pipeline_loader import PipelineArtifactLoader
-            params_path  = os.getenv("PARAMS_PATH", "/home/ray/app/repo/k3s/params.yaml")
-            self._loader = PipelineArtifactLoader(params_path, logger)
-            executor     = _load_executor(self._loader, self._registry_name, self._canary_alias, logger)
-            self._rt.set_executor(executor)
-        else:
-            self._loader = None
+        # Always load NumpyPipelineExecutor: Ray Serve runs DSL preprocessing + inference.
+        from src.serve.pipeline_loader import PipelineArtifactLoader
+        params_path  = os.getenv("PARAMS_PATH", "/home/ray/app/repo/k3s/params.yaml")
+        self._loader = PipelineArtifactLoader(params_path, logger)
+        executor     = _load_executor(self._loader, self._registry_name, self._canary_alias, logger)
+        self._rt.set_executor(executor)
 
     def reconfigure(self, config: Dict[str, str]) -> None:
         alias = config.get("alias") if config else None
@@ -119,14 +109,13 @@ class CanaryModel:
             alias = serving_config.canary.alias if serving_config.canary else "challenger"
         self._rt.load(alias_override=alias)
 
-        if self._online:
-            executor = _load_executor(
-                self._loader,
-                self._registry_name,
-                alias,
-                self._rt._logger,
-            )
-            self._rt.set_executor(executor)
+        executor = _load_executor(
+            self._loader,
+            self._registry_name,
+            alias,
+            self._rt._logger,
+        )
+        self._rt.set_executor(executor)
 
     async def predict(self, payload: Dict[str, object]):
         return self._rt.predict(payload)
@@ -154,25 +143,17 @@ class ModelRouter:
         )
         self._webhook_handler = MLflowAliasWebhookHandler(self._stable, self._logger)
 
-        # Register the MLflow webhook only in online mode.
-        # In offline mode Spark handles DSL preprocessing; Ray Serve only predicts.
-        # The model is loaded once at startup in both modes — no periodic polling.
-        if config.online:
-            registry = MLflowRegistry(config.model.tracking_uri, self._logger)
-            try:
-                registry.ensure_webhook(
-                    config.webhook,
-                    config.model.registry_name,
-                    config.model.default_alias,
-                )
-            except Exception as e:
-                self._logger.warning(
-                    "Could not ensure MLflow webhook (expected if MLflow requires HTTPS): %s", e
-                )
-        else:
-            self._logger.info(
-                "online=false — MLflow webhook registration skipped. "
-                "Model is loaded once at startup and stays fixed until redeploy."
+        # Register the MLflow webhook so model + executor reload automatically on alias change.
+        registry = MLflowRegistry(config.model.tracking_uri, self._logger)
+        try:
+            registry.ensure_webhook(
+                config.webhook,
+                config.model.registry_name,
+                config.model.default_alias,
+            )
+        except Exception as e:
+            self._logger.warning(
+                "Could not ensure MLflow webhook (expected if MLflow requires HTTPS): %s", e
             )
 
     def reconfigure(self, config: Dict[str, object]) -> None:

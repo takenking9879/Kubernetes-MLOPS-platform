@@ -38,11 +38,10 @@ kuberay:
   serving:
     alias: "champion"  # MLflow Model Registry alias (champion = production model)
     canary: false
-    # online: true  → Ray Serve handles full preprocessing (NumPy DSL) + prediction.
-    #                  Pipeline artifacts are resolved via MLflow → Iceberg → S3.
-    #                  MLflow webhook is registered for fast model + executor reload.
-    # online: false → Ray Serve only runs the ML model; Spark preprocesses upstream.
-    online: true
+    # Ray Serve handles full preprocessing (NumPy DSL) + prediction.
+    # Pipeline artifacts are resolved via MLflow → Iceberg → S3.
+    # MLflow webhook is registered for fast model + executor reload.
+    # Spark acts as a pure router: schema conversion only, no DSL preprocessing.
     webhook_public_base_url: "http://serving.localhost"
     webhook_path: "/infer/webhook"
     webhook_name: "rayserve-attack-detection-champion-alias"
@@ -79,21 +78,6 @@ spark:
     kafka_to_features: "kafka_to_schema_features"
     # Puedes agregar más conversores aquí:
     # features_to_another: "another_converter_function"
-  
-  # ===== PREPROCESSING CONFIGURATION =====
-  preprocessing:
-    # Configuración de artefactos (scalers, encoders, etc.)
-    artifacts:
-      source: "s3"  # s3, local, minio
-      bucket: "k8s-mlops-platform-bucket"
-      key: "v1/artifacts"
-      archives:
-        - "config.json"
-        - "stages.json"
-    # Opciones para la tabla procesada
-    processed:
-      # Especificar particionado Iceberg, por ejemplo: "days(timestamp)", "months(timestamp)", "hours(timestamp)"
-      partition: "days(timestamp)"
   
   # ===== PREDICTION CONFIGURATION =====
   prediction:
@@ -133,13 +117,10 @@ spark:
   # ===== OPERATIONAL CONFIGURATION =====
   operational:
     check_kafka_connection: true
-    check_storage_connection: true
     log_level: "INFO"
 
   streaming:
-    max_offsets_per_trigger: 10000
-    processing_time: "10 seconds"
-    continuous_trigger_interval: "1 second"  # checkpoint commit interval for RTM (online=True)
+    online_processing_time: "100 milliseconds"  # micro-batch trigger interval (fast drain)
     starting_offsets: "latest"
     fail_on_data_loss: false
 

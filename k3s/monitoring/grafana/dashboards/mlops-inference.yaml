@@ -230,8 +230,8 @@ data:
           "type": "timeseries",
           "targets": [
             {
-              "expr": "avg(latency_preprocess_seconds) or vector(0)",
-              "legendFormat": "Preprocess (Spark)",
+              "expr": "avg(latency_kafka_write_seconds) or vector(0)",
+              "legendFormat": "Kafka Write (Spark)",
               "refId": "A"
             },
             {
