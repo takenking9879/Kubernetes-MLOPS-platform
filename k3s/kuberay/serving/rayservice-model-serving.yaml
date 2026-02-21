@@ -145,10 +145,10 @@ spec:
                     value: /home/ray/app/repo:/home/ray/app/repo/src
                 resources:
                   requests:
-                    cpu: "1"
+                    cpu: "3"
                     memory: "2Gi"
                   limits:
-                    cpu: "2"
+                    cpu: "4"
                     memory: "3Gi"
                 volumeMounts:
                   - name: job-files
