@@ -33,10 +33,41 @@ from src.prometheus import (
     PREDICTIONS_BY_CLASS_LAST_BATCH,
 )
 
-# ===== FUNCIÓN STANDALONE PARA PREDICCIONES =====
+# ===== FUNCIONES STANDALONE PARA PREDICCIONES =====
+
+def _predict_partition_ray_online(
+    partition: Iterator[Row],
+    config: Dict[str, Any],
+) -> Iterator[Row]:
+    """
+    Online mode: sends each schema-converted row as {"raw": {...}} to Ray Serve.
+
+    Spark ran kafka_to_schema_features (schema conversion only).
+    Ray Serve runs the NumpyPipelineExecutor (DSL) + model prediction.
+    One HTTP request per event.
+    """
+    url = config['url']
+    timeout = config['timeout']
+    id_column = config['id_column']
+    pred_column = config['prediction_column']
+    pred_key = config.get('prediction_key', 'predictions')
+
+    for row in partition:
+        event_id = row[id_column]
+        raw_dict = row.asDict()
+        try:
+            response = requests.post(url, json={"raw": raw_dict}, timeout=timeout)
+            response.raise_for_status()
+            preds = response.json().get(pred_key, [0])
+            pred = preds[0] if preds else 0
+            yield Row(**{id_column: event_id, pred_column: int(pred)})
+        except Exception as e:
+            print(f"[online] Error sending event {event_id!r} to Ray Serve: {e}")
+            yield Row(**{id_column: event_id, pred_column: 0})
+
 
 def _predict_partition_ray(
-    partition: Iterator[Row], 
+    partition: Iterator[Row],
     config: Dict[str, Any]
 ) -> Iterator[Row]:
     """
@@ -158,13 +189,34 @@ class KafkaSparkInference(BaseUtils):
         if operational_config.get('check_minio_connection', True):
             self._check_minio_connection()
         
+        # Serving mode: read once here so __init__ branches correctly.
+        self.online = bool(
+            self.params_full.get('kuberay', {}).get('serving', {}).get('online', False)
+        )
+
         # Crear Spark session
         self.spark = self._create_spark_session()
 
         # Cargar módulos y funciones
-        self._load_dsl_config()                   # reads DSL YAML → feature/metadata/passthrough cols
-        self.pipeline = self.load_pipeline_artifact()
         self._load_converter_function()
+
+        if self.online:
+            # online=true: Spark only does schema conversion (kafka_to_schema_features).
+            # DSL preprocessing + prediction run entirely in Ray Serve (NumPy executor).
+            self.pipeline = None
+            self.num_features = 0        # unused in online mode
+            self.dsl_feature_cols = []
+            self.dsl_metadata_cols = []
+            self.dsl_passthrough_cols = []
+            self.logger.info(
+                "online=true: DSL preprocessing delegated to Ray Serve. "
+                "Spark will only convert schema and forward events."
+            )
+        else:
+            # online=false: Spark runs the full DSL pipeline, then sends
+            # pre-processed feature vectors to Ray Serve.
+            self._load_dsl_config()       # reads DSL YAML → feature/metadata/passthrough cols
+            self.pipeline = self.load_pipeline_artifact()
     
     # ===== PROMETHEUS SERVER =====
     
@@ -858,6 +910,25 @@ class KafkaSparkInference(BaseUtils):
             self.logger.error(f"Prediction failed: {e}")
             raise
     
+    def predict_batch_online(self, df_converted: DataFrame) -> DataFrame:
+        """
+        Online mode: sends schema-converted rows to Ray Serve as raw events.
+
+        Each row becomes {"raw": <schema_dict>}. Ray Serve runs the NumPy DSL
+        executor and the model, returning one prediction per event.
+        """
+        pred_config = {
+            'url': str(self.ray_url),
+            'timeout': int(self.ray_timeout),
+            'id_column': str(self.id_column),
+            'prediction_column': str(self.prediction_column),
+            'prediction_key': str(self.ray_pred_key),
+        }
+        predictions_rdd = df_converted.rdd.mapPartitions(
+            lambda p: _predict_partition_ray_online(p, pred_config)
+        )
+        return self.spark.createDataFrame(predictions_rdd, schema=self.output_schema)
+
     def process_batch(self, batch_df: DataFrame, batch_id: int):
         """
         Procesa un micro-batch completo.
@@ -878,21 +949,31 @@ class KafkaSparkInference(BaseUtils):
                 self.logger.info(f"⏭️ Batch {batch_id} is empty, skipping")
                 return
             
-            # 1. Convertir schema de Kafka a features
+            # 1. Convertir schema de Kafka a features (always done in both modes)
             df_features = self.convert_schema(batch_df)
-            
-            # 2. Preprocesar (with latency tracking)
-            preprocess_start = time.time()
-            df_preprocessed = self.preprocess(df_features)
-            preprocess_latency = time.time() - preprocess_start
-            LATENCY_PREPROCESS.set(preprocess_latency)
-            
-            # 3. Predecir (with latency tracking)
-            inference_start = time.time()
-            predictions_df = self.predict_batch(df_preprocessed)
-            inference_latency = time.time() - inference_start
-            LATENCY_INFERENCE.set(inference_latency)
-            INFERENCE_LATENCY_SUMMARY.observe(inference_latency)
+
+            if self.online:
+                # online=true: schema-converted rows go directly to Ray Serve.
+                # Ray Serve runs DSL preprocessing (NumPy) + prediction.
+                inference_start = time.time()
+                predictions_df = self.predict_batch_online(df_features)
+                inference_latency = time.time() - inference_start
+                LATENCY_INFERENCE.set(inference_latency)
+                INFERENCE_LATENCY_SUMMARY.observe(inference_latency)
+            else:
+                # online=false: full DSL preprocessing in Spark, then prediction.
+                # 2. Preprocesar (with latency tracking)
+                preprocess_start = time.time()
+                df_preprocessed = self.preprocess(df_features)
+                preprocess_latency = time.time() - preprocess_start
+                LATENCY_PREPROCESS.set(preprocess_latency)
+
+                # 3. Predecir (with latency tracking)
+                inference_start = time.time()
+                predictions_df = self.predict_batch(df_preprocessed)
+                inference_latency = time.time() - inference_start
+                LATENCY_INFERENCE.set(inference_latency)
+                INFERENCE_LATENCY_SUMMARY.observe(inference_latency)
 
             # 3.1 Distribution of predicted classes (for attack monitoring)
             try:
@@ -1005,7 +1086,10 @@ class KafkaSparkInference(BaseUtils):
             self.logger.info(f"📤 Output topic: {self.kafka_output_topic}")
             self.logger.info(f"⚙️  Schema: {self.input_schema_name} → {self.output_schema_name}")
             self.logger.info(f"🔄 Converter: {self.converter_name}")
-            self.logger.info(f"🧮 Preprocessing using Spark Custom Pipeline")
+            if self.online:
+                self.logger.info("🧮 online=true: schema conversion in Spark → DSL + prediction in Ray Serve")
+            else:
+                self.logger.info("🧮 online=false: full DSL preprocessing in Spark → prediction in Ray Serve")
             self.logger.info("⏳ Waiting for termination...")
             
             # Esperar terminación

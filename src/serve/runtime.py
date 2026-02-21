@@ -1,6 +1,6 @@
 import os
 import time
-from typing import Any, Dict, Optional, Literal
+from typing import Any, Dict, List, Optional, Literal
 
 import yaml
 from ray.util.metrics import Counter, Histogram
@@ -27,12 +27,18 @@ class ModelRuntime:
         self._registry = registry
         self._registry_name = registry_name
         self._default_alias = default_alias
-        self._input_dim = self._resolve_input_dim(dsl_path, input_dim_fallback)
         self._num_classes = num_classes
         self._adapter: Optional[ModelAdapter] = None
         self._artifact: Optional[ModelArtifact] = None
-        self._last_alias_check_epoch = 0.0
-        self._alias_refresh_seconds = self._resolve_alias_refresh_seconds()
+
+        # Resolve DSL metadata (input_dim + ordered feature list)
+        self._input_dim, self._final_features = self._resolve_dsl_meta(
+            dsl_path, input_dim_fallback
+        )
+
+        # NumPy executor for online (raw-payload) inference.
+        # Injected via set_executor() by app.py when online mode is enabled.
+        self._executor = None
 
         self._requests_total = Counter(
             "serve_infer_requests_total",
@@ -51,19 +57,22 @@ class ModelRuntime:
             tag_keys=("application", "variant", "framework"),
         )
 
-    def _resolve_alias_refresh_seconds(self) -> float:
-        raw_value = os.getenv("MODEL_ALIAS_REFRESH_SECONDS", "15")
-        try:
-            value = float(raw_value)
-            return max(0.0, value)
-        except ValueError:
-            self._logger.warning(
-                "Invalid MODEL_ALIAS_REFRESH_SECONDS=%s; using default 15s",
-                raw_value,
-            )
-            return 15.0
+    def set_executor(self, executor) -> None:
+        """
+        Inject a NumpyPipelineExecutor for online (raw-payload) inference.
 
-    def _resolve_input_dim(self, dsl_path: str, fallback: int) -> int:
+        Called by app.py after PipelineArtifactLoader resolves the executor
+        from the MLflow → Iceberg → S3 chain.  Called again on webhook-triggered
+        reconfigure so the executor tracks the current champion model's artifacts.
+        """
+        self._executor = executor
+        self._logger.info(
+            "NumpyPipelineExecutor set (%d features).",
+            len(executor.final_features) if executor is not None else 0,
+        )
+
+    def _resolve_dsl_meta(self, dsl_path: str, fallback: int):
+        """Return (input_dim, ordered_feature_list) from the DSL YAML."""
         try:
             path = os.path.join("/home/ray/", dsl_path.lstrip("/"))
             if not os.path.exists(path):
@@ -72,17 +81,18 @@ class ModelRuntime:
             with open(path, "r") as f:
                 dsl = yaml.safe_load(f)
 
-            final_features = dsl.get("final_features", {})
-            if not isinstance(final_features, dict):
+            ff = dsl.get("final_features", {})
+            if not isinstance(ff, dict):
                 raise ValueError("DSL final_features must be an object with key 'features'")
 
-            dim = len(final_features.get("features", []))
-
-            self._logger.info("Input dimension resolved from DSL: %d", dim)
-            return dim
+            features: List[str] = list(ff.get("features", []))
+            self._logger.info("Input dimension resolved from DSL: %d", len(features))
+            return len(features), features
         except Exception as e:
-            self._logger.warning("DSL dimension resolution failed, using fallback %d: %s", fallback, e)
-            return fallback
+            self._logger.warning(
+                "DSL meta resolution failed, using fallback dim=%d: %s", fallback, e
+            )
+            return fallback, []
 
     def load(self, alias_override: Optional[str] = None) -> None:
         alias = alias_override or self._default_alias
@@ -100,48 +110,9 @@ class ModelRuntime:
             artifact.framework.value,
         )
 
-    def _maybe_refresh_alias_target(self) -> None:
-        if self._adapter is None or self._artifact is None:
-            return
-
-        if self._alias_refresh_seconds <= 0:
-            return
-
-        now_epoch = time.time()
-        if (now_epoch - self._last_alias_check_epoch) < self._alias_refresh_seconds:
-            return
-
-        self._last_alias_check_epoch = now_epoch
-        alias = self._artifact.alias
-
-        try:
-            latest_version = self._registry.resolve_alias_version(self._registry_name, alias)
-        except Exception as e:
-            self._logger.warning(
-                "Alias refresh check failed (%s@%s): %s",
-                self._registry_name,
-                alias,
-                e,
-            )
-            return
-
-        if latest_version == self._artifact.version:
-            return
-
-        self._logger.info(
-            "Alias target changed for %s@%s: v%s -> v%s. Reloading runtime.",
-            self._registry_name,
-            alias,
-            self._artifact.version,
-            latest_version,
-        )
-        self.load(alias_override=alias)
-
     def predict(self, payload: Dict[str, Any]) -> Dict[str, Any]:
         if self._adapter is None or self._artifact is None:
             raise RuntimeError("Model not initialized")
-
-        self._maybe_refresh_alias_target()
 
         tags = {
             "application": "inference",
@@ -153,7 +124,7 @@ class ModelRuntime:
         started = time.perf_counter()
 
         try:
-            matrix = normalize_payload(payload)
+            matrix = self._build_matrix(payload)
             if len(matrix[0]) != self._input_dim:
                 raise ValueError(
                     f"Matrix dimension mismatch. Expected {self._input_dim}, got {len(matrix[0])}"
@@ -175,3 +146,34 @@ class ModelRuntime:
             "version": self._artifact.version,
         }
         return result
+
+    def _build_matrix(self, payload: Dict[str, Any]) -> List[List[Any]]:
+        """
+        Convert a request payload to a feature matrix.
+
+        Two payload formats are supported:
+
+        1. Pre-processed (offline/batch Spark path):
+               {"data": [[f1, f2, ..., f14]]}
+           Spark ran the DSL pipeline and sends the 14 final features directly.
+           Passed through without any preprocessing.
+
+        2. Schema-converted event (online path):
+               {"raw": {"timestamp": 1735691403, "event_id": "...",
+                        "src_port": 12345, "dst_port": 80, ...}}
+           Spark ran kafka_to_schema_features (schema conversion only, no DSL).
+           The NumpyPipelineExecutor runs the full DSL preprocessing here in Ray Serve.
+        """
+        if "raw" in payload:
+            if self._executor is None:
+                raise RuntimeError(
+                    "Raw-payload inference is unavailable: NumpyPipelineExecutor not loaded. "
+                    "Ensure kuberay.serving.online=true and pipeline artifacts resolved from S3."
+                )
+            # Spark already did kafka_to_schema_features (schema conversion).
+            # The dict is already flat and typed — pass directly to the executor.
+            feature_vec = self._executor.transform_to_vector(payload["raw"])
+            return [feature_vec]
+
+        # Default: pre-processed numeric matrix from Spark DSL pipeline
+        return normalize_payload(payload)

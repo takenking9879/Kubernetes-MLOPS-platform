@@ -38,10 +38,14 @@ kuberay:
   serving:
     alias: "champion"  # MLflow Model Registry alias (champion = production model)
     canary: false
+    # online: true  → Ray Serve handles full preprocessing (NumPy DSL) + prediction.
+    #                  Pipeline artifacts are resolved via MLflow → Iceberg → S3.
+    #                  MLflow webhook is registered for fast model + executor reload.
+    # online: false → Ray Serve only runs the ML model; Spark preprocesses upstream.
+    online: false
     webhook_public_base_url: "http://serving.localhost"
     webhook_path: "/infer/webhook"
     webhook_name: "rayserve-attack-detection-champion-alias"
-    webhook_require_signature: true
     webhook_max_timestamp_age_seconds: 300
 
   # Optional per-deployment canary configuration. When present, `CanaryModel`

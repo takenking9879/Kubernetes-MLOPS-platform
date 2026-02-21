@@ -55,6 +55,7 @@ class ServingConfig:
     webhook: WebhookConfig
     canary: Optional[CanaryConfig]
     canary_enabled: bool
+    online: bool  # kuberay.serving.online: true = NumPy DSL preprocessing in Ray Serve
 
 
 class ConfigLoader:
@@ -122,6 +123,7 @@ class ConfigLoader:
             webhook=webhook,
             canary=canary,
             canary_enabled=canary_enabled,
+            online=bool(serving_cfg.get("online", False)),
         )
         return cls._instance
 
