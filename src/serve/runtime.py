@@ -164,6 +164,21 @@ class ModelRuntime:
            Spark ran kafka_to_schema_features (schema conversion only, no DSL).
            The NumpyPipelineExecutor runs the full DSL preprocessing here in Ray Serve.
         """
+        if "raw_batch" in payload:
+            if self._executor is None:
+                raise RuntimeError(
+                    "Raw-payload inference is unavailable: NumpyPipelineExecutor not loaded. "
+                    "Ensure kuberay.serving.online=true and pipeline artifacts resolved from S3."
+                )
+
+            raw_batch = payload["raw_batch"]
+            if not isinstance(raw_batch, list) or not raw_batch:
+                raise ValueError("'raw_batch' must be a non-empty list of row objects")
+            if any(not isinstance(item, dict) for item in raw_batch):
+                raise ValueError("Each item in 'raw_batch' must be an object")
+
+            return [self._executor.transform_to_vector(item) for item in raw_batch]
+
         if "raw" in payload:
             if self._executor is None:
                 raise RuntimeError(

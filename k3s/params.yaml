@@ -86,7 +86,7 @@ spark:
     # Configuración específica de Ray Serve
     ray_serve:
       url: "http://model-serving-serve-svc.ray.svc.cluster.local:8000/infer"
-      batch_size: 100
+      batch_size: 256
       timeout: 30
       max_retries: 3
       request_payload_format: "list"  # list, dict
@@ -120,7 +120,7 @@ spark:
     log_level: "INFO"
 
   streaming:
-    online_processing_time: "100 milliseconds"  # micro-batch trigger interval (fast drain)
+    online_processing_time: "250 milliseconds"  # smoother micro-batches to reduce burst queueing
     starting_offsets: "latest"
     fail_on_data_loss: false
 

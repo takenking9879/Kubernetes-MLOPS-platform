@@ -44,27 +44,61 @@ def _predict_partition_ray_online(
 
     Spark ran kafka_to_schema_features (schema conversion only).
     Ray Serve runs the NumpyPipelineExecutor (DSL) + model prediction.
-    One HTTP request per event.
+    Sends batched events per partition to reduce HTTP overhead and queueing.
     """
     url = config['url']
     timeout = config['timeout']
     id_column = config['id_column']
     pred_column = config['prediction_column']
     pred_key = config.get('prediction_key', 'predictions')
+    batch_size = max(1, int(config.get('batch_size', 100)))
+    max_retries = max(0, int(config.get('max_retries', 3)))
+
+    def _chunk_rows(rows: Iterator[Row], size: int) -> Iterator[List[Row]]:
+        chunk: List[Row] = []
+        for item in rows:
+            chunk.append(item)
+            if len(chunk) >= size:
+                yield chunk
+                chunk = []
+        if chunk:
+            yield chunk
+
+    def _emit_default(rows_batch: List[Row]) -> Iterator[Row]:
+        for row in rows_batch:
+            yield Row(**{id_column: row[id_column], pred_column: 0})
 
     with requests.Session() as session:
-        for row in partition:
-            event_id = row[id_column]
-            raw_dict = row.asDict()
-            try:
-                response = session.post(url, json={"raw": raw_dict}, timeout=timeout)
-                response.raise_for_status()
-                preds = response.json().get(pred_key, [0])
-                pred = preds[0] if preds else 0
-                yield Row(**{id_column: event_id, pred_column: int(pred)})
-            except Exception as e:
-                print(f"[online] Error sending event {event_id!r} to Ray Serve: {e}")
-                yield Row(**{id_column: event_id, pred_column: 0})
+        for rows_batch in _chunk_rows(partition, batch_size):
+            raw_batch = [row.asDict() for row in rows_batch]
+            event_ids = [row[id_column] for row in rows_batch]
+
+            delivered = False
+            for attempt in range(max_retries + 1):
+                try:
+                    response = session.post(url, json={"raw_batch": raw_batch}, timeout=timeout)
+                    response.raise_for_status()
+                    body = response.json()
+                    preds = body.get(pred_key, [])
+
+                    if not isinstance(preds, list) or len(preds) != len(event_ids):
+                        raise ValueError(
+                            f"Invalid prediction response size. expected={len(event_ids)}, got={len(preds) if isinstance(preds, list) else 'non-list'}"
+                        )
+
+                    for event_id, pred in zip(event_ids, preds):
+                        yield Row(**{id_column: event_id, pred_column: int(pred)})
+
+                    delivered = True
+                    break
+                except Exception as e:
+                    if attempt >= max_retries:
+                        print(
+                            f"[online] Batched request failed after {max_retries + 1} attempts "
+                            f"(events={len(rows_batch)}): {e}"
+                        )
+            if not delivered:
+                yield from _emit_default(rows_batch)
 
 
 
@@ -376,6 +410,8 @@ class KafkaSparkInference(BaseUtils):
         pred_config = {
             'url': str(self.ray_url),
             'timeout': int(self.ray_timeout),
+            'batch_size': int(self.ray_batch_size),
+            'max_retries': int(self.ray_max_retries),
             'id_column': str(self.id_column),
             'prediction_column': str(self.prediction_column),
             'prediction_key': str(self.ray_pred_key),

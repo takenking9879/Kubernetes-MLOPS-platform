@@ -1,109 +1,370 @@
-2026-02-21 01:32:08.351 | 2026-02-21 07:32:08,351 - kafka_spark_inference - INFO - ⏭️ Batch 7 is empty, skipping
-2026-02-21 01:32:09.168 | 26/02/21 07:32:09 INFO CheckpointFileManager: Writing atomically to s3a://k8s-mlops-platform-bucket/checkpoints/kafka-spark-inference/commits/7 using temp file s3a://k8s-mlops-platform-bucket/checkpoints/kafka-spark-inference/commits/.7.8fead2b0-931b-4ac1-9093-2f309fdf1f13.tmp
-2026-02-21 01:32:11.216 | 26/02/21 07:32:11 INFO CheckpointFileManager: Renamed temp file s3a://k8s-mlops-platform-bucket/checkpoints/kafka-spark-inference/commits/.7.8fead2b0-931b-4ac1-9093-2f309fdf1f13.tmp to s3a://k8s-mlops-platform-bucket/checkpoints/kafka-spark-inference/commits/7
-2026-02-21 01:32:11.235 | 26/02/21 07:32:11 ERROR MicroBatchExecution: Query [id = 838f40e3-6288-4929-9ac1-2bea9c2e866c, runId = 57f24b1f-595e-42dd-b1cd-bb56a830b3af] terminated with error
-2026-02-21 01:32:11.235 | java.lang.NullPointerException: Cannot invoke "scala.collection.IterableOps.map(scala.Function1)" because the return value of "scala.Option.get()" is null
-2026-02-21 01:32:11.235 | 	at org.apache.spark.sql.kafka010.KafkaMicroBatchStream$.metrics(KafkaMicroBatchStream.scala:520)
-2026-02-21 01:32:11.235 | 	at org.apache.spark.sql.kafka010.KafkaMicroBatchStream.metrics(KafkaMicroBatchStream.scala:363)
-2026-02-21 01:32:11.235 | 	at org.apache.spark.sql.execution.streaming.runtime.ProgressContext.$anonfun$extractSourceProgress$2(ProgressReporter.scala:384)
-2026-02-21 01:32:11.235 | 	at org.apache.spark.util.Utils$.timeTakenMs(Utils.scala:496)
-2026-02-21 01:32:11.235 | 	at org.apache.spark.sql.execution.streaming.runtime.ProgressContext.$anonfun$extractSourceProgress$1(ProgressReporter.scala:380)
-2026-02-21 01:32:11.235 | 	at scala.collection.immutable.List.map(List.scala:236)
-2026-02-21 01:32:11.235 | 	at scala.collection.immutable.List.map(List.scala:79)
-2026-02-21 01:32:11.235 | 	at org.apache.spark.sql.execution.streaming.runtime.ProgressContext.extractSourceProgress(ProgressReporter.scala:379)
-2026-02-21 01:32:11.235 | 	at org.apache.spark.sql.execution.streaming.runtime.ProgressContext.constructNewProgress(ProgressReporter.scala:348)
-2026-02-21 01:32:11.235 | 	at org.apache.spark.sql.execution.streaming.runtime.ProgressContext.finishTrigger(ProgressReporter.scala:312)
-2026-02-21 01:32:11.235 | 	at org.apache.spark.sql.execution.streaming.runtime.ProgressContext.finishTrigger(ProgressReporter.scala:429)
-2026-02-21 01:32:11.235 | 	at org.apache.spark.sql.execution.streaming.runtime.MicroBatchExecution.executeOneBatch(MicroBatchExecution.scala:525)
-2026-02-21 01:32:11.235 | 	at org.apache.spark.sql.execution.streaming.runtime.MicroBatchExecution.$anonfun$runActivatedStream$1(MicroBatchExecution.scala:461)
-2026-02-21 01:32:11.235 | 	at org.apache.spark.sql.execution.streaming.runtime.MicroBatchExecution.$anonfun$runActivatedStream$1$adapted(MicroBatchExecution.scala:461)
-2026-02-21 01:32:11.235 | 	at org.apache.spark.sql.execution.streaming.runtime.TriggerExecutor.runOneBatch(TriggerExecutor.scala:40)
-2026-02-21 01:32:11.235 | 	at org.apache.spark.sql.execution.streaming.runtime.TriggerExecutor.runOneBatch$(TriggerExecutor.scala:38)
-2026-02-21 01:32:11.235 | 	at org.apache.spark.sql.execution.streaming.runtime.ProcessingTimeExecutor.runOneBatch(TriggerExecutor.scala:71)
-2026-02-21 01:32:11.235 | 	at org.apache.spark.sql.execution.streaming.runtime.ProcessingTimeExecutor.execute(TriggerExecutor.scala:83)
-2026-02-21 01:32:11.235 | 	at org.apache.spark.sql.execution.streaming.runtime.MicroBatchExecution.runActivatedStream(MicroBatchExecution.scala:461)
-2026-02-21 01:32:11.235 | 	at org.apache.spark.sql.execution.streaming.runtime.StreamExecution.$anonfun$runStream$1(StreamExecution.scala:347)
-2026-02-21 01:32:11.235 | 	at scala.runtime.java8.JFunction0$mcV$sp.apply(JFunction0$mcV$sp.scala:18)
-2026-02-21 01:32:11.235 | 	at org.apache.spark.sql.SparkSession.withActive(SparkSession.scala:804)
-2026-02-21 01:32:11.235 | 	at org.apache.spark.sql.execution.streaming.runtime.StreamExecution.org$apache$spark$sql$execution$streaming$runtime$StreamExecution$$runStream(StreamExecution.scala:307)
-2026-02-21 01:32:11.235 | 	at org.apache.spark.sql.execution.streaming.runtime.StreamExecution$$anon$1.run(StreamExecution.scala:230)
-2026-02-21 01:32:11.237 | 26/02/21 07:32:11 INFO MicroBatchExecution: Async log purge executor pool for query [id = 838f40e3-6288-4929-9ac1-2bea9c2e866c, runId = 57f24b1f-595e-42dd-b1cd-bb56a830b3af] has been shutdown
-2026-02-21 01:32:11.302 | 2026-02-21 07:32:11,298 - kafka_spark_inference - ERROR - ❌ Pipeline failed: [STREAM_FAILED] Query [id = 838f40e3-6288-4929-9ac1-2bea9c2e866c, runId = 57f24b1f-595e-42dd-b1cd-bb56a830b3af] terminated with exception: Cannot invoke "scala.collection.IterableOps.map(scala.Function1)" because the return value of "scala.Option.get()" is null SQLSTATE: XXKST
-2026-02-21 01:32:11.302 | === Streaming Query ===
-2026-02-21 01:32:11.302 | Identifier: [id = 838f40e3-6288-4929-9ac1-2bea9c2e866c, runId = 57f24b1f-595e-42dd-b1cd-bb56a830b3af]
-2026-02-21 01:32:11.302 | Current Committed Offsets: {KafkaV2[Subscribe[topic-traffic]]: {"topic-traffic":{"0":845,"1":830,"2":883,"3":853,"4":841,"5":834}}}
-2026-02-21 01:32:11.302 | Current Available Offsets: {KafkaV2[Subscribe[topic-traffic]]: {"topic-traffic":{"0":886,"1":888,"2":927,"3":898,"4":874,"5":877}}}
-2026-02-21 01:32:11.302 | 
-2026-02-21 01:32:11.302 | Current State: ACTIVE
-2026-02-21 01:32:11.302 | Thread State: RUNNABLE
-2026-02-21 01:32:11.302 | 
-2026-02-21 01:32:11.302 | Logical Plan:
-2026-02-21 01:32:11.302 | ~WriteToMicroBatchDataSourceV1 ForeachBatchSink, 838f40e3-6288-4929-9ac1-2bea9c2e866c, [checkpointLocation=s3a://k8s-mlops-platform-bucket/checkpoints/kafka-spark-inference], Append
-2026-02-21 01:32:11.302 | +- ~Project [data#15.timestamp AS timestamp#16, data#15.event_id AS event_id#17, data#15.properties AS properties#18]
-2026-02-21 01:32:11.302 |    +- ~Project [from_json(StructField(timestamp,StringType,true), StructField(event_id,StringType,true), StructField(properties,StructType(StructField(src_port,LongType,true),StructField(dst_port,LongType,true),StructField(protocol,StringType,true),StructField(packet_count,LongType,true),StructField(conn_state,StringType,true),StructField(bytes_transferred,DoubleType,true)),true), value#14, Some(Etc/UTC), false) AS data#15]
-2026-02-21 01:32:11.302 |       +- ~Project [cast(value#8 as string) AS value#14]
-2026-02-21 01:32:11.302 |          +- ~StreamingDataSourceV2ScanRelation[key#7, value#8, topic#9, partition#10, offset#11L, timestamp#12, timestampType#13] KafkaTable
-2026-02-21 01:32:11.302 | Traceback (most recent call last):
-2026-02-21 01:32:11.302 |   File "/app/repo/k3s/spark/inference/kafka_main.py", line 518, in run_inference
-2026-02-21 01:32:11.302 |     query.awaitTermination()
-2026-02-21 01:32:11.302 |   File "/opt/spark/python/lib/pyspark.zip/pyspark/sql/streaming/query.py", line 225, in awaitTermination
-2026-02-21 01:32:11.302 |     return self._jsq.awaitTermination()
-2026-02-21 01:32:11.302 |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-2026-02-21 01:32:11.302 |   File "/opt/spark/python/lib/py4j-0.10.9.9-src.zip/py4j/java_gateway.py", line 1362, in __call__
-2026-02-21 01:32:11.302 |     return_value = get_return_value(
-2026-02-21 01:32:11.302 |                    ^^^^^^^^^^^^^^^^^
-2026-02-21 01:32:11.303 |   File "/opt/spark/python/lib/pyspark.zip/pyspark/errors/exceptions/captured.py", line 269, in deco
-2026-02-21 01:32:11.303 |     raise converted from None
-2026-02-21 01:32:11.303 | pyspark.errors.exceptions.captured.StreamingQueryException: [STREAM_FAILED] Query [id = 838f40e3-6288-4929-9ac1-2bea9c2e866c, runId = 57f24b1f-595e-42dd-b1cd-bb56a830b3af] terminated with exception: Cannot invoke "scala.collection.IterableOps.map(scala.Function1)" because the return value of "scala.Option.get()" is null SQLSTATE: XXKST
-2026-02-21 01:32:11.303 | === Streaming Query ===
-2026-02-21 01:32:11.303 | Identifier: [id = 838f40e3-6288-4929-9ac1-2bea9c2e866c, runId = 57f24b1f-595e-42dd-b1cd-bb56a830b3af]
-2026-02-21 01:32:11.303 | Current Committed Offsets: {KafkaV2[Subscribe[topic-traffic]]: {"topic-traffic":{"0":845,"1":830,"2":883,"3":853,"4":841,"5":834}}}
-2026-02-21 01:32:11.303 | Current Available Offsets: {KafkaV2[Subscribe[topic-traffic]]: {"topic-traffic":{"0":886,"1":888,"2":927,"3":898,"4":874,"5":877}}}
-2026-02-21 01:32:11.303 | 
-2026-02-21 01:32:11.303 | Current State: ACTIVE
-2026-02-21 01:32:11.303 | Thread State: RUNNABLE
-2026-02-21 01:32:11.303 | 
-2026-02-21 01:32:11.303 | Logical Plan:
-2026-02-21 01:32:11.303 | ~WriteToMicroBatchDataSourceV1 ForeachBatchSink, 838f40e3-6288-4929-9ac1-2bea9c2e866c, [checkpointLocation=s3a://k8s-mlops-platform-bucket/checkpoints/kafka-spark-inference], Append
-2026-02-21 01:32:11.303 | +- ~Project [data#15.timestamp AS timestamp#16, data#15.event_id AS event_id#17, data#15.properties AS properties#18]
-2026-02-21 01:32:11.303 |    +- ~Project [from_json(StructField(timestamp,StringType,true), StructField(event_id,StringType,true), StructField(properties,StructType(StructField(src_port,LongType,true),StructField(dst_port,LongType,true),StructField(protocol,StringType,true),StructField(packet_count,LongType,true),StructField(conn_state,StringType,true),StructField(bytes_transferred,DoubleType,true)),true), value#14, Some(Etc/UTC), false) AS data#15]
-2026-02-21 01:32:11.303 |       +- ~Project [cast(value#8 as string) AS value#14]
-2026-02-21 01:32:11.303 |          +- ~StreamingDataSourceV2ScanRelation[key#7, value#8, topic#9, partition#10, offset#11L, timestamp#12, timestampType#13] KafkaTable
-2026-02-21 01:32:11.303 | 
-2026-02-21 01:32:11.304 | Traceback (most recent call last):
-2026-02-21 01:32:11.304 |   File "/app/repo/k3s/spark/inference/kafka_main.py", line 532, in <module>
-2026-02-21 01:32:11.305 |     main()
-2026-02-21 01:32:11.305 |   File "/app/repo/k3s/spark/inference/kafka_main.py", line 529, in main
-2026-02-21 01:32:11.305 |     pipeline.run_inference()
-2026-02-21 01:32:11.305 |   File "/app/repo/k3s/spark/inference/kafka_main.py", line 518, in run_inference
-2026-02-21 01:32:11.305 |     query.awaitTermination()
-2026-02-21 01:32:11.305 |   File "/opt/spark/python/lib/pyspark.zip/pyspark/sql/streaming/query.py", line 225, in awaitTermination
-2026-02-21 01:32:11.306 |   File "/opt/spark/python/lib/py4j-0.10.9.9-src.zip/py4j/java_gateway.py", line 1362, in __call__
-2026-02-21 01:32:11.306 |   File "/opt/spark/python/lib/pyspark.zip/pyspark/errors/exceptions/captured.py", line 269, in deco
-2026-02-21 01:32:11.307 | pyspark.errors.exceptions.captured.StreamingQueryException: [STREAM_FAILED] Query [id = 838f40e3-6288-4929-9ac1-2bea9c2e866c, runId = 57f24b1f-595e-42dd-b1cd-bb56a830b3af] terminated with exception: Cannot invoke "scala.collection.IterableOps.map(scala.Function1)" because the return value of "scala.Option.get()" is null SQLSTATE: XXKST
-2026-02-21 01:32:11.307 | === Streaming Query ===
-2026-02-21 01:32:11.307 | Identifier: [id = 838f40e3-6288-4929-9ac1-2bea9c2e866c, runId = 57f24b1f-595e-42dd-b1cd-bb56a830b3af]
-2026-02-21 01:32:11.307 | Current Committed Offsets: {KafkaV2[Subscribe[topic-traffic]]: {"topic-traffic":{"0":845,"1":830,"2":883,"3":853,"4":841,"5":834}}}
-2026-02-21 01:32:11.307 | Current Available Offsets: {KafkaV2[Subscribe[topic-traffic]]: {"topic-traffic":{"0":886,"1":888,"2":927,"3":898,"4":874,"5":877}}}
-2026-02-21 01:32:11.307 | 
-2026-02-21 01:32:11.307 | Current State: ACTIVE
-2026-02-21 01:32:11.307 | Thread State: RUNNABLE
-2026-02-21 01:32:11.307 | 
-2026-02-21 01:32:11.307 | Logical Plan:
-2026-02-21 01:32:11.307 | ~WriteToMicroBatchDataSourceV1 ForeachBatchSink, 838f40e3-6288-4929-9ac1-2bea9c2e866c, [checkpointLocation=s3a://k8s-mlops-platform-bucket/checkpoints/kafka-spark-inference], Append
-2026-02-21 01:32:11.307 | +- ~Project [data#15.timestamp AS timestamp#16, data#15.event_id AS event_id#17, data#15.properties AS properties#18]
-2026-02-21 01:32:11.307 |    +- ~Project [from_json(StructField(timestamp,StringType,true), StructField(event_id,StringType,true), StructField(properties,StructType(StructField(src_port,LongType,true),StructField(dst_port,LongType,true),StructField(protocol,StringType,true),StructField(packet_count,LongType,true),StructField(conn_state,StringType,true),StructField(bytes_transferred,DoubleType,true)),true), value#14, Some(Etc/UTC), false) AS data#15]
-2026-02-21 01:32:11.307 |       +- ~Project [cast(value#8 as string) AS value#14]
-2026-02-21 01:32:11.307 |          +- ~StreamingDataSourceV2ScanRelation[key#7, value#8, topic#9, partition#10, offset#11L, timestamp#12, timestampType#13] KafkaTable
-2026-02-21 01:32:11.307 | 
-2026-02-21 01:32:11.413 | 26/02/21 07:32:11 INFO SparkContext: SparkContext is stopping with exitCode 0 from stop at SparkSubmit.scala:1050.
-2026-02-21 01:32:11.425 | 26/02/21 07:32:11 INFO SparkUI: Stopped Spark web UI at http://spark-kafka-app-0-driver-svc.spark.svc:4040
-2026-02-21 01:32:11.428 | 26/02/21 07:32:11 INFO KubernetesClusterSchedulerBackend: Shutting down all executors
-2026-02-21 01:32:11.429 | 26/02/21 07:32:11 INFO KubernetesClusterSchedulerBackend$KubernetesDriverEndpoint: Asking each executor to shut down
-2026-02-21 01:32:11.436 | 26/02/21 07:32:11 INFO ExecutorPodsWatchSnapshotSource: Kubernetes client has been closed.
-2026-02-21 01:32:11.589 | 26/02/21 07:32:11 INFO MapOutputTrackerMasterEndpoint: MapOutputTrackerMasterEndpoint stopped!
-2026-02-21 01:32:11.608 | 26/02/21 07:32:11 INFO MemoryStore: MemoryStore cleared
-2026-02-21 01:32:11.608 | 26/02/21 07:32:11 INFO BlockManager: BlockManager stopped
-2026-02-21 01:32:11.615 | 26/02/21 07:32:11 INFO BlockManagerMaster: BlockManagerMaster stopped
-2026-02-21 01:32:11.618 | 26/02/21 07:32:11 INFO OutputCommitCoordinator$OutputCommitCoordinatorEndpoint: OutputCommitCoordinator stopped!
-2026-02-21 01:32:11.629 | 26/02/21 07:32:11 INFO SparkContext: Successfully stopped SparkContext (Uptime: 28541 ms)
+2026-02-21 01:58:37.851 | WARNING: Using incubator modules: jdk.incubator.vector
+2026-02-21 01:58:39.449 | Files local:///app/repo/k3s/spark/inference/kafka_main.py from /app/.worktrees/a0d5c9f5acf03cf67e8c4fc77f1942ca14c94b02/k3s/spark/inference/kafka_main.py to /opt/spark/work-dir/kafka_main.py
+2026-02-21 01:58:39.556 | 26/02/21 07:58:39 WARN NativeCodeLoader: Unable to load native-hadoop library for your platform... using builtin-java classes where applicable
+2026-02-21 01:58:40.422 | 2026-02-21 07:58:40,421 - kafka_spark_inference - DEBUG - Parameters retrieved and sanitized from /app/repo/k3s/params.yaml
+2026-02-21 01:58:40.422 | 2026-02-21 07:58:40,422 - kafka_spark_inference - INFO - ✅ Prometheus metrics server started on port 8000
+2026-02-21 01:58:40.422 | 2026-02-21 07:58:40,422 - kafka_spark_inference - INFO - ✅ Kafka config: topic-traffic → topic-prediction
+2026-02-21 01:58:40.422 | 2026-02-21 07:58:40,422 - kafka_spark_inference - INFO - ✅ Schemas loaded: input=kafka_schema_features, output=prediction_schema
+2026-02-21 01:58:40.422 | 2026-02-21 07:58:40,422 - kafka_spark_inference - INFO - ✅ Converter configured: kafka_to_schema_features
+2026-02-21 01:58:40.423 | 2026-02-21 07:58:40,422 - kafka_spark_inference - INFO - ✅ Prediction: ray_serve at http://model-serving-serve-svc.ray.svc.cluster.local:8000/infer
+2026-02-21 01:58:40.423 | 2026-02-21 07:58:40,422 - kafka_spark_inference - INFO - ✅ Output: format=json
+2026-02-21 01:58:40.423 | 2026-02-21 07:58:40,422 - kafka_spark_inference - INFO - ✅ Checkpoint: s3a://k8s-mlops-platform-bucket/checkpoints/kafka-spark-inference
+2026-02-21 01:58:40.423 | 2026-02-21 07:58:40,422 - kafka_spark_inference - INFO - Checking Kafka connection: host.docker.internal:9094
+2026-02-21 01:58:40.485 | %3|1771660720.484|FAIL|rdkafka#consumer-1| [thrd:sasl_plaintext://host.docker.internal:9094/bootstrap]: sasl_plaintext://host.docker.internal:9094/bootstrap: Failed to connect to broker at [fdc4:f303:9324::254]:9094: Network is unreachable (after 50ms in state CONNECT)
+2026-02-21 01:58:41.573 | 2026-02-21 07:58:41,573 - kafka_spark_inference - INFO - ✅ Kafka connected: 2 topics available
+2026-02-21 01:58:41.573 | 2026-02-21 07:58:41,573 - kafka_spark_inference - INFO - Creating SparkSession with Kafka and S3 support
+2026-02-21 01:58:42.216 | Using Spark's default log4j profile: org/apache/spark/log4j2-defaults.properties
+2026-02-21 01:58:42.222 | 26/02/21 07:58:42 INFO SparkContext: Running Spark version 4.1.1
+2026-02-21 01:58:42.223 | 26/02/21 07:58:42 INFO SparkContext: OS info Linux, 6.6.87.2-microsoft-standard-WSL2, amd64
+2026-02-21 01:58:42.223 | 26/02/21 07:58:42 INFO SparkContext: Java version 17.0.18+8
+2026-02-21 01:58:42.253 | 26/02/21 07:58:42 INFO ResourceUtils: ==============================================================
+2026-02-21 01:58:42.253 | 26/02/21 07:58:42 INFO ResourceUtils: No custom resources configured for spark.driver.
+2026-02-21 01:58:42.253 | 26/02/21 07:58:42 INFO ResourceUtils: ==============================================================
+2026-02-21 01:58:42.254 | 26/02/21 07:58:42 INFO SparkContext: Submitted application: spark-preprocessing
+2026-02-21 01:58:42.328 | 26/02/21 07:58:42 INFO SecurityManager: Changing view acls to: spark
+2026-02-21 01:58:42.328 | 26/02/21 07:58:42 INFO SecurityManager: Changing modify acls to: spark
+2026-02-21 01:58:42.329 | 26/02/21 07:58:42 INFO SecurityManager: Changing view acls groups to: spark
+2026-02-21 01:58:42.329 | 26/02/21 07:58:42 INFO SecurityManager: Changing modify acls groups to: spark
+2026-02-21 01:58:42.330 | 26/02/21 07:58:42 INFO SecurityManager: SecurityManager: authentication disabled; ui acls disabled; users with view permissions: spark groups with view permissions: EMPTY; users with modify permissions: spark; groups with modify permissions: EMPTY; RPC SSL disabled
+2026-02-21 01:58:42.598 | 26/02/21 07:58:42 INFO Utils: Successfully started service 'sparkDriver' on port 7078.
+2026-02-21 01:58:42.628 | 26/02/21 07:58:42 INFO SparkEnv: Registering MapOutputTracker
+2026-02-21 01:58:42.639 | 26/02/21 07:58:42 INFO SparkEnv: Registering BlockManagerMaster
+2026-02-21 01:58:42.662 | 26/02/21 07:58:42 INFO BlockManagerMasterEndpoint: Using org.apache.spark.storage.DefaultTopologyMapper for getting topology information
+2026-02-21 01:58:42.663 | 26/02/21 07:58:42 INFO BlockManagerMasterEndpoint: BlockManagerMasterEndpoint up
+2026-02-21 01:58:42.667 | 26/02/21 07:58:42 INFO SparkEnv: Registering BlockManagerMasterHeartbeat
+2026-02-21 01:58:42.705 | 26/02/21 07:58:42 INFO DiskBlockManager: Created local directory at /var/data/spark-bd1fa0c0-0899-4922-85b1-64f196813ea3/blockmgr-73ffb691-872d-4dd7-b848-f4e86488534a
+2026-02-21 01:58:42.730 | 26/02/21 07:58:42 INFO SparkEnv: Registering OutputCommitCoordinator
+2026-02-21 01:58:42.885 | 26/02/21 07:58:42 INFO JettyUtils: Start Jetty 0.0.0.0:4040 for SparkUI
+2026-02-21 01:58:42.972 | 26/02/21 07:58:42 INFO Utils: Successfully started service 'SparkUI' on port 4040.
+2026-02-21 01:58:43.094 | 26/02/21 07:58:43 INFO SparkContext: Added file file:/opt/spark/work-dir/kafka_main.py at spark://spark-kafka-app-0-driver-svc.spark.svc:7078/files/kafka_main.py with timestamp 1771660722206
+2026-02-21 01:58:43.095 | 26/02/21 07:58:43 INFO Utils: Copying /opt/spark/work-dir/kafka_main.py to /var/data/spark-bd1fa0c0-0899-4922-85b1-64f196813ea3/spark-1a12a68e-b749-4ee9-a3e4-45343f8dd130/userFiles-903b4aff-7353-45fd-8244-4131b13ba84e/kafka_main.py
+2026-02-21 01:58:43.129 | 26/02/21 07:58:43 INFO ResourceProfile: Default ResourceProfile created, executor resources: Map(cores -> name: cores, amount: 2, script: , vendor: , memory -> name: memory, amount: 512, script: , vendor: , offHeap -> name: offHeap, amount: 0, script: , vendor: ), task resources: Map(cpus -> name: cpus, amount: 1.0)
+2026-02-21 01:58:43.132 | 26/02/21 07:58:43 INFO ResourceProfile: Limiting resource is cpus at 2 tasks per executor
+2026-02-21 01:58:43.133 | 26/02/21 07:58:43 INFO ResourceProfileManager: Added ResourceProfile id: 0
+2026-02-21 01:58:43.145 | 26/02/21 07:58:43 INFO SecurityManager: Changing view acls to: spark
+2026-02-21 01:58:43.145 | 26/02/21 07:58:43 INFO SecurityManager: Changing modify acls to: spark
+2026-02-21 01:58:43.145 | 26/02/21 07:58:43 INFO SecurityManager: Changing view acls groups to: spark
+2026-02-21 01:58:43.145 | 26/02/21 07:58:43 INFO SecurityManager: Changing modify acls groups to: spark
+2026-02-21 01:58:43.146 | 26/02/21 07:58:43 INFO SecurityManager: SecurityManager: authentication disabled; ui acls disabled; users with view permissions: spark groups with view permissions: EMPTY; users with modify permissions: spark; groups with modify permissions: EMPTY; RPC SSL disabled
+2026-02-21 01:58:43.193 | 26/02/21 07:58:43 INFO SparkKubernetesClientFactory: Auto-configuring K8S client using current context from users K8S config file
+2026-02-21 01:58:46.381 | 26/02/21 07:58:46 INFO SslUtils: Default SSL endpoint verification has been disabled:  -Dio.netty.handler.ssl.defaultEndpointVerificationAlgorithm="NONE"
+2026-02-21 01:58:46.759 | 26/02/21 07:58:46 WARN Utils: spark.executor.instances less than spark.dynamicAllocation.minExecutors is invalid, ignoring its setting, please update your configs.
+2026-02-21 01:58:46.761 | 26/02/21 07:58:46 INFO Utils: Using initial executors = 2, max of spark.dynamicAllocation.initialExecutors,spark.dynamicAllocation.minExecutors and spark.executor.instances
+2026-02-21 01:58:46.923 | 26/02/21 07:58:46 INFO ExecutorPodsAllocator: Going to request 2 executors from Kubernetes for ResourceProfile Id: 0, target: 2, known: 0, sharedSlotFromPendingPods: 2147483647.
+2026-02-21 01:58:46.946 | 26/02/21 07:58:46 INFO ExecutorPodsAllocator: Found 0 reusable PVCs from 0 PVCs
+2026-02-21 01:58:46.987 | 26/02/21 07:58:46 INFO KubernetesClientUtils: Spark configuration files loaded from Some(/opt/spark/conf) : spark.kubernetes.namespace
+2026-02-21 01:58:46.996 | 26/02/21 07:58:46 INFO KubernetesClientUtils: Spark configuration files loaded from Some(/opt/spark/conf) : spark.kubernetes.namespace
+2026-02-21 01:58:47.005 | 26/02/21 07:58:47 INFO BasicExecutorFeatureStep: Decommissioning not enabled, skipping shutdown script
+2026-02-21 01:58:47.112 | 26/02/21 07:58:47 INFO KubernetesClientUtils: Spark configuration files loaded from Some(/opt/spark/conf) : spark.kubernetes.namespace
+2026-02-21 01:58:47.113 | 26/02/21 07:58:47 INFO BasicExecutorFeatureStep: Decommissioning not enabled, skipping shutdown script
+2026-02-21 01:58:47.402 | 26/02/21 07:58:47 INFO Utils: Successfully started service 'org.apache.spark.network.netty.NettyBlockTransferService' on port 7079.
+2026-02-21 01:58:47.405 | 26/02/21 07:58:47 INFO NettyBlockTransferService: Server created on spark-kafka-app-0-driver-svc.spark.svc 10.1.13.3:7079
+2026-02-21 01:58:47.408 | 26/02/21 07:58:47 INFO BlockManager: Using org.apache.spark.storage.RandomBlockReplicationPolicy for block replication policy
+2026-02-21 01:58:47.426 | 26/02/21 07:58:47 INFO BlockManagerMaster: Registering BlockManager BlockManagerId(driver, spark-kafka-app-0-driver-svc.spark.svc, 7079, None)
+2026-02-21 01:58:47.430 | 26/02/21 07:58:47 INFO BlockManagerMasterEndpoint: Registering block manager spark-kafka-app-0-driver-svc.spark.svc:7079 with 117.0 MiB RAM, BlockManagerId(driver, spark-kafka-app-0-driver-svc.spark.svc, 7079, None)
+2026-02-21 01:58:47.433 | 26/02/21 07:58:47 INFO BlockManagerMaster: Registered BlockManager BlockManagerId(driver, spark-kafka-app-0-driver-svc.spark.svc, 7079, None)
+2026-02-21 01:58:47.434 | 26/02/21 07:58:47 INFO BlockManager: Initialized BlockManager: BlockManagerId(driver, spark-kafka-app-0-driver-svc.spark.svc, 7079, None)
+2026-02-21 01:58:47.449 | 26/02/21 07:58:47 WARN Utils: spark.executor.instances less than spark.dynamicAllocation.minExecutors is invalid, ignoring its setting, please update your configs.
+2026-02-21 01:58:47.450 | 26/02/21 07:58:47 INFO Utils: Using initial executors = 2, max of spark.dynamicAllocation.initialExecutors,spark.dynamicAllocation.minExecutors and spark.executor.instances
+2026-02-21 01:58:47.451 | 26/02/21 07:58:47 INFO ExecutorAllocationManager: Dynamic allocation is enabled without a shuffle service.
+2026-02-21 01:58:52.517 | 26/02/21 07:58:52 INFO KubernetesClusterSchedulerBackend$KubernetesDriverEndpoint: Registered executor NettyRpcEndpointRef(spark-client://Executor) (10.1.13.4:44432) with ID 2, ResourceProfileId 0
+2026-02-21 01:58:52.525 | 26/02/21 07:58:52 INFO ExecutorMonitor: New executor 2 has registered (new total is 1)
+2026-02-21 01:58:52.651 | 26/02/21 07:58:52 INFO BlockManagerMasterEndpoint: Registering block manager 10.1.13.4:45707 with 117.0 MiB RAM, BlockManagerId(2, 10.1.13.4, 45707, None)
+2026-02-21 01:58:53.814 | 26/02/21 07:58:53 INFO KubernetesClusterSchedulerBackend$KubernetesDriverEndpoint: Registered executor NettyRpcEndpointRef(spark-client://Executor) (10.1.13.5:37282) with ID 1, ResourceProfileId 0
+2026-02-21 01:58:53.815 | 26/02/21 07:58:53 INFO ExecutorMonitor: New executor 1 has registered (new total is 2)
+2026-02-21 01:58:53.817 | 26/02/21 07:58:53 INFO KubernetesClusterSchedulerBackend: SchedulerBackend is ready for scheduling beginning after reached minRegisteredResourcesRatio: 0.8
+2026-02-21 01:58:53.918 | 26/02/21 07:58:53 INFO BlockManagerMasterEndpoint: Registering block manager 10.1.13.5:36083 with 117.0 MiB RAM, BlockManagerId(1, 10.1.13.5, 36083, None)
+2026-02-21 01:58:55.657 | 2026-02-21 07:58:55,656 - kafka_spark_inference - INFO - ✅ SparkSession created
+2026-02-21 01:58:55.657 | 2026-02-21 07:58:55,657 - kafka_spark_inference - INFO - ✅ Converter function loaded: kafka_to_schema_features
+2026-02-21 01:58:55.657 | 2026-02-21 07:58:55,657 - kafka_spark_inference - INFO - Router mode: Spark converts schema and forwards events to Ray Serve. DSL preprocessing + prediction run in Ray Serve (NumpyPipelineExecutor).
+2026-02-21 01:58:55.657 | 2026-02-21 07:58:55,657 - kafka_spark_inference - INFO - 🚀 Kafka-Spark Inference Pipeline — router mode
+2026-02-21 01:58:55.657 | 2026-02-21 07:58:55,657 - kafka_spark_inference - INFO - Reading from Kafka (online mode): topic-traffic
+2026-02-21 01:58:55.663 | 26/02/21 07:58:55 INFO SharedState: Setting hive.metastore.warehouse.dir ('null') to the value of spark.sql.warehouse.dir.
+2026-02-21 01:58:55.666 | 26/02/21 07:58:55 INFO SharedState: Warehouse path is 'file:/opt/spark/work-dir/spark-warehouse'.
+2026-02-21 01:58:56.776 | 2026-02-21 07:58:56,776 - kafka_spark_inference - INFO - ✅ Kafka online stream configured (no maxOffsetsPerTrigger)
+2026-02-21 01:58:56.898 | 26/02/21 07:58:56 INFO StateStoreCoordinatorRef: Registered StateStoreCoordinator endpoint
+2026-02-21 01:58:58.738 | 26/02/21 07:58:58 INFO ResolveWriteToStream: Checkpoint root s3a://k8s-mlops-platform-bucket/checkpoints/kafka-spark-inference resolved to s3a://k8s-mlops-platform-bucket/checkpoints/kafka-spark-inference.
+2026-02-21 01:58:59.283 | 26/02/21 07:58:59 INFO deprecation: org.apache.hadoop.shaded.io.bytes.per.checksum is deprecated. Instead, use dfs.bytes-per-checksum
+2026-02-21 01:59:00.101 | 26/02/21 07:59:00 INFO CheckpointFileManager: Writing atomically to s3a://k8s-mlops-platform-bucket/checkpoints/kafka-spark-inference/metadata using temp file s3a://k8s-mlops-platform-bucket/checkpoints/kafka-spark-inference/.metadata.8fc1fb48-4ae1-42fc-b594-8e48635f8281.tmp
+2026-02-21 01:59:02.600 | 26/02/21 07:59:02 INFO CheckpointFileManager: Renamed temp file s3a://k8s-mlops-platform-bucket/checkpoints/kafka-spark-inference/.metadata.8fc1fb48-4ae1-42fc-b594-8e48635f8281.tmp to s3a://k8s-mlops-platform-bucket/checkpoints/kafka-spark-inference/metadata
+2026-02-21 01:59:02.641 | 26/02/21 07:59:02 INFO MicroBatchExecution: Starting [id = dfdb7138-c37b-43ea-9fa7-0b2b90f6c629, runId = f32e350d-7998-4379-9308-0ed6dcde5bb2]. Use s3a://k8s-mlops-platform-bucket/checkpoints/kafka-spark-inference to store the query checkpoint.
+2026-02-21 01:59:02.648 | 2026-02-21 07:59:02,647 - kafka_spark_inference - INFO - 📍 Checkpoint: s3a://k8s-mlops-platform-bucket/checkpoints/kafka-spark-inference
+2026-02-21 01:59:02.648 | 2026-02-21 07:59:02,648 - kafka_spark_inference - INFO - 📥 topic-traffic → 📤 topic-prediction
+2026-02-21 01:59:02.648 | 2026-02-21 07:59:02,648 - kafka_spark_inference - INFO - ⚡ processingTime=100 milliseconds
+2026-02-21 01:59:02.648 | 2026-02-21 07:59:02,648 - kafka_spark_inference - INFO - 🧮 Spark router: schema conversion → Ray Serve (DSL + inference)
+2026-02-21 01:59:02.648 | 2026-02-21 07:59:02,648 - kafka_spark_inference - INFO - ⏳ Awaiting termination...
+2026-02-21 01:59:02.658 | 26/02/21 07:59:02 INFO MicroBatchExecution: Reading table [org.apache.spark.sql.kafka010.KafkaSourceProvider$KafkaTable@25607f21] from DataSourceV2 named 'kafka' [org.apache.spark.sql.kafka010.KafkaSourceProvider@72a957bf]
+2026-02-21 01:59:02.716 | 26/02/21 07:59:02 INFO MicroBatchExecution: Finish initializing with logical plan:
+2026-02-21 01:59:02.716 | ~WriteToMicroBatchDataSourceV1 ForeachBatchSink, dfdb7138-c37b-43ea-9fa7-0b2b90f6c629, [checkpointLocation=s3a://k8s-mlops-platform-bucket/checkpoints/kafka-spark-inference], Append
+2026-02-21 01:59:02.716 | +- ~Project [data#15.timestamp AS timestamp#16, data#15.event_id AS event_id#17, data#15.properties AS properties#18]
+2026-02-21 01:59:02.716 |    +- ~Project [from_json(StructField(timestamp,StringType,true), StructField(event_id,StringType,true), StructField(properties,StructType(StructField(src_port,LongType,true),StructField(dst_port,LongType,true),StructField(protocol,StringType,true),StructField(packet_count,LongType,true),StructField(conn_state,StringType,true),StructField(bytes_transferred,DoubleType,true)),true), value#14, Some(Etc/UTC), false) AS data#15]
+2026-02-21 01:59:02.716 |       +- ~Project [cast(value#8 as string) AS value#14]
+2026-02-21 01:59:02.716 |          +- ~StreamingDataSourceV2ScanRelation[key#7, value#8, topic#9, partition#10, offset#11L, timestamp#12, timestampType#13] KafkaTable
+2026-02-21 01:59:02.716 | 
+2026-02-21 01:59:03.988 | 26/02/21 07:59:03 INFO OffsetSeqLog: BatchIds found from listing: 
+2026-02-21 01:59:05.278 | 26/02/21 07:59:05 INFO CommitLog: BatchIds found from listing: 
+2026-02-21 01:59:05.629 | 26/02/21 07:59:05 INFO OffsetSeqLog: BatchIds found from listing: 
+2026-02-21 01:59:05.974 | 26/02/21 07:59:05 INFO OffsetSeqLog: BatchIds found from listing: 
+2026-02-21 01:59:07.563 | 26/02/21 07:59:07 INFO MicroBatchExecution: Starting new streaming query.
+2026-02-21 01:59:07.567 | 26/02/21 07:59:07 INFO MicroBatchExecution: Stream started from {}
+2026-02-21 01:59:08.945 | 26/02/21 07:59:08 INFO AdminClientConfig: AdminClientConfig values: 
+2026-02-21 01:59:08.945 | 	auto.include.jmx.reporter = true
+2026-02-21 01:59:08.945 | 	bootstrap.controllers = []
+2026-02-21 01:59:08.945 | 	bootstrap.servers = [host.docker.internal:9094]
+2026-02-21 01:59:08.945 | 	client.dns.lookup = use_all_dns_ips
+2026-02-21 01:59:08.945 | 	client.id = 
+2026-02-21 01:59:08.945 | 	connections.max.idle.ms = 300000
+2026-02-21 01:59:08.945 | 	default.api.timeout.ms = 60000
+2026-02-21 01:59:08.945 | 	enable.metrics.push = true
+2026-02-21 01:59:08.945 | 	metadata.max.age.ms = 300000
+2026-02-21 01:59:08.945 | 	metadata.recovery.strategy = none
+2026-02-21 01:59:08.945 | 	metric.reporters = []
+2026-02-21 01:59:08.945 | 	metrics.num.samples = 2
+2026-02-21 01:59:08.945 | 	metrics.recording.level = INFO
+2026-02-21 01:59:08.945 | 	metrics.sample.window.ms = 30000
+2026-02-21 01:59:08.945 | 	receive.buffer.bytes = 65536
+2026-02-21 01:59:08.945 | 	reconnect.backoff.max.ms = 1000
+2026-02-21 01:59:08.945 | 	reconnect.backoff.ms = 50
+2026-02-21 01:59:08.945 | 	request.timeout.ms = 30000
+2026-02-21 01:59:08.945 | 	retries = 2147483647
+2026-02-21 01:59:08.945 | 	retry.backoff.max.ms = 1000
+2026-02-21 01:59:08.945 | 	retry.backoff.ms = 100
+2026-02-21 01:59:08.945 | 	sasl.client.callback.handler.class = null
+2026-02-21 01:59:08.945 | 	sasl.jaas.config = [hidden]
+2026-02-21 01:59:08.945 | 	sasl.kerberos.kinit.cmd = /usr/bin/kinit
+2026-02-21 01:59:08.945 | 	sasl.kerberos.min.time.before.relogin = 60000
+2026-02-21 01:59:08.945 | 	sasl.kerberos.service.name = null
+2026-02-21 01:59:08.945 | 	sasl.kerberos.ticket.renew.jitter = 0.05
+2026-02-21 01:59:08.945 | 	sasl.kerberos.ticket.renew.window.factor = 0.8
+2026-02-21 01:59:08.945 | 	sasl.login.callback.handler.class = null
+2026-02-21 01:59:08.945 | 	sasl.login.class = null
+2026-02-21 01:59:08.945 | 	sasl.login.connect.timeout.ms = null
+2026-02-21 01:59:08.945 | 	sasl.login.read.timeout.ms = null
+2026-02-21 01:59:08.945 | 	sasl.login.refresh.buffer.seconds = 300
+2026-02-21 01:59:08.945 | 	sasl.login.refresh.min.period.seconds = 60
+2026-02-21 01:59:08.945 | 	sasl.login.refresh.window.factor = 0.8
+2026-02-21 01:59:08.945 | 	sasl.login.refresh.window.jitter = 0.05
+2026-02-21 01:59:08.945 | 	sasl.login.retry.backoff.max.ms = 10000
+2026-02-21 01:59:08.945 | 	sasl.login.retry.backoff.ms = 100
+2026-02-21 01:59:08.945 | 	sasl.mechanism = SCRAM-SHA-512
+2026-02-21 01:59:08.945 | 	sasl.oauthbearer.clock.skew.seconds = 30
+2026-02-21 01:59:08.945 | 	sasl.oauthbearer.expected.audience = null
+2026-02-21 01:59:08.945 | 	sasl.oauthbearer.expected.issuer = null
+2026-02-21 01:59:08.945 | 	sasl.oauthbearer.jwks.endpoint.refresh.ms = 3600000
+2026-02-21 01:59:08.945 | 	sasl.oauthbearer.jwks.endpoint.retry.backoff.max.ms = 10000
+2026-02-21 01:59:08.945 | 	sasl.oauthbearer.jwks.endpoint.retry.backoff.ms = 100
+2026-02-21 01:59:08.945 | 	sasl.oauthbearer.jwks.endpoint.url = null
+2026-02-21 01:59:08.945 | 	sasl.oauthbearer.scope.claim.name = scope
+2026-02-21 01:59:08.945 | 	sasl.oauthbearer.sub.claim.name = sub
+2026-02-21 01:59:08.945 | 	sasl.oauthbearer.token.endpoint.url = null
+2026-02-21 01:59:08.945 | 	security.protocol = SASL_PLAINTEXT
+2026-02-21 01:59:08.945 | 	security.providers = null
+2026-02-21 01:59:08.945 | 	send.buffer.bytes = 131072
+2026-02-21 01:59:08.945 | 	socket.connection.setup.timeout.max.ms = 30000
+2026-02-21 01:59:08.945 | 	socket.connection.setup.timeout.ms = 10000
+2026-02-21 01:59:08.945 | 	ssl.cipher.suites = null
+2026-02-21 01:59:08.945 | 	ssl.enabled.protocols = [TLSv1.2, TLSv1.3]
+2026-02-21 01:59:08.945 | 	ssl.endpoint.identification.algorithm = https
+2026-02-21 01:59:08.945 | 	ssl.engine.factory.class = null
+2026-02-21 01:59:08.945 | 	ssl.key.password = null
+2026-02-21 01:59:08.945 | 	ssl.keymanager.algorithm = SunX509
+2026-02-21 01:59:08.945 | 	ssl.keystore.certificate.chain = null
+2026-02-21 01:59:08.945 | 	ssl.keystore.key = null
+2026-02-21 01:59:08.945 | 	ssl.keystore.location = null
+2026-02-21 01:59:08.945 | 	ssl.keystore.password = null
+2026-02-21 01:59:08.945 | 	ssl.keystore.type = JKS
+2026-02-21 01:59:08.945 | 	ssl.protocol = TLSv1.3
+2026-02-21 01:59:08.945 | 	ssl.provider = null
+2026-02-21 01:59:08.945 | 	ssl.secure.random.implementation = null
+2026-02-21 01:59:08.945 | 	ssl.trustmanager.algorithm = PKIX
+2026-02-21 01:59:08.945 | 	ssl.truststore.certificates = null
+2026-02-21 01:59:08.945 | 	ssl.truststore.location = null
+2026-02-21 01:59:08.945 | 	ssl.truststore.password = null
+2026-02-21 01:59:08.945 | 	ssl.truststore.type = JKS
+2026-02-21 01:59:08.945 | 
+2026-02-21 01:59:08.995 | 26/02/21 07:59:08 INFO AbstractLogin: Successfully logged in.
+2026-02-21 01:59:09.019 | 26/02/21 07:59:09 INFO AdminClientConfig: These configurations '[key.deserializer, value.deserializer, enable.auto.commit, max.poll.records, auto.offset.reset]' were supplied but are not used yet.
+2026-02-21 01:59:09.021 | 26/02/21 07:59:09 INFO AppInfoParser: Kafka version: 3.8.1
+2026-02-21 01:59:09.021 | 26/02/21 07:59:09 INFO AppInfoParser: Kafka commitId: 70d6ff42debf7e17
+2026-02-21 01:59:09.021 | 26/02/21 07:59:09 INFO AppInfoParser: Kafka startTimeMs: 1771660749019
+2026-02-21 01:59:10.289 | 26/02/21 07:59:10 INFO CheckpointFileManager: Writing atomically to s3a://k8s-mlops-platform-bucket/checkpoints/kafka-spark-inference/sources/0/0 using temp file s3a://k8s-mlops-platform-bucket/checkpoints/kafka-spark-inference/sources/0/.0.c39c07f8-8fc2-4959-83cc-2a1d7d318c68.tmp
+2026-02-21 01:59:12.497 | 26/02/21 07:59:12 INFO CheckpointFileManager: Renamed temp file s3a://k8s-mlops-platform-bucket/checkpoints/kafka-spark-inference/sources/0/.0.c39c07f8-8fc2-4959-83cc-2a1d7d318c68.tmp to s3a://k8s-mlops-platform-bucket/checkpoints/kafka-spark-inference/sources/0/0
+2026-02-21 01:59:12.498 | 26/02/21 07:59:12 INFO KafkaMicroBatchStream: Initial offsets: {"topic-traffic":{"0":10018,"1":9870,"2":10150,"3":9997,"4":9884,"5":9921}}
+2026-02-21 01:59:13.307 | 26/02/21 07:59:13 INFO CheckpointFileManager: Writing atomically to s3a://k8s-mlops-platform-bucket/checkpoints/kafka-spark-inference/offsets/0 using temp file s3a://k8s-mlops-platform-bucket/checkpoints/kafka-spark-inference/offsets/.0.93bd7884-1382-4334-86dc-4f2ff68902c8.tmp
+2026-02-21 01:59:15.383 | 26/02/21 07:59:15 INFO CheckpointFileManager: Renamed temp file s3a://k8s-mlops-platform-bucket/checkpoints/kafka-spark-inference/offsets/.0.93bd7884-1382-4334-86dc-4f2ff68902c8.tmp to s3a://k8s-mlops-platform-bucket/checkpoints/kafka-spark-inference/offsets/0
+2026-02-21 01:59:15.384 | 26/02/21 07:59:15 INFO MicroBatchExecution: Committed offsets for batch 0. Metadata OffsetSeqMetadata(0,1771660752507,HashMap(spark.sql.streaming.stateStore.providerClass -> org.apache.spark.sql.execution.streaming.state.HDFSBackedStateStoreProvider, spark.sql.streaming.stateStore.rocksdb.formatVersion -> 5, spark.sql.streaming.stateStore.encodingFormat -> unsaferow, spark.sql.streaming.statefulOperator.useStrictDistribution -> true, spark.sql.streaming.flatMapGroupsWithState.stateFormatVersion -> 2, spark.sql.streaming.multipleWatermarkPolicy -> min, spark.sql.streaming.aggregation.stateFormatVersion -> 2, spark.sql.shuffle.partitions -> 200, spark.sql.streaming.join.stateFormatVersion -> 2, spark.sql.streaming.stateStore.compression.codec -> lz4, spark.sql.optimizer.pruneFiltersCanPruneStreamingSubplan -> false))
+2026-02-21 01:59:19.263 | 26/02/21 07:59:19 INFO CodeGenerator: Code generated in 155.480279 ms
+2026-02-21 01:59:19.266 | 26/02/21 07:59:19 INFO KafkaOffsetReaderAdmin: Partitions added: Map()
+2026-02-21 01:59:19.353 | 2026-02-21 07:59:19,352 - kafka_spark_inference - INFO - Processing batch 0
+2026-02-21 01:59:19.460 | 26/02/21 07:59:19 INFO CodeGenerator: Code generated in 14.265962 ms
+2026-02-21 01:59:19.485 | 26/02/21 07:59:19 INFO CodeGenerator: Code generated in 17.179947 ms
+2026-02-21 01:59:19.575 | 26/02/21 07:59:19 INFO SparkContext: Starting job: start at NativeMethodAccessorImpl.java:0
+2026-02-21 01:59:19.585 | 26/02/21 07:59:19 INFO DAGScheduler: Registering RDD 6 (start at NativeMethodAccessorImpl.java:0) as input to shuffle 0
+2026-02-21 01:59:19.590 | 26/02/21 07:59:19 INFO DAGScheduler: Got job 0 (start at NativeMethodAccessorImpl.java:0) with 1 output partitions
+2026-02-21 01:59:19.591 | 26/02/21 07:59:19 INFO DAGScheduler: Final stage: ResultStage 1 (start at NativeMethodAccessorImpl.java:0)
+2026-02-21 01:59:19.592 | 26/02/21 07:59:19 INFO DAGScheduler: Parents of final stage: List(ShuffleMapStage 0)
+2026-02-21 01:59:19.593 | 26/02/21 07:59:19 INFO DAGScheduler: Missing parents: List()
+2026-02-21 01:59:19.596 | 26/02/21 07:59:19 INFO DAGScheduler: Missing parents found for ResultStage 1: List()
+2026-02-21 01:59:19.596 | 26/02/21 07:59:19 INFO DAGScheduler: Submitting ResultStage 1 (MapPartitionsRDD[9] at start at NativeMethodAccessorImpl.java:0), which has no missing parents
+2026-02-21 01:59:19.621 | 26/02/21 07:59:19 INFO MemoryStore: MemoryStore started with capacity 117.0 MiB
+2026-02-21 01:59:19.640 | 26/02/21 07:59:19 INFO MemoryStore: Block broadcast_0 stored as values in memory (estimated size 13.8 KiB, free 116.9 MiB)
+2026-02-21 01:59:19.668 | 26/02/21 07:59:19 INFO MemoryStore: Block broadcast_0_piece0 stored as bytes in memory (estimated size 6.6 KiB, free 116.9 MiB)
+2026-02-21 01:59:19.673 | 26/02/21 07:59:19 INFO SparkContext: Created broadcast 0 from broadcast at DAGScheduler.scala:1686
+2026-02-21 01:59:19.690 | 26/02/21 07:59:19 INFO DAGScheduler: Submitting 1 missing tasks from ResultStage 1 (MapPartitionsRDD[9] at start at NativeMethodAccessorImpl.java:0) (first 15 tasks are for partitions Vector(0))
+2026-02-21 01:59:19.692 | 26/02/21 07:59:19 INFO TaskSchedulerImpl: Adding task set 1.0 with 1 tasks resource profile 0
+2026-02-21 01:59:19.717 | 26/02/21 07:59:19 INFO TaskSetManager: Starting task 0.0 in stage 1.0 (TID 0) (10.1.13.4,executor 2, partition 0, PROCESS_LOCAL, 9827 bytes) 
+2026-02-21 01:59:20.054 | 26/02/21 07:59:20 INFO MapOutputTrackerMasterEndpoint: Asked to send map output locations for shuffle 0 to 10.1.13.4:44432
+2026-02-21 01:59:20.408 | 26/02/21 07:59:20 INFO TaskSetManager: Finished task 0.0 in stage 1.0 (TID 0) in 701 ms on 10.1.13.4 (executor 2) (1/1)
+2026-02-21 01:59:20.411 | 26/02/21 07:59:20 INFO TaskSchedulerImpl: Removed TaskSet 1.0 whose tasks have all completed, from pool 
+2026-02-21 01:59:20.416 | 26/02/21 07:59:20 INFO DAGScheduler: ResultStage 1 (start at NativeMethodAccessorImpl.java:0) finished in 810 ms
+2026-02-21 01:59:20.419 | 26/02/21 07:59:20 INFO DAGScheduler: Job 0 is finished. Cancelling potential speculative or zombie tasks for this job
+2026-02-21 01:59:20.419 | 26/02/21 07:59:20 INFO TaskSchedulerImpl: Canceling stage 1
+2026-02-21 01:59:20.420 | 26/02/21 07:59:20 INFO TaskSchedulerImpl: Killing all running tasks in stage 1: Stage finished
+2026-02-21 01:59:20.423 | 26/02/21 07:59:20 INFO DAGScheduler: Job 0 finished: start at NativeMethodAccessorImpl.java:0, took 847.319952 ms
+2026-02-21 01:59:20.430 | 2026-02-21 07:59:20,429 - kafka_spark_inference - INFO - ⏭️ Batch 0 is empty, skipping
+2026-02-21 01:59:21.233 | 26/02/21 07:59:21 INFO CheckpointFileManager: Writing atomically to s3a://k8s-mlops-platform-bucket/checkpoints/kafka-spark-inference/commits/0 using temp file s3a://k8s-mlops-platform-bucket/checkpoints/kafka-spark-inference/commits/.0.451acfe9-c7f7-4d79-8473-2bfccf573e36.tmp
+2026-02-21 01:59:23.553 | 26/02/21 07:59:23 INFO CheckpointFileManager: Renamed temp file s3a://k8s-mlops-platform-bucket/checkpoints/kafka-spark-inference/commits/.0.451acfe9-c7f7-4d79-8473-2bfccf573e36.tmp to s3a://k8s-mlops-platform-bucket/checkpoints/kafka-spark-inference/commits/0
+2026-02-21 01:59:23.575 | 26/02/21 07:59:23 INFO MicroBatchExecutionContext: Extracting source progress metrics for source=KafkaV2[Subscribe[topic-traffic]] took duration_ms=2
+2026-02-21 01:59:23.577 | 26/02/21 07:59:23 INFO MicroBatchExecutionContext: Extracting sink progress metrics for sink=ForeachBatchSink took duration_ms=0
+2026-02-21 01:59:23.593 | 26/02/21 07:59:23 INFO ProgressReporter: Streaming query made progress: {
+2026-02-21 01:59:23.593 |   "id" : "dfdb7138-c37b-43ea-9fa7-0b2b90f6c629",
+2026-02-21 01:59:23.593 |   "runId" : "f32e350d-7998-4379-9308-0ed6dcde5bb2",
+2026-02-21 01:59:23.593 |   "name" : null,
+2026-02-21 01:59:23.593 |   "timestamp" : "2026-02-21T07:59:07.568Z",
+2026-02-21 01:59:23.593 |   "batchId" : 0,
+2026-02-21 01:59:23.593 |   "batchDuration" : 15987,
+2026-02-21 01:59:23.593 |   "numInputRows" : 0,
+2026-02-21 01:59:23.593 |   "inputRowsPerSecond" : 0.0,
+2026-02-21 01:59:23.593 |   "processedRowsPerSecond" : 0.0,
+2026-02-21 01:59:23.593 |   "durationMs" : {
+2026-02-21 01:59:23.593 |     "addBatch" : 1469,
+2026-02-21 01:59:23.593 |     "commitOffsets" : 3117,
+2026-02-21 01:59:23.593 |     "getBatch" : 3023,
+2026-02-21 01:59:23.593 |     "latestOffset" : 4935,
+2026-02-21 01:59:23.593 |     "queryPlanning" : 547,
+2026-02-21 01:59:23.593 |     "triggerExecution" : 15984,
+2026-02-21 01:59:23.593 |     "walCommit" : 2875
+2026-02-21 01:59:23.593 |   },
+2026-02-21 01:59:23.593 |   "stateOperators" : [ ],
+2026-02-21 01:59:23.593 |   "sources" : [ {
+2026-02-21 01:59:23.593 |     "description" : "KafkaV2[Subscribe[topic-traffic]]",
+2026-02-21 01:59:23.593 |     "startOffset" : null,
+2026-02-21 01:59:23.593 |     "endOffset" : {
+2026-02-21 01:59:23.593 |       "topic-traffic" : {
+2026-02-21 01:59:23.593 |         "0" : 10018,
+2026-02-21 01:59:23.593 |         "1" : 9870,
+2026-02-21 01:59:23.593 |         "2" : 10150,
+2026-02-21 01:59:23.593 |         "3" : 9997,
+2026-02-21 01:59:23.593 |         "4" : 9884,
+2026-02-21 01:59:23.593 |         "5" : 9921
+2026-02-21 01:59:23.593 |       }
+2026-02-21 01:59:23.593 |     },
+2026-02-21 01:59:23.593 |     "latestOffset" : {
+2026-02-21 01:59:23.593 |       "topic-traffic" : {
+2026-02-21 01:59:23.593 |         "0" : 10018,
+2026-02-21 01:59:23.593 |         "1" : 9870,
+2026-02-21 01:59:23.593 |         "2" : 10150,
+2026-02-21 01:59:23.593 |         "3" : 9997,
+2026-02-21 01:59:23.593 |         "4" : 9884,
+2026-02-21 01:59:23.593 |         "5" : 9921
+2026-02-21 01:59:23.593 |       }
+2026-02-21 01:59:23.593 |     },
+2026-02-21 01:59:23.593 |     "numInputRows" : 0,
+2026-02-21 01:59:23.593 |     "inputRowsPerSecond" : 0.0,
+2026-02-21 01:59:23.593 |     "processedRowsPerSecond" : 0.0,
+2026-02-21 01:59:23.593 |     "metrics" : {
+2026-02-21 01:59:23.593 |       "avgOffsetsBehindLatest" : "0.0",
+2026-02-21 01:59:23.593 |       "maxOffsetsBehindLatest" : "0",
+2026-02-21 01:59:23.593 |       "minOffsetsBehindLatest" : "0"
+2026-02-21 01:59:23.593 |     }
+2026-02-21 01:59:23.593 |   } ],
+2026-02-21 01:59:23.593 |   "sink" : {
+2026-02-21 01:59:23.593 |     "description" : "ForeachBatchSink",
+2026-02-21 01:59:23.593 |     "numOutputRows" : -1
+2026-02-21 01:59:23.593 |   }
+2026-02-21 01:59:23.593 | }
+2026-02-21 01:59:23.604 | 26/02/21 07:59:23 WARN ProcessingTimeExecutor: Current batch is falling behind. The trigger interval is 100 milliseconds, but spent 16034 milliseconds
+2026-02-21 01:59:23.614 | 26/02/21 07:59:23 INFO MicroBatchExecutionContext: Extracting source progress metrics for source=KafkaV2[Subscribe[topic-traffic]] took duration_ms=0
+2026-02-21 01:59:23.614 | 26/02/21 07:59:23 INFO MicroBatchExecutionContext: Extracting sink progress metrics for sink=ForeachBatchSink took duration_ms=0
+2026-02-21 01:59:23.713 | 26/02/21 07:59:23 INFO MicroBatchExecutionContext: Extracting source progress metrics for source=KafkaV2[Subscribe[topic-traffic]] took duration_ms=0
+2026-02-21 01:59:23.713 | 26/02/21 07:59:23 INFO MicroBatchExecutionContext: Extracting sink progress metrics for sink=ForeachBatchSink took duration_ms=0
+2026-02-21 01:59:23.808 | 26/02/21 07:59:23 INFO MicroBatchExecutionContext: Extracting source progress metrics for source=KafkaV2[Subscribe[topic-traffic]] took duration_ms=0
+2026-02-21 01:59:23.808 | 26/02/21 07:59:23 INFO MicroBatchExecutionContext: Extracting sink progress metrics for sink=ForeachBatchSink took duration_ms=0
+2026-02-21 01:59:23.909 | 26/02/21 07:59:23 INFO MicroBatchExecutionContext: Extracting source progress metrics for source=KafkaV2[Subscribe[topic-traffic]] took duration_ms=0
+2026-02-21 01:59:23.909 | 26/02/21 07:59:23 INFO MicroBatchExecutionContext: Extracting sink progress metrics for sink=ForeachBatchSink took duration_ms=0
+2026-02-21 01:59:24.014 | 26/02/21 07:59:24 INFO MicroBatchExecutionContext: Extracting source progress metrics for source=KafkaV2[Subscribe[topic-traffic]] took duration_ms=0
+2026-02-21 01:59:24.014 | 26/02/21 07:59:24 INFO MicroBatchExecutionContext: Extracting sink progress metrics for sink=ForeachBatchSink took duration_ms=0
+2026-02-21 01:59:24.110 | 26/02/21 07:59:24 INFO MicroBatchExecutionContext: Extracting source progress metrics for source=KafkaV2[Subscribe[topic-traffic]] took duration_ms=0
+2026-02-21 01:59:24.110 | 26/02/21 07:59:24 INFO MicroBatchExecutionContext: Extracting sink progress metrics for sink=ForeachBatchSink took duration_ms=0
+2026-02-21 01:59:24.211 | 26/02/21 07:59:24 INFO MicroBatchExecutionContext: Extracting source progress metrics for source=KafkaV2[Subscribe[topic-traffic]] took duration_ms=0
+2026-02-21 01:59:24.211 | 26/02/21 07:59:24 INFO MicroBatchExecutionContext: Extracting sink progress metrics for sink=ForeachBatchSink took duration_ms=0
+2026-02-21 01:59:24.307 | 26/02/21 07:59:24 INFO MicroBatchExecutionContext: Extracting source progress metrics for source=KafkaV2[Subscribe[topic-traffic]] took duration_ms=0
+2026-02-21 01:59:24.307 | 26/02/21 07:59:24 INFO MicroBatchExecutionContext: Extracting sink progress metrics for sink=ForeachBatchSink took duration_ms=0
+2026-02-21 01:59:24.414 | 26/02/21 07:59:24 INFO MicroBatchExecutionContext: Extracting source progress metrics for source=KafkaV2[Subscribe[topic-traffic]] took duration_ms=0
+2026-02-21 01:59:24.414 | 26/02/21 07:59:24 INFO MicroBatchExecutionContext: Extracting sink progress metrics for sink=ForeachBatchSink took duration_ms=0
+2026-02-21 01:59:24.506 | 26/02/21 07:59:24 INFO MicroBatchExecutionContext: Extracting source progress metrics for source=KafkaV2[Subscribe[topic-traffic]] took duration_ms=0
+2026-02-21 01:59:24.507 | 26/02/21 07:59:24 INFO MicroBatchExecutionContext: Extracting sink progress metrics for sink=ForeachBatchSink took duration_ms=0
+2026-02-21 01:59:24.612 | 26/02/21 07:59:24 INFO MicroBatchExecutionContext: Extracting source progress metrics for source=KafkaV2[Subscribe[topic-traffic]] took duration_ms=0
+2026-02-21 01:59:24.612 | 26/02/21 07:59:24 INFO MicroBatchExecutionContext: Extracting sink progress metrics for sink=ForeachBatchSink took duration_ms=0
+2026-02-21 01:59:24.710 | 26/02/21 07:59:24 INFO MicroBatchExecutionContext: Extracting source progress metrics for source=KafkaV2[Subscribe[topic-traffic]] took duration_ms=0
+2026-02-21 01:59:24.710 | 26/02/21 07:59:24 INFO MicroBatchExecutionContext: Extracting sink progress metrics for sink=ForeachBatchSink took duration_ms=0
+2026-02-21 01:59:24.806 | 26/02/21 07:59:24 INFO MicroBatchExecutionContext: Extracting source progress metrics for source=KafkaV2[Subscribe[topic-traffic]] took duration_ms=0
+2026-02-21 01:59:24.806 | 26/02/21 07:59:24 INFO MicroBatchExecutionContext: Extracting sink progress metrics for sink=ForeachBatchSink took duration_ms=0
+2026-02-21 01:59:24.908 | 26/02/21 07:59:24 INFO MicroBatchExecutionContext: Extracting source progress metrics for source=KafkaV2[Subscribe[topic-traffic]] took duration_ms=0
+2026-02-21 01:59:24.908 | 26/02/21 07:59:24 INFO MicroBatchExecutionContext: Extracting sink progress metrics for sink=ForeachBatchSink took duration_ms=0
+2026-02-21 01:59:25.012 | 26/02/21 07:59:25 INFO MicroBatchExecutionContext: Extracting source progress metrics for source=KafkaV2[Subscribe[topic-traffic]] took duration_ms=0
+2026-02-21 01:59:25.012 | 26/02/21 07:59:25 INFO MicroBatchExecutionContext: Extracting sink progress metrics for sink=ForeachBatchSink took duration_ms=0
+2026-02-21 01:59:25.111 | 26/02/21 07:59:25 INFO MicroBatchExecutionContext: Extracting source progress metrics for source=KafkaV2[Subscribe[topic-traffic]] took duration_ms=0
+2026-02-21 01:59:25.111 | 26/02/21 07:59:25 INFO MicroBatchExecutionContext: Extracting sink progress metrics for sink=ForeachBatchSink took duration_ms=0
+2026-02-21 01:59:25.209 | 26/02/21 07:59:25 INFO MicroBatchExecutionContext: Extracting source progress metrics for source=KafkaV2[Subscribe[topic-traffic]] took duration_ms=0
+2026-02-21 01:59:25.209 | 26/02/21 07:59:25 INFO MicroBatchExecutionContext: Extracting sink progress metrics for sink=ForeachBatchSink took duration_ms=0
+2026-02-21 01:59:25.311 | 26/02/21 07:59:25 INFO MicroBatchExecutionContext: Extracting source progress metrics for source=KafkaV2[Subscribe[topic-traffic]] took duration_ms=0
+2026-02-21 01:59:25.312 | 26/02/21 07:59:25 INFO MicroBatchExecutionContext: Extracting sink progress metrics for sink=ForeachBatchSink took duration_ms=0
+2026-02-21 01:59:25.411 | 26/02/21 07:59:25 INFO MicroBatchExecutionContext: Extracting source progress metrics for source=KafkaV2[Subscribe[topic-traffic]] took duration_ms=0
+2026-02-21 01:59:25.411 | 26/02/21 07:59:25 INFO MicroBatchExecutionContext: Extracting sink progress metrics for sink=ForeachBatchSink took duration_ms=0
+2026-02-21 01:59:25.512 | 26/02/21 07:59:25 INFO MicroBatchExecutionContext: Extracting source progress metrics for source=KafkaV2[Subscribe[topic-traffic]] took duration_ms=0
+2026-02-21 01:59:25.512 | 26/02/21 07:59:25 INFO MicroBatchExecutionContext: Extracting sink progress metrics for sink=ForeachBatchSink took duration_ms=0
+2026-02-21 01:59:25.611 | 26/02/21 07:59:25 INFO MicroBatchExecutionContext: Extracting source progress metrics for source=KafkaV2[Subscribe[topic-traffic]] took duration_ms=0
+2026-02-21 01:59:25.611 | 26/02/21 07:59:25 INFO MicroBatchExecutionContext: Extracting sink progress metrics for sink=ForeachBatchSink took duration_ms=0
+2026-02-21 01:59:25.706 | 26/02/21 07:59:25 INFO MicroBatchExecutionContext: Extracting source progress metrics for source=KafkaV2[Subscribe[topic-traffic]] took duration_ms=0
+2026-02-21 01:59:25.706 | 26/02/21 07:59:25 INFO MicroBatchExecutionContext: Extracting sink progress metrics for sink=ForeachBatchSink took duration_ms=0
+2026-02-21 01:59:25.813 | 26/02/21 07:59:25 INFO MicroBatchExecutionContext: Extracting source progress metrics for source=KafkaV2[Subscribe[topic-traffic]] took duration_ms=0
+2026-02-21 01:59:25.813 | 26/02/21 07:59:25 INFO MicroBatchExecutionContext: Extracting sink progress metrics for sink=ForeachBatchSink took duration_ms=0
+2026-02-21 01:59:25.907 | 26/02/21 07:59:25 INFO MicroBatchExecutionContext: Extracting source progress metrics for source=KafkaV2[Subscribe[topic-traffic]] took duration_ms=0
+2026-02-21 01:59:25.907 | 26/02/21 07:59:25 INFO MicroBatchExecutionContext: Extracting sink progress metrics for sink=ForeachBatchSink took duration_ms=0
+2026-02-21 01:59:26.009 | 26/02/21 07:59:26 INFO MicroBatchExecutionContext: Extracting source progress metrics for source=KafkaV2[Subscribe[topic-traffic]] took duration_ms=0
+2026-02-21 01:59:26.009 | 26/02/21 07:59:26 INFO MicroBatchExecutionContext: Extracting sink progress metrics for sink=ForeachBatchSink took duration_ms=0
+2026-02-21 01:59:26.109 | 26/02/21 07:59:26 INFO MicroBatchExecutionContext: Extracting source progress metrics for source=KafkaV2[Subscribe[topic-traffic]] took duration_ms=0
+2026-02-21 01:59:26.109 | 26/02/21 07:59:26 INFO MicroBatchExecutionContext: Extracting sink progress metrics for sink=ForeachBatchSink took duration_ms=0
+2026-02-21 01:59:26.210 | 26/02/21 07:59:26 INFO MicroBatchExecutionContext: Extracting source progress metrics for source=KafkaV2[Subscribe[topic-traffic]] took duration_ms=0
+2026-02-21 01:59:26.210 | 26/02/21 07:59:26 INFO MicroBatchExecutionContext: Extracting sink progress metrics for sink=ForeachBatchSink took duration_ms=0
+2026-02-21 01:59:26.308 | 26/02/21 07:59:26 INFO MicroBatchExecutionContext: Extracting source progress metrics for source=KafkaV2[Subscribe[topic-traffic]] took duration_ms=0
+2026-02-21 01:59:26.308 | 26/02/21 07:59:26 INFO MicroBatchExecutionContext: Extracting sink progress metrics for sink=ForeachBatchSink took duration_ms=0
+2026-02-21 01:59:26.409 | 26/02/21 07:59:26 INFO MicroBatchExecutionContext: Extracting source progress metrics for source=KafkaV2[Subscribe[topic-traffic]] took duration_ms=0
+2026-02-21 01:59:26.409 | 26/02/21 07:59:26 INFO MicroBatchExecutionContext: Extracting sink progress metrics for sink=ForeachBatchSink took duration_ms=0
+2026-02-21 01:59:26.508 | 26/02/21 07:59:26 INFO MicroBatchExecutionContext: Extracting source progress metrics for source=KafkaV2[Subscribe[topic-traffic]] took duration_ms=0
+2026-02-21 01:59:26.508 | 26/02/21 07:59:26 INFO MicroBatchExecutionContext: Extracting sink progress metrics for sink=ForeachBatchSink took duration_ms=0
+2026-02-21 01:59:26.612 | 26/02/21 07:59:26 INFO MicroBatchExecutionContext: Extracting source progress metrics for source=KafkaV2[Subscribe[topic-traffic]] took duration_ms=0
+2026-02-21 01:59:26.612 | 26/02/21 07:59:26 INFO MicroBatchExecutionContext: Extracting sink progress metrics for sink=ForeachBatchSink took duration_ms=0
+2026-02-21 01:59:26.706 | 26/02/21 07:59:26 INFO MicroBatchExecutionContext: Extracting source progress metrics for source=KafkaV2[Subscribe[topic-traffic]] took duration_ms=0
+2026-02-21 01:59:26.706 | 26/02/21 07:59:26 INFO MicroBatchExecutionContext: Extracting sink progress metrics for sink=ForeachBatchSink took duration_ms=0
+2026-02-21 01:59:26.806 | 26/02/21 07:59:26 INFO MicroBatchExecutionContext: Extracting source progress metrics for source=KafkaV2[Subscribe[topic-traffic]] took duration_ms=0
+2026-02-21 01:59:26.807 | 26/02/21 07:59:26 INFO MicroBatchExecutionContext: Extracting sink progress metrics for sink=ForeachBatchSink took duration_ms=0
+2026-02-21 01:59:26.905 | 26/02/21 07:59:26 INFO MicroBatchExecutionContext: Extracting source progress metrics for source=KafkaV2[Subscribe[topic-traffic]] took duration_ms=0
+2026-02-21 01:59:26.905 | 26/02/21 07:59:26 INFO MicroBatchExecutionContext: Extracting sink progress metrics for sink=ForeachBatchSink took duration_ms=0
+2026-02-21 01:59:27.012 | 26/02/21 07:59:27 INFO MicroBatchExecutionContext: Extracting source progress metrics for source=KafkaV2[Subscribe[topic-traffic]] took duration_ms=0
+2026-02-21 01:59:27.012 | 26/02/21 07:59:27 INFO MicroBatchExecutionContext: Extracting sink progress metrics for sink=ForeachBatchSink took duration_ms=0
+2026-02-21 01:59:27.112 | 26/02/21 07:59:27 INFO MicroBatchExecutionContext: Extracting source progress metrics for source=KafkaV2[Subscribe[topic-traffic]] took duration_ms=0
+2026-02-21 01:59:27.112 | 26/02/21 07:59:27 INFO MicroBatchExecutionContext: Extracting sink progress metrics for sink=ForeachBatchSink took duration_ms=0
+2026-02-21 01:59:27.209 | 26/02/21 07:59:27 INFO MicroBatchExecutionContext: Extracting source progress metrics for source=KafkaV2[Subscribe[topic-traffic]] took duration_ms=0
+2026-02-21 01:59:27.209 | 26/02/21 07:59:27 INFO MicroBatchExecutionContext: Extracting sink progress metrics for sink=ForeachBatchSink took duration_ms=0
+2026-02-21 01:59:27.308 | 26/02/21 07:59:27 INFO MicroBatchExecutionContext: Extracting source progress metrics for source=KafkaV2[Subscribe[topic-traffic]] took duration_ms=0
+2026-02-21 01:59:27.308 | 26/02/21 07:59:27 INFO MicroBatchExecutionContext: Extracting sink progress metrics for sink=ForeachBatchSink took duration_ms=0
+2026-02-21 01:59:27.408 | 26/02/21 07:59:27 INFO MicroBatchExecutionContext: Extracting source progress metrics for source=KafkaV2[Subscribe[topic-traffic]] took duration_ms=0
+2026-02-21 01:59:27.408 | 26/02/21 07:59:27 INFO MicroBatchExecutionContext: Extracting sink progress metrics for sink=ForeachBatchSink took duration_ms=0
+2026-02-21 01:59:27.508 | 26/02/21 07:59:27 INFO MicroBatchExecutionContext: Extracting source progress metrics for source=KafkaV2[Subscribe[topic-traffic]] took duration_ms=0
+2026-02-21 01:59:27.508 | 26/02/21 07:59:27 INFO MicroBatchExecutionContext: Extracting sink progress metrics for sink=ForeachBatchSink took duration_ms=0
+2026-02-21 01:59:27.613 | 26/02/21 07:59:27 INFO MicroBatchExecutionContext: Extracting source progress metrics for source=KafkaV2[Subscribe[topic-traffic]] took duration_ms=0
+2026-02-21 01:59:27.613 | 26/02/21 07:59:27 INFO MicroBatchExecutionContext: Extracting sink progress metrics for sink=ForeachBatchSink took duration_ms=0
+2026-02-21 01:59:27.707 | 26/02/21 07:59:27 INFO MicroBatchExecutionContext: Extracting source progress metrics for source=KafkaV2[Subscribe[topic-traffic]] took duration_ms=0
+2026-02-21 01:59:27.707 | 26/02/21 07:59:27 INFO MicroBatchExecutionContext: Extracting sink progress metrics for sink=ForeachBatchSink took duration_ms=0
