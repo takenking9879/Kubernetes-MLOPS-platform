@@ -13,6 +13,7 @@
 # Set ENABLE_PREPROCESS=false to skip Spark preprocessing
 # Set ENABLE_TRAINING=false to skip Ray training
 # Set ENABLE_DELETION=false to keep resources after completion
+# Example: ENABLE_PREPROCESS=false ENABLE_INGESTION=false ./k3s/training.sh
 
 set -euo pipefail
 
