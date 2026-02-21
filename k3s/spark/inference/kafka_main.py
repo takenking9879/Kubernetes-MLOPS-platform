@@ -542,7 +542,7 @@ class KafkaSparkInference(BaseUtils):
                 df_stream
                 .writeStream
                 .foreachBatch(self.process_batch)
-                .option("checkpointLocation", self.checkpoint_location)
+                # .option("checkpointLocation", self.checkpoint_location)
                 .outputMode("append")
                 .trigger(processingTime=self.online_processing_time)
                 .start()

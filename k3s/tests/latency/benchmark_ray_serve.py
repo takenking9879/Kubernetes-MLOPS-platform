@@ -39,9 +39,13 @@ def one_request(url: str, host_header: str, timeout: int, event_id: str) -> Tupl
         headers["Host"] = host_header
 
     started = time.perf_counter()
-    response = requests.post(url, json=payload, headers=headers, timeout=timeout)
-    elapsed_ms = (time.perf_counter() - started) * 1000.0
-    return elapsed_ms, response.status_code
+    try:
+        response = requests.post(url, json=payload, headers=headers, timeout=timeout)
+        elapsed_ms = (time.perf_counter() - started) * 1000.0
+        return elapsed_ms, response.status_code
+    except Exception:
+        elapsed_ms = (time.perf_counter() - started) * 1000.0
+        return elapsed_ms, 0
 
 
 def run_benchmark(url: str, host_header: str, requests_count: int, concurrency: int, timeout: int, warmup: int) -> Dict[str, float]:

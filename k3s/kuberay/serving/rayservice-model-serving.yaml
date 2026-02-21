@@ -17,28 +17,38 @@ spec:
         deployments:
           - name: ModelRouter
             ray_actor_options:
-              num_cpus: 0.2
-            user_config: {}
-          - name: StableModel
-            ray_actor_options:
-              num_cpus: 0.8
+              num_cpus: 0.05
+            max_ongoing_requests: 128
             user_config: {}
             autoscaling_config:
-              min_replicas: 2
-              initial_replicas: 2
-              max_replicas: 8
-              target_ongoing_requests: 2
+              min_replicas: 4
+              initial_replicas: 4
+              max_replicas: 16
+              target_ongoing_requests: 16
+              upscale_delay_s: 0
+              downscale_delay_s: 15
+          - name: StableModel
+            ray_actor_options:
+              num_cpus: 0.25
+            max_ongoing_requests: 64
+            user_config: {}
+            autoscaling_config:
+              min_replicas: 4
+              initial_replicas: 4
+              max_replicas: 12
+              target_ongoing_requests: 8
               upscale_delay_s: 0
               downscale_delay_s: 15
           - name: CanaryModel
             ray_actor_options:
-              num_cpus: 0.8
+              num_cpus: 0.25
+            max_ongoing_requests: 64
             user_config: {}
             autoscaling_config:
               min_replicas: 0
               initial_replicas: 0
-              max_replicas: 4
-              target_ongoing_requests: 2
+              max_replicas: 8
+              target_ongoing_requests: 8
               upscale_delay_s: 0
               downscale_delay_s: 15
   rayClusterConfig:
@@ -118,9 +128,9 @@ spec:
 
     workerGroupSpecs:
       - groupName: serve-workers
-        replicas: 2
-        minReplicas: 1
-        maxReplicas: 6
+        replicas: 3
+        minReplicas: 2
+        maxReplicas: 8
         rayStartParams: {}
         template:
           spec:
