@@ -1,6 +1,7 @@
 import asyncio
 import json
 import os
+import time
 import urllib.request
 from typing import Dict
 
@@ -173,7 +174,13 @@ class ModelRouter:
                 "import_path": "k3s.kuberay.serving.app:deployment_graph",
                 "route_prefix": "/infer",
                 "deployments": [
-                    {"name": "StableModel", "user_config": {"alias": alias}},
+                    {
+                        "name": "StableModel",
+                        "user_config": {
+                            "alias": alias,
+                            "reload_nonce": int(time.time() * 1000),
+                        },
+                    },
                     {"name": "CanaryModel", "user_config": {}},
                     {"name": "ModelRouter", "user_config": {}},
                 ],
