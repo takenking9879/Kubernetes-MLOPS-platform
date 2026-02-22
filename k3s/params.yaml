@@ -42,7 +42,7 @@ kuberay:
     # Pipeline artifacts are resolved via MLflow → Iceberg → S3.
     # MLflow webhook is registered for fast model + executor reload.
     # Spark acts as a pure router: schema conversion only, no DSL preprocessing.
-    webhook_public_base_url: "http://serving.localhost"
+    webhook_public_base_url: "http://model-serving-serve-svc.ray.svc.cluster.local:8000"
     webhook_path: "/infer/webhook"
     webhook_name: "rayserve-attack-detection-champion-alias"
     webhook_max_timestamp_age_seconds: 300

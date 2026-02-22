@@ -1,9 +1,8 @@
-import base64
 import hashlib
 import hmac
 import json
 import time
-from typing import Any, Dict, Optional
+from typing import Optional
 
 from starlette.responses import JSONResponse
 
@@ -11,39 +10,43 @@ from starlette.responses import JSONResponse
 def verify_webhook_signature(
     payload_bytes: bytes,
     signature_header: Optional[str],
-    delivery_id_header: Optional[str],
     timestamp_header: Optional[str],
     secret: str,
     max_age_seconds: int,
 ) -> bool:
-    """Verify MLflow webhook HMAC signature (v1) and timestamp freshness."""
-    if not signature_header or not delivery_id_header or not timestamp_header:
+    """Verify MLflow webhook HMAC-SHA256 signature and optional timestamp freshness.
+
+    MLflow signs the raw request body with HMAC-SHA256 and sends:
+        X-Mlflow-Signature: sha256=<hex_digest>
+        X-Mlflow-Timestamp: <unix_ms>   (optional — present in newer MLflow versions)
+    """
+    if not signature_header:
         return False
 
-    try:
-        webhook_ts = int(timestamp_header)
-        # MLflow sends timestamps in milliseconds; normalize to seconds.
-        if webhook_ts > 1_000_000_000_000:
-            webhook_ts = webhook_ts // 1000
-        age = int(time.time()) - webhook_ts
-        if age < 0 or age > max_age_seconds:
+    # Optional timestamp freshness check (skipped if header absent).
+    if timestamp_header:
+        try:
+            webhook_ts = int(timestamp_header)
+            # MLflow sends timestamps in milliseconds; normalize to seconds.
+            if webhook_ts > 1_000_000_000_000:
+                webhook_ts = webhook_ts // 1000
+            age = int(time.time()) - webhook_ts
+            if age < 0 or age > max_age_seconds:
+                return False
+        except (ValueError, TypeError):
             return False
-    except (ValueError, TypeError):
+
+    if not signature_header.startswith("sha256="):
         return False
 
-    if not signature_header.startswith("v1,"):
-        return False
+    received_hex = signature_header[len("sha256="):]
+    expected_hex = hmac.new(secret.encode("utf-8"), payload_bytes, hashlib.sha256).hexdigest()
 
-    received_sig_b64 = signature_header.split(",", 1)[1]
-    signed_content = f"{delivery_id_header}.{timestamp_header}.{payload_bytes.decode('utf-8')}".encode("utf-8")
-    expected_sig = hmac.new(secret.encode("utf-8"), signed_content, hashlib.sha256).digest()
-    expected_sig_b64 = base64.b64encode(expected_sig).decode("utf-8")
-
-    return hmac.compare_digest(received_sig_b64, expected_sig_b64)
+    return hmac.compare_digest(received_hex, expected_hex)
 
 
 class MLflowAliasWebhookHandler:
-    """Handle MLflow alias webhook events and trigger stable reloads."""
+    """Handle MLflow MODEL_VERSION_ALIASED webhook events and trigger stable reloads."""
 
     def __init__(self, stable_handle, logger):
         self._stable = stable_handle
@@ -63,7 +66,6 @@ class MLflowAliasWebhookHandler:
         verified = verify_webhook_signature(
             payload_bytes=payload_bytes,
             signature_header=request.headers.get("x-mlflow-signature"),
-            delivery_id_header=request.headers.get("x-mlflow-delivery-id"),
             timestamp_header=request.headers.get("x-mlflow-timestamp"),
             secret=secret,
             max_age_seconds=max_age_seconds,
@@ -72,9 +74,8 @@ class MLflowAliasWebhookHandler:
         if not verified:
             self._logger.warning(
                 "Rejected webhook: invalid signature or timestamp "
-                "(sig=%s, delivery-id=%s, ts=%s)",
+                "(sig=%s, ts=%s)",
                 request.headers.get("x-mlflow-signature"),
-                request.headers.get("x-mlflow-delivery-id"),
                 request.headers.get("x-mlflow-timestamp"),
             )
             return JSONResponse(
@@ -83,19 +84,14 @@ class MLflowAliasWebhookHandler:
             )
 
         webhook_body = json.loads(payload_bytes.decode("utf-8"))
-        entity = webhook_body.get("entity")
-        action = webhook_body.get("action")
+
+        # Real MLflow payload: {"event_type": "MODEL_VERSION_ALIASED", "data": {...}}
+        event_type = webhook_body.get("event_type", "")
         data = webhook_body.get("data", {}) or {}
 
-        if entity != "model_version_alias":
+        if event_type != "MODEL_VERSION_ALIASED":
             return JSONResponse(
-                {"status": "ignored", "reason": "unsupported_entity"},
-                status_code=202,
-            )
-
-        if action not in {"created", "updated", "set"}:
-            return JSONResponse(
-                {"status": "ignored", "reason": "unsupported_action"},
+                {"status": "ignored", "reason": "unsupported_event_type", "event_type": event_type},
                 status_code=202,
             )
 
@@ -127,7 +123,7 @@ class MLflowAliasWebhookHandler:
         return JSONResponse(
             {
                 "status": "ok",
-                "event": f"{entity}.{action}",
+                "event_type": event_type,
                 "model_name": model_name,
                 "alias": alias,
                 "version": version,

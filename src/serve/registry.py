@@ -78,13 +78,8 @@ class MLflowRegistry:
         raise ValueError(f"Unsupported framework: {framework}")
 
     def ensure_webhook(self, webhook_config: WebhookConfig, registry_name: str, alias: str) -> None:
-        preferred_events = [
-            "model_version_alias.created",
-            "model_version_alias.updated",
-            "model_version_alias.set",
-            "model_version_alias.deleted",
-        ]
-        fallback_events = ["model_version_alias.created", "model_version_alias.deleted"]
+        preferred_events = ["MODEL_VERSION_ALIASED"]
+        fallback_events = ["MODEL_VERSION_ALIASED"]
         description = f"Ray Serve sync for {registry_name}@{alias}"
 
         existing = self._find_webhook_by_name(webhook_config.name)
