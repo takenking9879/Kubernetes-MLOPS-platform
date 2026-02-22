@@ -1,3 +1,4 @@
+import base64
 import hashlib
 import hmac
 import json
@@ -11,14 +12,18 @@ def verify_webhook_signature(
     payload_bytes: bytes,
     signature_header: Optional[str],
     timestamp_header: Optional[str],
+    delivery_id_header: Optional[str],
     secret: str,
     max_age_seconds: int,
 ) -> bool:
     """Verify MLflow webhook HMAC-SHA256 signature and optional timestamp freshness.
 
     MLflow signs the raw request body with HMAC-SHA256 and sends:
-        X-Mlflow-Signature: sha256=<hex_digest>
-        X-Mlflow-Timestamp: <unix_ms>   (optional — present in newer MLflow versions)
+        X-Mlflow-Signature: sha256=<hex_digest> (old)
+        or
+        X-Mlflow-Signature: v1,<base64_encoded_signature> (new)
+        X-Mlflow-Timestamp: <unix_ms> or <unix_s>
+        X-Mlflow-Delivery-Id: <uuid>
     """
     if not signature_header:
         return False
@@ -36,13 +41,24 @@ def verify_webhook_signature(
         except (ValueError, TypeError):
             return False
 
-    if not signature_header.startswith("sha256="):
-        return False
+    if signature_header.startswith("v1,"):
+        if not timestamp_header or not delivery_id_header:
+            return False
+        received_b64 = signature_header[len("v1,"):]
+        payload_str = payload_bytes.decode("utf-8")
+        signed_content = f"{delivery_id_header}.{timestamp_header}.{payload_str}"
+        expected_signature = hmac.new(
+            secret.encode("utf-8"), signed_content.encode("utf-8"), hashlib.sha256
+        ).digest()
+        expected_b64 = base64.b64encode(expected_signature).decode("utf-8")
+        return hmac.compare_digest(received_b64, expected_b64)
 
-    received_hex = signature_header[len("sha256="):]
-    expected_hex = hmac.new(secret.encode("utf-8"), payload_bytes, hashlib.sha256).hexdigest()
+    if signature_header.startswith("sha256="):
+        received_hex = signature_header[len("sha256="):]
+        expected_hex = hmac.new(secret.encode("utf-8"), payload_bytes, hashlib.sha256).hexdigest()
+        return hmac.compare_digest(received_hex, expected_hex)
 
-    return hmac.compare_digest(received_hex, expected_hex)
+    return False
 
 
 class MLflowAliasWebhookHandler:
@@ -67,6 +83,7 @@ class MLflowAliasWebhookHandler:
             payload_bytes=payload_bytes,
             signature_header=request.headers.get("x-mlflow-signature"),
             timestamp_header=request.headers.get("x-mlflow-timestamp"),
+            delivery_id_header=request.headers.get("x-mlflow-delivery-id"),
             secret=secret,
             max_age_seconds=max_age_seconds,
         )
