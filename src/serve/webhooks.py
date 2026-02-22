@@ -22,6 +22,9 @@ def verify_webhook_signature(
 
     try:
         webhook_ts = int(timestamp_header)
+        # MLflow sends timestamps in milliseconds; normalize to seconds.
+        if webhook_ts > 1_000_000_000_000:
+            webhook_ts = webhook_ts // 1000
         age = int(time.time()) - webhook_ts
         if age < 0 or age > max_age_seconds:
             return False
@@ -67,7 +70,13 @@ class MLflowAliasWebhookHandler:
         )
 
         if not verified:
-            self._logger.warning("Rejected webhook: invalid signature or timestamp")
+            self._logger.warning(
+                "Rejected webhook: invalid signature or timestamp "
+                "(sig=%s, delivery-id=%s, ts=%s)",
+                request.headers.get("x-mlflow-signature"),
+                request.headers.get("x-mlflow-delivery-id"),
+                request.headers.get("x-mlflow-timestamp"),
+            )
             return JSONResponse(
                 {"status": "rejected", "reason": "invalid_signature"},
                 status_code=401,

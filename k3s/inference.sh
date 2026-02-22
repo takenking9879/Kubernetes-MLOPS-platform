@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Run ./k3s/inference.sh AFTER ./k3s/deploy.sh
+# Run ./k3s/inference.sh AFTER ./k3s/deploy.sh and mlflow alias is available.
 # Deploys the inference plane:
 # - Ray Serve (RayService)
 # - Spark Kafka inference (SparkApplication)
