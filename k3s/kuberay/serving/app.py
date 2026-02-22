@@ -1,5 +1,7 @@
 import asyncio
+import json
 import os
+import urllib.request
 from typing import Dict
 
 from ray import serve
@@ -142,7 +144,13 @@ class ModelRouter:
             canary_handle=self._canary,
             canary_probability=canary_probability,
         )
-        self._webhook_handler = MLflowAliasWebhookHandler(self._stable, self._logger)
+        self._serve_admin_url = os.getenv(
+            "RAY_SERVE_ADMIN_URL",
+            "http://model-serving-head-svc.ray.svc.cluster.local:8265",
+        )
+        self._webhook_handler = MLflowAliasWebhookHandler(
+            self._reload_all_stable_replicas, self._logger
+        )
 
         # Register the MLflow webhook so model + executor reload automatically on alias change.
         registry = MLflowRegistry(config.model.tracking_uri, self._logger)
@@ -156,6 +164,39 @@ class ModelRouter:
             self._logger.warning(
                 "Could not ensure MLflow webhook (expected if MLflow requires HTTPS): %s", e
             )
+
+    async def _reload_all_stable_replicas(self, alias: str) -> None:
+        """Update user_config via Ray Serve admin API so ALL StableModel replicas reload."""
+        payload = json.dumps({
+            "applications": [{
+                "name": "inference",
+                "import_path": "k3s.kuberay.serving.app:deployment_graph",
+                "route_prefix": "/infer",
+                "deployments": [
+                    {"name": "StableModel", "user_config": {"alias": alias}},
+                    {"name": "CanaryModel", "user_config": {}},
+                    {"name": "ModelRouter", "user_config": {}},
+                ],
+            }]
+        }).encode()
+
+        def _put():
+            req = urllib.request.Request(
+                f"{self._serve_admin_url}/api/serve/applications/",
+                data=payload,
+                headers={"Content-Type": "application/json"},
+                method="PUT",
+            )
+            with urllib.request.urlopen(req, timeout=30) as resp:
+                return resp.status
+
+        status = await asyncio.to_thread(_put)
+        self._logger.info(
+            "Ray Serve admin API: user_config updated for all StableModel replicas "
+            "(alias=%s, http_status=%s)",
+            alias,
+            status,
+        )
 
     def reconfigure(self, config: Dict[str, object]) -> None:
         serving_config = ConfigLoader.load()

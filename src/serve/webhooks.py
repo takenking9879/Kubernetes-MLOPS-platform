@@ -48,8 +48,8 @@ def verify_webhook_signature(
 class MLflowAliasWebhookHandler:
     """Handle MLflow MODEL_VERSION_ALIASED webhook events and trigger stable reloads."""
 
-    def __init__(self, stable_handle, logger):
-        self._stable = stable_handle
+    def __init__(self, on_alias_set, logger):
+        self._on_alias_set = on_alias_set
         self._logger = logger
 
     async def handle(
@@ -111,7 +111,7 @@ class MLflowAliasWebhookHandler:
                 status_code=202,
             )
 
-        await self._stable.reconfigure.remote({"alias": alias})
+        await self._on_alias_set(alias)
 
         self._logger.info(
             "Stable model reloaded: %s@%s v%s",
