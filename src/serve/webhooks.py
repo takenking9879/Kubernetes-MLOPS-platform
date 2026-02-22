@@ -85,13 +85,14 @@ class MLflowAliasWebhookHandler:
 
         webhook_body = json.loads(payload_bytes.decode("utf-8"))
 
-        # Real MLflow payload: {"event_type": "MODEL_VERSION_ALIASED", "data": {...}}
-        event_type = webhook_body.get("event_type", "")
+        # Real MLflow payload: {"entity": "model_version_alias", "action": "created", "data": {...}}
+        entity = webhook_body.get("entity", "")
+        action = webhook_body.get("action", "")
         data = webhook_body.get("data", {}) or {}
 
-        if event_type != "MODEL_VERSION_ALIASED":
+        if entity != "model_version_alias" or action not in ("created", "deleted"):
             return JSONResponse(
-                {"status": "ignored", "reason": "unsupported_event_type", "event_type": event_type},
+                {"status": "ignored", "reason": "unsupported_event_type", "entity": entity, "action": action},
                 status_code=202,
             )
 
@@ -123,7 +124,8 @@ class MLflowAliasWebhookHandler:
         return JSONResponse(
             {
                 "status": "ok",
-                "event_type": event_type,
+                "entity": entity,
+                "action": action,
                 "model_name": model_name,
                 "alias": alias,
                 "version": version,
