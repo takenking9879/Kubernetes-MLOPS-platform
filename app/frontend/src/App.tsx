@@ -107,9 +107,11 @@ export default function App() {
 
         {/* ReactFlowProvider only wraps the DSL Builder */}
         {page === 'dsl-builder' && (
-          <ReactFlowProvider>
-            <MainLayout />
-          </ReactFlowProvider>
+          <div className="h-full min-h-0">
+            <ReactFlowProvider>
+              <MainLayout />
+            </ReactFlowProvider>
+          </div>
         )}
 
         {page === 'run-pipeline' && <RunPage />}
