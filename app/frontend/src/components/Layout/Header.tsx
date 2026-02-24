@@ -41,10 +41,10 @@ export function Header() {
   };
 
   return (
-    <header className="flex h-12 items-center justify-between border-b border-slate-800 bg-slate-900 px-4">
+    <header className="flex h-10 shrink-0 items-center justify-between border-b border-slate-800 bg-slate-900 px-4 shadow-sm">
       {/* Title */}
       <div className="flex items-center gap-3">
-        <h1 className="text-sm font-bold text-slate-200">Spark Feature Designer</h1>
+        <h1 className="text-xs font-bold text-slate-400 uppercase tracking-wider">Feature Designer</h1>
         {validationResult && (
           <span
             className={`rounded-full px-2 py-0.5 text-[10px] font-medium ${
@@ -54,8 +54,8 @@ export function Header() {
             }`}
           >
             {validationResult.valid
-              ? `Valid (${validationResult.topologicalOrder.length} stages)`
-              : `${validationResult.errors.length} error(s)`}
+              ? `Valid (${validationResult.topologicalOrder.length})`
+              : `${validationResult.errors.length} ERR`}
           </span>
         )}
       </div>
@@ -63,16 +63,16 @@ export function Header() {
       {/* Dataset badge + S3 save */}
       <div className="flex items-center gap-2">
         {activeDataset && (
-          <span className="rounded bg-blue-900 px-2 py-0.5 text-[10px] text-blue-300">
+          <span className="rounded bg-blue-900/50 px-2 py-0.5 text-[10px] font-bold text-blue-300 ring-1 ring-blue-700/30">
             {activeDataset}
           </span>
         )}
         <button
           onClick={() => { void handleSaveDSLToS3(); }}
           disabled={isSavingDSL}
-          className="rounded-md bg-violet-700 px-3 py-1.5 text-xs font-medium text-white hover:bg-violet-600 disabled:opacity-40"
+          className="rounded border border-indigo-500/30 bg-indigo-600/20 px-2 py-0.5 text-[10px] font-bold text-indigo-300 hover:bg-indigo-600/40 disabled:opacity-40"
         >
-          {isSavingDSL ? 'Saving…' : 'Save DSL to S3'}
+          {isSavingDSL ? 'Saving…' : 'Save to S3'}
         </button>
       </div>
 
@@ -85,11 +85,10 @@ export function Header() {
             const selectNode = usePipelineStore.getState().selectNode;
             const log = usePipelineStore.getState().log;
 
-            // If a dataset node already exists, select it instead of creating another
             const existing = nodes.find((n) => n.data.type === 'dataset');
             if (existing) {
               selectNode(existing.id);
-              log('Dataset node already exists. Reusing existing singleton.', 'warning');
+              log('Dataset node exists.', 'warning');
               return;
             }
 
@@ -109,32 +108,28 @@ export function Header() {
             } as Node<NodeData>;
 
             addNode(datasetNode);
-            // select after a tick to ensure ReactFlow has rendered
             setTimeout(() => selectNode(id), 50);
           }}
-          className="rounded-md bg-slate-700 px-3 py-1.5 text-xs font-medium text-white hover:bg-slate-600"
+          className="rounded-md bg-slate-800 px-2 py-1 text-[10px] font-bold text-slate-300 hover:bg-slate-700"
         >
-          Add Dataset
+          + DATASET
         </button>
 
         <button
           onClick={() => validate()}
           disabled={isValidating}
-          className="rounded-md bg-slate-800 px-3 py-1.5 text-xs font-medium text-slate-300
-                     hover:bg-slate-700 disabled:opacity-40"
+          className="rounded-md bg-slate-800 px-2 py-1 text-[10px] font-bold text-slate-300 hover:bg-slate-700 disabled:opacity-40"
         >
-          {isValidating ? 'Validating...' : 'Validate'}
+          {isValidating ? '...' : 'VALIDATE'}
         </button>
 
         <button
           onClick={() => { dryRun().catch(() => {}); }}
           disabled={isDryRunning}
-          className="rounded-md bg-blue-700 px-3 py-1.5 text-xs font-medium text-white
-                     hover:bg-blue-600 disabled:opacity-40"
+          className="rounded-md bg-blue-700 px-2 py-1 text-[10px] font-bold text-white hover:bg-blue-600 disabled:opacity-40"
         >
-          {isDryRunning ? 'Running...' : 'Dry-Run'}
+          {isDryRunning ? '...' : 'DRY-RUN'}
         </button>
-
       </div>
     </header>
   );
