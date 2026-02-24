@@ -229,7 +229,9 @@ async def get_sample(name: str, limit: int = 3000):
         catalog = GlueCatalog(
             "glue",
             **{
+                "glue.region": AWS_REGION,
                 "s3.region": AWS_REGION,
+                "warehouse": f"s3://{S3_BUCKET}/warehouse/",
                 "aws_access_key_id": os.getenv("AWS_ACCESS_KEY_ID", ""),
                 "aws_secret_access_key": os.getenv("AWS_SECRET_ACCESS_KEY", ""),
             },
