@@ -392,7 +392,7 @@ async def dry_run(request: DryRunRequest) -> dict[str, Any]:
     """
     Execute a pipeline dry-run:
     1. Parse the YAML config
-    2. Load a dataset sample (CSV/Parquet)
+    2. Load a dataset sample (CSV/Parquet/Iceberg)
     3. Execute pipeline.fit() + transform()
     4. Return output schema, preview rows, and metrics
     5. On error: return the raw Spark/Python traceback
@@ -405,21 +405,15 @@ async def dry_run(request: DryRunRequest) -> dict[str, Any]:
             "error": {"message": f"Invalid YAML: {exc}"},
         }
 
-    dataset_path = resolve_dataset_path(request.datasetPath)
+    dataset_path = request.datasetPath
     if not dataset_path:
-        # Check if the path was actually empty or just not found
-        msg = f"Dataset file not found: '{request.datasetPath}'"
-        if not request.datasetPath:
-            msg = "No dataset path provided. Please upload a file or specify a path in the Dataset node."
-        
         return {
             "success": False,
-            "error": {"message": msg},
+            "error": {"message": "No dataset path provided. Please select a table or upload a file."},
         }
 
     try:
         import sys
-
         # Add project root to sys.path so we can import src.dsl
         project_root = str(PROJECT_ROOT)
         if project_root not in sys.path:
@@ -428,26 +422,59 @@ async def dry_run(request: DryRunRequest) -> dict[str, Any]:
         from pyspark.sql import SparkSession
         from src.dsl.pipeline import Pipeline
 
-        spark = (
+        # Initialize Spark with Iceberg support if needed
+        builder = (
             SparkSession.builder
             .appName("FeatureDesigner-DryRun")
             .master("local[*]")
             .config("spark.ui.enabled", "false")
             .config("spark.driver.memory", "1g")
-            .getOrCreate()
         )
 
-        detected_format = detect_dataset_format(dataset_path)
+        if dataset_path.startswith("iceberg:"):
+            from routers.datasets import AWS_REGION, S3_BUCKET
+            builder = (
+                builder
+                .config("spark.sql.extensions", "org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions")
+                .config("spark.sql.catalog.iceberg", "org.apache.iceberg.spark.SparkCatalog")
+                .config("spark.sql.catalog.iceberg.type", "glue")
+                .config("spark.sql.catalog.iceberg.warehouse", f"s3a://{S3_BUCKET}/warehouse/")
+                .config("spark.hadoop.fs.s3a.endpoint", os.getenv("S3_ENDPOINT", "http://minio-service.magda:9000"))
+                .config("spark.hadoop.fs.s3a.access.key", os.getenv("AWS_ACCESS_KEY_ID", ""))
+                .config("spark.hadoop.fs.s3a.secret.key", os.getenv("AWS_SECRET_ACCESS_KEY", ""))
+                .config("spark.hadoop.fs.s3a.path.style.access", "true")
+            )
 
-        if detected_format == "parquet":
-            df = spark.read.parquet(str(dataset_path)).limit(request.sampleLimit)
-        elif detected_format == "csv":
-            detected_delimiter = detect_csv_delimiter(dataset_path)
-            df = spark.read.option("sep", detected_delimiter).csv(
-                str(dataset_path), header=True, inferSchema=True
-            ).limit(request.sampleLimit)
+        spark = builder.getOrCreate()
+
+        if dataset_path.startswith("iceberg:"):
+            table_name = dataset_path.replace("iceberg:", "")
+            # Assume local dry-run uses the same catalog name as production if possible
+            # or just use the table name if it's qualified
+            if "." not in table_name:
+                table_name = f"iceberg.raw.{table_name}"
+            df = spark.table(table_name).limit(request.sampleLimit)
         else:
-            return {
+            resolved_path = resolve_dataset_path(dataset_path)
+            if not resolved_path:
+                 return {
+                    "success": False,
+                    "error": {"message": f"Dataset file not found: {dataset_path}"},
+                }
+            
+            detected_format = detect_dataset_format(resolved_path)
+            if detected_format == "parquet":
+                df = spark.read.parquet(str(resolved_path)).limit(request.sampleLimit)
+            elif detected_format == "csv":
+                detected_delimiter = detect_csv_delimiter(resolved_path)
+                df = spark.read.option("sep", detected_delimiter).csv(
+                    str(resolved_path), header=True, inferSchema=True
+                ).limit(request.sampleLimit)
+            else:
+                return {
+                    "success": False,
+                    "error": {"message": f"Unsupported format for path: {dataset_path}"},
+                }
                 "success": False,
                 "error": {
                     "message": (

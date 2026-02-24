@@ -69,6 +69,12 @@ export async function fetchSchemaFromIceberg(table: string): Promise<SparkSchema
   );
 }
 
+// ─── Dataset endpoints ──────────────────────────────────────────────
+
+export async function listDatasets(): Promise<string[]> {
+  return fetchJSON<string[]>(`${BASE_URL}/datasets`);
+}
+
 // ─── Dry-run endpoint ───────────────────────────────────────────────
 
 export async function executeDryRun(req: DryRunRequest): Promise<DryRunResult> {

@@ -252,6 +252,21 @@ async def get_sample(name: str, limit: int = 3000):
     return {"columns": columns, "rows": rows, "row_count": len(rows)}
 
 
+@router.get("/from-iceberg")
+async def get_schema_from_iceberg(table: str):
+    """Bridge for the DSL builder to load schema from any Iceberg table."""
+    # table is expected as 'catalog.db.table' or just 'table' (which we treat as iceberg.raw.{table})
+    # If it contains raw. we strip it to use get_sample
+    name = table.split(".")[-1]
+    res = await get_sample(name)
+    return {
+        "columns": res["columns"],
+        "sampleRows": res["rows"][:10],
+        "schemaHash": "iceberg",
+        "uploadedPath": f"iceberg:{table}"
+    }
+
+
 _PANDAS_TYPE_MAP = {
     "int64": "long", "int32": "integer", "float64": "double",
     "float32": "double", "object": "string", "bool": "boolean",

@@ -4,7 +4,7 @@ import type { NodeData, StageNodeData, DatasetNodeData, FinalFeatureSelectorData
 import { isStageNode, isDatasetNode, isFinalFeatures } from '../../types/nodes';
 import { usePipelineStore } from '../../store/pipelineStore';
 import { useDatasetStore } from '../../store/datasetStore';
-import { getIcebergSample } from '../../api/platformClient';
+import { listDatasets } from '../../api/client';
 import { getNodeDefinition, type ParamSchema } from '../../registry/NodeRegistry';
 import type { OutputNamingStrategy } from '../../types/naming';
 import {
@@ -27,6 +27,13 @@ export function NodePropertiesForm({ node }: Props) {
   const log = usePipelineStore((s) => s.log);
   const { activeDataset } = useDatasetStore();
   const [icebergLoading, setIcebergLoading] = useState(false);
+  const [availableTables, setAvailableTables] = useState<string[]>([]);
+
+  useEffect(() => {
+    listDatasets()
+      .then(setAvailableTables)
+      .catch((e) => log(`Failed to fetch tables: ${e instanceof Error ? e.message : String(e)}`, 'error'));
+  }, [log]);
 
   const data = node.data;
 
@@ -51,14 +58,17 @@ export function NodePropertiesForm({ node }: Props) {
     };
 
     const handleLoadFromIceberg = async () => {
-      if (!activeDataset) return;
+      // Use the path if it's set, otherwise fall back to activeDataset
+      const tableToLoad = data.path || activeDataset;
+      if (!tableToLoad) return;
+
       setIcebergLoading(true);
       try {
-        const result = await getIcebergSample(activeDataset, 3000);
-        setDatasetSchema({ columns: result.columns });
-        log(`Loaded ${result.columns.length} columns from iceberg.raw.${activeDataset} (${result.row_count} rows sampled)`, 'info');
+        // Use the store's action to update both schema AND node path
+        const loadSchemaFromIceberg = usePipelineStore.getState().loadSchemaFromIceberg;
+        await loadSchemaFromIceberg(tableToLoad);
       } catch (e) {
-        log(`Failed to load Iceberg sample: ${e instanceof Error ? e.message : String(e)}`, 'error');
+        // Error is already logged by the store
       } finally {
         setIcebergLoading(false);
       }
@@ -84,20 +94,42 @@ export function NodePropertiesForm({ node }: Props) {
           </select>
         </Field>
 
-        <Field label="Path / Table">
-          <input
-            type="text"
-            value={data.path}
-            onChange={(e) =>
-              updateNodeData(node.id, (prev) => ({
-                ...prev,
-                path: e.target.value,
-              } as DatasetNodeData))
-            }
-            placeholder={data.source === 'csv' ? '/data/file.csv or /data/file.parquet' : 'catalog.db.table'}
-            className="input-field"
-          />
-        </Field>
+        {data.source === 'csv' ? (
+          <Field label="Path">
+            <input
+              type="text"
+              value={data.path}
+              onChange={(e) =>
+                updateNodeData(node.id, (prev) => ({
+                  ...prev,
+                  path: e.target.value,
+                } as DatasetNodeData))
+              }
+              placeholder="/data/file.csv or /data/file.parquet"
+              className="input-field"
+            />
+          </Field>
+        ) : (
+          <Field label="Table">
+            <select
+              value={data.path}
+              onChange={(e) =>
+                updateNodeData(node.id, (prev) => ({
+                  ...prev,
+                  path: e.target.value,
+                } as DatasetNodeData))
+              }
+              className="input-field"
+            >
+              <option value="">Select a table...</option>
+              {availableTables.map((t) => (
+                <option key={t} value={t}>
+                  {t}
+                </option>
+              ))}
+            </select>
+          </Field>
+        )}
 
         {data.source === 'csv' && (
           <div className="space-y-1.5">
@@ -115,17 +147,17 @@ export function NodePropertiesForm({ node }: Props) {
           </div>
         )}
 
-        {activeDataset && (
+        {data.source === 'iceberg' && (
           <div className="space-y-1.5">
             <label className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
               Load Schema from Iceberg
             </label>
             <button
               onClick={() => void handleLoadFromIceberg()}
-              disabled={icebergLoading}
+              disabled={icebergLoading || !data.path}
               className="w-full rounded border border-emerald-700 bg-emerald-900/30 px-3 py-1.5 text-xs text-emerald-300 hover:bg-emerald-900/50 disabled:opacity-40"
             >
-              {icebergLoading ? 'Loading…' : `Load from iceberg.raw.${activeDataset}`}
+              {icebergLoading ? 'Loading…' : data.path ? `Load from ${data.path}` : 'Select a table first'}
             </button>
           </div>
         )}

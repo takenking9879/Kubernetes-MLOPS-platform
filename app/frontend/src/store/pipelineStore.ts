@@ -276,7 +276,19 @@ export const usePipelineStore = create<PipelineState>()(
       loadSchemaFromIceberg: async (table) => {
         try {
           const schema = await fetchSchemaFromIceberg(table);
-          set({ datasetSchema: schema });
+          set((state) => ({
+            datasetSchema: schema,
+            nodes: state.nodes.map((node) => {
+              if (node.data.type !== 'dataset') return node;
+              return {
+                ...node,
+                data: {
+                  ...node.data,
+                  path: schema.uploadedPath || table,
+                },
+              };
+            }),
+          }));
           get().log(`Schema loaded: ${schema.columns.length} columns from ${table}`, 'info');
         } catch (err) {
           const msg = err instanceof Error ? err.message : String(err);
