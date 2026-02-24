@@ -19,7 +19,8 @@ spec:
         - name: backend
           image: dsl-app:latest
           imagePullPolicy: IfNotPresent
-          command: ["sh", "-c", "cd /workspace/backend && uvicorn main:app --host 0.0.0.0 --port 8000"]
+          # We run from the latest code in the volume
+          command: ["sh", "-c", "cd /git-data/repo/app/backend && uvicorn main:app --host 0.0.0.0 --port 8000"]
           ports:
             - name: backend
               containerPort: 8000
@@ -58,10 +59,14 @@ spec:
           securityContext:
             runAsUser: 0
             runAsGroup: 0
-          command: ["sh", "-c", "cd /workspace/frontend && npm run dev -- --host 0.0.0.0 --port 5173"]
+          # We use the mounted code and symlink node_modules from the image
+          command: ["sh", "-c", "ln -s /workspace/frontend/node_modules /git-data/repo/app/frontend/node_modules && cd /git-data/repo/app/frontend && npm run dev -- --host 0.0.0.0 --port 5173"]
           ports:
             - name: frontend
               containerPort: 5173
+          volumeMounts:
+            - name: job-files
+              mountPath: /git-data
           readinessProbe:
             httpGet:
               path: /
