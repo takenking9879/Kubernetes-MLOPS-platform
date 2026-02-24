@@ -149,7 +149,8 @@ async def submit_ingest(name: str):
         manifest = copy.deepcopy(_yaml.safe_load(fh))
 
     ts = int(time.time())
-    job_name = f"spark-ingestion-{name}-{ts}"
+    safe_name = name.replace("_", "-")
+    job_name = f"spark-ingestion-{safe_name}-{ts}"
     manifest["metadata"]["name"] = job_name
     manifest["metadata"]["namespace"] = SPARK_NAMESPACE
 

@@ -218,6 +218,7 @@ deploy_dsl_app() {
   sep
   info "Deploying DSL App"
 
+  kubectl apply -f k3s/app/dsl-app-rbac.yaml
   kubectl apply -f k3s/app/deployment.yaml
   kubectl apply -f k3s/app/services.yaml
 
