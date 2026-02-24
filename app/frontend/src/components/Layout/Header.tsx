@@ -93,13 +93,34 @@ export function Header() {
         )}
       </div>
 
-      {/* Dataset badge + S3 save */}
+      {/* Dataset badge + YAML + S3 save */}
       <div className="flex items-center gap-2">
         {activeDataset && (
           <span className="rounded bg-blue-900 px-2 py-0.5 text-[10px] text-blue-300">
             {activeDataset}
           </span>
         )}
+        <button
+          onClick={handleExport}
+          className="rounded-md bg-emerald-700 px-3 py-1.5 text-xs font-medium text-white
+                     hover:bg-emerald-600"
+        >
+          Export YAML
+        </button>
+        <button
+          onClick={() => fileInputRef.current?.click()}
+          className="rounded-md bg-amber-700 px-3 py-1.5 text-xs font-medium text-white
+                     hover:bg-amber-600"
+        >
+          Import YAML
+        </button>
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept=".yaml,.yml"
+          className="hidden"
+          onChange={handleImport}
+        />
         <button
           onClick={() => { void handleSaveDSLToS3(); }}
           disabled={isSavingDSL}
@@ -168,28 +189,6 @@ export function Header() {
           {isDryRunning ? 'Running...' : 'Dry-Run'}
         </button>
 
-        <button
-          onClick={handleExport}
-          className="rounded-md bg-emerald-700 px-3 py-1.5 text-xs font-medium text-white
-                     hover:bg-emerald-600"
-        >
-          Export YAML
-        </button>
-
-        <button
-          onClick={() => fileInputRef.current?.click()}
-          className="rounded-md bg-amber-700 px-3 py-1.5 text-xs font-medium text-white
-                     hover:bg-amber-600"
-        >
-          Import YAML
-        </button>
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept=".yaml,.yml"
-          className="hidden"
-          onChange={handleImport}
-        />
       </div>
     </header>
   );
