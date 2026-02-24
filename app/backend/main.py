@@ -27,6 +27,16 @@ from pydantic import BaseModel, Field
 
 app = FastAPI(title="Spark Feature Designer API", version="0.1.0")
 
+# ─── Dataset-oriented platform routers (v2) ──────────────────────────────────
+from routers import datasets as _datasets_router
+from routers import dsls as _dsls_router
+from routers import runs as _runs_router
+
+app.include_router(_datasets_router.router)
+app.include_router(_dsls_router.router)
+app.include_router(_runs_router.router)
+# ─────────────────────────────────────────────────────────────────────────────
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],

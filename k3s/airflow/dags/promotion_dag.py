@@ -1,11 +1,15 @@
 from airflow import DAG
 from airflow.operators.python import PythonOperator
 from datetime import datetime
+import os
 import mlflow
 from mlflow.tracking import MlflowClient
 
-# Configuración de MLflow (ajustar a la URL de tu servicio en K8s)
-MLFLOW_TRACKING_URI = "http://mlflow-service.mlflow.svc.cluster.local:5000"
+# Read tracking URI from env var; fall back to in-cluster default
+MLFLOW_TRACKING_URI = os.getenv(
+    "MLFLOW_TRACKING_URI",
+    "http://mlflow-service.mlflow.svc.cluster.local:5000",
+)
 
 def promote_model_to_champion(model_name: str, version: str):
     """
@@ -68,8 +72,8 @@ with DAG(
         task_id='promote_to_champion',
         python_callable=promote_model_to_champion,
         op_kwargs={
-            'model_name': 'ids_intrusion_model', # Tomado de params.yaml
-            'version': "{{ dag_run.conf['version'] }}" # Se pasa al lanzar el DAG
+            'model_name': "{{ dag_run.conf['model_name'] }}",
+            'version': "{{ dag_run.conf['version'] }}"
         }
     )
 
@@ -77,5 +81,5 @@ with DAG(
     check_and_promote = PythonOperator(
         task_id='auto_eval_and_promote',
         python_callable=auto_promote_base_on_metrics,
-        op_kwargs={'model_name': 'ids_intrusion_model'}
+        op_kwargs={'model_name': "{{ dag_run.conf['model_name'] }}"}
     )

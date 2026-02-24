@@ -3,6 +3,8 @@ import type { Node } from 'reactflow';
 import type { NodeData, StageNodeData, DatasetNodeData, FinalFeatureSelectorData } from '../../types/nodes';
 import { isStageNode, isDatasetNode, isFinalFeatures } from '../../types/nodes';
 import { usePipelineStore } from '../../store/pipelineStore';
+import { useDatasetStore } from '../../store/datasetStore';
+import { getIcebergSample } from '../../api/platformClient';
 import { getNodeDefinition, type ParamSchema } from '../../registry/NodeRegistry';
 import type { OutputNamingStrategy } from '../../types/naming';
 import {
@@ -21,11 +23,47 @@ export function NodePropertiesForm({ node }: Props) {
   const updateNodeData = usePipelineStore((s) => s.updateNodeData);
   const datasetSchema = usePipelineStore((s) => s.datasetSchema);
   const uploadSchemaFromCSV = usePipelineStore((s) => s.uploadSchemaFromCSV);
+  const setDatasetSchema = usePipelineStore((s) => s.setDatasetSchema);
+  const log = usePipelineStore((s) => s.log);
+  const { activeDataset } = useDatasetStore();
+  const [icebergLoading, setIcebergLoading] = useState(false);
 
   const data = node.data;
 
   // ── Dataset node ────────────────────────────────────────────────
   if (isDatasetNode(data)) {
+    const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0];
+      if (!file) return;
+      const isParquet = file.name.toLowerCase().endsWith('.parquet');
+      const isCsv = file.name.toLowerCase().endsWith('.csv');
+      if (isParquet && file.size > 10 * 1024 * 1024) {
+        log('Parquet sample must be ≤ 10 MB', 'error');
+        e.target.value = '';
+        return;
+      }
+      if (isCsv && file.size > 5 * 1024 * 1024) {
+        log('CSV sample must be ≤ 5 MB', 'error');
+        e.target.value = '';
+        return;
+      }
+      uploadSchemaFromCSV(file).catch(() => {});
+    };
+
+    const handleLoadFromIceberg = async () => {
+      if (!activeDataset) return;
+      setIcebergLoading(true);
+      try {
+        const result = await getIcebergSample(activeDataset, 3000);
+        setDatasetSchema({ columns: result.columns });
+        log(`Loaded ${result.columns.length} columns from iceberg.raw.${activeDataset} (${result.row_count} rows sampled)`, 'info');
+      } catch (e) {
+        log(`Failed to load Iceberg sample: ${e instanceof Error ? e.message : String(e)}`, 'error');
+      } finally {
+        setIcebergLoading(false);
+      }
+    };
+
     return (
       <div className="space-y-3">
         <SectionTitle title="Dataset" color="emerald" />
@@ -64,25 +102,34 @@ export function NodePropertiesForm({ node }: Props) {
         {data.source === 'csv' && (
           <div className="space-y-1.5">
             <label className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
-              Upload Local File (CSV / Parquet)
+              Upload Sample File (CSV ≤ 5 MB · Parquet ≤ 10 MB)
             </label>
             <input
               type="file"
               accept=".csv,.parquet"
-              onChange={(e) => {
-                const file = e.target.files?.[0];
-                if (file) {
-                  uploadSchemaFromCSV(file).catch(() => {});
-                }
-              }}
-              className="w-full text-xs text-slate-400 file:mr-2 file:rounded-md file:border-0 
-                         file:bg-slate-800 file:px-2 file:py-1 file:text-xs file:font-medium 
+              onChange={handleFileUpload}
+              className="w-full text-xs text-slate-400 file:mr-2 file:rounded-md file:border-0
+                         file:bg-slate-800 file:px-2 file:py-1 file:text-xs file:font-medium
                          file:text-emerald-400 hover:file:bg-slate-700"
             />
           </div>
         )}
 
-        
+        {activeDataset && (
+          <div className="space-y-1.5">
+            <label className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
+              Load Schema from Iceberg
+            </label>
+            <button
+              onClick={() => void handleLoadFromIceberg()}
+              disabled={icebergLoading}
+              className="w-full rounded border border-emerald-700 bg-emerald-900/30 px-3 py-1.5 text-xs text-emerald-300 hover:bg-emerald-900/50 disabled:opacity-40"
+            >
+              {icebergLoading ? 'Loading…' : `Load from iceberg.raw.${activeDataset}`}
+            </button>
+          </div>
+        )}
+
         {datasetSchema && (
           <p className="text-xs text-emerald-400">
             {datasetSchema.columns.length} columns loaded

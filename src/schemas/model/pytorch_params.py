@@ -32,6 +32,9 @@ PYTORCH_PARAMS: Dict[str, Any] = {
     "weight_decay": 0.0,
 }
 
+# Allowlist of keys accepted from YAML hyperparameter overrides.
+PYTORCH_ALLOWED_KEYS: frozenset = frozenset(PYTORCH_PARAMS.keys())
+
 # Configuración del scheduler ASHA para tuning
 PYTORCH_TUNE_SETTINGS: Dict[str, int] = {
     "grace_period": 5,

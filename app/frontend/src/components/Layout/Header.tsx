@@ -1,5 +1,7 @@
-import { useRef } from 'react';
+import { useRef, useState } from 'react';
 import { usePipelineStore } from '../../store/pipelineStore';
+import { useDatasetStore } from '../../store/datasetStore';
+import { saveDsl } from '../../api/platformClient';
 import type { Node } from 'reactflow';
 import type { NodeData } from '../../types/nodes';
 import { DATASET_NODE_CONTRACT } from '../../registry/NodeRegistry';
@@ -13,7 +15,33 @@ export function Header() {
   const isDryRunning = usePipelineStore((s) => s.isDryRunning);
   const validationResult = usePipelineStore((s) => s.validationResult);
 
+  const { activeDataset } = useDatasetStore();
+  const [isSavingDSL, setIsSavingDSL] = useState(false);
+
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleSaveDSLToS3 = async () => {
+    const log = usePipelineStore.getState().log;
+    if (!activeDataset) {
+      log('Select a dataset in the Datasets tab before saving the DSL to S3.', 'warning');
+      return;
+    }
+    const yaml = exportYAML();
+    if (!yaml) return; // exportYAML already logged the error
+
+    const name = window.prompt('Enter a descriptive name for this DSL version:');
+    if (!name?.trim()) return;
+
+    setIsSavingDSL(true);
+    try {
+      const result = await saveDsl(activeDataset, name.trim(), yaml);
+      log(`DSL saved to S3: dsl/dsl_${activeDataset}/v${result.version}__${result.slug}.yaml`, 'info');
+    } catch (e) {
+      log(`Failed to save DSL to S3: ${e instanceof Error ? e.message : String(e)}`, 'error');
+    } finally {
+      setIsSavingDSL(false);
+    }
+  };
 
   const handleImport = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -63,6 +91,22 @@ export function Header() {
               : `${validationResult.errors.length} error(s)`}
           </span>
         )}
+      </div>
+
+      {/* Dataset badge + S3 save */}
+      <div className="flex items-center gap-2">
+        {activeDataset && (
+          <span className="rounded bg-blue-900 px-2 py-0.5 text-[10px] text-blue-300">
+            {activeDataset}
+          </span>
+        )}
+        <button
+          onClick={() => { void handleSaveDSLToS3(); }}
+          disabled={isSavingDSL}
+          className="rounded-md bg-violet-700 px-3 py-1.5 text-xs font-medium text-white hover:bg-violet-600 disabled:opacity-40"
+        >
+          {isSavingDSL ? 'Saving…' : 'Save DSL to S3'}
+        </button>
       </div>
 
       {/* Actions */}

@@ -58,18 +58,25 @@ class SparkPreprocessIceberg(BaseUtils):
         
         # Iceberg configuration
         self.iceberg_cfg = self.params.get('iceberg_tables', {})
-        # Configuración de tablas (prioridad: Env Var > params.yaml > hardcoded)
-        self.raw_table = self.iceberg_cfg.get('raw', {}).get('full_name', 'iceberg.raw.network_traffic_raw')
+        # Priority: env var > params.yaml > hardcoded default
+        self.raw_table = (
+            os.getenv("RAW_TABLE")
+            or self.iceberg_cfg.get('raw', {}).get('full_name', 'iceberg.raw.network_traffic_raw')
+        )
         self.metadata_table = self.iceberg_cfg.get('metadata', {}).get('full_name', 'iceberg.metadata.preprocessing_artifacts')
-        
-        # Path al DSL
-        self.dsl_path = self.preprocess_params.get('dsl_path', '/app/repo/k3s/spark/preprocess/dsl_001.yaml')
+
+        # DSL path: env var > params.yaml > hardcoded default
+        # Env var follows convention: s3://bucket/dsl/dsl_{raw_table_name}/v{N}.yaml
+        self.dsl_path = (
+            os.getenv("DSL_S3_PATH")
+            or self.preprocess_params.get('dsl_path', '/app/repo/k3s/spark/preprocess/dsl_001.yaml')
+        )
         
         # Splits configuration
         self.splits_config = self.params.get('splits', {})
         
-        # Schema y pipeline
-        self.schema = get_schema(self.spark_params.get('schemas', {}).get('full_schema'))
+        # Schema resolution (priority: SCHEMA_S3_PATH env > auto-derived from raw_table > static)
+        self.schema = self._resolve_schema()
         self.pipeline = None
         
         # S3 y Spark
@@ -80,6 +87,47 @@ class SparkPreprocessIceberg(BaseUtils):
         self._load_artifacts_config()
         # Prometheus metrics
         self._start_prometheus_server()
+
+    def _resolve_schema(self):
+        """Return the schema for full raw data (features + target label).
+
+        Resolution order:
+        1. SCHEMA_S3_PATH env var — explicit S3 URI to a schema YAML
+        2. Auto-derived from raw_table: s3://{bucket}/schemas/datasets/{table}/full.yaml
+        3. Static fallback: schema name from params.yaml (existing behaviour)
+
+        If SCHEMA_ALLOW_STATIC_FALLBACK=false and S3 loading fails, an error
+        is raised to make the failure explicit rather than silently using a
+        potentially wrong schema.
+        """
+        from src.schemas.spark.schema_registry import SchemaRegistry
+
+        allow_static_fallback = os.getenv("SCHEMA_ALLOW_STATIC_FALLBACK", "true").lower() in ("1", "true", "yes")
+
+        schema_s3 = os.getenv("SCHEMA_S3_PATH")
+        if not schema_s3:
+            # Derive path from raw_table name:
+            #   iceberg.raw.network_traffic_raw → network_traffic_raw
+            raw_table_short = self.raw_table.split(".")[-1]
+            bucket = self.spark_params.get("bucket", "k8s-mlops-platform-bucket")
+            schema_s3 = f"s3://{bucket}/schemas/datasets/{raw_table_short}/full.yaml"
+
+        try:
+            schema = SchemaRegistry.load_from_s3(schema_s3)
+            self.logger.info(f"Schema loaded from S3: {schema_s3}")
+            return schema
+        except Exception as e:
+            if allow_static_fallback:
+                self.logger.warning(
+                    f"Could not load schema from S3 ({schema_s3}): {e}. "
+                    "Falling back to static schema from params.yaml."
+                )
+                schema_name = self.spark_params.get('schemas', {}).get('full_schema')
+                return get_schema(schema_name)
+            raise RuntimeError(
+                f"Schema S3 load failed for {schema_s3!r} and static fallback is disabled. "
+                f"Original error: {e}"
+            ) from e
 
     def _load_artifacts_config(self):
         """Carga configuración de artifacts desde params."""
@@ -857,8 +905,11 @@ class SparkPreprocessIceberg(BaseUtils):
             self.logger.info("=" * 60)
             self.logger.info("Writing processed table to Iceberg")
             self.logger.info("=" * 60)
-            
-            processed_table_name = f"{artifact_set_id}"
+
+            # Naming: iceberg.processed.{raw_table}_{artifact_id}
+            # e.g.  iceberg.processed.network_traffic_raw_20260223_050000
+            raw_table_short = self.raw_table.split(".")[-1]
+            processed_table_name = f"{raw_table_short}_{artifact_set_id}"
             self.write_processed_table(df_full_processed, processed_table_name)
 
             # ===== PROMETHEUS METRICS (full dataset) =====
@@ -868,9 +919,9 @@ class SparkPreprocessIceberg(BaseUtils):
             PREPROCESS_BATCHES.labels(dataset="full").inc(1)
             PREPROCESS_BATCH_LATENCY.labels(dataset="full").observe(full_elapsed)
             PREPROCESS_BATCH_LATENCY_LAST.labels(dataset="full").set(full_elapsed)
-            
+
             # ========== INSERT METADATA ==========
-            processed_table_ref = f"iceberg.processed.{artifact_set_id}"
+            processed_table_ref = f"iceberg.processed.{processed_table_name}"
             
             self.insert_metadata_record(
                 artifact_set_id=artifact_set_id,
@@ -907,11 +958,7 @@ def main():
     # Inicializar job (carga params internamente)
     job = SparkPreprocessIceberg(params_path=params_path)
     
-    artifact_set_id = os.getenv("ARTIFACT_SET_ID")
-    if not artifact_set_id:
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        dsl_basename = os.path.basename(job.dsl_path).replace('.yaml', '')
-        artifact_set_id = f"{dsl_basename}_{timestamp}"
+    artifact_set_id = os.getenv("ARTIFACT_SET_ID") or datetime.now().strftime("%Y%m%d_%H%M%S")
     
     job.run_preprocessing_pipeline(
         artifact_set_id=artifact_set_id

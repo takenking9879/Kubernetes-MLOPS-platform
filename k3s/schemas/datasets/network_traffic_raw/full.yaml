@@ -1,0 +1,13 @@
+# Schema: network_traffic_raw — full (features + target label)
+# Equivalent to src/schemas/spark/schemas.py :: schema_full
+# Upload to: s3://k8s-mlops-platform-bucket/schemas/datasets/network_traffic_raw/full.yaml
+
+fields:
+  - {name: src_port,            type: long,      nullable: true}
+  - {name: dst_port,            type: long,      nullable: true}
+  - {name: protocol,            type: string,    nullable: true}
+  - {name: packet_count,        type: long,      nullable: true}
+  - {name: conn_state,          type: string,    nullable: true}
+  - {name: bytes_transferred,   type: double,    nullable: true}
+  - {name: timestamp,           type: timestamp, nullable: true}
+  - {name: attack,              type: long,      nullable: true}

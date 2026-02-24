@@ -1,11 +1,16 @@
-kafka:
-  output_topic: "fraud_predictions"
-  security_protocol: 'SASL_PLAINTEXT'
-  sasl_mechanism: 'SCRAM-SHA-512'
+# ============================================================================
+# EXECUTION MANIFEST
+# Generated per run by the UI and exported to S3.
+# Static infrastructure config lives in k3s/config.yaml.
+# ============================================================================
 
-# ============================================================================
-# SPLITS CONFIGURATION - Rangos de fechas para train/val/test
-# ============================================================================
+# ---- Execution identity (set by UI / Airflow) ----
+execution:
+  execution_id: ""          # e.g. "20260223_120000"
+  raw_table: ""             # e.g. "iceberg.raw.network_traffic_raw"
+  dsl_s3_path: ""           # e.g. "s3://k8s-mlops-platform-bucket/dsl/dsl_network_traffic_raw/v1.yaml"
+
+# ---- Time splits ----
 splits:
   train:
     start: "2026-01-01 00:30:00"
@@ -19,136 +24,148 @@ splits:
     start: "2026-01-02 07:00:00"
     end:   "2026-01-03 03:50:00"
 
+# ---- Model selection and training ----
+model:
+  framework: "xgboost"          # "xgboost" | "pytorch"
+  experiment_name: "kuberay-attack-detection"
+  registry_model_name: "attack-detection"
+  target: "attack"
+  num_classes: 6
+  tune: true
+  sample_fraction_for_tuning: 0.2
+  seed: 42
+  # artifact_location = config.mlflow.artifact_base + "/" + experiment_name (derived at runtime)
+
+# ---- Hyperparameter overrides (validated against allowed keys in src/schemas/model/) ----
+# Only keys already defined in the Python defaults are accepted.
+# Leave a section empty ({}) to use all defaults.
+hyperparams:
+  xgboost:
+    num_boost_round: 60
+    objective: "multi:softprob"
+    eval_metric: ["mlogloss", "merror"]
+    booster: "gbtree"
+    tree_method: "hist"
+    verbosity: 1
+    eta: 0.3
+    max_depth: 6
+    min_child_weight: 1
+    subsample: 1.0
+    lambda: 1.0
+    alpha: 0.0
+
+  pytorch:
+    batch_size: 256
+    max_epochs: 50
+    lr: 0.001
+    weight_decay: 0.0
+
+# ============================================================================
+# BACKWARD-COMPATIBILITY BLOCK
+# The serving layer (src/serve/config.py) and Spark jobs still read from
+# kuberay.* and spark.* keys. These are kept here until ConfigLoader.load()
+# is updated to merge config.yaml + params.yaml transparently.
+# ============================================================================
+
 kuberay:
   model:
-    #num_data_blocks: 4  # Número de bloques para leer los datos con Ray Datasets, None =  default
     tune: true
     sample_fraction_for_tuning: 0.2 # Realiza un muestreo estratificado para acelerar el tuning
     target: "attack"
     num_classes: 6
-    dsl_count_dim: true  # Usar DSL para contar columnas de entrada
+    dsl_count_dim: true # Usar DSL para contar columnas de entrada
     input_dim: 14
-    framework: "xgboost"  # "pytorch", "xgboost"
+    framework: "xgboost" # "pytorch", "xgboost"
     seed: 42
     mlflow_tracking_uri: "http://my-mlflow"
     mlflow_experiment_name: "kuberay-attack-detection"
     mlflow_artifact_location: "s3://k8s-mlops-platform-bucket/mlflow-artifacts/"
-    mlflow_registry_model_name: "attack-detection"  # Name in MLflow Model Registry (optional, defaults to experiment name)
-    
+    mlflow_registry_model_name: "attack-detection"
+
   serving:
-    alias: "champion"  # MLflow Model Registry alias (champion = production model)
+    alias: "champion" # MLflow Model Registry alias (champion = production model)
     canary: false
-    # Ray Serve handles full preprocessing (NumPy DSL) + prediction.
-    # Pipeline artifacts are resolved via MLflow → Iceberg → S3.
-    # MLflow webhook is registered for fast model + executor reload.
-    # Spark acts as a pure router: schema conversion only, no DSL preprocessing.
     webhook_public_base_url: "http://model-serving-serve-svc.ray.svc.cluster.local:8000"
     webhook_path: "/infer/webhook"
     webhook_name: "rayserve-attack-detection-champion-alias"
     webhook_max_timestamp_age_seconds: 300
 
-  # Optional per-deployment canary configuration. When present, `CanaryModel`
-  # will pick these values (overrides `kuberay.serving` / `kuberay.model`).
-  # Example: set `initial_replicas: 0` to keep canary inactive until you scale it.
   canary:
-    alias: "challenger"  # MLflow Model Registry alias for canary
+    alias: "challenger" # MLflow Model Registry alias for canary
     canary_probability: 0.10
-    # initial_replicas controls whether a canary instance is started automatically
     initial_replicas: 0
 
 spark:
   app_name: "spark-preprocessing"
-  bucket: "k8s-mlops-platform-bucket" # dummy bucket name
-  read_batch_size: 512  # Max MB read into memory per batch
-  write_batch_size: 100000  # Max lines written to S3 per batch
+  bucket: "k8s-mlops-platform-bucket"
+  read_batch_size: 512
+  write_batch_size: 100000
   num_classes: 6
   target: "attack"
-  # ===== SCHEMAS CONFIGURATION =====
-  # Nombres de schemas definidos en schema/schemas.py
+
   schemas:
-    input_schema: "kafka_schema_features"     # Schema para parsear Kafka
-    features_schema: "schema_features"        # Schema después de conversión
-    output_schema: "prediction_schema"        # Schema de predicciones
-    preprocessed_schema: "schema_preprocessed" # Schema después de preprocessing
-    full_schema: "schema_full"              # Schema completo (features + label)
-  
-  # ===== CONVERTERS CONFIGURATION =====
-  # Nombres de funciones definidas en helpers/spark_kafka_helper.py
+    input_schema: "kafka_schema_features"
+    features_schema: "schema_features"
+    output_schema: "prediction_schema"
+    preprocessed_schema: "schema_preprocessed"
+    full_schema: "schema_full"
+
   converters:
     kafka_to_features: "kafka_to_schema_features"
-    # Puedes agregar más conversores aquí:
-    # features_to_another: "another_converter_function"
-  
-  # ===== PREDICTION CONFIGURATION =====
+
   prediction:
-    type: "ray_serve"  # ray_serve, http, sagemaker, custom
-    
-    # Configuración específica de Ray Serve
+    type: "ray_serve"
     ray_serve:
       url: "http://model-serving-serve-svc.ray.svc.cluster.local:8000/infer"
       batch_size: 256
       timeout: 30
       max_retries: 3
-      request_payload_format: "list"  # list, dict
+      request_payload_format: "list"
       response_format: "json"
-      prediction_key: "predictions"   # Key en la respuesta JSON
-    
-    # Configuración de columnas
+      prediction_key: "predictions"
     columns:
       id_column: "event_id"
       prediction_column: "label"
-  
-  # ===== OUTPUT CONFIGURATION =====
+
   output:
-    format: "json"  # json, avro, protobuf
+    format: "json"
     key_column: "event_id"
-    # Columnas a incluir en la salida (o "all" para todas)
     value_columns:
       - "timestamp"
       - "event_id"
       - "properties"
       - "label"
-  
-  # ===== CHECKPOINT CONFIGURATION =====
+
   checkpoint:
     location: "s3a://k8s-mlops-platform-bucket/checkpoints/kafka-spark-inference"
     cleanup_on_exit: false
-  
-  # ===== OPERATIONAL CONFIGURATION =====
+
   operational:
     check_kafka_connection: true
     log_level: "INFO"
 
   streaming:
-    online_processing_time: "250 milliseconds"  # smoother micro-batches to reduce burst queueing
+    online_processing_time: "250 milliseconds"
     starting_offsets: "latest"
     fail_on_data_loss: false
 
-# ============================================================================
-# ICEBERG TABLES CONFIGURATION
-# ============================================================================
 iceberg_tables:
+  warehouse: "s3://k8s-mlops-platform-bucket/warehouse"
 
-  warehouse: "s3://k8s-mlops-platform-bucket/warehouse" # Ruta al warehouse de Iceberg en S3
-
-  # Tabla de raw data
   raw:
     catalog: "iceberg"
     namespace: "raw"
     table: "network_traffic_raw"
     full_name: "iceberg.raw.network_traffic_raw"
-  
-  # Tabla de metadata
+
   metadata:
     catalog: "iceberg"
     namespace: "metadata"
     table: "preprocessing_artifacts"
     full_name: "iceberg.metadata.preprocessing_artifacts"
-  
-  # Namespace para tablas procesadas
+
   processed:
     catalog: "iceberg"
     namespace: "processed"
-    # Las tablas procesadas se crearán dinámicamente con formato:
-    # iceberg.processed.{artifact_set_id}
-    # cambiar a iceberg.processed.{network_traffic}
+    # Tables created as: iceberg.processed.{raw_table}_{artifact_id}
+    # e.g.              iceberg.processed.network_traffic_raw_20260223_050000

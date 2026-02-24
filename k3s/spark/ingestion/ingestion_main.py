@@ -132,7 +132,10 @@ class SparkIngestionRaw(BaseUtils):
             df.writeTo(full_table).using("iceberg").option("format-version", "2").append()
 
 def main():
-    raw_https_path = "https://k8s-mlops-platform-bucket.s3.us-east-2.amazonaws.com/raw/"
+    raw_https_path = os.getenv(
+        "RAW_S3_PATH",
+        "https://k8s-mlops-platform-bucket.s3.us-east-2.amazonaws.com/raw/",
+    )
     raw_path = SparkIngestionRaw._to_s3a_path(raw_https_path)
 
     table_name = os.getenv("ICEBERG_RAW_TABLE", "network_traffic_raw")

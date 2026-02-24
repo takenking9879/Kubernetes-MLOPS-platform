@@ -26,6 +26,10 @@ XGBOOST_PARAMS: Dict[str, Any] = {
     "alpha": 0.0,
 }
 
+# Allowlist of keys accepted from YAML hyperparameter overrides.
+# Only keys in XGBOOST_PARAMS are permitted; any other key raises ValueError.
+XGBOOST_ALLOWED_KEYS: frozenset = frozenset(XGBOOST_PARAMS.keys())
+
 # Ray Tune scheduler settings.
 XGBOOST_TUNE_SETTINGS: Dict[str, int] = {
   "num_boost_round": 10,

@@ -1,0 +1,19 @@
+# Schema: network_traffic_raw — preprocessed (14 DSL output features)
+# Equivalent to src/schemas/spark/schemas.py :: schema_preprocessed
+# Upload to: s3://k8s-mlops-platform-bucket/schemas/datasets/network_traffic_raw/preprocessed.yaml
+
+fields:
+  - {name: protocol_idx,          type: double, nullable: true}
+  - {name: conn_state_idx,        type: double, nullable: true}
+  - {name: protocol_conn_idx,     type: double, nullable: true}
+  - {name: src_port_norm,         type: double, nullable: true}
+  - {name: dst_port_norm,         type: double, nullable: true}
+  - {name: packet_count_norm,     type: double, nullable: true}
+  - {name: bytes_transferred_norm, type: double, nullable: true}
+  - {name: bytes_log_norm,        type: double, nullable: true}
+  - {name: packet_log_norm,       type: double, nullable: true}
+  - {name: hour_norm,             type: double, nullable: true}
+  - {name: dayofweek_norm,        type: double, nullable: true}
+  - {name: is_weekend_norm,       type: double, nullable: true}
+  - {name: hour_sin_norm,         type: double, nullable: true}
+  - {name: hour_cos_norm,         type: double, nullable: true}

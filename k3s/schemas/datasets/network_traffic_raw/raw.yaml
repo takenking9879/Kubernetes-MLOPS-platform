@@ -1,0 +1,17 @@
+# Schema: network_traffic_raw — raw Kafka input
+# Equivalent to src/schemas/spark/schemas.py :: kafka_schema_features
+# Upload to: s3://k8s-mlops-platform-bucket/schemas/datasets/network_traffic_raw/raw.yaml
+
+fields:
+  - {name: timestamp, type: string, nullable: true}
+  - {name: event_id,  type: string, nullable: false}
+  - name: properties
+    type: struct
+    nullable: false
+    fields:
+      - {name: src_port,          type: long,   nullable: true}
+      - {name: dst_port,          type: long,   nullable: true}
+      - {name: protocol,          type: string, nullable: true}
+      - {name: packet_count,      type: long,   nullable: true}
+      - {name: conn_state,        type: string, nullable: true}
+      - {name: bytes_transferred, type: double, nullable: true}

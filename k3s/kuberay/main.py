@@ -78,8 +78,14 @@ class KubeRayTraining(BaseUtils):
             "client.region": os.environ.get("AWS_REGION", "us-east-2"),
         }
 
-    def _get_latest_artifact_set_id(self):
-        """Retrieves the latest artifact_set_id from the metadata table."""
+    def _get_latest_artifact(self):
+        """Retrieves the latest (artifact_set_id, processed_table_full) from the metadata table.
+
+        Returns a tuple (artifact_set_id, processed_table_name) where processed_table_name
+        is the full Iceberg reference stored by the preprocessing job
+        (e.g. 'iceberg.processed.network_traffic_raw_20260223_050000').
+        Returns (None, None) if no metadata records exist.
+        """
         try:
             meta_cfg = self.params_full.get('iceberg_tables', {}).get('metadata', {})
             identifier = f"{meta_cfg.get('namespace', 'metadata')}.{meta_cfg.get('table', 'preprocessing_artifacts')}"
@@ -87,14 +93,18 @@ class KubeRayTraining(BaseUtils):
             table = load_catalog("iceberg", **self.catalog_kwargs).load_table(identifier)
             df = table.scan().to_pandas()
             if df.empty:
-                return None
+                return None, None
 
             latest = df.sort_values('created_at', ascending=False).iloc[0]
-            self.logger.info(f"Latest artifact_set_id found in metadata: {latest['artifact_set_id']}")
-            return latest['artifact_set_id']
+            artifact_set_id = latest['artifact_set_id']
+            processed_table_full = latest['processed_table_name']
+            self.logger.info(
+                f"Latest artifact found — id={artifact_set_id}, table={processed_table_full}"
+            )
+            return artifact_set_id, processed_table_full
         except Exception as e:
-            self.logger.warning(f"Could not find latest artifact_set_id from metadata: {e}")
-            return None
+            self.logger.warning(f"Could not find latest artifact from metadata: {e}")
+            return None, None
 
     def _start_prometheus_server(self):
         """Start Prometheus metrics HTTP server on port 8002."""
@@ -250,6 +260,34 @@ class KubeRayTraining(BaseUtils):
         self.logger.info(f"Input dimension calculated from DSL: {self.input_dim} features.")
         return features
 
+    def _load_hyperparams(self, framework: str, defaults: dict) -> dict:
+        """Merge YAML hyperparameter overrides with framework defaults.
+
+        Reads from params.yaml → hyperparams → {framework} (new format) or
+        params.yaml → kuberay.model.{framework}_params (legacy format).
+        Validates that only known keys are passed — raises ValueError on any unknown key.
+        """
+        from src.schemas.model.xgboost_params import XGBOOST_ALLOWED_KEYS
+        from src.schemas.model.pytorch_params import PYTORCH_ALLOWED_KEYS
+
+        allowed = XGBOOST_ALLOWED_KEYS if framework == "xgboost" else PYTORCH_ALLOWED_KEYS
+
+        # New format: params.yaml → hyperparams → {framework}
+        yaml_overrides = self.params_full.get("hyperparams", {}).get(framework, {})
+        # Legacy fallback: params.yaml → kuberay.model.{framework}_params
+        if not yaml_overrides:
+            yaml_overrides = self.params.get(f"{framework}_params", {})
+
+        if yaml_overrides:
+            invalid = set(yaml_overrides) - allowed
+            if invalid:
+                raise ValueError(
+                    f"Invalid hyperparameters for {framework}: {sorted(invalid)}. "
+                    f"Allowed keys: {sorted(allowed)}"
+                )
+
+        return {**defaults, **yaml_overrides}
+
     def _log_final_to_mlflow(
         self,
         *,
@@ -326,7 +364,8 @@ class KubeRayTraining(BaseUtils):
     # ──────────────────────────────────────────────
 
     def train(self):
-        framework = self.params.get("framework", "xgboost")
+        # Priority: MODEL_TYPE env var > params.yaml > default
+        framework = os.getenv("MODEL_TYPE") or self.params.get("framework", "xgboost")
 
         try:
             # Log cluster resources
@@ -353,16 +392,19 @@ class KubeRayTraining(BaseUtils):
             self.logger.info(pretty_log)
             self._check_minio_connection()
 
-            # Resolve Iceberg table
-            artifact_set_id = self._get_latest_artifact_set_id()
-            if not artifact_set_id:
+            # Resolve Iceberg processed table from metadata
+            artifact_set_id, processed_table_full = self._get_latest_artifact()
+            if not processed_table_full:
                 raise ValueError(
-                    "ARTIFACT_SET_ID not found and no metadata records available. "
+                    "No processed table found in metadata. "
                     "Preprocessing must run first."
                 )
-            self.logger.info(f"Using latest artifact_set_id from metadata: {artifact_set_id}")
+            self.logger.info(f"Using processed table from metadata: {processed_table_full}")
 
-            table_identifier = f"processed.{artifact_set_id}"
+            # Strip catalog prefix ("iceberg") → pyiceberg 2-part identifier
+            # e.g. "iceberg.processed.network_traffic_raw_20260223_050000"
+            #    → "processed.network_traffic_raw_20260223_050000"
+            table_identifier = ".".join(processed_table_full.split(".")[1:])
             catalog_config = dict(self.catalog_kwargs)
 
             self.logger.info(f"Starting training pipeline with Iceberg table: {table_identifier}")
@@ -425,16 +467,21 @@ class KubeRayTraining(BaseUtils):
                 self.logger.warning(f"Could not export dataset counts: {e}")
 
             # ── Resolve effective params ──
+            # Base defaults come from the Python schema (XGBOOST_PARAMS / PYTORCH_PARAMS).
+            # YAML overrides from params.yaml → hyperparams → {framework} are merged on top
+            # and validated against the allowed-keys allowlist before training starts.
             defaults, params_key = _FRAMEWORK_DEFAULTS[framework]
+            base = self._load_hyperparams(framework, dict(defaults))
+
             if best_params is None:
-                effective_params = dict(defaults)
+                effective_params = base
             else:
-                effective_params = dict(best_params)
-                # Ensure long-training keys are present (not in search spaces)
+                effective_params = {**base, **best_params}
+                # Ensure long-training keys are present (not in tune search spaces)
                 if framework == "xgboost" and "num_boost_round" not in effective_params:
-                    effective_params["num_boost_round"] = defaults["num_boost_round"]
+                    effective_params["num_boost_round"] = base["num_boost_round"]
                 if framework == "pytorch" and "max_epochs" not in effective_params:
-                    effective_params["max_epochs"] = defaults["max_epochs"]
+                    effective_params["max_epochs"] = base["max_epochs"]
 
             # ── Train ──
             trainer = get_trainer(framework)
