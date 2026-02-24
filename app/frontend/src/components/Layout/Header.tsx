@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useState } from 'react';
 import { usePipelineStore } from '../../store/pipelineStore';
 import { useDatasetStore } from '../../store/datasetStore';
 import { saveDsl } from '../../api/platformClient';
@@ -9,7 +9,6 @@ import { DATASET_NODE_CONTRACT } from '../../registry/NodeRegistry';
 export function Header() {
   const validate = usePipelineStore((s) => s.validate);
   const exportYAML = usePipelineStore((s) => s.exportYAML);
-  const importYAML = usePipelineStore((s) => s.importYAML);
   const dryRun = usePipelineStore((s) => s.dryRun);
   const isValidating = usePipelineStore((s) => s.isValidating);
   const isDryRunning = usePipelineStore((s) => s.isDryRunning);
@@ -17,8 +16,6 @@ export function Header() {
 
   const { activeDataset } = useDatasetStore();
   const [isSavingDSL, setIsSavingDSL] = useState(false);
-
-  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleSaveDSLToS3 = async () => {
     const log = usePipelineStore.getState().log;
@@ -43,36 +40,6 @@ export function Header() {
     }
   };
 
-  const handleImport = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
-
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      const text = e.target?.result;
-      if (typeof text === 'string') {
-        importYAML(text);
-      }
-    };
-    reader.readAsText(file);
-
-    // Reset so the same file can be re-imported
-    event.target.value = '';
-  };
-
-  const handleExport = () => {
-    const yaml = exportYAML();
-    if (!yaml) return;
-
-    const blob = new Blob([yaml], { type: 'text/yaml' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'pipeline.yaml';
-    a.click();
-    URL.revokeObjectURL(url);
-  };
-
   return (
     <header className="flex h-12 items-center justify-between border-b border-slate-800 bg-slate-900 px-4">
       {/* Title */}
@@ -93,34 +60,13 @@ export function Header() {
         )}
       </div>
 
-      {/* Dataset badge + YAML + S3 save */}
+      {/* Dataset badge + S3 save */}
       <div className="flex items-center gap-2">
         {activeDataset && (
           <span className="rounded bg-blue-900 px-2 py-0.5 text-[10px] text-blue-300">
             {activeDataset}
           </span>
         )}
-        <button
-          onClick={handleExport}
-          className="rounded-md bg-emerald-700 px-3 py-1.5 text-xs font-medium text-white
-                     hover:bg-emerald-600"
-        >
-          Export YAML
-        </button>
-        <button
-          onClick={() => fileInputRef.current?.click()}
-          className="rounded-md bg-amber-700 px-3 py-1.5 text-xs font-medium text-white
-                     hover:bg-amber-600"
-        >
-          Import YAML
-        </button>
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept=".yaml,.yml"
-          className="hidden"
-          onChange={handleImport}
-        />
         <button
           onClick={() => { void handleSaveDSLToS3(); }}
           disabled={isSavingDSL}

@@ -6,7 +6,7 @@ import { ConsolePanel } from '../Console/ConsolePanel';
 
 export function MainLayout() {
   return (
-    <div className="flex h-screen flex-col bg-slate-950 text-slate-100">
+    <div className="flex flex-1 flex-col overflow-hidden bg-slate-950 text-slate-100">
       {/* Top bar */}
       <Header />
 
