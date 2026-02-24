@@ -8,7 +8,9 @@ import type { ColumnMeta } from '../types/schema';
 
 export type { ColumnMeta };
 
-const API_BASE = import.meta.env.VITE_API_URL ?? 'http://localhost:8000';
+// Hardcoded backend URL (requests from the frontend container/pod
+// should reach the backend via localhost).
+const API_BASE = 'http://localhost:8000';
 
 async function _fetch<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(`${API_BASE}${path}`, {

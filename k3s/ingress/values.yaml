@@ -36,13 +36,13 @@ ingress:
     - apps
   resources:
     # Uncomment these when you deploy the corresponding services.
-    # - name: airflow
-    #   namespace: airflow
-    #   subdomain: airflow
-    #   serviceName: my-airflow-api-server
-    #   servicePort: 8080
-    #   path: /
-    #   pathType: Prefix
+    - name: airflow
+      namespace: airflow
+      subdomain: airflow
+      serviceName: my-airflow-api-server
+      servicePort: 8080
+      path: /
+      pathType: Prefix
     - name: mlflow
       namespace: ray
       subdomain: mlflow

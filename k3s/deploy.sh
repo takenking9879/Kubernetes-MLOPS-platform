@@ -11,8 +11,9 @@ ENABLE_KAFKA=false
 ENABLE_RAY=true
 ENABLE_MLFLOW=true
 ENABLE_SPARK=true
-ENABLE_APP=false
+ENABLE_APP=true
 ENABLE_MONITORING=true
+ENABLE_AIRFLOW=true
 
 # ============================================================
 # TIMEOUTS
@@ -270,6 +271,18 @@ deploy_monitoring() {
 # ============================================================
 # INGRESS (ABSOLUTELY LAST)
 # ============================================================
+# ============================================================
+# AIRFLOW (PARALLEL)
+# ============================================================
+deploy_airflow() {
+  sep
+  info "Deploying Airflow"
+  kubectl create namespace airflow || true
+  kubectl create secret generic env-secret -n airflow --from-env-file=.env || true
+  helm upgrade --install my-airflow apache-airflow/airflow -n airflow -f k3s/airflow/airflow_values.yaml
+  ok "Airflow deployed"
+}
+
 deploy_ingress() {
   sep
   info "Deploying Ingress NGINX controller"
@@ -324,6 +337,10 @@ fi
 
 if [ "${ENABLE_APP}" = true ]; then
   deploy_dsl_app & PIDS+=($!)
+fi
+
+if [ "${ENABLE_AIRFLOW}" = true ]; then
+  deploy_airflow & PIDS+=($!)
 fi
 
 info "Waiting for parallel jobs to finish"
