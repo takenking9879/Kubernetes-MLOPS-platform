@@ -8,9 +8,9 @@ import type { ColumnMeta } from '../types/schema';
 
 export type { ColumnMeta };
 
-// Hardcoded backend URL (requests from the frontend container/pod
-// should reach the backend via localhost).
-const API_BASE = 'http://localhost:8000';
+// Use relative paths so the browser sends requests to the frontend server,
+// which then proxies them to the backend inside the pod.
+const API_BASE = '';
 
 async function _fetch<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(`${API_BASE}${path}`, {

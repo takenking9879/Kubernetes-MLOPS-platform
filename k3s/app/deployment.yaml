@@ -62,9 +62,6 @@ spec:
           ports:
             - name: frontend
               containerPort: 5173
-          env:
-            - name: VITE_API_URL
-              value: "http://localhost:8000"
           readinessProbe:
             httpGet:
               path: /
