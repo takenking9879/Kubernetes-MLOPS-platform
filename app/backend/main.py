@@ -37,6 +37,17 @@ app.include_router(_dsls_router.router)
 app.include_router(_runs_router.router)
 # ─────────────────────────────────────────────────────────────────────────────
 
+
+# Backwards-compatibility endpoint: some frontends call /api/datasets (no v2)
+@app.get("/api/datasets")
+async def legacy_list_datasets():
+    """Compatibility bridge for older frontend: return list of dataset names."""
+    # Reuse the v2 router implementation and return only names for the legacy API
+    from routers import datasets as datasets_router
+
+    datasets = await datasets_router.list_datasets()
+    return [d.name for d in datasets]
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
