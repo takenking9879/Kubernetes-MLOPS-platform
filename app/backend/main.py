@@ -475,14 +475,6 @@ async def dry_run(request: DryRunRequest) -> dict[str, Any]:
                     "success": False,
                     "error": {"message": f"Unsupported format for path: {dataset_path}"},
                 }
-                "success": False,
-                "error": {
-                    "message": (
-                        "Could not detect dataset format. "
-                        "Provide a valid CSV or Parquet file (or use .csv/.parquet extension)."
-                    )
-                },
-            }
 
         df = normalize_spark_columns(df)
 
