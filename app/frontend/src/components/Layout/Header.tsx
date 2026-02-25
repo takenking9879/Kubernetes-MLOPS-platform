@@ -47,17 +47,32 @@ export function Header() {
       <div className="flex items-center gap-3">
         <h1 className="text-xs font-bold text-slate-400 uppercase tracking-wider">Feature Designer</h1>
         {validationResult && (
-          <span
-            className={`rounded-full px-2 py-0.5 text-[10px] font-medium ${
-              validationResult.valid
-                ? 'bg-emerald-900/40 text-emerald-400'
-                : 'bg-red-900/40 text-red-400'
-            }`}
-          >
-            {validationResult.valid
-              ? `Valid (${validationResult.topologicalOrder.length})`
-              : `${validationResult.errors.length} ERR`}
-          </span>
+          <div className="flex items-center gap-2">
+            <span
+              className={`rounded-full px-2 py-0.5 text-[10px] font-medium ${
+                validationResult.valid
+                  ? 'bg-emerald-900/40 text-emerald-400'
+                  : 'bg-red-900/40 text-red-400'
+              }`}
+            >
+              {validationResult.valid
+                ? `Valid (${validationResult.topologicalOrder.length})`
+                : `${validationResult.errors.length} ERR`}
+            </span>
+
+            {/* Dry-run result badge next to Valid */}
+            {dryRunResult && (
+              <span
+                className={`rounded-full px-2 py-0.5 text-[10px] font-medium ${
+                  dryRunResult.success
+                    ? 'bg-emerald-900/40 text-emerald-400'
+                    : 'bg-red-900/40 text-red-400'
+                }`}
+              >
+                {dryRunResult.success ? 'DRY-RUN OK' : 'DRY-RUN ERR'}
+              </span>
+            )}
+          </div>
         )}
       </div>
 
@@ -124,18 +139,7 @@ export function Header() {
           {isValidating ? '...' : 'VALIDATE'}
         </button>
 
-        {/* Dry-run result badge (right of VALIDATE) */}
-        {dryRunResult && (
-          <span
-            className={`ml-2 rounded-full px-2 py-0.5 text-[10px] font-medium ${
-              dryRunResult.success
-                ? 'bg-emerald-900/40 text-emerald-400'
-                : 'bg-red-900/40 text-red-400'
-            }`}
-          >
-            {dryRunResult.success ? 'DRY-RUN OK' : 'DRY-RUN ERR'}
-          </span>
-        )}
+        
 
         <button
           onClick={() => { dryRun().catch(() => {}); }}
