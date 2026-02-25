@@ -8,6 +8,7 @@ Endpoints:
   POST /api/v2/datasets/{name}/ingest          - submit SparkApplication ingestion job
   GET  /api/v2/datasets/{name}/ingest/{job}/status - poll ingestion job state
   GET  /api/v2/datasets/{name}/sample          - fetch up to 3000 rows from iceberg.raw.{name}
+  POST /api/v2/datasets/{name}/schemas         - upload versioned schema YAMLs to S3
 """
 
 from __future__ import annotations
@@ -265,6 +266,75 @@ async def get_schema_from_iceberg(table: str):
         "schemaHash": "iceberg",
         "uploadedPath": f"iceberg:{table}"
     }
+
+
+class SchemaUploadRequest(BaseModel):
+    raw: str            # YAML string for raw.yaml
+    full: str           # YAML string for full.yaml
+    preprocessed: str   # YAML string for preprocessed.yaml
+
+
+@router.post("/{name}/schemas", status_code=201)
+async def upload_schemas(name: str, request: SchemaUploadRequest):
+    """Upload versioned schema YAMLs (raw, full, preprocessed) to S3.
+
+    Schemas are stored under: schemas/datasets/{name}/v{N}/
+    Version is auto-incremented by scanning existing S3 prefixes.
+    """
+    _validate_dataset_name(name)
+    s3 = _s3_client()
+
+    # Validate each YAML field: must parse and contain a top-level 'fields' list
+    for field_name, content in [
+        ("raw", request.raw),
+        ("full", request.full),
+        ("preprocessed", request.preprocessed),
+    ]:
+        try:
+            parsed = _yaml.safe_load(content)
+        except _yaml.YAMLError as exc:
+            raise HTTPException(
+                status_code=422,
+                detail=f"Invalid YAML in '{field_name}': {exc}",
+            )
+        if not isinstance(parsed, dict) or not isinstance(parsed.get("fields"), list):
+            raise HTTPException(
+                status_code=422,
+                detail=(
+                    f"Schema '{field_name}' must be a YAML dict with a top-level 'fields' list."
+                ),
+            )
+
+    # Determine the next version number by scanning existing S3 prefixes
+    prefix = f"schemas/datasets/{name}/v"
+    paginator = s3.get_paginator("list_objects_v2")
+    existing_versions: list[int] = []
+    for page in paginator.paginate(Bucket=S3_BUCKET, Prefix=prefix, Delimiter="/"):
+        for cp in page.get("CommonPrefixes", []):
+            # Key looks like: schemas/datasets/{name}/v3/
+            segment = cp["Prefix"].rstrip("/").split("/")[-1]  # e.g. "v3"
+            if segment.startswith("v") and segment[1:].isdigit():
+                existing_versions.append(int(segment[1:]))
+
+    next_version = (max(existing_versions) + 1) if existing_versions else 1
+
+    # Upload each schema YAML to S3
+    uploaded: dict[str, str] = {}
+    for field_name, content in [
+        ("raw", request.raw),
+        ("full", request.full),
+        ("preprocessed", request.preprocessed),
+    ]:
+        key = f"schemas/datasets/{name}/v{next_version}/{field_name}.yaml"
+        s3.put_object(
+            Bucket=S3_BUCKET,
+            Key=key,
+            Body=content.encode("utf-8"),
+            ContentType="application/x-yaml",
+        )
+        uploaded[field_name] = f"s3://{S3_BUCKET}/{key}"
+
+    return {"version": next_version, "uploaded": uploaded}
 
 
 _PANDAS_TYPE_MAP = {

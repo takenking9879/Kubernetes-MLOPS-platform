@@ -18,7 +18,7 @@ import boto3
 import requests as _requests
 import yaml as _yaml
 from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, Field, model_validator
 
 router = APIRouter(prefix="/api/v2/runs", tags=["runs"])
 
@@ -39,6 +39,44 @@ _REPO_CONFIG_PATH = os.getenv(
     "REPO_CONFIG_PATH",
     "/git-data/repo/k3s/config.yaml",
 )
+
+# ─── Hyperparameter validation data ──────────────────────────────────────────
+# Mirrors src/schemas/model/*_params.py exactly.
+# Defined here to avoid cross-package import issues at the boundary layer.
+
+_XGBOOST_ALLOWED_KEYS: frozenset = frozenset({
+    "num_boost_round", "objective", "eval_metric", "booster",
+    "tree_method", "verbosity", "eta", "max_depth", "min_child_weight",
+    "subsample", "lambda", "alpha",
+})
+
+_PYTORCH_ALLOWED_KEYS: frozenset = frozenset({
+    "batch_size", "max_epochs", "lr", "weight_decay",
+})
+
+# Expected Python types for each parameter (int/float overlap handled explicitly)
+_XGBOOST_PARAM_TYPES: dict[str, type] = {
+    "num_boost_round": int, "objective": str, "eval_metric": list,
+    "booster": str, "tree_method": str, "verbosity": int,
+    "eta": float, "max_depth": int, "min_child_weight": int,
+    "subsample": float, "lambda": float, "alpha": float,
+}
+_PYTORCH_PARAM_TYPES: dict[str, type] = {
+    "batch_size": int, "max_epochs": int, "lr": float, "weight_decay": float,
+}
+
+_XGBOOST_TUNE_SETTINGS_DEFAULTS: dict[str, int] = {
+    "num_boost_round": 10,
+    "grace_period": 5,
+    "reduction_factor": 2,
+}
+_PYTORCH_TUNE_SETTINGS_DEFAULTS: dict[str, int] = {
+    "grace_period": 5,
+    "reduction_factor": 2,
+    "max_epochs": 10,
+}
+
+_DATE_FMT = "%Y-%m-%d %H:%M:%S"
 
 
 def _s3_client():
@@ -73,13 +111,88 @@ class Splits(BaseModel):
     test: SplitRange
 
 
+class TuningConfig(BaseModel):
+    enabled: bool = True
+    number_of_trials: int = Field(3, ge=1)
+
+
+class ModelConfig(BaseModel):
+    experiment_name: str = "kuberay-attack-detection"
+    registry_model_name: str = "attack-detection"
+    target: str = "attack"
+    num_classes: int = Field(6, ge=2)
+    seed: int = 42
+
+
 class RunRequest(BaseModel):
-    dataset: str                                       # e.g. "network_traffic"
-    dsl_version: int                                   # version number from /dsls listing
-    execution_id: str = ""                             # auto-generated if empty
+    dataset: str
+    dsl_version: int
+    execution_id: str = ""
     framework: Literal["xgboost", "pytorch"] = "xgboost"
     splits: Splits
-    hyperparams: dict[str, Any] = {}                  # optional overrides per framework
+    tuning: TuningConfig = Field(default_factory=TuningConfig)
+    model: ModelConfig = Field(default_factory=ModelConfig)
+    sample_fraction_for_tuning: float = Field(0.2, ge=0.01, le=1.0)
+    hyperparams: dict[str, Any] = {}       # *_PARAMS overrides
+    tune_settings: dict[str, Any] = {}    # *_TUNE_SETTINGS overrides
+
+    @model_validator(mode="after")
+    def validate_hyperparams(self) -> "RunRequest":
+        """Validate hyperparameter keys and types against the allowed set."""
+        fw = self.framework
+        allowed = _XGBOOST_ALLOWED_KEYS if fw == "xgboost" else _PYTORCH_ALLOWED_KEYS
+        expected_types = _XGBOOST_PARAM_TYPES if fw == "xgboost" else _PYTORCH_PARAM_TYPES
+
+        for key, val in self.hyperparams.items():
+            if key not in allowed:
+                raise ValueError(
+                    f"hyperparams['{key}'] is not a valid {fw} parameter. "
+                    f"Allowed keys: {sorted(allowed)}"
+                )
+            exp_type = expected_types.get(key)
+            if exp_type is not None and not isinstance(val, exp_type):
+                # Allow int where float is expected (JSON numbers)
+                if exp_type is float and isinstance(val, int):
+                    pass
+                else:
+                    raise ValueError(
+                        f"hyperparams['{key}'] expected {exp_type.__name__}, "
+                        f"got {type(val).__name__}"
+                    )
+
+        return self
+
+    @model_validator(mode="after")
+    def validate_splits_format_and_order(self) -> "RunRequest":
+        """Validate split dates: format + chronological order (train < val < test)."""
+
+        def _parse(s: str, label: str) -> datetime:
+            try:
+                return datetime.strptime(s, _DATE_FMT)
+            except ValueError:
+                raise ValueError(
+                    f"{label} must be YYYY-MM-DD HH:MM:SS, got '{s}'"
+                )
+
+        train_start = _parse(self.splits.train.start, "splits.train.start")
+        train_end   = _parse(self.splits.train.end,   "splits.train.end")
+        val_start   = _parse(self.splits.val.start,   "splits.val.start")
+        val_end     = _parse(self.splits.val.end,     "splits.val.end")
+        test_start  = _parse(self.splits.test.start,  "splits.test.start")
+        test_end    = _parse(self.splits.test.end,    "splits.test.end")
+
+        if train_start >= train_end:
+            raise ValueError("splits.train.start must be before splits.train.end")
+        if train_end > val_start:
+            raise ValueError("splits.train.end must not exceed splits.val.start")
+        if val_start >= val_end:
+            raise ValueError("splits.val.start must be before splits.val.end")
+        if val_end > test_start:
+            raise ValueError("splits.val.end must not exceed splits.test.start")
+        if test_start >= test_end:
+            raise ValueError("splits.test.start must be before splits.test.end")
+
+        return self
 
 
 # ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -104,11 +217,31 @@ def _generate_params_yaml(req: RunRequest, execution_id: str, cfg: dict) -> str:
     mlflow_cfg = cfg.get("mlflow", {})
     serving_cfg = cfg.get("serving", {})
 
+    dsl_s3_path = _resolve_dsl_s3_path(req.dataset, req.dsl_version)
+
+    # ── Resolved *_TUNE_SETTINGS (merge defaults + overrides) ─────────────
+    tune_defaults = (
+        _XGBOOST_TUNE_SETTINGS_DEFAULTS if req.framework == "xgboost"
+        else _PYTORCH_TUNE_SETTINGS_DEFAULTS
+    )
+    resolved_tune_settings = {**tune_defaults, **req.tune_settings}
+
+    # ── Hyperparams block ──────────────────────────────────────────────────
+    hyperparams_block: dict[str, Any] = {
+        req.framework: req.hyperparams,
+    }
+    if req.tuning.enabled:
+        hyperparams_block["tuning"] = resolved_tune_settings
+
     params: dict[str, Any] = {
         "execution": {
             "execution_id": execution_id,
             "raw_table": f"iceberg.raw.{req.dataset}",
-            "dsl_s3_path": _resolve_dsl_s3_path(req.dataset, req.dsl_version),
+            "dsl_s3_path": dsl_s3_path,
+            "tuning": {
+                "enabled": req.tuning.enabled,
+                "number_of_trials": req.tuning.number_of_trials,
+            },
         },
         "splits": {
             "train": {"start": req.splits.train.start, "end": req.splits.train.end},
@@ -117,32 +250,32 @@ def _generate_params_yaml(req: RunRequest, execution_id: str, cfg: dict) -> str:
         },
         "model": {
             "framework": req.framework,
-            "experiment_name": "kuberay-attack-detection",
-            "registry_model_name": "attack-detection",
-            "target": "attack",
-            "num_classes": 6,
-            "tune": True,
-            "sample_fraction_for_tuning": 0.2,
-            "seed": 42,
+            "experiment_name": req.model.experiment_name,
+            "registry_model_name": req.model.registry_model_name,
+            "target": req.model.target,
+            "num_classes": req.model.num_classes,
+            "tune": req.tuning.enabled,
+            "sample_fraction_for_tuning": req.sample_fraction_for_tuning,
+            "seed": req.model.seed,
         },
-        "hyperparams": {
-            req.framework: req.hyperparams,
-        },
+        "hyperparams": hyperparams_block,
         # ── Backward-compat block (serving layer reads kuberay.*) ──────────
         "kuberay": {
             "model": {
-                "tune": True,
-                "sample_fraction_for_tuning": 0.2,
-                "target": "attack",
-                "num_classes": 6,
+                "tune": req.tuning.enabled,
+                "sample_fraction_for_tuning": req.sample_fraction_for_tuning,
+                "target": req.model.target,
+                "num_classes": req.model.num_classes,
                 "dsl_count_dim": True,
                 "input_dim": 14,
                 "framework": req.framework,
-                "seed": 42,
+                "seed": req.model.seed,
                 "mlflow_tracking_uri": mlflow_cfg.get("tracking_uri", "http://my-mlflow"),
-                "mlflow_experiment_name": "kuberay-attack-detection",
-                "mlflow_artifact_location": mlflow_cfg.get("artifact_base", ""),
-                "mlflow_registry_model_name": "attack-detection",
+                "mlflow_experiment_name": req.model.experiment_name,
+                "mlflow_artifact_location": mlflow_cfg.get(
+                    "artifact_base", f"s3://{S3_BUCKET}/mlflow-artifacts/"
+                ),
+                "mlflow_registry_model_name": req.model.registry_model_name,
             },
             "serving": {
                 "alias": serving_cfg.get("alias", "champion"),
@@ -165,14 +298,51 @@ def _generate_params_yaml(req: RunRequest, execution_id: str, cfg: dict) -> str:
             "bucket": S3_BUCKET,
             "read_batch_size": 512,
             "write_batch_size": 100000,
-            "num_classes": 6,
-            "target": "attack",
+            "num_classes": req.model.num_classes,
+            "target": req.model.target,
             "schemas": {
                 "input_schema": "kafka_schema_features",
                 "features_schema": "schema_features",
                 "output_schema": "prediction_schema",
                 "preprocessed_schema": "schema_preprocessed",
                 "full_schema": "schema_full",
+            },
+            "converters": {
+                "kafka_to_features": "kafka_to_schema_features",
+            },
+            "prediction": {
+                "type": "ray_serve",
+                "ray_serve": {
+                    "url": (serving_cfg.get("webhook_base_url", "http://model-serving-serve-svc.ray.svc.cluster.local:8000") + "/infer"),
+                    "batch_size": 256,
+                    "timeout": 30,
+                    "max_retries": 3,
+                    "request_payload_format": "list",
+                    "response_format": "json",
+                    "prediction_key": "predictions",
+                },
+                "columns": {
+                    "id_column": "event_id",
+                    "prediction_column": "label",
+                },
+            },
+            "output": {
+                "format": "json",
+                "key_column": "event_id",
+                "value_columns": ["timestamp", "event_id", "properties", "label"],
+            },
+            "checkpoint": {
+                "location": f"s3a://{S3_BUCKET}/checkpoints/kafka-spark-inference",
+                "cleanup_on_exit": False,
+            },
+            "operational": {
+                "check_kafka_connection": True,
+                "log_level": "INFO",
+            },
+            "streaming": {
+                "online_processing_time": "250 milliseconds",
+                "starting_offsets": "latest",
+                "fail_on_data_loss": False,
             },
         },
         "iceberg_tables": {
@@ -188,6 +358,11 @@ def _generate_params_yaml(req: RunRequest, execution_id: str, cfg: dict) -> str:
                 "namespace": "metadata",
                 "table": "preprocessing_artifacts",
                 "full_name": "iceberg.metadata.preprocessing_artifacts",
+            },
+            "processed": {
+                "catalog": "iceberg",
+                "namespace": "processed",
+                # Tables created as: iceberg.processed.{dataset}_{execution_id}
             },
         },
     }

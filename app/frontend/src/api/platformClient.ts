@@ -103,6 +103,19 @@ export interface SplitRange {
   end: string;
 }
 
+export interface TuningConfig {
+  enabled: boolean;
+  number_of_trials: number;
+}
+
+export interface ModelConfig {
+  experiment_name?: string;
+  registry_model_name?: string;
+  target?: string;
+  num_classes?: number;
+  seed?: number;
+}
+
 export interface RunRequest {
   dataset: string;
   dsl_version: number;
@@ -113,7 +126,28 @@ export interface RunRequest {
     val: SplitRange;
     test: SplitRange;
   };
+  tuning?: TuningConfig;
+  model?: ModelConfig;
+  sample_fraction_for_tuning?: number;
   hyperparams?: Record<string, unknown>;
+  tune_settings?: Record<string, unknown>;
+}
+
+// ─── Schema types ─────────────────────────────────────────────────────────────
+
+export interface SchemaUploadRequest {
+  raw: string;
+  full: string;
+  preprocessed: string;
+}
+
+export interface SchemaUploadResult {
+  version: number;
+  uploaded: {
+    raw: string;
+    full: string;
+    preprocessed: string;
+  };
 }
 
 // ─── Dataset API ──────────────────────────────────────────────────────────────
@@ -212,4 +246,16 @@ export async function submitRun(request: RunRequest): Promise<RunResult> {
 
 export async function getRunStatus(dagRunId: string): Promise<RunStatus> {
   return _fetch<RunStatus>(`/api/v2/runs/${encodeURIComponent(dagRunId)}/status`);
+}
+
+// ─── Schema API ───────────────────────────────────────────────────────────────
+
+export async function uploadSchemas(
+  datasetName: string,
+  schemas: SchemaUploadRequest,
+): Promise<SchemaUploadResult> {
+  return _fetch<SchemaUploadResult>(`/api/v2/datasets/${encodeURIComponent(datasetName)}/schemas`, {
+    method: 'POST',
+    body: JSON.stringify(schemas),
+  });
 }
