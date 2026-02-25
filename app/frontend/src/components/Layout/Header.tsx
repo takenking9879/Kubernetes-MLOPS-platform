@@ -13,6 +13,7 @@ export function Header() {
   const isValidating = usePipelineStore((s) => s.isValidating);
   const isDryRunning = usePipelineStore((s) => s.isDryRunning);
   const validationResult = usePipelineStore((s) => s.validationResult);
+  const dryRunResult = usePipelineStore((s) => s.dryRunResult);
 
   const { activeDataset } = useDatasetStore();
   const [isSavingDSL, setIsSavingDSL] = useState(false);
@@ -122,6 +123,19 @@ export function Header() {
         >
           {isValidating ? '...' : 'VALIDATE'}
         </button>
+
+        {/* Dry-run result badge (right of VALIDATE) */}
+        {dryRunResult && (
+          <span
+            className={`ml-2 rounded-full px-2 py-0.5 text-[10px] font-medium ${
+              dryRunResult.success
+                ? 'bg-emerald-900/40 text-emerald-400'
+                : 'bg-red-900/40 text-red-400'
+            }`}
+          >
+            {dryRunResult.success ? 'DRY-RUN OK' : 'DRY-RUN ERR'}
+          </span>
+        )}
 
         <button
           onClick={() => { dryRun().catch(() => {}); }}

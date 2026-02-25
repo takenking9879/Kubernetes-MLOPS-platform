@@ -20,6 +20,7 @@ import {
   uploadSchemaFromCSV,
   executeDryRun as apiDryRun,
 } from '../api/client';
+import { useDatasetStore } from './datasetStore';
 import { validatePipelineLocally } from '../lib/validation/lafValidator';
 import { generateYAML } from '../lib/yaml/generator';
 import { importFromYAML } from '../lib/yaml/importer';
@@ -554,6 +555,25 @@ export const usePipelineStore = create<PipelineState>()(
 
           if (result.success) {
             get().log(`Dry-run succeeded (${result.metrics.executionTime.toFixed(2)}s)`, 'info');
+            try {
+              // Try to set the global active dataset so UI actions (Save to S3)
+              // know which dataset is selected. Best-effort extraction from
+              // dataset node path (handles 'iceberg:table' and simple names).
+              const rawPath = datasetNode.data.path || '';
+              let dsName = rawPath;
+              if (rawPath.startsWith('iceberg:')) dsName = rawPath.split(':')[1] || rawPath;
+              else {
+                const parts = rawPath.replace(/\/+$/,'').split('/');
+                dsName = parts[parts.length - 1] || rawPath;
+              }
+              if (dsName) {
+                const setActive = useDatasetStore.getState().setActiveDataset;
+                setActive(dsName);
+                get().log(`Active dataset set to ${dsName}`, 'info');
+              }
+            } catch {
+              // Non-fatal — just don't block dry-run success
+            }
           } else {
             get().log(`Dry-run failed: ${result.error.message}`, 'error');
             if (result.error.sparkTrace) {
