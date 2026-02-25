@@ -389,10 +389,13 @@ async def upload_schema_file(
 @app.get("/api/schema/from-iceberg", response_model=SparkSchemaResponse)
 async def get_schema_from_iceberg(table: str):
     """Load schema from an Iceberg table. Placeholder — requires catalog setup."""
-    raise HTTPException(
-        status_code=501,
-        detail=f"Iceberg schema loading not yet implemented for table: {table}",
-    )
+    # Delegate to the datasets router v2 implementation which already supports
+    # loading Iceberg schemas via the datasets endpoints.
+    from routers import datasets as datasets_router
+
+    # The v2 implementation expects a query param `table` and returns the
+    # same structure; forward the call directly.
+    return await datasets_router.get_schema_from_iceberg(table)
 
 
 # ─── POST /api/dry-run ───────────────────────────────────────────────
