@@ -446,6 +446,7 @@ class KubeRayTraining(BaseUtils):
                     mlflow_tracking_uri=mlflow_tracking_uri,
                     mlflow_experiment_name=mlflow_experiment_name,
                     extra_callbacks=[prom_tune_cb],
+                    number_of_trials=self.params_full.get('execution', {}).get('tuning', {}).get('number_of_trials'),
                 )
 
                 best_params = best_config.get(tuner.params_key)

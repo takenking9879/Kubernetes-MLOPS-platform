@@ -23,8 +23,7 @@ export function NodePropertiesForm({ node }: Props) {
   const updateNodeData = usePipelineStore((s) => s.updateNodeData);
   const datasetSchema = usePipelineStore((s) => s.datasetSchema);
   const uploadSchemaFromCSV = usePipelineStore((s) => s.uploadSchemaFromCSV);
-  const setDatasetSchema = usePipelineStore((s) => s.setDatasetSchema);
-  const log = usePipelineStore((s) => s.log);
+const log = usePipelineStore((s) => s.log);
   const { activeDataset } = useDatasetStore();
   const [icebergLoading, setIcebergLoading] = useState(false);
   const [availableTables, setAvailableTables] = useState<string[]>([]);

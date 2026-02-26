@@ -142,6 +142,7 @@ class BaseTuner(ABC):
         mlflow_tracking_uri: Optional[str] = None,
         mlflow_experiment_name: Optional[str] = None,
         extra_callbacks: Optional[List[object]] = None,
+        number_of_trials: Optional[int] = None,
     ) -> Dict[str, Any]:
         """Run hyperparameter search. Returns ``best.config``."""
 
@@ -288,7 +289,7 @@ class BaseTuner(ABC):
             _trainable,
             param_space=param_space,
             tune_config=tune.TuneConfig(
-                num_samples=self.default_num_samples,
+                num_samples=number_of_trials if number_of_trials is not None else self.default_num_samples,
                 scheduler=scheduler,
                 max_concurrent_trials=int(os.getenv("MAX_CONCURRENT_TRIALS", "1")),
             ),
