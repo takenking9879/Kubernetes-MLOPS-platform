@@ -5,6 +5,8 @@ The Pipeline orchestrates the execution of stages in sequence, handling
 the fit-transform pattern correctly for both Transformers and Estimators.
 """
 
+import os
+import re
 import yaml
 from typing import List, Dict, Any
 from pyspark.sql import DataFrame
@@ -49,9 +51,25 @@ class Pipeline:
         Returns:
             Pipeline instance
         """
-        with open(yaml_path, 'r') as f:
-            config = yaml.safe_load(f)
-        
+        if yaml_path.startswith("s3://"):
+            import boto3
+            match = re.match(r"s3://([^/]+)/(.+)", yaml_path)
+            if not match:
+                raise ValueError(f"Invalid S3 path: {yaml_path!r}. Expected s3://bucket/key")
+            bucket, key = match.group(1), match.group(2)
+            s3 = boto3.client(
+                "s3",
+                aws_access_key_id=os.getenv("AWS_ACCESS_KEY_ID"),
+                aws_secret_access_key=os.getenv("AWS_SECRET_ACCESS_KEY"),
+                region_name=os.getenv("AWS_REGION", "us-east-2"),
+            )
+            obj = s3.get_object(Bucket=bucket, Key=key)
+            content = obj["Body"].read().decode("utf-8")
+            config = yaml.safe_load(content)
+        else:
+            with open(yaml_path, 'r') as f:
+                config = yaml.safe_load(f)
+
         return cls.from_config(config)
     
     @classmethod
