@@ -1,14 +1,18 @@
 """ML Pipeline DAG — UI-triggered end-to-end training pipeline.
 
 Triggered by the UI via dag_run.conf with:
-    execution_id   : str  — unique run identifier (e.g. "20260223_120000")
-    raw_table      : str  — full Iceberg table ref (e.g. "iceberg.raw.network_traffic_raw")
-    dsl_s3_path    : str  — S3 URI to DSL YAML (e.g. "s3://bucket/dsl/dsl_network_traffic/v1.yaml")
-    params_s3_path : str  — S3 URI of execution params.yaml
-    model_type     : str  — "xgboost" or "pytorch"
-    schema_s3_path : str  — (optional) S3 URI to schema YAML; auto-derived from raw_table if absent
-    pipeline_mode  : str  — "full" (default) | "preprocessing_only" | "training_only"
-    processed_table: str  — (training_only) Iceberg processed table to use directly
+    execution_id            : str  — unique run identifier (e.g. "20260223_120000")
+    raw_table               : str  — full Iceberg table ref (e.g. "iceberg.raw.network_traffic")
+    dsl_s3_path             : str  — S3 URI to DSL YAML
+    preprocess_params_s3_path: str — S3 URI of params_preprocess.yaml (preprocessing runs)
+    train_params_s3_path    : str  — S3 URI of params_training.yaml (training runs)
+    serving_params_s3_path  : str  — S3 URI of params_serving.yaml (training runs, para serving)
+    model_type              : str  — "xgboost" or "pytorch"
+    schema_s3_path          : str  — (optional) S3 URI to schema YAML
+    pipeline_mode           : str  — "full" (default) | "preprocessing_only" | "training_only"
+    processed_table         : str  — (training_only) Iceberg processed table to use directly
+
+    Backward-compat: params_s3_path sigue siendo aceptado como fallback.
 
 Tasks:
     1. spark_preprocess — fit DSL + write processed Iceberg table (skipped when training_only)
@@ -71,7 +75,11 @@ def _submit_spark_preprocessing(**context):
     execution_id = conf.get("execution_id", datetime.utcnow().strftime("%Y%m%d_%H%M%S"))
     raw_table = conf.get("raw_table", "")
     dsl_s3_path = conf.get("dsl_s3_path", "")
-    params_s3_path = conf.get("params_s3_path", "")
+    # Leer preprocess_params_s3_path; fallback a params_s3_path para backward-compat
+    params_s3_path = (
+        conf.get("preprocess_params_s3_path")
+        or conf.get("params_s3_path", "")
+    )
     schema_s3_path = conf.get("schema_s3_path", "")
 
     if not _PROVIDERS_AVAILABLE:
@@ -178,7 +186,11 @@ def _submit_ray_training(**context):
         return
     execution_id = conf.get("execution_id", datetime.utcnow().strftime("%Y%m%d_%H%M%S"))
     model_type = conf.get("model_type", "xgboost")
-    params_s3_path = conf.get("params_s3_path", "")
+    # Leer train_params_s3_path; fallback a params_s3_path para backward-compat
+    params_s3_path = (
+        conf.get("train_params_s3_path")
+        or conf.get("params_s3_path", "")
+    )
 
     if not _PROVIDERS_AVAILABLE:
         raise RuntimeError(

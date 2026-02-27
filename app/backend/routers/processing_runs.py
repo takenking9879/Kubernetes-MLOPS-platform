@@ -15,7 +15,8 @@ from typing import Any
 
 import boto3
 import requests as _requests
-from fastapi import APIRouter, HTTPException
+from botocore.exceptions import ClientError
+from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel, Field, model_validator
 
 router = APIRouter(prefix="/api/v2/processing-runs", tags=["processing-runs"])
@@ -104,10 +105,11 @@ class ProcessingRunRequest(BaseModel):
 
 class ProcessedTableEntry(BaseModel):
     execution_id: str
-    dataset: str
+    dataset: str           # alias de raw_dataset_name (backward-compat)
     processed_table_name: str
     pipeline_hash: str = ""
     created_at: str = ""
+    raw_dataset_name: str = ""  # nombre explícito del dataset fuente
 
 
 # ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -216,13 +218,14 @@ async def submit_processing_run(request: ProcessingRunRequest):
 
     dsl_s3_path = _resolve_dsl_s3_path(request.dataset, request.dsl_version)
 
-    # Upload a minimal params.yaml so the Spark task can read execution config
+    # Upload params_preprocess.yaml: solo config de preprocesamiento (sin model/kuberay/serving)
     import yaml as _yaml
 
     params: dict[str, Any] = {
         "execution": {
             "execution_id": execution_id,
             "raw_table": f"iceberg.raw.{request.dataset}",
+            "raw_dataset_name": request.dataset,
             "dsl_s3_path": dsl_s3_path,
         },
         "splits": {
@@ -253,14 +256,14 @@ async def submit_processing_run(request: ProcessingRunRequest):
     params_yaml_str = _yaml.dump(params, default_flow_style=False, allow_unicode=True)
 
     s3 = _s3_client()
-    params_key = f"params/{execution_id}/params.yaml"
+    params_key = f"params/{execution_id}/params_preprocess.yaml"
     s3.put_object(
         Bucket=S3_BUCKET,
         Key=params_key,
         Body=params_yaml_str.encode("utf-8"),
         ContentType="application/x-yaml",
     )
-    params_s3_path = f"s3://{S3_BUCKET}/{params_key}"
+    preprocess_params_s3_path = f"s3://{S3_BUCKET}/{params_key}"
 
     # Trigger Airflow DAG with preprocessing_only mode
     try:
@@ -273,7 +276,7 @@ async def submit_processing_run(request: ProcessingRunRequest):
                     "execution_id": execution_id,
                     "raw_table": f"iceberg.raw.{request.dataset}",
                     "dsl_s3_path": dsl_s3_path,
-                    "params_s3_path": params_s3_path,
+                    "preprocess_params_s3_path": preprocess_params_s3_path,
                     "pipeline_mode": "preprocessing_only",
                 },
             },
@@ -292,13 +295,13 @@ async def submit_processing_run(request: ProcessingRunRequest):
     return {
         "dag_run_id": dag_run_id,
         "execution_id": execution_id,
-        "params_s3_path": params_s3_path,
+        "preprocess_params_s3_path": preprocess_params_s3_path,
         "dsl_s3_path": dsl_s3_path,
     }
 
 
 @router.get("")
-async def list_processing_runs():
+async def list_processing_runs(dataset: str | None = Query(None, description="Filtrar por raw dataset name")):
     """List available processed tables from iceberg.metadata.preprocessing_artifacts."""
     try:
         from pyiceberg.catalog.glue import GlueCatalog
@@ -318,6 +321,7 @@ async def list_processing_runs():
                 "processed_table_name",
                 "pipeline_hash",
                 "created_at",
+                "raw_dataset_name",
             ),
         ).to_pandas()
     except Exception as exc:
@@ -329,30 +333,63 @@ async def list_processing_runs():
     runs = []
     for _, row in df.iterrows():
         table_name: str = str(row.get("processed_table_name", ""))
-        # Extract dataset from table name: iceberg.processed.{dataset}_{execution_id}
-        # Convention: last part after "processed." is "{dataset}_{execution_id}"
-        dataset = ""
-        if "." in table_name:
+
+        # raw_dataset_name: leer directamente de la columna (post-migración)
+        # Fallback: parsear del nombre de tabla para filas históricas con NULL
+        raw_dataset_name = str(row.get("raw_dataset_name") or "")
+        if not raw_dataset_name and "." in table_name:
             tail = table_name.rsplit(".", 1)[-1]
-            # execution_id format is YYYYMMDD_HHMMSS (15 chars including underscore)
-            # dataset is everything before the last two underscore-separated segments
             parts = tail.rsplit("_", 2)
             if len(parts) == 3:
-                dataset = parts[0]
+                raw_dataset_name = parts[0]
 
         runs.append(
             ProcessedTableEntry(
                 execution_id=str(row.get("artifact_set_id", "")),
-                dataset=dataset,
+                dataset=raw_dataset_name,
                 processed_table_name=table_name,
                 pipeline_hash=str(row.get("pipeline_hash", "")),
                 created_at=str(row.get("created_at", "")),
+                raw_dataset_name=raw_dataset_name,
             )
         )
+
+    # Filtro por dataset si se especifica
+    if dataset:
+        runs = [r for r in runs if r.raw_dataset_name == dataset]
 
     # Most recent first
     runs.sort(key=lambda r: r.created_at, reverse=True)
     return {"runs": [r.model_dump() for r in runs]}
+
+
+@router.get("/{execution_id}/params")
+async def get_preprocess_params(execution_id: str):
+    """Fetch params_preprocess.yaml for a given execution_id from S3.
+
+    Backward-compat: si no existe params_preprocess.yaml, intenta con el antiguo params.yaml.
+    """
+    s3 = _s3_client()
+
+    def _fetch_key(key: str) -> str | None:
+        try:
+            obj = s3.get_object(Bucket=S3_BUCKET, Key=key)
+            return obj["Body"].read().decode("utf-8")
+        except ClientError as e:
+            if e.response["Error"]["Code"] in ("NoSuchKey", "404"):
+                return None
+            raise HTTPException(status_code=500, detail=f"S3 error: {e}") from e
+
+    yaml_content = _fetch_key(f"params/{execution_id}/params_preprocess.yaml")
+    if yaml_content is None:
+        # Backward-compat: monolithic params.yaml de runs anteriores a la separación
+        yaml_content = _fetch_key(f"params/{execution_id}/params.yaml")
+    if yaml_content is None:
+        raise HTTPException(
+            status_code=404,
+            detail=f"No params file found for execution_id '{execution_id}'",
+        )
+    return {"execution_id": execution_id, "yaml_content": yaml_content}
 
 
 @router.get("/{dag_run_id}/status")

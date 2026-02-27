@@ -15,10 +15,13 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { Check, ChevronDown, ChevronUp, Copy, RefreshCw } from 'lucide-react';
 import {
   getIcebergSample,
+  getPreprocessParams,
   getRunStatus,
+  listDatasets,
   listProcessingRuns,
   submitRun,
   uploadSchemas,
+  type DatasetInfo,
   type ProcessedTableEntry,
   type RunResult,
   type SchemaUploadResult,
@@ -555,11 +558,20 @@ export function RunPage() {
   const [navErrors, setNavErrors] = useState<string[]>([]);
 
   // ── Execution ────────────────────────────────────────────────────────────
-  // dataset is derived automatically from the selected processed table entry
   const [dataset, setDataset] = useState('');
+  // rawDatasetFilter: selector de dataset fuente — NO se guarda en params.yaml
+  const [rawDatasetFilter, setRawDatasetFilter] = useState('');
+  const [dslVersion, setDslVersion] = useState<number | ''>('');
+  const [availableDatasets, setAvailableDatasets] = useState<DatasetInfo[]>([]);
   const [processingRuns, setProcessingRuns] = useState<ProcessedTableEntry[]>([]);
   const [selectedProcessedTable, setSelectedProcessedTable] = useState('');
   const [executionId, setExecutionId] = useState(nowId);
+
+  // ── Params inspection modal ───────────────────────────────────────────────
+  const [paramsModalOpen, setParamsModalOpen] = useState(false);
+  const [paramsModalContent, setParamsModalContent] = useState('');
+  const [paramsModalLoading, setParamsModalLoading] = useState(false);
+  const [paramsModalError, setParamsModalError] = useState('');
 
   // ── Tuning ───────────────────────────────────────────────────────────────
   const [tuningEnabled, setTuningEnabled] = useState(true);
@@ -623,18 +635,44 @@ export function RunPage() {
 
   // ── Effects ───────────────────────────────────────────────────────────────
 
-  // Load processing runs on mount
+  // Load available datasets on mount (para el selector de Raw Dataset)
   useEffect(() => {
-    listProcessingRuns()
-      .then((r) => setProcessingRuns(r.runs))
-      .catch(() => setProcessingRuns([]));
+    listDatasets()
+      .then((ds) => setAvailableDatasets(ds))
+      .catch(() => setAvailableDatasets([]));
   }, []);
 
-  // Derive dataset from selected processed table entry
+  // Load processing runs filtered by rawDatasetFilter
   useEffect(() => {
-    const entry = processingRuns.find((r) => r.processed_table_name === selectedProcessedTable);
-    setDataset(entry?.dataset ?? '');
+    if (!rawDatasetFilter) {
+      setProcessingRuns([]);
+      setSelectedProcessedTable('');
+      setDslVersion('');
+      return;
+    }
+    listProcessingRuns(rawDatasetFilter)
+      .then((r) => setProcessingRuns(r.runs))
+      .catch(() => setProcessingRuns([]));
+  }, [rawDatasetFilter]);
+
+  // Sync dslVersion when selectedProcessedTable changes
+  useEffect(() => {
+    if (selectedProcessedTable && processingRuns.length > 0) {
+      const match = processingRuns.find(
+        (r) => r.processed_table_name === selectedProcessedTable
+      );
+      if (match) {
+        setDslVersion(match.dsl_version);
+      }
+    } else {
+      setDslVersion('');
+    }
   }, [selectedProcessedTable, processingRuns]);
+
+  // dataset = rawDatasetFilter (ya no se deriva del entry)
+  useEffect(() => {
+    setDataset(rawDatasetFilter);
+  }, [rawDatasetFilter]);
 
   useEffect(() => {
     setHyperparams({ ...getDefaults(framework) });
@@ -837,6 +875,23 @@ export function RunPage() {
 
   // ── Handlers ──────────────────────────────────────────────────────────────
 
+
+  const handleInspectParams = async () => {
+    const entry = processingRuns.find((r) => r.processed_table_name === selectedProcessedTable);
+    if (!entry) return;
+    setParamsModalContent('');
+    setParamsModalError('');
+    setParamsModalLoading(true);
+    setParamsModalOpen(true);
+    try {
+      const result = await getPreprocessParams(entry.execution_id);
+      setParamsModalContent(result.yaml_content);
+    } catch (e) {
+      setParamsModalError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setParamsModalLoading(false);
+    }
+  };
 
   const handleSubmit = async () => {
     setSubmitError('');
@@ -1048,24 +1103,72 @@ export function RunPage() {
 
               <div className="space-y-3">
                 <p className="text-xs text-slate-500">
-                  Select a processed table produced by the Processing tab to
-                  train directly — Spark preprocessing is skipped.
+                  Elige el dataset fuente para filtrar las tablas procesadas,
+                  luego selecciona la tabla sobre la que entrenar.
                 </p>
-                <Field label="Processed Table" tooltip="Processed Iceberg table from a previous processing run.">
-                  <select
-                    value={selectedProcessedTable}
-                    onChange={(e) => setSelectedProcessedTable(e.target.value)}
-                    className={SELECT_CLS}
-                  >
-                    <option value="">— select processed table —</option>
-                    {processingRuns.map((r) => (
-                      <option key={r.execution_id} value={r.processed_table_name}>
-                        {r.execution_id} — {r.processed_table_name}
-                        {r.dataset ? ` (${r.dataset})` : ''}
-                      </option>
-                    ))}
-                  </select>
+
+                {/* Raw Dataset filter — solo filtra, NO se guarda en params_training.yaml */}
+                <Field label="Raw Dataset" tooltip="Filtra las tablas procesadas por dataset fuente. No se incluye en params_training.yaml.">
+                  {availableDatasets.length > 0 ? (
+                    <select
+                      value={rawDatasetFilter}
+                      onChange={(e) => {
+                        setRawDatasetFilter(e.target.value);
+                        setSelectedProcessedTable('');
+                      }}
+                      className={SELECT_CLS}
+                    >
+                      <option value="">— select dataset —</option>
+                      {availableDatasets.map((d) => (
+                        <option key={d.name} value={d.name}>{d.name}</option>
+                      ))}
+                    </select>
+                  ) : (
+                    <input
+                      value={rawDatasetFilter}
+                      onChange={(e) => {
+                        setRawDatasetFilter(e.target.value);
+                        setSelectedProcessedTable('');
+                      }}
+                      placeholder="network_traffic"
+                      className={INPUT_CLS}
+                    />
+                  )}
                 </Field>
+
+                {/* Processed Table — solo nombre, con botón de inspección */}
+                <Field label="Processed Table" tooltip="Tabla Iceberg generada por un run de preprocesamiento.">
+                  <div className="flex gap-1">
+                    <select
+                      value={selectedProcessedTable}
+                      onChange={(e) => setSelectedProcessedTable(e.target.value)}
+                      className={SELECT_CLS}
+                      disabled={!rawDatasetFilter || processingRuns.length === 0}
+                    >
+                      <option value="">
+                        {!rawDatasetFilter
+                          ? '— select a dataset first —'
+                          : processingRuns.length === 0
+                            ? '— no processed tables found —'
+                            : '— select processed table —'}
+                      </option>
+                      {processingRuns.map((r) => (
+                        <option key={r.execution_id} value={r.processed_table_name}>
+                          {r.processed_table_name}
+                        </option>
+                      ))}
+                    </select>
+                    <button
+                      onClick={() => void handleInspectParams()}
+                      disabled={!selectedProcessedTable}
+                      className={BTN_NEUTRAL}
+                      title="Inspeccionar params_preprocess.yaml de esta tabla"
+                    >
+                      🔍
+                    </button>
+                  </div>
+                </Field>
+
                 <Field
                   label="Execution ID"
                   tooltip="Unique run identifier. Auto-generated, editable."
@@ -2156,6 +2259,38 @@ export function RunPage() {
           onTabChange={setActivePreviewTab}
         />
       </div>
+
+      {/* ── Modal: inspección de params_preprocess.yaml ── */}
+      {paramsModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
+          <div className="flex w-[600px] max-h-[80vh] flex-col rounded-lg border border-slate-700 bg-slate-900 shadow-xl">
+            <div className="flex items-center justify-between border-b border-slate-700 px-4 py-3">
+              <p className="text-xs font-semibold text-slate-200">
+                params_preprocess.yaml — {selectedProcessedTable}
+              </p>
+              <button
+                onClick={() => setParamsModalOpen(false)}
+                className="text-xs text-slate-500 hover:text-slate-300"
+              >
+                Close ✕
+              </button>
+            </div>
+            <div className="flex-1 overflow-auto p-3">
+              {paramsModalLoading && (
+                <p className="text-xs text-slate-400">Loading…</p>
+              )}
+              {paramsModalError && (
+                <p className="text-xs text-red-400">{paramsModalError}</p>
+              )}
+              {paramsModalContent && (
+                <pre className="whitespace-pre font-mono text-[11px] leading-relaxed text-green-300">
+                  {paramsModalContent}
+                </pre>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

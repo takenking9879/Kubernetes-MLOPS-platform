@@ -304,10 +304,9 @@ def _resolve_dsl_s3_path(dataset: str, version: int) -> str:
     return f"s3://{S3_BUCKET}/{objs[0]['Key']}"
 
 
-def _generate_params_yaml(req: RunRequest, execution_id: str, cfg: dict) -> str:
-    """Build the execution params.yaml dict and return as a YAML string."""
+def _generate_training_params_yaml(req: RunRequest, execution_id: str, cfg: dict) -> str:
+    """Build params_training.yaml: solo config de entrenamiento (sin spark, sin serving/canary)."""
     mlflow_cfg = cfg.get("mlflow", {})
-    serving_cfg = cfg.get("serving", {})
 
     # ── Resolved *_TUNE_SETTINGS (merge defaults + overrides) ─────────────
     tune_defaults = (
@@ -323,20 +322,16 @@ def _generate_params_yaml(req: RunRequest, execution_id: str, cfg: dict) -> str:
     if req.tuning.enabled:
         hyperparams_block["tuning"] = resolved_tune_settings
 
-    execution_block: dict[str, Any] = {
-        "execution_id": execution_id,
-        "raw_table": "",
-        "dsl_s3_path": "",
-        "tuning": {
-            "enabled": req.tuning.enabled,
-            "number_of_trials": req.tuning.number_of_trials,
-        },
-        "skip_preprocessing": True,
-        "processed_table": req.processed_table,
-    }
-
     params: dict[str, Any] = {
-        "execution": execution_block,
+        "execution": {
+            "execution_id": execution_id,
+            "tuning": {
+                "enabled": req.tuning.enabled,
+                "number_of_trials": req.tuning.number_of_trials,
+            },
+            "skip_preprocessing": True,
+            "processed_table": req.processed_table,
+        },
         "splits": {
             "train": {"start": req.splits.train.start, "end": req.splits.train.end},
             "val":   {"start": req.splits.val.start,   "end": req.splits.val.end},
@@ -353,7 +348,7 @@ def _generate_params_yaml(req: RunRequest, execution_id: str, cfg: dict) -> str:
             "seed": req.model.seed,
         },
         "hyperparams": hyperparams_block,
-        # ── Backward-compat block (serving layer reads kuberay.*) ──────────
+        # kuberay.model — config de entrenamiento y registro MLflow
         "kuberay": {
             "model": {
                 "tune": req.tuning.enabled,
@@ -371,82 +366,9 @@ def _generate_params_yaml(req: RunRequest, execution_id: str, cfg: dict) -> str:
                 ),
                 "mlflow_registry_model_name": req.model.registry_model_name,
             },
-            "serving": {
-                "alias": serving_cfg.get("alias", "champion"),
-                "canary": False,
-                "webhook_public_base_url": serving_cfg.get("webhook_base_url", ""),
-                "webhook_path": serving_cfg.get("webhook_path", "/infer/webhook"),
-                "webhook_name": serving_cfg.get("webhook_name", ""),
-                "webhook_max_timestamp_age_seconds": serving_cfg.get(
-                    "webhook_max_timestamp_age_seconds", 300
-                ),
-            },
-            "canary": {
-                "alias": serving_cfg.get("canary_alias", "challenger"),
-                "canary_probability": serving_cfg.get("canary_probability", 0.10),
-                "initial_replicas": 0,
-            },
-        },
-        "spark": {
-            "app_name": "spark-preprocessing",
-            "bucket": S3_BUCKET,
-            "read_batch_size": 512,
-            "write_batch_size": 100000,
-            "num_classes": req.model.num_classes,
-            "target": req.model.target,
-            "schemas": {
-                "input_schema": "kafka_schema_features",
-                "features_schema": "schema_features",
-                "output_schema": "prediction_schema",
-                "preprocessed_schema": "schema_preprocessed",
-                "full_schema": "schema_full",
-            },
-            "converters": {
-                "kafka_to_features": "kafka_to_schema_features",
-            },
-            "prediction": {
-                "type": "ray_serve",
-                "ray_serve": {
-                    "url": (serving_cfg.get("webhook_base_url", "http://model-serving-serve-svc.ray.svc.cluster.local:8000") + "/infer"),
-                    "batch_size": 256,
-                    "timeout": 30,
-                    "max_retries": 3,
-                    "request_payload_format": "list",
-                    "response_format": "json",
-                    "prediction_key": "predictions",
-                },
-                "columns": {
-                    "id_column": "event_id",
-                    "prediction_column": "label",
-                },
-            },
-            "output": {
-                "format": "json",
-                "key_column": "event_id",
-                "value_columns": ["timestamp", "event_id", "properties", "label"],
-            },
-            "checkpoint": {
-                "location": f"s3a://{S3_BUCKET}/checkpoints/kafka-spark-inference",
-                "cleanup_on_exit": False,
-            },
-            "operational": {
-                "check_kafka_connection": True,
-                "log_level": "INFO",
-            },
-            "streaming": {
-                "online_processing_time": "250 milliseconds",
-                "starting_offsets": "latest",
-                "fail_on_data_loss": False,
-            },
         },
         "iceberg_tables": {
             "warehouse": f"s3://{S3_BUCKET}/warehouse",
-            "raw": {
-                "catalog": "iceberg",
-                "namespace": "raw",
-                "table": req.dataset,
-                "full_name": f"iceberg.raw.{req.dataset}",
-            },
             "metadata": {
                 "catalog": "iceberg",
                 "namespace": "metadata",
@@ -456,8 +378,35 @@ def _generate_params_yaml(req: RunRequest, execution_id: str, cfg: dict) -> str:
             "processed": {
                 "catalog": "iceberg",
                 "namespace": "processed",
-                # Tables created as: iceberg.processed.{dataset}_{execution_id}
             },
+        },
+    }
+
+    return _yaml.dump(params, default_flow_style=False, allow_unicode=True)
+
+
+def _generate_serving_params_yaml(execution_id: str, cfg: dict) -> str:
+    """Build params_serving.yaml: config de despliegue Ray Serve (alias, canary, webhook)."""
+    serving_cfg = cfg.get("serving", {})
+
+    params: dict[str, Any] = {
+        "execution": {
+            "execution_id": execution_id,
+        },
+        "serving": {
+            "alias": serving_cfg.get("alias", "champion"),
+            "canary": False,
+            "webhook_public_base_url": serving_cfg.get("webhook_base_url", ""),
+            "webhook_path": serving_cfg.get("webhook_path", "/infer/webhook"),
+            "webhook_name": serving_cfg.get("webhook_name", ""),
+            "webhook_max_timestamp_age_seconds": serving_cfg.get(
+                "webhook_max_timestamp_age_seconds", 300
+            ),
+        },
+        "canary": {
+            "alias": serving_cfg.get("canary_alias", "challenger"),
+            "canary_probability": serving_cfg.get("canary_probability", 0.10),
+            "initial_replicas": 0,
         },
     }
 
@@ -507,25 +456,37 @@ async def submit_run(request: RunRequest):
     )
 
     cfg = _load_static_config()
-    params_yaml_str = _generate_params_yaml(request, execution_id, cfg)
+    training_yaml_str = _generate_training_params_yaml(request, execution_id, cfg)
+    serving_yaml_str = _generate_serving_params_yaml(execution_id, cfg)
 
-    # Upload params.yaml to S3
+    # Upload params_training.yaml y params_serving.yaml a S3
     s3 = _s3_client()
-    params_key = f"params/{execution_id}/params.yaml"
+
+    training_key = f"params/{execution_id}/params_training.yaml"
     s3.put_object(
         Bucket=S3_BUCKET,
-        Key=params_key,
-        Body=params_yaml_str.encode("utf-8"),
+        Key=training_key,
+        Body=training_yaml_str.encode("utf-8"),
         ContentType="application/x-yaml",
     )
-    params_s3_path = f"s3://{S3_BUCKET}/{params_key}"
+    train_params_s3_path = f"s3://{S3_BUCKET}/{training_key}"
+
+    serving_key = f"params/{execution_id}/params_serving.yaml"
+    s3.put_object(
+        Bucket=S3_BUCKET,
+        Key=serving_key,
+        Body=serving_yaml_str.encode("utf-8"),
+        ContentType="application/x-yaml",
+    )
+    serving_params_s3_path = f"s3://{S3_BUCKET}/{serving_key}"
 
     # Trigger Airflow DAG (training_only — Spark preprocessing skipped)
     dag_conf: dict[str, Any] = {
         "execution_id": execution_id,
         "raw_table": "",
         "dsl_s3_path": "",
-        "params_s3_path": params_s3_path,
+        "train_params_s3_path": train_params_s3_path,
+        "serving_params_s3_path": serving_params_s3_path,
         "model_type": request.framework,
         "pipeline_mode": "training_only",
         "processed_table": request.processed_table,
@@ -550,7 +511,8 @@ async def submit_run(request: RunRequest):
     return {
         "dag_run_id": dag_run_id,
         "execution_id": execution_id,
-        "params_s3_path": params_s3_path,
+        "train_params_s3_path": train_params_s3_path,
+        "serving_params_s3_path": serving_params_s3_path,
     }
 
 

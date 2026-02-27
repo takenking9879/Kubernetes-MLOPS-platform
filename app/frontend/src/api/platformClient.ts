@@ -88,6 +88,7 @@ export interface RunResult {
   dag_run_id: string;
   execution_id: string;
   params_s3_path: string;
+  dsl_s3_path?: string;
 }
 
 export interface RunStatus {
@@ -146,10 +147,17 @@ export interface ProcessingRunRequest {
 
 export interface ProcessedTableEntry {
   execution_id: string;
-  dataset: string;
+  dataset: string;           // alias de raw_dataset_name (backward-compat)
   processed_table_name: string;
   pipeline_hash: string;
+  dsl_version: number;
   created_at: string;
+  raw_dataset_name: string;  // nombre explícito del dataset fuente
+}
+
+export interface PreprocessParamsResult {
+  execution_id: string;
+  yaml_content: string;
 }
 
 export interface ProcessingRunsResult {
@@ -282,8 +290,15 @@ export async function submitProcessingRun(
   });
 }
 
-export async function listProcessingRuns(): Promise<ProcessingRunsResult> {
-  return _fetch<ProcessingRunsResult>('/api/v2/processing-runs');
+export async function listProcessingRuns(rawDataset?: string): Promise<ProcessingRunsResult> {
+  const qs = rawDataset ? `?dataset=${encodeURIComponent(rawDataset)}` : '';
+  return _fetch<ProcessingRunsResult>(`/api/v2/processing-runs${qs}`);
+}
+
+export async function getPreprocessParams(executionId: string): Promise<PreprocessParamsResult> {
+  return _fetch<PreprocessParamsResult>(
+    `/api/v2/processing-runs/${encodeURIComponent(executionId)}/params`,
+  );
 }
 
 export async function getProcessingRunStatus(dagRunId: string): Promise<RunStatus> {

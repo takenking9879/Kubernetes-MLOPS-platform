@@ -603,7 +603,7 @@ class SparkPreprocessIceberg(BaseUtils):
     def ensure_metadata_table_exists(self):
         """
         Crea la tabla de metadata si no existe.
-        
+
         Schema:
         - artifact_set_id: UUID único
         - created_at: timestamp de creación
@@ -611,6 +611,7 @@ class SparkPreprocessIceberg(BaseUtils):
         - processed_table_name: nombre de tabla procesada
         - dsl_name: nombre del DSL usado
         - pipeline_hash: hash del pipeline en S3
+        - raw_dataset_name: nombre explícito del dataset fuente (e.g. "network_traffic")
         - train_start, train_end: rango train
         - val_start, val_end: rango val
         - test_start, test_end: rango test
@@ -621,12 +622,12 @@ class SparkPreprocessIceberg(BaseUtils):
                 namespace = parts[1]
             else:
                 namespace = "metadata"
-            
+
             self.spark.sql(f"CREATE NAMESPACE IF NOT EXISTS iceberg.{namespace}")
-            
+
             if not self.spark.catalog.tableExists(self.metadata_table):
                 self.logger.info(f"Creating metadata table: {self.metadata_table}")
-                
+
                 create_sql = f"""
                 CREATE TABLE {self.metadata_table} (
                     artifact_set_id STRING,
@@ -635,6 +636,7 @@ class SparkPreprocessIceberg(BaseUtils):
                     processed_table_name STRING,
                     dsl_name STRING,
                     pipeline_hash STRING,
+                    raw_dataset_name STRING,
                     train_start TIMESTAMP,
                     train_end TIMESTAMP,
                     val_start TIMESTAMP,
@@ -644,12 +646,22 @@ class SparkPreprocessIceberg(BaseUtils):
                 ) USING iceberg
                 OPTIONS ('format-version'='2')
                 """
-                
+
                 self.spark.sql(create_sql)
                 self.logger.info(f"Metadata table created: {self.metadata_table}")
             else:
                 self.logger.info(f"Metadata table already exists: {self.metadata_table}")
-                
+                # Migración no-destructiva: agregar raw_dataset_name si no existe
+                try:
+                    existing_cols = [f.name for f in self.spark.table(self.metadata_table).schema.fields]
+                    if "raw_dataset_name" not in existing_cols:
+                        self.spark.sql(
+                            f"ALTER TABLE {self.metadata_table} ADD COLUMN raw_dataset_name STRING"
+                        )
+                        self.logger.info("Migración: columna raw_dataset_name agregada a metadata table")
+                except Exception as migration_err:
+                    self.logger.warning(f"No se pudo verificar/migrar raw_dataset_name: {migration_err}")
+
         except Exception as e:
             self.logger.error(f"Failed ensuring metadata table: {e}", exc_info=True)
             raise
@@ -660,23 +672,25 @@ class SparkPreprocessIceberg(BaseUtils):
         raw_snapshot: int,
         processed_table_name: str,
         dsl_name: str,
-        pipeline_hash: str
+        pipeline_hash: str,
+        raw_dataset_name: str = "",
     ):
         """
         Inserta un registro en la tabla de metadata.
-        
+
         Args:
             artifact_set_id: UUID del artifact set
             raw_snapshot: snapshot ID de raw data
             processed_table_name: nombre completo de tabla procesada
             dsl_name: nombre del DSL
             pipeline_hash: hash del pipeline
+            raw_dataset_name: nombre explícito del dataset fuente (e.g. "network_traffic")
         """
         try:
             train_cfg = self.splits_config.get('train', {})
             val_cfg = self.splits_config.get('val', {})
             test_cfg = self.splits_config.get('test', {})
-            
+
             metadata_row = self.spark.createDataFrame([{
                 'artifact_set_id': artifact_set_id,
                 'created_at': datetime.now(),
@@ -684,6 +698,7 @@ class SparkPreprocessIceberg(BaseUtils):
                 'processed_table_name': processed_table_name,
                 'dsl_name': dsl_name,
                 'pipeline_hash': pipeline_hash,
+                'raw_dataset_name': raw_dataset_name,
                 'train_start': train_cfg.get('start'),
                 'train_end': train_cfg.get('end'),
                 'val_start': val_cfg.get('start'),
@@ -929,13 +944,15 @@ class SparkPreprocessIceberg(BaseUtils):
 
             # ========== INSERT METADATA ==========
             processed_table_ref = f"iceberg.processed.{processed_table_name}"
-            
+            raw_dataset_name = self.raw_table.split(".")[-1]  # e.g. "network_traffic"
+
             self.insert_metadata_record(
                 artifact_set_id=artifact_set_id,
                 raw_snapshot=raw_snapshot,
                 processed_table_name=processed_table_ref,
                 dsl_name=dsl_name,
-                pipeline_hash=pipeline_hash
+                pipeline_hash=pipeline_hash,
+                raw_dataset_name=raw_dataset_name,
             )
             
             elapsed = time.time() - start_time

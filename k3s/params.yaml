@@ -1,6 +1,14 @@
 # ============================================================================
-# EXECUTION MANIFEST
-# Generated per run by the UI and exported to S3.
+# REFERENCIA PARA DESARROLLADORES — NO SE USA EN RUNTIME
+#
+# A partir de la separación de params (2026-02-27), los archivos de ejecución
+# reales son generados por el backend y subidos a S3 bajo params/{execution_id}/:
+#
+#   params_preprocess.yaml  — config de Spark preprocessing (escrito por processing_runs.py)
+#   params_training.yaml    — config de entrenamiento Ray (escrito por runs.py)
+#   params_serving.yaml     — config de serving Ray Serve (escrito por runs.py)
+#
+# Este archivo es solo una referencia de la estructura completa anterior.
 # Static infrastructure config lives in k3s/config.yaml.
 # ============================================================================
 

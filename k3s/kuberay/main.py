@@ -64,9 +64,12 @@ class KubeRayTraining(BaseUtils):
 
     def _get_iceberg_catalog(self):
         """Build Iceberg catalog kwargs for Ray's ``read_iceberg``."""
-        warehouse = self.params_full.get('spark', {}).get('iceberg', {}).get(
-            'warehouse',
-            's3a://k8s-mlops-platform-bucket/warehouse'
+        # Prefer iceberg_tables.warehouse (set in params_training.yaml and static params.yaml).
+        # Fall back to hardcoded default if neither key is present.
+        warehouse = (
+            self.params_full.get('iceberg_tables', {}).get('warehouse')
+            or self.params_full.get('spark', {}).get('iceberg', {}).get('warehouse')
+            or 's3a://k8s-mlops-platform-bucket/warehouse'
         ).replace('s3a://', 's3://')
 
         self.logger.info(f"Using Iceberg warehouse: {warehouse}")
@@ -551,6 +554,39 @@ class KubeRayTraining(BaseUtils):
             raise
 
 
+def _resolve_params_path() -> str:
+    """Resolve local params file path.
+
+    Priority:
+      1. PARAMS_PATH env var (explicit local path — manual runs, testing)
+      2. PARAMS_S3_PATH env var — download params_training.yaml from S3 to a temp file
+         (Airflow-triggered runs: the DAG injects the per-run S3 URI here)
+      3. Static git-synced reference file (fallback for legacy / local dev)
+    """
+    explicit = os.getenv("PARAMS_PATH")
+    if explicit:
+        return explicit
+
+    s3_uri = os.getenv("PARAMS_S3_PATH")
+    if s3_uri:
+        import tempfile
+        parsed = urlparse(s3_uri)
+        bucket = parsed.netloc
+        key = parsed.path.lstrip("/")
+        s3 = boto3.client(
+            "s3",
+            aws_access_key_id=os.getenv("AWS_ACCESS_KEY_ID"),
+            aws_secret_access_key=os.getenv("AWS_SECRET_ACCESS_KEY"),
+            region_name=os.getenv("AWS_REGION", "us-east-2"),
+        )
+        tmp = tempfile.NamedTemporaryFile(suffix=".yaml", delete=False)
+        s3.download_file(bucket, key, tmp.name)
+        print(f"Downloaded params from {s3_uri} → {tmp.name}")
+        return tmp.name
+
+    return "/home/ray/app/repo/k3s/params.yaml"
+
+
 def main():
     ctx = ray.data.DataContext.get_current()
     ctx.enable_rich_progress_bars = True
@@ -559,7 +595,7 @@ def main():
     output_dir = os.getenv("OUTPUT_DIR", "s3://k8s-mlops-platform-bucket/v1/models")
 
     model = KubeRayTraining(
-        params_path=os.getenv("PARAMS_PATH", "/home/ray/app/repo/k3s/params.yaml"),
+        params_path=_resolve_params_path(),
         output_dir=output_dir
     )
     model.train()

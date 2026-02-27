@@ -7,7 +7,7 @@
  *   3. Status    — post-submit DAG polling
  */
 
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { RefreshCw } from 'lucide-react';
 import {
   getProcessingRunStatus,
@@ -160,13 +160,38 @@ export function ProcessingPage() {
     if (activeDataset) setDataset(activeDataset);
   }, [activeDataset]);
 
-  // Reset DSL search when dataset changes
+  // Auto-load DSLs when dataset changes; botón 🔍 llama al mismo handler para refresh manual
+  const handleDslSearch = useCallback(async () => {
+    if (!dataset) return;
+    setDslSearchStatus('loading');
+    setDslSearchMessage('');
+    setDsls([]);
+    setDslVersion('');
+    try {
+      const r = await listDsls(dataset);
+      setDsls(r.dsls);
+      setDslSearchStatus('success');
+      setDslSearchMessage(
+        `✔ ${r.dsls.length} DSL version${r.dsls.length !== 1 ? 's' : ''} available for ${dataset}`,
+      );
+    } catch (e) {
+      setDslSearchStatus('error');
+      setDslSearchMessage(
+        `⚠ Could not fetch DSLs: ${e instanceof Error ? e.message : String(e)}`,
+      );
+    }
+  }, [dataset]);
+
   useEffect(() => {
     setDsls([]);
     setDslVersion('');
-    setDslSearchStatus('idle');
-    setDslSearchMessage('');
-  }, [dataset]);
+    if (dataset) {
+      void handleDslSearch();
+    } else {
+      setDslSearchStatus('idle');
+      setDslSearchMessage('');
+    }
+  }, [dataset, handleDslSearch]);
 
   // Poll run status after submission
   useEffect(() => {
@@ -190,27 +215,6 @@ export function ProcessingPage() {
   }, [submitResult]);
 
   // ── Handlers ─────────────────────────────────────────────────────────────
-
-  const handleDslSearch = async () => {
-    if (!dataset) return;
-    setDslSearchStatus('loading');
-    setDslSearchMessage('');
-    setDsls([]);
-    setDslVersion('');
-    try {
-      const r = await listDsls(dataset);
-      setDsls(r.dsls);
-      setDslSearchStatus('success');
-      setDslSearchMessage(
-        `✔ ${r.dsls.length} DSL version${r.dsls.length !== 1 ? 's' : ''} available for ${dataset}`,
-      );
-    } catch (e) {
-      setDslSearchStatus('error');
-      setDslSearchMessage(
-        `⚠ Could not fetch DSLs: ${e instanceof Error ? e.message : String(e)}`,
-      );
-    }
-  };
 
   const stepErrors = (): string[] => {
     const e: string[] = [];

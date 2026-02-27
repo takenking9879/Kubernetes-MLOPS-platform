@@ -1,11 +1,13 @@
 /**
- * Client-side params.yaml generator.
+ * Client-side params_training.yaml generator.
  *
- * Produces the exact YAML structure that the backend _generate_params_yaml()
- * emits, for use in the live YAML preview panel.
+ * Produce la misma estructura que el backend _generate_training_params_yaml() emite,
+ * para el panel de preview YAML en el Training tab.
  *
- * S3 paths use <S3_BUCKET> as a placeholder since the bucket name is
- * resolved server-side.
+ * Nota: spark block y serving/canary ya NO están aquí — pertenecen a
+ * params_preprocess.yaml y params_serving.yaml respectivamente.
+ *
+ * S3 paths use <S3_BUCKET> as a placeholder (bucket resolved server-side).
  */
 
 import { stringify } from 'yaml';
@@ -64,12 +66,10 @@ export interface ParamsYamlInput {
 
 export function generateParamsYaml(input: ParamsYamlInput): string {
   const {
-    execution_id, dataset, dslS3Path, tuning, splits,
+    execution_id, tuning, splits,
     framework, model, sample_fraction_for_tuning,
     hyperparams, tuneSettings, advanced,
   } = input;
-
-  const BUCKET = '<S3_BUCKET>';
 
   const hyperparamsBlock: Record<string, unknown> = {
     [framework]: hyperparams,
@@ -78,15 +78,15 @@ export function generateParamsYaml(input: ParamsYamlInput): string {
     hyperparamsBlock['tuning'] = tuneSettings;
   }
 
+  // params_training.yaml — sin spark block, sin raw_table/dsl_s3_path, sin kuberay.serving/canary
   const params = {
     execution: {
       execution_id,
-      raw_table: `iceberg.raw.${dataset}`,
-      dsl_s3_path: dslS3Path,
       tuning: {
         enabled: tuning.enabled,
         number_of_trials: tuning.number_of_trials,
       },
+      skip_preprocessing: true,
     },
     splits: {
       train: { start: splits.train.start, end: splits.train.end },
@@ -119,80 +119,9 @@ export function generateParamsYaml(input: ParamsYamlInput): string {
         mlflow_artifact_location: advanced.mlflow_artifact_location,
         mlflow_registry_model_name: model.registry_model_name,
       },
-      serving: {
-        alias: advanced.serving_alias,
-        canary: advanced.canary,
-        webhook_public_base_url: advanced.webhook_public_base_url,
-        webhook_path: advanced.webhook_path,
-        webhook_name: advanced.webhook_name,
-        webhook_max_timestamp_age_seconds: advanced.webhook_max_timestamp_age_seconds,
-      },
-      canary: {
-        alias: advanced.canary_alias,
-        canary_probability: advanced.canary_probability,
-        initial_replicas: 0,
-      },
-    },
-    spark: {
-      app_name: 'spark-preprocessing',
-      bucket: BUCKET,
-      read_batch_size: advanced.spark_read_batch_size,
-      write_batch_size: advanced.spark_write_batch_size,
-      num_classes: model.num_classes,
-      target: model.target,
-      schemas: {
-        input_schema: 'kafka_schema_features',
-        features_schema: 'schema_features',
-        output_schema: 'prediction_schema',
-        preprocessed_schema: 'schema_preprocessed',
-        full_schema: 'schema_full',
-      },
-      converters: {
-        kafka_to_features: 'kafka_to_schema_features',
-      },
-      prediction: {
-        type: 'ray_serve',
-        ray_serve: {
-          url: `${advanced.webhook_public_base_url}/infer`,
-          batch_size: 256,
-          timeout: 30,
-          max_retries: 3,
-          request_payload_format: 'list',
-          response_format: 'json',
-          prediction_key: 'predictions',
-        },
-        columns: {
-          id_column: 'event_id',
-          prediction_column: 'label',
-        },
-      },
-      output: {
-        format: 'json',
-        key_column: 'event_id',
-        value_columns: ['timestamp', 'event_id', 'properties', 'label'],
-      },
-      checkpoint: {
-        location: `s3a://${BUCKET}/checkpoints/kafka-spark-inference`,
-        cleanup_on_exit: false,
-      },
-      operational: {
-        check_kafka_connection: true,
-        log_level: 'INFO',
-      },
-      streaming: {
-        online_processing_time: '250 milliseconds',
-        starting_offsets: 'latest',
-        fail_on_data_loss: false,
-      },
     },
     iceberg_tables: {
       warehouse: advanced.iceberg_warehouse,
-      raw: {
-        catalog: 'iceberg',
-        namespace: 'raw',
-        table: dataset,
-        full_name: `iceberg.raw.${dataset}`,
-      },
       metadata: {
         catalog: 'iceberg',
         namespace: 'metadata',
