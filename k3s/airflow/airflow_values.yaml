@@ -2,8 +2,8 @@ executor: "LocalExecutor"
 
 images:
   airflow:
-    repository: apache/airflow
-    tag: 3.1.3
+    repository: apache/airflow-k8s
+    tag: latest
     pullPolicy: IfNotPresent
 
 fernetKey: VnBXNmNoRE1HU3dIUTR3MFlBM3NlWHV0UUtwQTdoSmk=

@@ -31,13 +31,7 @@ from airflow.providers.standard.operators.python import PythonOperator
 # are not yet installed (e.g. local lint/test).
 # ---------------------------------------------------------------------------
 try:
-    from airflow.providers.cncf.kubernetes.operators.spark_kubernetes import (
-        SparkKubernetesOperator,
-    )
-    from airflow.providers.cncf.kubernetes.operators.kubernetes_pod import (
-        KubernetesPodOperator,
-    )
-    from kubernetes.client import V1EnvVar
+    from airflow.providers.cncf.kubernetes.hooks.kubernetes import KubernetesHook as _KubernetesHook  # noqa: F401
     _PROVIDERS_AVAILABLE = True
 except ImportError:
     _PROVIDERS_AVAILABLE = False
