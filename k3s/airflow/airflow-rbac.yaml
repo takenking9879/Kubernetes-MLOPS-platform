@@ -1,0 +1,61 @@
+# RBAC for the Airflow scheduler service account.
+#
+# The scheduler submits and polls SparkApplication CRs (spark namespace) and
+# RayJob CRs (ray namespace) on behalf of the ml_pipeline DAG.
+#
+# Service account: system:serviceaccount:airflow:my-airflow-scheduler
+# (matches the Helm release name "my-airflow" + default scheduler SA suffix)
+
+---
+# ── Spark namespace ──────────────────────────────────────────────────────────
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: airflow-spark-role
+  namespace: spark
+rules:
+  - apiGroups: ["spark.apache.org"]
+    resources: ["sparkapplications"]
+    verbs: ["create", "delete", "get", "list", "watch"]
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: airflow-spark-rolebinding
+  namespace: spark
+subjects:
+  - kind: ServiceAccount
+    name: my-airflow-scheduler
+    namespace: airflow
+roleRef:
+  kind: Role
+  name: airflow-spark-role
+  apiGroup: rbac.authorization.k8s.io
+
+---
+# ── Ray namespace ─────────────────────────────────────────────────────────────
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: airflow-ray-role
+  namespace: ray
+rules:
+  - apiGroups: ["ray.io"]
+    resources: ["rayjobs"]
+    verbs: ["create", "delete", "get", "list", "watch"]
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: airflow-ray-rolebinding
+  namespace: ray
+subjects:
+  - kind: ServiceAccount
+    name: my-airflow-scheduler
+    namespace: airflow
+roleRef:
+  kind: Role
+  name: airflow-ray-role
+  apiGroup: rbac.authorization.k8s.io

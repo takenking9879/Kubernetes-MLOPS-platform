@@ -98,7 +98,9 @@ def _submit_spark_preprocessing(**context):
         manifest = copy.deepcopy(_yaml.safe_load(fh))
 
     # Unique name per execution (avoids conflicts with manual kubectl runs)
-    manifest["metadata"]["name"] = f"{SPARK_APP_NAME}-{execution_id}"
+    # Kubernetes names must be RFC 1123 — replace underscores with hyphens.
+    safe_id = execution_id.replace("_", "-").lower()
+    manifest["metadata"]["name"] = f"{SPARK_APP_NAME}-{safe_id}"
 
     # Inject per-run env vars via sparkConf — identical to how PYTHONPATH is set.
     # spark.kubernetes.driverEnv.KEY  → visible to the driver Python process
@@ -203,7 +205,9 @@ def _submit_ray_training(**context):
         manifest = copy.deepcopy(_yaml.safe_load(fh))
 
     # Unique name per execution (avoids conflicts with manual training.sh runs)
-    manifest["metadata"]["name"] = f"{RAY_JOB_NAME}-{execution_id}"
+    # Kubernetes names must be RFC 1123 — replace underscores with hyphens.
+    safe_id = execution_id.replace("_", "-").lower()
+    manifest["metadata"]["name"] = f"{RAY_JOB_NAME}-{safe_id}"
 
     # Patch runtimeEnvYAML: merge existing env vars with per-run overrides
     extra_env = {
