@@ -532,7 +532,9 @@ async def submit_run(request: RunRequest):
     }
     try:
         status, data = _airflow_request(
-            "POST", f"api/v2/dags/{DAG_ID}/dagRuns", body={"conf": dag_conf}
+            "POST",
+            f"api/v2/dags/{DAG_ID}/dagRuns",
+            body={"logical_date": datetime.now(timezone.utc).isoformat(), "conf": dag_conf},
         )
         if status >= 400:
             raise HTTPException(status_code=502, detail=f"Airflow returned {status}: {data}")

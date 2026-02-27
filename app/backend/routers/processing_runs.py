@@ -268,6 +268,7 @@ async def submit_processing_run(request: ProcessingRunRequest):
             "POST",
             f"api/v2/dags/{DAG_ID}/dagRuns",
             body={
+                "logical_date": datetime.now(timezone.utc).isoformat(),
                 "conf": {
                     "execution_id": execution_id,
                     "raw_table": f"iceberg.raw.{request.dataset}",
