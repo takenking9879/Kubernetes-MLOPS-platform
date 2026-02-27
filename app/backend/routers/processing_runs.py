@@ -304,26 +304,20 @@ async def submit_processing_run(request: ProcessingRunRequest):
 async def list_processing_runs(dataset: str | None = Query(None, description="Filtrar por raw dataset name")):
     """List available processed tables from iceberg.metadata.preprocessing_artifacts."""
     try:
-        from pyiceberg.catalog.glue import GlueCatalog
+        from pyiceberg.catalog import load_catalog
 
-        catalog = GlueCatalog(
+        catalog = load_catalog(
             "glue",
             **{
-                "s3.region": AWS_REGION,
-                "aws_access_key_id": os.getenv("AWS_ACCESS_KEY_ID", ""),
-                "aws_secret_access_key": os.getenv("AWS_SECRET_ACCESS_KEY", ""),
+                "type": "glue",
+                "client.region": AWS_REGION,
+                "client.access-key-id": os.getenv("AWS_ACCESS_KEY_ID", ""),
+                "client.secret-access-key": os.getenv("AWS_SECRET_ACCESS_KEY", ""),
             },
         )
         table = catalog.load_table("metadata.preprocessing_artifacts")
-        df = table.scan(
-            selected_fields=(
-                "artifact_set_id",
-                "processed_table_name",
-                "pipeline_hash",
-                "created_at",
-                "raw_dataset_name",
-            ),
-        ).to_pandas()
+        # Scan all fields — raw_dataset_name may not exist on tables created before the migration.
+        df = table.scan().to_pandas()
     except Exception as exc:
         raise HTTPException(
             status_code=500,
