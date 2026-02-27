@@ -125,8 +125,9 @@ class ModelConfig(BaseModel):
 
 
 class RunRequest(BaseModel):
-    dataset: str
-    dsl_version: int
+    dataset: str = ""
+    dsl_version: int | None = None
+    processed_table: str | None = None   # e.g. "iceberg.processed.network_traffic_raw_20260101_120000"
     execution_id: str = ""
     framework: Literal["xgboost", "pytorch"] = "xgboost"
     splits: Splits
@@ -135,6 +136,18 @@ class RunRequest(BaseModel):
     sample_fraction_for_tuning: float = Field(0.2, ge=0.01, le=1.0)
     hyperparams: dict[str, Any] = {}       # *_PARAMS overrides
     tune_settings: dict[str, Any] = {}    # *_TUNE_SETTINGS overrides
+
+    @model_validator(mode="after")
+    def validate_pipeline_mode_fields(self) -> "RunRequest":
+        """Either dsl_version (full pipeline) or processed_table (training-only) must be set."""
+        if self.processed_table:
+            # Training-only: processed_table takes precedence; dataset/dsl_version optional
+            return self
+        if not self.dataset:
+            raise ValueError("dataset is required when processed_table is not set")
+        if self.dsl_version is None:
+            raise ValueError("dsl_version is required when processed_table is not set")
+        return self
 
     @model_validator(mode="after")
     def validate_hyperparams(self) -> "RunRequest":
@@ -163,8 +176,8 @@ class RunRequest(BaseModel):
         return self
 
     @model_validator(mode="after")
-    def validate_splits_format_and_order(self) -> "RunRequest":
-        """Validate split dates: format + chronological order (train < val < test)."""
+    def validate_splits_no_overlap(self) -> "RunRequest":
+        """Validate split dates: format, positive duration, and no pairwise overlap."""
 
         def _parse(s: str, label: str) -> datetime:
             try:
@@ -174,23 +187,40 @@ class RunRequest(BaseModel):
                     f"{label} must be YYYY-MM-DD HH:MM:SS, got '{s}'"
                 )
 
-        train_start = _parse(self.splits.train.start, "splits.train.start")
-        train_end   = _parse(self.splits.train.end,   "splits.train.end")
-        val_start   = _parse(self.splits.val.start,   "splits.val.start")
-        val_end     = _parse(self.splits.val.end,     "splits.val.end")
-        test_start  = _parse(self.splits.test.start,  "splits.test.start")
-        test_end    = _parse(self.splits.test.end,    "splits.test.end")
+        parsed: dict[str, tuple[datetime, datetime]] = {
+            "train": (
+                _parse(self.splits.train.start, "splits.train.start"),
+                _parse(self.splits.train.end,   "splits.train.end"),
+            ),
+            "val": (
+                _parse(self.splits.val.start, "splits.val.start"),
+                _parse(self.splits.val.end,   "splits.val.end"),
+            ),
+            "test": (
+                _parse(self.splits.test.start, "splits.test.start"),
+                _parse(self.splits.test.end,   "splits.test.end"),
+            ),
+        }
 
-        if train_start >= train_end:
-            raise ValueError("splits.train.start must be before splits.train.end")
-        if train_end > val_start:
-            raise ValueError("splits.train.end must not exceed splits.val.start")
-        if val_start >= val_end:
-            raise ValueError("splits.val.start must be before splits.val.end")
-        if val_end > test_start:
-            raise ValueError("splits.val.end must not exceed splits.test.start")
-        if test_start >= test_end:
-            raise ValueError("splits.test.start must be before splits.test.end")
+        # Each split must have positive duration
+        for name, (s, e) in parsed.items():
+            if s >= e:
+                raise ValueError(
+                    f"splits.{name}.start must be before splits.{name}.end"
+                )
+
+        # No overlap between any two splits
+        pairs = [("train", "val"), ("train", "test"), ("val", "test")]
+        overlapping = []
+        for a, b in pairs:
+            a_start, a_end = parsed[a]
+            b_start, b_end = parsed[b]
+            if a_start < b_end and b_start < a_end:
+                overlapping.append(f"{a} and {b}")
+        if overlapping:
+            raise ValueError(
+                f"Splits overlap — conflicting pairs: {', '.join(overlapping)}"
+            )
 
         return self
 
@@ -217,7 +247,13 @@ def _generate_params_yaml(req: RunRequest, execution_id: str, cfg: dict) -> str:
     mlflow_cfg = cfg.get("mlflow", {})
     serving_cfg = cfg.get("serving", {})
 
-    dsl_s3_path = _resolve_dsl_s3_path(req.dataset, req.dsl_version)
+    # Training-only mode: use existing processed table, skip preprocessing
+    training_only = bool(req.processed_table)
+    dsl_s3_path = (
+        ""
+        if training_only
+        else _resolve_dsl_s3_path(req.dataset, req.dsl_version)  # type: ignore[arg-type]
+    )
 
     # ── Resolved *_TUNE_SETTINGS (merge defaults + overrides) ─────────────
     tune_defaults = (
@@ -233,16 +269,21 @@ def _generate_params_yaml(req: RunRequest, execution_id: str, cfg: dict) -> str:
     if req.tuning.enabled:
         hyperparams_block["tuning"] = resolved_tune_settings
 
-    params: dict[str, Any] = {
-        "execution": {
-            "execution_id": execution_id,
-            "raw_table": f"iceberg.raw.{req.dataset}",
-            "dsl_s3_path": dsl_s3_path,
-            "tuning": {
-                "enabled": req.tuning.enabled,
-                "number_of_trials": req.tuning.number_of_trials,
-            },
+    execution_block: dict[str, Any] = {
+        "execution_id": execution_id,
+        "raw_table": f"iceberg.raw.{req.dataset}" if not training_only else "",
+        "dsl_s3_path": dsl_s3_path,
+        "tuning": {
+            "enabled": req.tuning.enabled,
+            "number_of_trials": req.tuning.number_of_trials,
         },
+    }
+    if training_only:
+        execution_block["skip_preprocessing"] = True
+        execution_block["processed_table"] = req.processed_table
+
+    params: dict[str, Any] = {
+        "execution": execution_block,
         "splits": {
             "train": {"start": req.splits.train.start, "end": req.splits.train.end},
             "val":   {"start": req.splits.val.start,   "end": req.splits.val.end},
@@ -412,6 +453,7 @@ async def submit_run(request: RunRequest):
         "%Y%m%d_%H%M%S"
     )
 
+    training_only = bool(request.processed_table)
     cfg = _load_static_config()
     params_yaml_str = _generate_params_yaml(request, execution_id, cfg)
 
@@ -426,22 +468,29 @@ async def submit_run(request: RunRequest):
     )
     params_s3_path = f"s3://{S3_BUCKET}/{params_key}"
 
-    dsl_s3_path = _resolve_dsl_s3_path(request.dataset, request.dsl_version)
+    if training_only:
+        dsl_s3_path = ""
+        pipeline_mode = "training_only"
+    else:
+        dsl_s3_path = _resolve_dsl_s3_path(request.dataset, request.dsl_version)  # type: ignore[arg-type]
+        pipeline_mode = "full"
 
     # Trigger Airflow DAG
     airflow_url = f"{AIRFLOW_BASE_URL.rstrip('/')}/api/v1/dags/{DAG_ID}/dagRuns"
+    dag_conf: dict[str, Any] = {
+        "execution_id": execution_id,
+        "raw_table": f"iceberg.raw.{request.dataset}" if not training_only else "",
+        "dsl_s3_path": dsl_s3_path,
+        "params_s3_path": params_s3_path,
+        "model_type": request.framework,
+        "pipeline_mode": pipeline_mode,
+    }
+    if training_only:
+        dag_conf["processed_table"] = request.processed_table
     try:
         resp = _requests.post(
             airflow_url,
-            json={
-                "conf": {
-                    "execution_id": execution_id,
-                    "raw_table": f"iceberg.raw.{request.dataset}",
-                    "dsl_s3_path": dsl_s3_path,
-                    "params_s3_path": params_s3_path,
-                    "model_type": request.framework,
-                },
-            },
+            json={"conf": dag_conf},
             auth=(AIRFLOW_USER, AIRFLOW_PASSWORD),
             timeout=15,
         )

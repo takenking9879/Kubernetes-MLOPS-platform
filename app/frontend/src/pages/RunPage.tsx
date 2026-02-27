@@ -12,15 +12,19 @@
  */
 
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Check, ChevronDown, ChevronUp, Copy, Lock, RefreshCw } from 'lucide-react';
+import { Check, ChevronDown, ChevronUp, Copy, RefreshCw } from 'lucide-react';
 import {
   checkArtifact,
   getIcebergSample,
   getRunStatus,
+  listDatasets,
   listDsls,
+  listProcessingRuns,
   submitRun,
   uploadSchemas,
+  type DatasetInfo,
   type DslVersion,
+  type ProcessedTableEntry,
   type RunResult,
   type SchemaUploadResult,
 } from '../api/platformClient';
@@ -56,9 +60,9 @@ import {
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const DEFAULT_SPLITS = {
-  train: { start: '2026-01-01 00:00:00', end: '2026-01-01 12:00:00' },
-  val:   { start: '2026-01-01 12:00:00', end: '2026-01-02 00:00:00' },
-  test:  { start: '2026-01-02 00:00:00', end: '2026-01-03 00:00:00' },
+  train: { start: '2026-01-01 00:00:00', end: '2026-01-05 00:00:00' },
+  val:   { start: '2026-01-07 00:00:00', end: '2026-01-09 00:00:00' },
+  test:  { start: '2026-01-11 00:00:00', end: '2026-01-13 00:00:00' },
 };
 
 const DEFAULT_MODEL_CONFIG = {
@@ -285,7 +289,6 @@ function SplitRow({
   label,
   start,
   end,
-  startLocked,
   onStartChange,
   onEndChange,
   duration,
@@ -293,29 +296,19 @@ function SplitRow({
   label: string;
   start: string;
   end: string;
-  startLocked?: boolean;
-  onStartChange?: (v: string) => void;
+  onStartChange: (v: string) => void;
   onEndChange: (v: string) => void;
   duration: string;
 }) {
   return (
     <div className="grid grid-cols-[52px_1fr_18px_1fr_48px] items-center gap-2">
       <span className="text-xs font-medium text-slate-400">{label}</span>
-      <div className="relative">
-        <input
-          value={start}
-          readOnly={startLocked}
-          onChange={(e) => onStartChange?.(e.target.value)}
-          placeholder="YYYY-MM-DD HH:MM:SS"
-          className={`${INPUT_CLS} ${startLocked ? 'cursor-not-allowed pr-6 opacity-50' : ''}`}
-        />
-        {startLocked && (
-          <Lock
-            size={9}
-            className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-600"
-          />
-        )}
-      </div>
+      <input
+        value={start}
+        onChange={(e) => onStartChange(e.target.value)}
+        placeholder="YYYY-MM-DD HH:MM:SS"
+        className={INPUT_CLS}
+      />
       <span className="text-center text-xs text-slate-600">→</span>
       <input
         value={end}
@@ -572,6 +565,15 @@ export function RunPage() {
   const [dataset, setDataset] = useState(activeDataset ?? '');
   const [dsls, setDsls] = useState<DslVersion[]>([]);
   const [dslVersion, setDslVersion] = useState<number | ''>('');
+  const [availableDatasets, setAvailableDatasets] = useState<DatasetInfo[]>([]);
+  const [dslSearchStatus, setDslSearchStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
+  const [dslSearchMessage, setDslSearchMessage] = useState('');
+
+  // ── Pipeline mode (full pipeline vs training-only from existing processed table) ──
+  type PipelineMode = 'full' | 'training_only';
+  const [pipelineMode, setPipelineMode] = useState<PipelineMode>('full');
+  const [processingRuns, setProcessingRuns] = useState<ProcessedTableEntry[]>([]);
+  const [selectedProcessedTable, setSelectedProcessedTable] = useState('');
   const [executionId, setExecutionId] = useState(nowId);
 
   // ── Tuning ───────────────────────────────────────────────────────────────
@@ -646,15 +648,28 @@ export function RunPage() {
     if (activeDataset) setDataset(activeDataset);
   }, [activeDataset]);
 
+  // Fetch dataset list on mount for the dropdown
   useEffect(() => {
-    if (!dataset) {
-      setDsls([]);
-      return;
-    }
-    listDsls(dataset)
-      .then((r) => setDsls(r.dsls))
-      .catch(() => setDsls([]));
+    listDatasets()
+      .then((ds) => setAvailableDatasets(ds))
+      .catch(() => setAvailableDatasets([]));
+  }, []);
+
+  // When dataset changes, reset DSL search state
+  useEffect(() => {
+    setDsls([]);
+    setDslVersion('');
+    setDslSearchStatus('idle');
+    setDslSearchMessage('');
   }, [dataset]);
+
+  // Load processing runs when pipeline mode switches to training_only
+  useEffect(() => {
+    if (pipelineMode !== 'training_only') return;
+    listProcessingRuns()
+      .then((r) => setProcessingRuns(r.runs))
+      .catch(() => setProcessingRuns([]));
+  }, [pipelineMode]);
 
   useEffect(() => {
     setHyperparams({ ...getDefaults(framework) });
@@ -749,31 +764,51 @@ export function RunPage() {
     switch (step) {
       case 1: {
         const e: string[] = [];
-        if (!dataset.trim()) e.push('Dataset name is required');
-        if (dslVersion === '') e.push('Select a DSL version');
+        if (pipelineMode === 'training_only') {
+          if (!selectedProcessedTable) e.push('Select a processed table');
+        } else {
+          if (!dataset.trim()) e.push('Dataset name is required');
+          if (dslVersion === '') e.push('Select a DSL version');
+        }
         return e;
       }
       case 2: {
         const e: string[] = [];
-        const editableFields: Array<[keyof typeof splits, 'start' | 'end']> = [
-          ['train', 'start'],
-          ['train', 'end'],
-          ['val', 'end'],
-          ['test', 'end'],
+        const allFields: Array<[keyof typeof splits, 'start' | 'end']> = [
+          ['train', 'start'], ['train', 'end'],
+          ['val',   'start'], ['val',   'end'],
+          ['test',  'start'], ['test',  'end'],
         ];
-        for (const [s, f] of editableFields) {
+        for (const [s, f] of allFields) {
           if (!DATE_RE.test(splits[s][f]))
             e.push(`${s}.${f}: must be YYYY-MM-DD HH:MM:SS`);
         }
         if (e.length === 0) {
-          const ts = (str: string) =>
-            Date.parse(str.replace(' ', 'T') + 'Z');
-          if (ts(splits.train.start) >= ts(splits.train.end))
-            e.push('Train start must be before train end');
-          if (ts(splits.val.start) >= ts(splits.val.end))
-            e.push('Validation split must have positive duration');
-          if (ts(splits.test.start) >= ts(splits.test.end))
-            e.push('Test split must have positive duration');
+          const ts = (str: string) => Date.parse(str.replace(' ', 'T') + 'Z');
+          const parsed = {
+            train: [ts(splits.train.start), ts(splits.train.end)] as [number, number],
+            val:   [ts(splits.val.start),   ts(splits.val.end)]   as [number, number],
+            test:  [ts(splits.test.start),  ts(splits.test.end)]  as [number, number],
+          };
+          // Positive duration per split
+          const labels: Record<string, string> = { train: 'Train', val: 'Validation', test: 'Test' };
+          for (const [k, [s, en]] of Object.entries(parsed)) {
+            if (s >= en) e.push(`${labels[k]} start must be before ${labels[k]} end`);
+          }
+          // No pairwise overlap
+          const splitsOverlap = (
+            [as_, ae]: [number, number],
+            [bs, be]: [number, number],
+          ) => as_ < be && bs < ae;
+          const pairs: Array<[keyof typeof parsed, keyof typeof parsed, string]> = [
+            ['train', 'val',  '"Train" and "Validation"'],
+            ['train', 'test', '"Train" and "Test"'],
+            ['val',   'test', '"Validation" and "Test"'],
+          ];
+          for (const [a, b, label] of pairs) {
+            if (splitsOverlap(parsed[a], parsed[b]))
+              e.push(`${label} ranges overlap`);
+          }
         }
         return e;
       }
@@ -864,26 +899,60 @@ export function RunPage() {
     }
   };
 
+  const handleDslSearch = async () => {
+    if (!dataset) return;
+    setDslSearchStatus('loading');
+    setDslSearchMessage('');
+    setDsls([]);
+    setDslVersion('');
+    try {
+      const r = await listDsls(dataset);
+      setDsls(r.dsls);
+      setDslSearchStatus('success');
+      setDslSearchMessage(
+        `✔ ${r.dsls.length} DSL version${r.dsls.length !== 1 ? 's' : ''} available for ${dataset}`,
+      );
+    } catch (e) {
+      setDslSearchStatus('error');
+      setDslSearchMessage(
+        `⚠ Could not fetch DSLs: ${e instanceof Error ? e.message : String(e)}`,
+      );
+    }
+  };
+
   const handleSubmit = async () => {
     setSubmitError('');
     setSubmitResult(null);
     setRunStatus('');
     const errors = validateForm();
     if (errors.length > 0) return;
-    if (!dataset || dslVersion === '') return;
     try {
-      const result = await submitRun({
-        dataset,
-        dsl_version: dslVersion as number,
-        execution_id: executionId.trim(),
-        framework,
-        splits,
-        tuning: { enabled: tuningEnabled, number_of_trials: numberOfTrials },
-        model: modelConfig,
-        sample_fraction_for_tuning: sampleFraction,
-        hyperparams: tuningEnabled ? {} : hyperparams,
-        tune_settings: tuningEnabled ? tuneSettings : {},
-      });
+      const requestBody =
+        pipelineMode === 'training_only'
+          ? {
+              processed_table: selectedProcessedTable,
+              execution_id: executionId.trim(),
+              framework,
+              splits,
+              tuning: { enabled: tuningEnabled, number_of_trials: numberOfTrials },
+              model: modelConfig,
+              sample_fraction_for_tuning: sampleFraction,
+              hyperparams: tuningEnabled ? {} : hyperparams,
+              tune_settings: tuningEnabled ? tuneSettings : {},
+            }
+          : {
+              dataset,
+              dsl_version: dslVersion as number,
+              execution_id: executionId.trim(),
+              framework,
+              splits,
+              tuning: { enabled: tuningEnabled, number_of_trials: numberOfTrials },
+              model: modelConfig,
+              sample_fraction_for_tuning: sampleFraction,
+              hyperparams: tuningEnabled ? {} : hyperparams,
+              tune_settings: tuningEnabled ? tuneSettings : {},
+            };
+      const result = await submitRun(requestBody);
       setSubmitResult(result);
       setRunStatus('queued');
     } catch (e) {
@@ -971,21 +1040,15 @@ export function RunPage() {
     }));
   };
 
-  // Cascading split update: val.start is always locked to train.end,
-  // test.start is always locked to val.end.
   const updateSplit = (
     split: 'train' | 'val' | 'test',
     field: 'start' | 'end',
     val: string,
   ) => {
-    setSplits((prev) => {
-      const next = { ...prev, [split]: { ...prev[split], [field]: val } };
-      if (split === 'train' && field === 'end')
-        next.val = { ...next.val, start: val };
-      if (split === 'val' && field === 'end')
-        next.test = { ...next.test, start: val };
-      return next;
-    });
+    setSplits((prev) => ({
+      ...prev,
+      [split]: { ...prev[split], [field]: val },
+    }));
   };
 
   const updateSchemaToggle = (
@@ -1077,95 +1140,191 @@ export function RunPage() {
           {/* ── STEP 1: Dataset ── */}
           {currentStep === 1 && (
             <div className="space-y-4">
-              <p className={SUB_HEADING}>Dataset & Execution</p>
-
-              <div className="grid grid-cols-2 gap-3">
-                <Field label="Dataset">
-                  <input
-                    value={dataset}
-                    onChange={(e) => setDataset(e.target.value)}
-                    placeholder="network_traffic_raw"
-                    className={INPUT_CLS}
-                  />
-                </Field>
-                <Field
-                  label="DSL Version"
-                  tooltip="Saved DSL pipeline version for preprocessing."
-                >
-                  <select
-                    value={dslVersion}
-                    onChange={(e) =>
-                      setDslVersion(
-                        e.target.value === '' ? '' : Number(e.target.value),
-                      )
-                    }
-                    className={SELECT_CLS}
+              <div className="flex items-center justify-between">
+                <p className={SUB_HEADING}>Dataset & Execution</p>
+                {/* Pipeline mode toggle */}
+                <div className="flex gap-1">
+                  <ToggleButton
+                    active={pipelineMode === 'full'}
+                    onClick={() => setPipelineMode('full')}
                   >
-                    <option value="">— select —</option>
-                    {dsls.map((d) => (
-                      <option key={d.version} value={d.version}>
-                        v{d.version} — {d.slug}
-                      </option>
-                    ))}
-                  </select>
-                </Field>
-
-                <Field
-                  label="Execution ID"
-                  tooltip="Unique run identifier. Auto-generated, editable."
-                >
-                  <div className="flex gap-1">
-                    <input
-                      value={executionId}
-                      onChange={(e) => setExecutionId(e.target.value)}
-                      className={INPUT_CLS}
-                    />
-                    <button
-                      onClick={() => setExecutionId(nowId())}
-                      className={BTN_NEUTRAL}
-                      title="Regenerate"
-                    >
-                      <RefreshCw size={12} />
-                    </button>
-                  </div>
-                </Field>
-                <Field label="">
-                  <div className="flex items-center gap-2 pt-4">
-                    <button
-                      onClick={() => void handleCheckArtifact()}
-                      disabled={artifactCheck.loading}
-                      className={BTN_NEUTRAL}
-                    >
-                      {artifactCheck.loading ? 'Checking…' : 'Check artifact'}
-                    </button>
-                    {artifactCheck.exists !== undefined && (
-                      <span
-                        className={`text-xs font-medium ${
-                          artifactCheck.exists
-                            ? 'text-yellow-400'
-                            : 'text-green-400'
-                        }`}
-                      >
-                        {artifactCheck.exists
-                          ? '⚠ Exists — preprocessing skipped'
-                          : '✓ New run'}
-                      </span>
-                    )}
-                    {artifactCheck.error && (
-                      <span className="text-xs text-red-400">
-                        {artifactCheck.error}
-                      </span>
-                    )}
-                  </div>
-                </Field>
+                    Full Pipeline
+                  </ToggleButton>
+                  <ToggleButton
+                    active={pipelineMode === 'training_only'}
+                    onClick={() => setPipelineMode('training_only')}
+                  >
+                    Training Only
+                  </ToggleButton>
+                </div>
               </div>
 
-              {dataset && dsls.length > 0 && (
-                <div className="rounded border border-green-800/30 bg-green-900/10 px-3 py-2 text-xs text-green-400">
-                  ✓{' '}
-                  <span className="font-mono">{dataset}</span> —{' '}
-                  {dsls.length} DSL version
-                  {dsls.length !== 1 ? 's' : ''} available
+              {pipelineMode === 'training_only' ? (
+                /* ── Training-only: pick an existing processed table ── */
+                <div className="space-y-3">
+                  <p className="text-xs text-slate-500">
+                    Select an existing processed table to skip Spark preprocessing
+                    and train directly.
+                  </p>
+                  <Field label="Processed Table" tooltip="Processed Iceberg table from a previous run.">
+                    <select
+                      value={selectedProcessedTable}
+                      onChange={(e) => setSelectedProcessedTable(e.target.value)}
+                      className={SELECT_CLS}
+                    >
+                      <option value="">— select processed table —</option>
+                      {processingRuns.map((r) => (
+                        <option key={r.execution_id} value={r.processed_table_name}>
+                          {r.execution_id} — {r.processed_table_name}
+                          {r.dataset ? ` (${r.dataset})` : ''}
+                        </option>
+                      ))}
+                    </select>
+                  </Field>
+                  <Field
+                    label="Execution ID"
+                    tooltip="Unique run identifier. Auto-generated, editable."
+                  >
+                    <div className="flex gap-1">
+                      <input
+                        value={executionId}
+                        onChange={(e) => setExecutionId(e.target.value)}
+                        className={INPUT_CLS}
+                      />
+                      <button
+                        onClick={() => setExecutionId(nowId())}
+                        className={BTN_NEUTRAL}
+                        title="Regenerate"
+                      >
+                        <RefreshCw size={12} />
+                      </button>
+                    </div>
+                  </Field>
+                </div>
+              ) : (
+                /* ── Full pipeline: dataset + DSL version ── */
+                <div className="grid grid-cols-2 gap-3">
+                  <Field label="Dataset">
+                    {availableDatasets.length > 0 ? (
+                      <select
+                        value={dataset}
+                        onChange={(e) => setDataset(e.target.value)}
+                        className={SELECT_CLS}
+                      >
+                        <option value="">— select dataset —</option>
+                        {availableDatasets.map((d) => (
+                          <option key={d.name} value={d.name}>
+                            {d.name}
+                          </option>
+                        ))}
+                      </select>
+                    ) : (
+                      <input
+                        value={dataset}
+                        onChange={(e) => setDataset(e.target.value)}
+                        placeholder="network_traffic_raw"
+                        className={INPUT_CLS}
+                      />
+                    )}
+                  </Field>
+                  <Field
+                    label="DSL Version"
+                    tooltip="Saved DSL pipeline version for preprocessing. Click 'Find DSLs' to load."
+                  >
+                    <div className="flex gap-1">
+                      <select
+                        value={dslVersion}
+                        onChange={(e) =>
+                          setDslVersion(
+                            e.target.value === '' ? '' : Number(e.target.value),
+                          )
+                        }
+                        className={SELECT_CLS}
+                        disabled={dsls.length === 0}
+                      >
+                        <option value="">
+                          {dsls.length === 0 ? '— search first —' : '— select —'}
+                        </option>
+                        {dsls.map((d) => (
+                          <option key={d.version} value={d.version}>
+                            v{d.version} — {d.slug}
+                          </option>
+                        ))}
+                      </select>
+                      <button
+                        onClick={() => void handleDslSearch()}
+                        disabled={!dataset || dslSearchStatus === 'loading'}
+                        className={BTN_NEUTRAL}
+                        title="Find DSL versions for this dataset"
+                      >
+                        {dslSearchStatus === 'loading' ? '…' : '🔍'}
+                      </button>
+                    </div>
+                  </Field>
+
+                  <Field
+                    label="Execution ID"
+                    tooltip="Unique run identifier. Auto-generated, editable."
+                  >
+                    <div className="flex gap-1">
+                      <input
+                        value={executionId}
+                        onChange={(e) => setExecutionId(e.target.value)}
+                        className={INPUT_CLS}
+                      />
+                      <button
+                        onClick={() => setExecutionId(nowId())}
+                        className={BTN_NEUTRAL}
+                        title="Regenerate"
+                      >
+                        <RefreshCw size={12} />
+                      </button>
+                    </div>
+                  </Field>
+                  <Field label="">
+                    <div className="flex items-center gap-2 pt-4">
+                      <button
+                        onClick={() => void handleCheckArtifact()}
+                        disabled={artifactCheck.loading}
+                        className={BTN_NEUTRAL}
+                      >
+                        {artifactCheck.loading ? 'Checking…' : 'Check artifact'}
+                      </button>
+                      {artifactCheck.exists !== undefined && (
+                        <span
+                          className={`text-xs font-medium ${
+                            artifactCheck.exists
+                              ? 'text-yellow-400'
+                              : 'text-green-400'
+                          }`}
+                        >
+                          {artifactCheck.exists
+                            ? '⚠ Exists — preprocessing skipped'
+                            : '✓ New run'}
+                        </span>
+                      )}
+                      {artifactCheck.error && (
+                        <span className="text-xs text-red-400">
+                          {artifactCheck.error}
+                        </span>
+                      )}
+                    </div>
+                  </Field>
+                </div>
+              )}
+
+              {/* DSL search result banner */}
+              {pipelineMode === 'full' && dslSearchStatus !== 'idle' && (
+                <div
+                  className={`rounded border px-3 py-2 text-xs font-medium ${
+                    dslSearchStatus === 'success'
+                      ? 'border-green-800/30 bg-green-900/10 text-green-400'
+                      : dslSearchStatus === 'error'
+                        ? 'border-red-800/30 bg-red-900/10 text-red-400'
+                        : 'border-slate-700 bg-slate-800/50 text-slate-400'
+                  }`}
+                >
+                  {dslSearchStatus === 'loading' ? 'Searching…' : dslSearchMessage}
                 </div>
               )}
             </div>
@@ -1177,11 +1336,12 @@ export function RunPage() {
               <div>
                 <p className={SUB_HEADING}>Temporal Split Boundaries</p>
                 <p className="mt-1 text-xs text-slate-500">
-                  Val start is locked to train end; test start is locked to val
-                  end.{' '}
+                  Each split is independent — ranges can have gaps or be in any
+                  order.{' '}
                   <span className="font-mono text-slate-400">
                     YYYY-MM-DD HH:MM:SS
                   </span>
+                  . Overlaps between splits are not allowed.
                 </p>
               </div>
 
@@ -1201,7 +1361,7 @@ export function RunPage() {
                   label="Val"
                   start={splits.val.start}
                   end={splits.val.end}
-                  startLocked
+                  onStartChange={(v) => updateSplit('val', 'start', v)}
                   onEndChange={(v) => updateSplit('val', 'end', v)}
                   duration={formatDuration(splits.val.start, splits.val.end)}
                 />
@@ -1209,7 +1369,7 @@ export function RunPage() {
                   label="Test"
                   start={splits.test.start}
                   end={splits.test.end}
-                  startLocked
+                  onStartChange={(v) => updateSplit('test', 'start', v)}
                   onEndChange={(v) => updateSplit('test', 'end', v)}
                   duration={formatDuration(
                     splits.test.start,

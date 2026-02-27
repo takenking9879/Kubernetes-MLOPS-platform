@@ -7,10 +7,12 @@ Triggered by the UI via dag_run.conf with:
     params_s3_path : str  — S3 URI of execution params.yaml
     model_type     : str  — "xgboost" or "pytorch"
     schema_s3_path : str  — (optional) S3 URI to schema YAML; auto-derived from raw_table if absent
+    pipeline_mode  : str  — "full" (default) | "preprocessing_only" | "training_only"
+    processed_table: str  — (training_only) Iceberg processed table to use directly
 
 Tasks:
-    1. preprocess — SparkKubernetesOperator: fit DSL + write processed Iceberg table
-    2. train      — KubernetesPodOperator (kubectl):  Ray distributed training + MLflow logging
+    1. spark_preprocess — fit DSL + write processed Iceberg table (skipped when training_only)
+    2. ray_train        — Ray distributed training + MLflow logging (skipped when preprocessing_only)
 
 After successful training the UI can optionally trigger a serving deployment.
 The existing promotion_dag.py handles champion/challenger alias assignment.
@@ -64,8 +66,16 @@ def _submit_spark_preprocessing(**context):
     Mirrors what a manual kubectl apply of spark-application.yaml does,
     preserving the full cluster spec (sparkConf, driverSpec, executorSpec,
     initContainers, volumes, etc.) without duplicating it in the DAG.
+
+    Skipped (no-op) when pipeline_mode=training_only.
     """
     conf = context["dag_run"].conf or {}
+    pipeline_mode = conf.get("pipeline_mode", "full")
+    if pipeline_mode == "training_only":
+        context["task_instance"].log.info(
+            "pipeline_mode=training_only: skipping Spark preprocessing."
+        )
+        return
     execution_id = conf.get("execution_id", datetime.utcnow().strftime("%Y%m%d_%H%M%S"))
     raw_table = conf.get("raw_table", "")
     dsl_s3_path = conf.get("dsl_s3_path", "")
@@ -161,8 +171,18 @@ def _submit_ray_training(**context):
 
     Uses the Kubernetes API to apply a RayJob with execution env vars injected
     into runtimeEnvYAML. Mirrors what training.sh does for manual runs.
+
+    Skipped (no-op) when pipeline_mode=preprocessing_only.
+    When pipeline_mode=training_only, uses processed_table from conf instead of
+    the table produced by the spark_preprocess task.
     """
     conf = context["dag_run"].conf or {}
+    pipeline_mode = conf.get("pipeline_mode", "full")
+    if pipeline_mode == "preprocessing_only":
+        context["task_instance"].log.info(
+            "pipeline_mode=preprocessing_only: skipping Ray training."
+        )
+        return
     execution_id = conf.get("execution_id", datetime.utcnow().strftime("%Y%m%d_%H%M%S"))
     model_type = conf.get("model_type", "xgboost")
     params_s3_path = conf.get("params_s3_path", "")
@@ -196,7 +216,10 @@ def _submit_ray_training(**context):
         "MODEL_TYPE":        model_type,
         "PARAMS_S3_PATH":    params_s3_path,
         "MLFLOW_TRACKING_URI": MLFLOW_TRACKING_URI,
+        "PIPELINE_MODE":     pipeline_mode,
     }
+    if pipeline_mode == "training_only" and conf.get("processed_table"):
+        extra_env["PROCESSED_TABLE"] = conf["processed_table"]
     existing_runtime_env = _yaml.safe_load(
         manifest["spec"].get("runtimeEnvYAML", "env_vars: {}") or "env_vars: {}"
     )

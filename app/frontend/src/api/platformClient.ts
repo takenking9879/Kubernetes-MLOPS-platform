@@ -117,8 +117,9 @@ export interface ModelConfig {
 }
 
 export interface RunRequest {
-  dataset: string;
-  dsl_version: number;
+  dataset?: string;
+  dsl_version?: number;
+  processed_table?: string;   // training-only mode: skip preprocessing
   execution_id?: string;
   framework: 'xgboost' | 'pytorch';
   splits: {
@@ -131,6 +132,26 @@ export interface RunRequest {
   sample_fraction_for_tuning?: number;
   hyperparams?: Record<string, unknown>;
   tune_settings?: Record<string, unknown>;
+}
+
+// ─── Processing run types ─────────────────────────────────────────────────────
+
+export interface ProcessingRunRequest {
+  dataset: string;
+  dsl_version: number;
+  execution_id?: string;
+}
+
+export interface ProcessedTableEntry {
+  execution_id: string;
+  dataset: string;
+  processed_table_name: string;
+  pipeline_hash: string;
+  created_at: string;
+}
+
+export interface ProcessingRunsResult {
+  runs: ProcessedTableEntry[];
 }
 
 // ─── Schema types ─────────────────────────────────────────────────────────────
@@ -246,6 +267,27 @@ export async function submitRun(request: RunRequest): Promise<RunResult> {
 
 export async function getRunStatus(dagRunId: string): Promise<RunStatus> {
   return _fetch<RunStatus>(`/api/v2/runs/${encodeURIComponent(dagRunId)}/status`);
+}
+
+// ─── Processing Runs API ─────────────────────────────────────────────────────
+
+export async function submitProcessingRun(
+  request: ProcessingRunRequest,
+): Promise<RunResult> {
+  return _fetch<RunResult>('/api/v2/processing-runs', {
+    method: 'POST',
+    body: JSON.stringify(request),
+  });
+}
+
+export async function listProcessingRuns(): Promise<ProcessingRunsResult> {
+  return _fetch<ProcessingRunsResult>('/api/v2/processing-runs');
+}
+
+export async function getProcessingRunStatus(dagRunId: string): Promise<RunStatus> {
+  return _fetch<RunStatus>(
+    `/api/v2/processing-runs/${encodeURIComponent(dagRunId)}/status`,
+  );
 }
 
 // ─── Schema API ───────────────────────────────────────────────────────────────

@@ -2,16 +2,18 @@ import { useState, useRef } from 'react';
 import { ReactFlowProvider } from 'reactflow';
 import { MainLayout } from './components/Layout/MainLayout';
 import { DatasetPage } from './pages/DatasetPage';
+import { ProcessingPage } from './pages/ProcessingPage';
 import { RunPage } from './pages/RunPage';
 import { useDatasetStore } from './store/datasetStore';
 import { usePipelineStore } from './store/pipelineStore';
 
-type Page = 'datasets' | 'dsl-builder' | 'run-pipeline';
+type Page = 'datasets' | 'dsl-builder' | 'processing' | 'run-pipeline';
 
 const TAB_LABELS: Record<Page, string> = {
   'datasets':    'Datasets',
   'dsl-builder': 'DSL Builder',
-  'run-pipeline':'Run Pipeline',
+  'processing':  'Processing',
+  'run-pipeline':'Training',
 };
 
 export default function App() {
@@ -113,6 +115,8 @@ export default function App() {
             </ReactFlowProvider>
           </div>
         )}
+
+        {page === 'processing' && <ProcessingPage />}
 
         {page === 'run-pipeline' && <RunPage />}
       </div>
