@@ -92,7 +92,7 @@ def _submit_spark_preprocessing(**context):
     # The full cluster spec (sparkConf, driverSpec, executorSpec, initContainers,
     # volumes, git-sync) lives there; we only patch the name and sparkConf env vars.
     base_yaml_path = Path(
-        os.getenv("SPARK_APP_YAML", "/git-data/repo/k3s/spark/spark-application.yaml")
+        os.getenv("SPARK_APP_YAML", "/opt/airflow/dags/repo/k3s/spark/spark-application.yaml")
     )
     with open(base_yaml_path) as fh:
         manifest = copy.deepcopy(_yaml.safe_load(fh))
@@ -196,7 +196,7 @@ def _submit_ray_training(**context):
     # The full cluster spec (head/worker groups, images, volumes) lives there —
     # we only patch the name and runtimeEnvYAML, nothing else.
     base_yaml_path = Path(
-        os.getenv("KUBERAY_JOB_YAML", "/git-data/repo/k3s/kuberay/kuberay-job.yaml")
+        os.getenv("KUBERAY_JOB_YAML", "/opt/airflow/dags/repo/k3s/kuberay/kuberay-job.yaml")
     )
     with open(base_yaml_path) as fh:
         manifest = copy.deepcopy(_yaml.safe_load(fh))
