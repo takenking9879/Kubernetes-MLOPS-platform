@@ -281,6 +281,7 @@ deploy_airflow() {
   kubectl create namespace airflow || true
   kubectl create secret generic env-secret -n airflow --from-env-file=.env || true
   helm upgrade --install my-airflow apache-airflow/airflow -n airflow -f k3s/airflow/airflow_values.yaml
+  kubectl apply -f k3s/airflow/airflow-rbac.yaml
   ok "Airflow deployed"
 }
 

@@ -394,15 +394,22 @@ class SparkPreprocessIceberg(BaseUtils):
             hash hexadecimal del contenido del DSL
         """
         try:
-            with open(dsl_path, 'r') as f:
-                dsl_content = f.read()
-            
+            if dsl_path.startswith("s3://"):
+                import boto3, re as _re
+                m = _re.match(r"s3://([^/]+)/(.+)", dsl_path)
+                bucket, key = m.group(1), m.group(2)
+                s3 = boto3.client("s3", region_name=os.getenv("AWS_REGION", "us-east-2"))
+                dsl_content = s3.get_object(Bucket=bucket, Key=key)["Body"].read().decode("utf-8")
+            else:
+                with open(dsl_path, 'r') as f:
+                    dsl_content = f.read()
+
             hash_obj = hashlib.sha256(dsl_content.encode('utf-8'))
             pipeline_hash = hash_obj.hexdigest()[:16]
-            
+
             self.logger.info(f"Pipeline hash computed: {pipeline_hash} for {dsl_path}")
             return pipeline_hash
-            
+
         except Exception as e:
             self.logger.error(f"Failed computing pipeline hash: {e}", exc_info=True)
             raise
