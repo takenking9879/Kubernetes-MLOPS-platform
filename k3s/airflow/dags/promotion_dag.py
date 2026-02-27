@@ -1,9 +1,7 @@
-from airflow import DAG
-from airflow.operators.python import PythonOperator
+from airflow.sdk import DAG
+from airflow.providers.standard.operators.python import PythonOperator
 from datetime import datetime
 import os
-import mlflow
-from mlflow.tracking import MlflowClient
 
 # Read tracking URI from env var; fall back to in-cluster default
 MLFLOW_TRACKING_URI = os.getenv(
@@ -16,6 +14,8 @@ def promote_model_to_champion(model_name: str, version: str):
     Asigna el alias 'champion' a una versión específica del modelo.
     Esto disparará automáticamente el cambio en el Serving de Ray Serve.
     """
+    import mlflow  # noqa: F401
+    from mlflow.tracking import MlflowClient
     client = MlflowClient(tracking_uri=MLFLOW_TRACKING_URI)
     
     # 1. Validar que la versión existe
@@ -37,6 +37,7 @@ def auto_promote_base_on_metrics(model_name: str):
     """
     Ejemplo de lógica para promover automáticamente si las métricas son mejores.
     """
+    from mlflow.tracking import MlflowClient
     client = MlflowClient(tracking_uri=MLFLOW_TRACKING_URI)
     
     # Obtener el actual champion
@@ -62,7 +63,7 @@ def auto_promote_base_on_metrics(model_name: str):
 with DAG(
     dag_id='model_promotion_workflow',
     start_date=datetime(2024, 1, 1),
-    schedule_interval=None,
+    schedule=None,
     catchup=False,
     tags=['mlops', 'promotion']
 ) as dag:

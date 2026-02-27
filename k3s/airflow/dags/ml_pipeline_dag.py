@@ -23,8 +23,8 @@ from __future__ import annotations
 import os
 from datetime import datetime, timedelta
 
-from airflow import DAG
-from airflow.operators.python import PythonOperator
+from airflow.sdk import DAG
+from airflow.providers.standard.operators.python import PythonOperator
 
 # ---------------------------------------------------------------------------
 # Provider imports with graceful fallback for environments where providers
@@ -278,7 +278,7 @@ with DAG(
         "params_s3_path, model_type."
     ),
     start_date=datetime(2026, 1, 1),
-    schedule_interval=None,
+    schedule=None,
     catchup=False,
     default_args={
         "retries": 0,
