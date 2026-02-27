@@ -33,6 +33,19 @@ const BTN_PRIMARY =
 const SUB_HEADING =
   'text-xs font-semibold text-slate-400 uppercase tracking-wider';
 
+// ─── Types / constants ───────────────────────────────────────────────────────
+
+const DATE_RE = /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/;
+
+interface SplitRange { start: string; end: string }
+interface Splits { train: SplitRange; val: SplitRange; test: SplitRange }
+
+const DEFAULT_SPLITS: Splits = {
+  train: { start: '2026-01-01 00:00:00', end: '2026-01-05 00:00:00' },
+  val:   { start: '2026-01-07 00:00:00', end: '2026-01-09 00:00:00' },
+  test:  { start: '2026-01-11 00:00:00', end: '2026-01-13 00:00:00' },
+};
+
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 function nowId(): string {
@@ -126,6 +139,9 @@ export function ProcessingPage() {
   >('idle');
   const [dslSearchMessage, setDslSearchMessage] = useState('');
 
+  // ── Splits ────────────────────────────────────────────────────────────────
+  const [splits, setSplits] = useState<Splits>(DEFAULT_SPLITS);
+
   // ── Submission state ──────────────────────────────────────────────────────
   const [submitResult, setSubmitResult] = useState<RunResult | null>(null);
   const [submitError, setSubmitError] = useState('');
@@ -201,6 +217,27 @@ export function ProcessingPage() {
     if (!dataset.trim()) e.push('Dataset is required');
     if (dslVersion === '') e.push('Select a DSL version');
     if (!executionId.trim()) e.push('Execution ID is required');
+
+    // Splits validation
+    const splitKeys: Array<keyof Splits> = ['train', 'val', 'test'];
+    for (const k of splitKeys) {
+      if (!DATE_RE.test(splits[k].start)) e.push(`${k} start: must be YYYY-MM-DD HH:MM:SS`);
+      if (!DATE_RE.test(splits[k].end))   e.push(`${k} end: must be YYYY-MM-DD HH:MM:SS`);
+    }
+    if (e.length === 0) {
+      const ts = (s: string) => Date.parse(s.replace(' ', 'T') + 'Z');
+      for (const k of splitKeys) {
+        if (ts(splits[k].start) >= ts(splits[k].end))
+          e.push(`${k} start must be before ${k} end`);
+      }
+      const pairs: Array<[keyof Splits, keyof Splits]> = [
+        ['train', 'val'], ['train', 'test'], ['val', 'test'],
+      ];
+      for (const [a, b] of pairs) {
+        if (ts(splits[a].start) < ts(splits[b].end) && ts(splits[b].start) < ts(splits[a].end))
+          e.push(`${a} and ${b} ranges overlap`);
+      }
+    }
     return e;
   };
 
@@ -219,6 +256,7 @@ export function ProcessingPage() {
         dataset,
         dsl_version: dslVersion as number,
         execution_id: executionId.trim(),
+        splits,
       });
       setSubmitResult(result);
       setRunStatus('queued');
@@ -238,6 +276,7 @@ export function ProcessingPage() {
     setDsls([]);
     setDslSearchStatus('idle');
     setDslSearchMessage('');
+    setSplits(DEFAULT_SPLITS);
   };
 
   const stateColor = (state: string) =>
@@ -345,6 +384,37 @@ export function ProcessingPage() {
               </Field>
             </div>
 
+            {/* ── Splits ── */}
+            <div className="space-y-2 pt-1">
+              <p className={SUB_HEADING}>Temporal Splits</p>
+              <p className="text-xs text-slate-500">
+                Spark fits the DSL pipeline on the <span className="font-mono text-slate-300">train</span> split and
+                transforms all splits. Ranges must not overlap.{' '}
+                <span className="font-mono text-slate-400">YYYY-MM-DD HH:MM:SS</span>
+              </p>
+              {(['train', 'val', 'test'] as const).map((k) => (
+                <div key={k} className="grid grid-cols-[60px_1fr_1fr] items-center gap-2">
+                  <span className="text-xs capitalize text-slate-400">{k}</span>
+                  <input
+                    value={splits[k].start}
+                    onChange={(e) =>
+                      setSplits((prev) => ({ ...prev, [k]: { ...prev[k], start: e.target.value } }))
+                    }
+                    placeholder="start"
+                    className={INPUT_CLS}
+                  />
+                  <input
+                    value={splits[k].end}
+                    onChange={(e) =>
+                      setSplits((prev) => ({ ...prev, [k]: { ...prev[k], end: e.target.value } }))
+                    }
+                    placeholder="end"
+                    className={INPUT_CLS}
+                  />
+                </div>
+              ))}
+            </div>
+
             {/* DSL search result banner */}
             {dslSearchStatus !== 'idle' && (
               <div
@@ -409,6 +479,16 @@ export function ProcessingPage() {
                 <span className="font-mono text-slate-500">
                   iceberg.processed.{dataset}_{executionId}
                 </span>
+              </div>
+              <div className="border-t border-slate-700 pt-2 space-y-1">
+                {(['train', 'val', 'test'] as const).map((k) => (
+                  <div key={k} className="flex justify-between">
+                    <span className="capitalize text-slate-400">{k} split</span>
+                    <span className="font-mono text-slate-100 text-[11px]">
+                      {splits[k].start} → {splits[k].end}
+                    </span>
+                  </div>
+                ))}
               </div>
             </div>
 

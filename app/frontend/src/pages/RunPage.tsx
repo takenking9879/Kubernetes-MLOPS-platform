@@ -14,21 +14,16 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Check, ChevronDown, ChevronUp, Copy, RefreshCw } from 'lucide-react';
 import {
-  checkArtifact,
   getIcebergSample,
   getRunStatus,
-  listDatasets,
-  listDsls,
   listProcessingRuns,
   submitRun,
   uploadSchemas,
-  type DatasetInfo,
-  type DslVersion,
   type ProcessedTableEntry,
   type RunResult,
   type SchemaUploadResult,
 } from '../api/platformClient';
-import { useDatasetStore } from '../store/datasetStore';
+
 import {
   generateParamsYaml,
   DEFAULT_ADVANCED_CONFIG,
@@ -555,23 +550,13 @@ function YamlPreviewPanel({
 // ─── RunPage ──────────────────────────────────────────────────────────────────
 
 export function RunPage() {
-  const { activeDataset } = useDatasetStore();
-
   // ── Step navigation ───────────────────────────────────────────────────────
   const [currentStep, setCurrentStep] = useState(1);
   const [navErrors, setNavErrors] = useState<string[]>([]);
 
   // ── Execution ────────────────────────────────────────────────────────────
-  const [dataset, setDataset] = useState(activeDataset ?? '');
-  const [dsls, setDsls] = useState<DslVersion[]>([]);
-  const [dslVersion, setDslVersion] = useState<number | ''>('');
-  const [availableDatasets, setAvailableDatasets] = useState<DatasetInfo[]>([]);
-  const [dslSearchStatus, setDslSearchStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
-  const [dslSearchMessage, setDslSearchMessage] = useState('');
-
-  // ── Pipeline mode (full pipeline vs training-only from existing processed table) ──
-  type PipelineMode = 'full' | 'training_only';
-  const [pipelineMode, setPipelineMode] = useState<PipelineMode>('full');
+  // dataset is derived automatically from the selected processed table entry
+  const [dataset, setDataset] = useState('');
   const [processingRuns, setProcessingRuns] = useState<ProcessedTableEntry[]>([]);
   const [selectedProcessedTable, setSelectedProcessedTable] = useState('');
   const [executionId, setExecutionId] = useState(nowId);
@@ -631,12 +616,6 @@ export function RunPage() {
     useState<PreviewTab>('params.yaml');
 
   // ── Submission ────────────────────────────────────────────────────────────
-  const [artifactCheck, setArtifactCheck] = useState<{
-    loading: boolean;
-    exists?: boolean;
-    processedTable?: string | null;
-    error?: string;
-  }>({ loading: false });
   const [submitResult, setSubmitResult] = useState<RunResult | null>(null);
   const [submitError, setSubmitError] = useState('');
   const [runStatus, setRunStatus] = useState('');
@@ -644,32 +623,18 @@ export function RunPage() {
 
   // ── Effects ───────────────────────────────────────────────────────────────
 
+  // Load processing runs on mount
   useEffect(() => {
-    if (activeDataset) setDataset(activeDataset);
-  }, [activeDataset]);
-
-  // Fetch dataset list on mount for the dropdown
-  useEffect(() => {
-    listDatasets()
-      .then((ds) => setAvailableDatasets(ds))
-      .catch(() => setAvailableDatasets([]));
-  }, []);
-
-  // When dataset changes, reset DSL search state
-  useEffect(() => {
-    setDsls([]);
-    setDslVersion('');
-    setDslSearchStatus('idle');
-    setDslSearchMessage('');
-  }, [dataset]);
-
-  // Load processing runs when pipeline mode switches to training_only
-  useEffect(() => {
-    if (pipelineMode !== 'training_only') return;
     listProcessingRuns()
       .then((r) => setProcessingRuns(r.runs))
       .catch(() => setProcessingRuns([]));
-  }, [pipelineMode]);
+  }, []);
+
+  // Derive dataset from selected processed table entry
+  useEffect(() => {
+    const entry = processingRuns.find((r) => r.processed_table_name === selectedProcessedTable);
+    setDataset(entry?.dataset ?? '');
+  }, [selectedProcessedTable, processingRuns]);
 
   useEffect(() => {
     setHyperparams({ ...getDefaults(framework) });
@@ -703,10 +668,7 @@ export function RunPage() {
     () => ({
       execution_id: executionId,
       dataset,
-      dslS3Path:
-        dslVersion !== ''
-          ? `s3://<S3_BUCKET>/dsl/dsl_${dataset}/v${dslVersion}__<slug>.yaml`
-          : '<select a DSL version>',
+      dslS3Path: '',
       tuning: { enabled: tuningEnabled, number_of_trials: numberOfTrials },
       splits,
       framework,
@@ -719,7 +681,6 @@ export function RunPage() {
     [
       executionId,
       dataset,
-      dslVersion,
       tuningEnabled,
       numberOfTrials,
       splits,
@@ -764,12 +725,7 @@ export function RunPage() {
     switch (step) {
       case 1: {
         const e: string[] = [];
-        if (pipelineMode === 'training_only') {
-          if (!selectedProcessedTable) e.push('Select a processed table');
-        } else {
-          if (!dataset.trim()) e.push('Dataset name is required');
-          if (dslVersion === '') e.push('Select a DSL version');
-        }
+        if (!selectedProcessedTable) e.push('Select a processed table');
         return e;
       }
       case 2: {
@@ -881,44 +837,6 @@ export function RunPage() {
 
   // ── Handlers ──────────────────────────────────────────────────────────────
 
-  const handleCheckArtifact = async () => {
-    if (!dataset || !executionId) return;
-    setArtifactCheck({ loading: true });
-    try {
-      const r = await checkArtifact(executionId, dataset);
-      setArtifactCheck({
-        loading: false,
-        exists: r.exists,
-        processedTable: r.processed_table,
-      });
-    } catch (e) {
-      setArtifactCheck({
-        loading: false,
-        error: e instanceof Error ? e.message : String(e),
-      });
-    }
-  };
-
-  const handleDslSearch = async () => {
-    if (!dataset) return;
-    setDslSearchStatus('loading');
-    setDslSearchMessage('');
-    setDsls([]);
-    setDslVersion('');
-    try {
-      const r = await listDsls(dataset);
-      setDsls(r.dsls);
-      setDslSearchStatus('success');
-      setDslSearchMessage(
-        `✔ ${r.dsls.length} DSL version${r.dsls.length !== 1 ? 's' : ''} available for ${dataset}`,
-      );
-    } catch (e) {
-      setDslSearchStatus('error');
-      setDslSearchMessage(
-        `⚠ Could not fetch DSLs: ${e instanceof Error ? e.message : String(e)}`,
-      );
-    }
-  };
 
   const handleSubmit = async () => {
     setSubmitError('');
@@ -927,31 +845,17 @@ export function RunPage() {
     const errors = validateForm();
     if (errors.length > 0) return;
     try {
-      const requestBody =
-        pipelineMode === 'training_only'
-          ? {
-              processed_table: selectedProcessedTable,
-              execution_id: executionId.trim(),
-              framework,
-              splits,
-              tuning: { enabled: tuningEnabled, number_of_trials: numberOfTrials },
-              model: modelConfig,
-              sample_fraction_for_tuning: sampleFraction,
-              hyperparams: tuningEnabled ? {} : hyperparams,
-              tune_settings: tuningEnabled ? tuneSettings : {},
-            }
-          : {
-              dataset,
-              dsl_version: dslVersion as number,
-              execution_id: executionId.trim(),
-              framework,
-              splits,
-              tuning: { enabled: tuningEnabled, number_of_trials: numberOfTrials },
-              model: modelConfig,
-              sample_fraction_for_tuning: sampleFraction,
-              hyperparams: tuningEnabled ? {} : hyperparams,
-              tune_settings: tuningEnabled ? tuneSettings : {},
-            };
+      const requestBody = {
+        processed_table: selectedProcessedTable,
+        execution_id: executionId.trim(),
+        framework,
+        splits,
+        tuning: { enabled: tuningEnabled, number_of_trials: numberOfTrials },
+        model: modelConfig,
+        sample_fraction_for_tuning: sampleFraction,
+        hyperparams: tuningEnabled ? {} : hyperparams,
+        tune_settings: tuningEnabled ? tuneSettings : {},
+      };
       const result = await submitRun(requestBody);
       setSubmitResult(result);
       setRunStatus('queued');
@@ -1137,196 +1041,51 @@ export function RunPage() {
         {/* Step content card */}
         <div className="rounded-lg border border-slate-700 bg-slate-900 px-4 py-4">
 
-          {/* ── STEP 1: Dataset ── */}
+          {/* ── STEP 1: Processed Table & Execution ── */}
           {currentStep === 1 && (
             <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <p className={SUB_HEADING}>Dataset & Execution</p>
-                {/* Pipeline mode toggle */}
-                <div className="flex gap-1">
-                  <ToggleButton
-                    active={pipelineMode === 'full'}
-                    onClick={() => setPipelineMode('full')}
-                  >
-                    Full Pipeline
-                  </ToggleButton>
-                  <ToggleButton
-                    active={pipelineMode === 'training_only'}
-                    onClick={() => setPipelineMode('training_only')}
-                  >
-                    Training Only
-                  </ToggleButton>
-                </div>
-              </div>
+              <p className={SUB_HEADING}>Processed Table & Execution</p>
 
-              {pipelineMode === 'training_only' ? (
-                /* ── Training-only: pick an existing processed table ── */
-                <div className="space-y-3">
-                  <p className="text-xs text-slate-500">
-                    Select an existing processed table to skip Spark preprocessing
-                    and train directly.
-                  </p>
-                  <Field label="Processed Table" tooltip="Processed Iceberg table from a previous run.">
-                    <select
-                      value={selectedProcessedTable}
-                      onChange={(e) => setSelectedProcessedTable(e.target.value)}
-                      className={SELECT_CLS}
-                    >
-                      <option value="">— select processed table —</option>
-                      {processingRuns.map((r) => (
-                        <option key={r.execution_id} value={r.processed_table_name}>
-                          {r.execution_id} — {r.processed_table_name}
-                          {r.dataset ? ` (${r.dataset})` : ''}
-                        </option>
-                      ))}
-                    </select>
-                  </Field>
-                  <Field
-                    label="Execution ID"
-                    tooltip="Unique run identifier. Auto-generated, editable."
+              <div className="space-y-3">
+                <p className="text-xs text-slate-500">
+                  Select a processed table produced by the Processing tab to
+                  train directly — Spark preprocessing is skipped.
+                </p>
+                <Field label="Processed Table" tooltip="Processed Iceberg table from a previous processing run.">
+                  <select
+                    value={selectedProcessedTable}
+                    onChange={(e) => setSelectedProcessedTable(e.target.value)}
+                    className={SELECT_CLS}
                   >
-                    <div className="flex gap-1">
-                      <input
-                        value={executionId}
-                        onChange={(e) => setExecutionId(e.target.value)}
-                        className={INPUT_CLS}
-                      />
-                      <button
-                        onClick={() => setExecutionId(nowId())}
-                        className={BTN_NEUTRAL}
-                        title="Regenerate"
-                      >
-                        <RefreshCw size={12} />
-                      </button>
-                    </div>
-                  </Field>
-                </div>
-              ) : (
-                /* ── Full pipeline: dataset + DSL version ── */
-                <div className="grid grid-cols-2 gap-3">
-                  <Field label="Dataset">
-                    {availableDatasets.length > 0 ? (
-                      <select
-                        value={dataset}
-                        onChange={(e) => setDataset(e.target.value)}
-                        className={SELECT_CLS}
-                      >
-                        <option value="">— select dataset —</option>
-                        {availableDatasets.map((d) => (
-                          <option key={d.name} value={d.name}>
-                            {d.name}
-                          </option>
-                        ))}
-                      </select>
-                    ) : (
-                      <input
-                        value={dataset}
-                        onChange={(e) => setDataset(e.target.value)}
-                        placeholder="network_traffic_raw"
-                        className={INPUT_CLS}
-                      />
-                    )}
-                  </Field>
-                  <Field
-                    label="DSL Version"
-                    tooltip="Saved DSL pipeline version for preprocessing. Click 'Find DSLs' to load."
-                  >
-                    <div className="flex gap-1">
-                      <select
-                        value={dslVersion}
-                        onChange={(e) =>
-                          setDslVersion(
-                            e.target.value === '' ? '' : Number(e.target.value),
-                          )
-                        }
-                        className={SELECT_CLS}
-                        disabled={dsls.length === 0}
-                      >
-                        <option value="">
-                          {dsls.length === 0 ? '— search first —' : '— select —'}
-                        </option>
-                        {dsls.map((d) => (
-                          <option key={d.version} value={d.version}>
-                            v{d.version} — {d.slug}
-                          </option>
-                        ))}
-                      </select>
-                      <button
-                        onClick={() => void handleDslSearch()}
-                        disabled={!dataset || dslSearchStatus === 'loading'}
-                        className={BTN_NEUTRAL}
-                        title="Find DSL versions for this dataset"
-                      >
-                        {dslSearchStatus === 'loading' ? '…' : '🔍'}
-                      </button>
-                    </div>
-                  </Field>
-
-                  <Field
-                    label="Execution ID"
-                    tooltip="Unique run identifier. Auto-generated, editable."
-                  >
-                    <div className="flex gap-1">
-                      <input
-                        value={executionId}
-                        onChange={(e) => setExecutionId(e.target.value)}
-                        className={INPUT_CLS}
-                      />
-                      <button
-                        onClick={() => setExecutionId(nowId())}
-                        className={BTN_NEUTRAL}
-                        title="Regenerate"
-                      >
-                        <RefreshCw size={12} />
-                      </button>
-                    </div>
-                  </Field>
-                  <Field label="">
-                    <div className="flex items-center gap-2 pt-4">
-                      <button
-                        onClick={() => void handleCheckArtifact()}
-                        disabled={artifactCheck.loading}
-                        className={BTN_NEUTRAL}
-                      >
-                        {artifactCheck.loading ? 'Checking…' : 'Check artifact'}
-                      </button>
-                      {artifactCheck.exists !== undefined && (
-                        <span
-                          className={`text-xs font-medium ${
-                            artifactCheck.exists
-                              ? 'text-yellow-400'
-                              : 'text-green-400'
-                          }`}
-                        >
-                          {artifactCheck.exists
-                            ? '⚠ Exists — preprocessing skipped'
-                            : '✓ New run'}
-                        </span>
-                      )}
-                      {artifactCheck.error && (
-                        <span className="text-xs text-red-400">
-                          {artifactCheck.error}
-                        </span>
-                      )}
-                    </div>
-                  </Field>
-                </div>
-              )}
-
-              {/* DSL search result banner */}
-              {pipelineMode === 'full' && dslSearchStatus !== 'idle' && (
-                <div
-                  className={`rounded border px-3 py-2 text-xs font-medium ${
-                    dslSearchStatus === 'success'
-                      ? 'border-green-800/30 bg-green-900/10 text-green-400'
-                      : dslSearchStatus === 'error'
-                        ? 'border-red-800/30 bg-red-900/10 text-red-400'
-                        : 'border-slate-700 bg-slate-800/50 text-slate-400'
-                  }`}
+                    <option value="">— select processed table —</option>
+                    {processingRuns.map((r) => (
+                      <option key={r.execution_id} value={r.processed_table_name}>
+                        {r.execution_id} — {r.processed_table_name}
+                        {r.dataset ? ` (${r.dataset})` : ''}
+                      </option>
+                    ))}
+                  </select>
+                </Field>
+                <Field
+                  label="Execution ID"
+                  tooltip="Unique run identifier. Auto-generated, editable."
                 >
-                  {dslSearchStatus === 'loading' ? 'Searching…' : dslSearchMessage}
-                </div>
-              )}
+                  <div className="flex gap-1">
+                    <input
+                      value={executionId}
+                      onChange={(e) => setExecutionId(e.target.value)}
+                      className={INPUT_CLS}
+                    />
+                    <button
+                      onClick={() => setExecutionId(nowId())}
+                      className={BTN_NEUTRAL}
+                      title="Regenerate"
+                    >
+                      <RefreshCw size={12} />
+                    </button>
+                  </div>
+                </Field>
+              </div>
             </div>
           )}
 

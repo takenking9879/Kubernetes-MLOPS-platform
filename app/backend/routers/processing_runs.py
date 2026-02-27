@@ -16,7 +16,7 @@ from typing import Any
 import boto3
 import requests as _requests
 from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 router = APIRouter(prefix="/api/v2/processing-runs", tags=["processing-runs"])
 
@@ -24,10 +24,9 @@ router = APIRouter(prefix="/api/v2/processing-runs", tags=["processing-runs"])
 
 S3_BUCKET = os.getenv("S3_BUCKET", "k8s-mlops-platform-bucket")
 AWS_REGION = os.getenv("AWS_REGION", "us-east-2")
-AIRFLOW_BASE_URL = os.getenv(
-    "AIRFLOW_BASE_URL",
-    "http://airflow.airflow.svc.cluster.local:8080",
-)
+AIRFLOW_SERVICE = os.getenv("AIRFLOW_SERVICE", "my-airflow-api-server")
+AIRFLOW_NAMESPACE = os.getenv("AIRFLOW_NAMESPACE", "airflow")
+AIRFLOW_PORT = os.getenv("AIRFLOW_PORT", "8080")
 AIRFLOW_USER = os.getenv("AIRFLOW_USER", "admin")
 AIRFLOW_PASSWORD = os.getenv("AIRFLOW_PASSWORD", "admin")
 DAG_ID = "ml_pipeline"
@@ -47,10 +46,60 @@ def _s3_client():
 # ─── Models ──────────────────────────────────────────────────────────────────
 
 
+class SplitRange(BaseModel):
+    start: str
+    end: str
+
+
+class Splits(BaseModel):
+    train: SplitRange
+    val: SplitRange
+    test: SplitRange
+
+
 class ProcessingRunRequest(BaseModel):
     dataset: str
     dsl_version: int = Field(..., ge=1)
     execution_id: str = ""          # auto-generated if empty
+    splits: Splits
+
+    @model_validator(mode="after")
+    def validate_splits(self) -> "ProcessingRunRequest":
+        """Validate split dates: format, positive duration, no pairwise overlap."""
+
+        def _parse(s: str, label: str) -> datetime:
+            try:
+                return datetime.strptime(s, _DATE_FMT)
+            except ValueError:
+                raise ValueError(f"{label} must be YYYY-MM-DD HH:MM:SS, got '{s}'")
+
+        parsed: dict[str, tuple[datetime, datetime]] = {
+            "train": (
+                _parse(self.splits.train.start, "splits.train.start"),
+                _parse(self.splits.train.end,   "splits.train.end"),
+            ),
+            "val": (
+                _parse(self.splits.val.start, "splits.val.start"),
+                _parse(self.splits.val.end,   "splits.val.end"),
+            ),
+            "test": (
+                _parse(self.splits.test.start, "splits.test.start"),
+                _parse(self.splits.test.end,   "splits.test.end"),
+            ),
+        }
+        for name, (s, e) in parsed.items():
+            if s >= e:
+                raise ValueError(f"splits.{name}.start must be before splits.{name}.end")
+        pairs = [("train", "val"), ("train", "test"), ("val", "test")]
+        overlapping = []
+        for a, b in pairs:
+            a_s, a_e = parsed[a]
+            b_s, b_e = parsed[b]
+            if a_s < b_e and b_s < a_e:
+                overlapping.append(f"{a} and {b}")
+        if overlapping:
+            raise ValueError(f"Splits overlap — conflicting pairs: {', '.join(overlapping)}")
+        return self
 
 
 class ProcessedTableEntry(BaseModel):
@@ -62,6 +111,64 @@ class ProcessedTableEntry(BaseModel):
 
 
 # ─── Helpers ─────────────────────────────────────────────────────────────────
+
+
+def _airflow_request(method: str, path: str, body=None):
+    """Make an Airflow API call via the k8s client.
+
+    - In-cluster: direct HTTP using cluster-local DNS.
+    - Local (kubeconfig): route through the k8s API-server proxy so the
+      cluster-internal service name resolves. k3s uses client-cert auth,
+      leaving the Authorization header free for Airflow Basic Auth.
+    """
+    import base64 as _base64
+    import json as _json
+    from kubernetes import client as _k8s_client, config as _k8s_config
+
+    in_cluster = False
+    try:
+        _k8s_config.load_incluster_config()
+        in_cluster = True
+    except Exception:
+        _k8s_config.load_kube_config()
+
+    if in_cluster:
+        url = (
+            f"http://{AIRFLOW_SERVICE}.{AIRFLOW_NAMESPACE}.svc.cluster.local"
+            f":{AIRFLOW_PORT}/{path.lstrip('/')}"
+        )
+        resp = _requests.request(
+            method.upper(), url,
+            auth=(AIRFLOW_USER, AIRFLOW_PASSWORD),
+            json=body,
+            timeout=15,
+        )
+        try:
+            data = resp.json()
+        except ValueError:
+            data = {"raw": resp.text}
+        return resp.status_code, data
+
+    # Local dev: proxy via k8s API server (cert auth means Authorization is free)
+    api = _k8s_client.ApiClient()
+    proxy_url = (
+        f"{api.configuration.host.rstrip('/')}"
+        f"/api/v1/namespaces/{AIRFLOW_NAMESPACE}/services"
+        f"/{AIRFLOW_SERVICE}:{AIRFLOW_PORT}/proxy/{path.lstrip('/')}"
+    )
+    auth_b64 = _base64.b64encode(f"{AIRFLOW_USER}:{AIRFLOW_PASSWORD}".encode()).decode()
+    http_resp = api.rest_client.pool_manager.request(
+        method.upper(),
+        proxy_url,
+        headers={"Authorization": f"Basic {auth_b64}", "Content-Type": "application/json"},
+        body=_json.dumps(body).encode("utf-8") if body is not None else None,
+        timeout=15.0,
+    )
+    try:
+        data = _json.loads(http_resp.data)
+    except (ValueError, AttributeError):
+        data = {"raw": (http_resp.data or b"").decode("utf-8", errors="replace")}
+    return http_resp.status, data
 
 
 def _resolve_dsl_s3_path(dataset: str, version: int) -> str:
@@ -99,6 +206,11 @@ async def submit_processing_run(request: ProcessingRunRequest):
             "raw_table": f"iceberg.raw.{request.dataset}",
             "dsl_s3_path": dsl_s3_path,
         },
+        "splits": {
+            "train": {"start": request.splits.train.start, "end": request.splits.train.end},
+            "val":   {"start": request.splits.val.start,   "end": request.splits.val.end},
+            "test":  {"start": request.splits.test.start,  "end": request.splits.test.end},
+        },
         "iceberg_tables": {
             "warehouse": f"s3://{S3_BUCKET}/warehouse",
             "raw": {
@@ -132,11 +244,11 @@ async def submit_processing_run(request: ProcessingRunRequest):
     params_s3_path = f"s3://{S3_BUCKET}/{params_key}"
 
     # Trigger Airflow DAG with preprocessing_only mode
-    airflow_url = f"{AIRFLOW_BASE_URL.rstrip('/')}/api/v1/dags/{DAG_ID}/dagRuns"
     try:
-        resp = _requests.post(
-            airflow_url,
-            json={
+        status, data = _airflow_request(
+            "POST",
+            f"api/v2/dags/{DAG_ID}/dagRuns",
+            body={
                 "conf": {
                     "execution_id": execution_id,
                     "raw_table": f"iceberg.raw.{request.dataset}",
@@ -145,12 +257,13 @@ async def submit_processing_run(request: ProcessingRunRequest):
                     "pipeline_mode": "preprocessing_only",
                 },
             },
-            auth=(AIRFLOW_USER, AIRFLOW_PASSWORD),
-            timeout=15,
         )
-        resp.raise_for_status()
-        dag_run_id = resp.json().get("dag_run_id", "")
-    except _requests.RequestException as exc:
+        if status >= 400:
+            raise HTTPException(status_code=502, detail=f"Airflow returned {status}: {data}")
+        dag_run_id = data.get("dag_run_id", "")
+    except HTTPException:
+        raise
+    except Exception as exc:
         raise HTTPException(
             status_code=502,
             detail=f"Failed to trigger Airflow DAG: {exc}",
@@ -225,18 +338,15 @@ async def list_processing_runs():
 @router.get("/{dag_run_id}/status")
 async def processing_run_status(dag_run_id: str):
     """Poll the state of an Airflow DAG run."""
-    airflow_url = (
-        f"{AIRFLOW_BASE_URL.rstrip('/')}/api/v1/dags/{DAG_ID}/dagRuns/{dag_run_id}"
-    )
     try:
-        resp = _requests.get(
-            airflow_url,
-            auth=(AIRFLOW_USER, AIRFLOW_PASSWORD),
-            timeout=10,
+        status, data = _airflow_request(
+            "GET", f"api/v2/dags/{DAG_ID}/dagRuns/{dag_run_id}"
         )
-        resp.raise_for_status()
-        data = resp.json()
-    except _requests.RequestException as exc:
+        if status >= 400:
+            raise HTTPException(status_code=502, detail=f"Airflow returned {status}: {data}")
+    except HTTPException:
+        raise
+    except Exception as exc:
         raise HTTPException(
             status_code=502,
             detail=f"Failed to fetch Airflow DAG run status: {exc}",

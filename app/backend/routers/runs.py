@@ -26,10 +26,9 @@ router = APIRouter(prefix="/api/v2/runs", tags=["runs"])
 
 S3_BUCKET = os.getenv("S3_BUCKET", "k8s-mlops-platform-bucket")
 AWS_REGION = os.getenv("AWS_REGION", "us-east-2")
-AIRFLOW_BASE_URL = os.getenv(
-    "AIRFLOW_BASE_URL",
-    "http://airflow.airflow.svc.cluster.local:8080",
-)
+AIRFLOW_SERVICE = os.getenv("AIRFLOW_SERVICE", "my-airflow-api-server")
+AIRFLOW_NAMESPACE = os.getenv("AIRFLOW_NAMESPACE", "airflow")
+AIRFLOW_PORT = os.getenv("AIRFLOW_PORT", "8080")
 AIRFLOW_USER = os.getenv("AIRFLOW_USER", "admin")
 AIRFLOW_PASSWORD = os.getenv("AIRFLOW_PASSWORD", "admin")
 DAG_ID = "ml_pipeline"
@@ -125,9 +124,7 @@ class ModelConfig(BaseModel):
 
 
 class RunRequest(BaseModel):
-    dataset: str = ""
-    dsl_version: int | None = None
-    processed_table: str | None = None   # e.g. "iceberg.processed.network_traffic_raw_20260101_120000"
+    processed_table: str              # e.g. "iceberg.processed.network_traffic_raw_20260101_120000"
     execution_id: str = ""
     framework: Literal["xgboost", "pytorch"] = "xgboost"
     splits: Splits
@@ -136,18 +133,6 @@ class RunRequest(BaseModel):
     sample_fraction_for_tuning: float = Field(0.2, ge=0.01, le=1.0)
     hyperparams: dict[str, Any] = {}       # *_PARAMS overrides
     tune_settings: dict[str, Any] = {}    # *_TUNE_SETTINGS overrides
-
-    @model_validator(mode="after")
-    def validate_pipeline_mode_fields(self) -> "RunRequest":
-        """Either dsl_version (full pipeline) or processed_table (training-only) must be set."""
-        if self.processed_table:
-            # Training-only: processed_table takes precedence; dataset/dsl_version optional
-            return self
-        if not self.dataset:
-            raise ValueError("dataset is required when processed_table is not set")
-        if self.dsl_version is None:
-            raise ValueError("dsl_version is required when processed_table is not set")
-        return self
 
     @model_validator(mode="after")
     def validate_hyperparams(self) -> "RunRequest":
@@ -228,6 +213,64 @@ class RunRequest(BaseModel):
 # ─── Helpers ─────────────────────────────────────────────────────────────────
 
 
+def _airflow_request(method: str, path: str, body=None):
+    """Make an Airflow API call via the k8s client.
+
+    - In-cluster: direct HTTP using cluster-local DNS.
+    - Local (kubeconfig): route through the k8s API-server proxy so the
+      cluster-internal service name resolves. k3s uses client-cert auth,
+      leaving the Authorization header free for Airflow Basic Auth.
+    """
+    import base64 as _base64
+    import json as _json
+    from kubernetes import client as _k8s_client, config as _k8s_config
+
+    in_cluster = False
+    try:
+        _k8s_config.load_incluster_config()
+        in_cluster = True
+    except Exception:
+        _k8s_config.load_kube_config()
+
+    if in_cluster:
+        url = (
+            f"http://{AIRFLOW_SERVICE}.{AIRFLOW_NAMESPACE}.svc.cluster.local"
+            f":{AIRFLOW_PORT}/{path.lstrip('/')}"
+        )
+        resp = _requests.request(
+            method.upper(), url,
+            auth=(AIRFLOW_USER, AIRFLOW_PASSWORD),
+            json=body,
+            timeout=15,
+        )
+        try:
+            data = resp.json()
+        except ValueError:
+            data = {"raw": resp.text}
+        return resp.status_code, data
+
+    # Local dev: proxy via k8s API server (cert auth means Authorization is free)
+    api = _k8s_client.ApiClient()
+    proxy_url = (
+        f"{api.configuration.host.rstrip('/')}"
+        f"/api/v1/namespaces/{AIRFLOW_NAMESPACE}/services"
+        f"/{AIRFLOW_SERVICE}:{AIRFLOW_PORT}/proxy/{path.lstrip('/')}"
+    )
+    auth_b64 = _base64.b64encode(f"{AIRFLOW_USER}:{AIRFLOW_PASSWORD}".encode()).decode()
+    http_resp = api.rest_client.pool_manager.request(
+        method.upper(),
+        proxy_url,
+        headers={"Authorization": f"Basic {auth_b64}", "Content-Type": "application/json"},
+        body=_json.dumps(body).encode("utf-8") if body is not None else None,
+        timeout=15.0,
+    )
+    try:
+        data = _json.loads(http_resp.data)
+    except (ValueError, AttributeError):
+        data = {"raw": (http_resp.data or b"").decode("utf-8", errors="replace")}
+    return http_resp.status, data
+
+
 def _resolve_dsl_s3_path(dataset: str, version: int) -> str:
     """Find the S3 key for dsl/dsl_{dataset}/v{version}__*.yaml."""
     s3 = _s3_client()
@@ -247,14 +290,6 @@ def _generate_params_yaml(req: RunRequest, execution_id: str, cfg: dict) -> str:
     mlflow_cfg = cfg.get("mlflow", {})
     serving_cfg = cfg.get("serving", {})
 
-    # Training-only mode: use existing processed table, skip preprocessing
-    training_only = bool(req.processed_table)
-    dsl_s3_path = (
-        ""
-        if training_only
-        else _resolve_dsl_s3_path(req.dataset, req.dsl_version)  # type: ignore[arg-type]
-    )
-
     # ── Resolved *_TUNE_SETTINGS (merge defaults + overrides) ─────────────
     tune_defaults = (
         _XGBOOST_TUNE_SETTINGS_DEFAULTS if req.framework == "xgboost"
@@ -271,16 +306,15 @@ def _generate_params_yaml(req: RunRequest, execution_id: str, cfg: dict) -> str:
 
     execution_block: dict[str, Any] = {
         "execution_id": execution_id,
-        "raw_table": f"iceberg.raw.{req.dataset}" if not training_only else "",
-        "dsl_s3_path": dsl_s3_path,
+        "raw_table": "",
+        "dsl_s3_path": "",
         "tuning": {
             "enabled": req.tuning.enabled,
             "number_of_trials": req.tuning.number_of_trials,
         },
+        "skip_preprocessing": True,
+        "processed_table": req.processed_table,
     }
-    if training_only:
-        execution_block["skip_preprocessing"] = True
-        execution_block["processed_table"] = req.processed_table
 
     params: dict[str, Any] = {
         "execution": execution_block,
@@ -453,7 +487,6 @@ async def submit_run(request: RunRequest):
         "%Y%m%d_%H%M%S"
     )
 
-    training_only = bool(request.processed_table)
     cfg = _load_static_config()
     params_yaml_str = _generate_params_yaml(request, execution_id, cfg)
 
@@ -468,35 +501,26 @@ async def submit_run(request: RunRequest):
     )
     params_s3_path = f"s3://{S3_BUCKET}/{params_key}"
 
-    if training_only:
-        dsl_s3_path = ""
-        pipeline_mode = "training_only"
-    else:
-        dsl_s3_path = _resolve_dsl_s3_path(request.dataset, request.dsl_version)  # type: ignore[arg-type]
-        pipeline_mode = "full"
-
-    # Trigger Airflow DAG
-    airflow_url = f"{AIRFLOW_BASE_URL.rstrip('/')}/api/v1/dags/{DAG_ID}/dagRuns"
+    # Trigger Airflow DAG (training_only — Spark preprocessing skipped)
     dag_conf: dict[str, Any] = {
         "execution_id": execution_id,
-        "raw_table": f"iceberg.raw.{request.dataset}" if not training_only else "",
-        "dsl_s3_path": dsl_s3_path,
+        "raw_table": "",
+        "dsl_s3_path": "",
         "params_s3_path": params_s3_path,
         "model_type": request.framework,
-        "pipeline_mode": pipeline_mode,
+        "pipeline_mode": "training_only",
+        "processed_table": request.processed_table,
     }
-    if training_only:
-        dag_conf["processed_table"] = request.processed_table
     try:
-        resp = _requests.post(
-            airflow_url,
-            json={"conf": dag_conf},
-            auth=(AIRFLOW_USER, AIRFLOW_PASSWORD),
-            timeout=15,
+        status, data = _airflow_request(
+            "POST", f"api/v2/dags/{DAG_ID}/dagRuns", body={"conf": dag_conf}
         )
-        resp.raise_for_status()
-        dag_run_id = resp.json().get("dag_run_id", "")
-    except _requests.RequestException as exc:
+        if status >= 400:
+            raise HTTPException(status_code=502, detail=f"Airflow returned {status}: {data}")
+        dag_run_id = data.get("dag_run_id", "")
+    except HTTPException:
+        raise
+    except Exception as exc:
         raise HTTPException(
             status_code=502,
             detail=f"Failed to trigger Airflow DAG: {exc}",
@@ -506,25 +530,21 @@ async def submit_run(request: RunRequest):
         "dag_run_id": dag_run_id,
         "execution_id": execution_id,
         "params_s3_path": params_s3_path,
-        "dsl_s3_path": dsl_s3_path,
     }
 
 
 @router.get("/{dag_run_id}/status")
 async def run_status(dag_run_id: str):
     """Poll the state of an Airflow DAG run."""
-    airflow_url = (
-        f"{AIRFLOW_BASE_URL.rstrip('/')}/api/v1/dags/{DAG_ID}/dagRuns/{dag_run_id}"
-    )
     try:
-        resp = _requests.get(
-            airflow_url,
-            auth=(AIRFLOW_USER, AIRFLOW_PASSWORD),
-            timeout=10,
+        status, data = _airflow_request(
+            "GET", f"api/v2/dags/{DAG_ID}/dagRuns/{dag_run_id}"
         )
-        resp.raise_for_status()
-        data = resp.json()
-    except _requests.RequestException as exc:
+        if status >= 400:
+            raise HTTPException(status_code=502, detail=f"Airflow returned {status}: {data}")
+    except HTTPException:
+        raise
+    except Exception as exc:
         raise HTTPException(
             status_code=502,
             detail=f"Failed to fetch Airflow DAG run status: {exc}",

@@ -88,7 +88,6 @@ export interface RunResult {
   dag_run_id: string;
   execution_id: string;
   params_s3_path: string;
-  dsl_s3_path: string;
 }
 
 export interface RunStatus {
@@ -117,9 +116,7 @@ export interface ModelConfig {
 }
 
 export interface RunRequest {
-  dataset?: string;
-  dsl_version?: number;
-  processed_table?: string;   // training-only mode: skip preprocessing
+  processed_table: string;
   execution_id?: string;
   framework: 'xgboost' | 'pytorch';
   splits: {
@@ -140,6 +137,11 @@ export interface ProcessingRunRequest {
   dataset: string;
   dsl_version: number;
   execution_id?: string;
+  splits: {
+    train: SplitRange;
+    val: SplitRange;
+    test: SplitRange;
+  };
 }
 
 export interface ProcessedTableEntry {
