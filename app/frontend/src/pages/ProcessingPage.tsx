@@ -41,9 +41,9 @@ interface SplitRange { start: string; end: string }
 interface Splits { train: SplitRange; val: SplitRange; test: SplitRange }
 
 const DEFAULT_SPLITS: Splits = {
-  train: { start: '2026-01-01 00:00:00', end: '2026-01-05 00:00:00' },
-  val:   { start: '2026-01-07 00:00:00', end: '2026-01-09 00:00:00' },
-  test:  { start: '2026-01-11 00:00:00', end: '2026-01-13 00:00:00' },
+  train: { start: '2026-01-01 00:30:00', end: '2026-01-01 13:00:00' },
+  val:   { start: '2026-01-01 13:00:00', end: '2026-01-02 05:40:00' },
+  test:  { start: '2026-01-02 07:00:00', end: '2026-01-03 03:50:00' },
 };
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
