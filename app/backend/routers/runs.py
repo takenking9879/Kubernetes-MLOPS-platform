@@ -216,12 +216,14 @@ class RunRequest(BaseModel):
 def _airflow_request(method: str, path: str, body=None):
     """Make an Airflow API call via the k8s client.
 
+    Airflow 3.x requires JWT Bearer auth. We first POST to /auth/token with
+    username/password in the request body, then use the returned access_token
+    as a Bearer header for the actual API call.
+
     - In-cluster: direct HTTP using cluster-local DNS.
     - Local (kubeconfig): route through the k8s API-server proxy so the
-      cluster-internal service name resolves. k3s uses client-cert auth,
-      leaving the Authorization header free for Airflow Basic Auth.
+      cluster-internal service name resolves (k3s uses client-cert auth).
     """
-    import base64 as _base64
     import json as _json
     from kubernetes import client as _k8s_client, config as _k8s_config
 
@@ -233,13 +235,22 @@ def _airflow_request(method: str, path: str, body=None):
         _k8s_config.load_kube_config()
 
     if in_cluster:
-        url = (
+        base_url = (
             f"http://{AIRFLOW_SERVICE}.{AIRFLOW_NAMESPACE}.svc.cluster.local"
-            f":{AIRFLOW_PORT}/{path.lstrip('/')}"
+            f":{AIRFLOW_PORT}"
         )
+        # Airflow 3.x: obtain JWT token
+        token_resp = _requests.post(
+            f"{base_url}/auth/token",
+            json={"username": AIRFLOW_USER, "password": AIRFLOW_PASSWORD},
+            timeout=15,
+        )
+        token = token_resp.json().get("access_token", "")
+
         resp = _requests.request(
-            method.upper(), url,
-            auth=(AIRFLOW_USER, AIRFLOW_PASSWORD),
+            method.upper(),
+            f"{base_url}/{path.lstrip('/')}",
+            headers={"Authorization": f"Bearer {token}"},
             json=body,
             timeout=15,
         )
@@ -249,21 +260,29 @@ def _airflow_request(method: str, path: str, body=None):
             data = {"raw": resp.text}
         return resp.status_code, data
 
-    # Local dev: proxy via k8s API server (cert auth means Authorization is free)
+    # Local dev: proxy via k8s API server (k3s uses client-cert auth)
     api = _k8s_client.ApiClient()
-    proxy_url = (
-        f"{api.configuration.host.rstrip('/')}"
-        f"/api/v1/namespaces/{AIRFLOW_NAMESPACE}/services"
-        f"/{AIRFLOW_SERVICE}:{AIRFLOW_PORT}/proxy/{path.lstrip('/')}"
-    )
-    auth_b64 = _base64.b64encode(f"{AIRFLOW_USER}:{AIRFLOW_PASSWORD}".encode()).decode()
-    http_resp = api.rest_client.pool_manager.request(
-        method.upper(),
-        proxy_url,
-        headers={"Authorization": f"Basic {auth_b64}", "Content-Type": "application/json"},
-        body=_json.dumps(body).encode("utf-8") if body is not None else None,
-        timeout=15.0,
-    )
+
+    def _proxy(m: str, p: str, b=None, extra_headers: dict | None = None):
+        proxy_url = (
+            f"{api.configuration.host.rstrip('/')}"
+            f"/api/v1/namespaces/{AIRFLOW_NAMESPACE}/services"
+            f"/{AIRFLOW_SERVICE}:{AIRFLOW_PORT}/proxy/{p.lstrip('/')}"
+        )
+        headers = {"Content-Type": "application/json", **(extra_headers or {})}
+        return api.rest_client.pool_manager.request(
+            m.upper(),
+            proxy_url,
+            headers=headers,
+            body=_json.dumps(b).encode("utf-8") if b is not None else None,
+            timeout=15.0,
+        )
+
+    # Airflow 3.x: obtain JWT token through the proxy
+    token_resp = _proxy("POST", "auth/token", b={"username": AIRFLOW_USER, "password": AIRFLOW_PASSWORD})
+    token = _json.loads(token_resp.data).get("access_token", "")
+
+    http_resp = _proxy(method, path, b=body, extra_headers={"Authorization": f"Bearer {token}"})
     try:
         data = _json.loads(http_resp.data)
     except (ValueError, AttributeError):
