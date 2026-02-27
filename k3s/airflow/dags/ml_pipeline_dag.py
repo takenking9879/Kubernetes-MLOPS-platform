@@ -66,9 +66,7 @@ def _submit_spark_preprocessing(**context):
     conf = context["dag_run"].conf or {}
     pipeline_mode = conf.get("pipeline_mode", "full")
     if pipeline_mode == "training_only":
-        context["task_instance"].log.info(
-            "pipeline_mode=training_only: skipping Spark preprocessing."
-        )
+        print("pipeline_mode=training_only: skipping Spark preprocessing.")
         return
     execution_id = conf.get("execution_id", datetime.utcnow().strftime("%Y%m%d_%H%M%S"))
     raw_table = conf.get("raw_table", "")
@@ -138,7 +136,7 @@ def _submit_spark_preprocessing(**context):
         pass
 
     client.create_namespaced_custom_object(group, version, namespace, plural, manifest)
-    context["task_instance"].log.info(f"SparkApplication {name} submitted.")
+    print(f"SparkApplication {name} submitted.")
 
     # Poll until ResourceReleased or FAILED
     timeout = 1800
@@ -153,9 +151,9 @@ def _submit_spark_preprocessing(**context):
                .get("currentState", {})
                .get("currentStateSummary", "")
         )
-        context["task_instance"].log.info(f"SparkApplication state: {state}")
+        print(f"SparkApplication state: {state}")
         if state in ("ResourceReleased", "RESOURCE_RELEASED"):
-            context["task_instance"].log.info("Spark preprocessing completed.")
+            print("Spark preprocessing completed.")
             return
         if state in ("FAILED", "Failed"):
             raise RuntimeError(f"SparkApplication {name} failed.")
@@ -176,9 +174,7 @@ def _submit_ray_training(**context):
     conf = context["dag_run"].conf or {}
     pipeline_mode = conf.get("pipeline_mode", "full")
     if pipeline_mode == "preprocessing_only":
-        context["task_instance"].log.info(
-            "pipeline_mode=preprocessing_only: skipping Ray training."
-        )
+        print("pipeline_mode=preprocessing_only: skipping Ray training.")
         return
     execution_id = conf.get("execution_id", datetime.utcnow().strftime("%Y%m%d_%H%M%S"))
     model_type = conf.get("model_type", "xgboost")
@@ -241,7 +237,7 @@ def _submit_ray_training(**context):
         pass
 
     client.create_namespaced_custom_object(group, version, RAY_NAMESPACE, plural, manifest)
-    context["task_instance"].log.info(f"RayJob {name} submitted.")
+    print(f"RayJob {name} submitted.")
 
     # Poll until succeeded or failed
     timeout = 3600
@@ -256,9 +252,9 @@ def _submit_ray_training(**context):
                .get("jobStatus", {})
                .get("state", "")
         ).lower()
-        context["task_instance"].log.info(f"RayJob state: {state}")
+        print(f"RayJob state: {state}")
         if state == "succeeded":
-            context["task_instance"].log.info("Ray training completed successfully.")
+            print("Ray training completed successfully.")
             return
         if state == "failed":
             raise RuntimeError(f"RayJob {name} failed.")
