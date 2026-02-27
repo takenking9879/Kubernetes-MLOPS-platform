@@ -118,8 +118,9 @@ def _submit_spark_preprocessing(**context):
         spark_conf[f"spark.kubernetes.driverEnv.{key}"] = val
         spark_conf[f"spark.kubernetes.executorEnv.{key}"] = val
 
+    from kubernetes import client as _k8s_api
     hook = KubernetesHook(conn_id="kubernetes_default")
-    client = hook.get_custom_object_client()
+    client = _k8s_api.CustomObjectsApi(hook.get_conn())
 
     name = manifest["metadata"]["name"]
     namespace = SPARK_NAMESPACE
@@ -221,8 +222,9 @@ def _submit_ray_training(**context):
     env_lines = "\n".join(f"      {k}: \"{v}\"" for k, v in merged_env.items())
     manifest["spec"]["runtimeEnvYAML"] = f"env_vars:\n{env_lines}\n"
 
+    from kubernetes import client as _k8s_api
     hook = KubernetesHook(conn_id="kubernetes_default")
-    client = hook.get_custom_object_client()
+    client = _k8s_api.CustomObjectsApi(hook.get_conn())
     name = manifest["metadata"]["name"]
     group = "ray.io"
     version = "v1"
