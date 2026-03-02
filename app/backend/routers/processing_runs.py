@@ -110,6 +110,7 @@ class ProcessedTableEntry(BaseModel):
     pipeline_hash: str = ""
     created_at: str = ""
     raw_dataset_name: str = ""  # nombre explícito del dataset fuente
+    dsl_name: str = ""         # e.g. "v1__network_traffic.yaml"
 
 
 # ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -345,6 +346,7 @@ async def list_processing_runs(dataset: str | None = Query(None, description="Fi
                 pipeline_hash=str(row.get("pipeline_hash", "")),
                 created_at=str(row.get("created_at", "")),
                 raw_dataset_name=raw_dataset_name,
+                dsl_name=str(row.get("dsl_name") or ""),
             )
         )
 

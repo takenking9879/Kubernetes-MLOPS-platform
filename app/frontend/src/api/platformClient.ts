@@ -165,7 +165,7 @@ export interface ProcessedTableEntry {
   dataset: string;           // alias de raw_dataset_name (backward-compat)
   processed_table_name: string;
   pipeline_hash: string;
-  dsl_version: number;
+  dsl_name: string;          // e.g. "v1__network_traffic.yaml"
   created_at: string;
   raw_dataset_name: string;  // nombre explícito del dataset fuente
 }

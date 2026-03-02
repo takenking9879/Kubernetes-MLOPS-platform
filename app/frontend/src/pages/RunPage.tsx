@@ -891,8 +891,10 @@ export function RunPage() {
   const handleDslSelectStep1 = async (version: number) => {
     if (!rawDatasetFilter || !version) return;
     setDslVersion(version);
-    // Infer processed table from matching run
-    const matchingRun = processingRuns.find((r) => r.dsl_version === version);
+    // Infer processed table from matching run by dsl_name (e.g. "v1__network_traffic.yaml")
+    const dslInfo = dslList.find((d) => d.version === version);
+    const dslFileName = dslInfo ? `v${dslInfo.version}__${dslInfo.slug}.yaml` : '';
+    const matchingRun = processingRuns.find((r) => r.dsl_name === dslFileName);
     const processedTable = matchingRun?.processed_table_name ?? '';
     setSelectedProcessedTable(processedTable);
     // Load DSL features and pre-populate schemaBuilder
