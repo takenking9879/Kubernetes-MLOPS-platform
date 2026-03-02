@@ -14,11 +14,6 @@ import { stringify } from 'yaml';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-export interface SplitRange {
-  start: string;
-  end: string;
-}
-
 export interface AdvancedConfig {
   mlflow_tracking_uri: string;
   mlflow_artifact_location: string;
@@ -43,11 +38,6 @@ export interface ParamsYamlInput {
     enabled: boolean;
     number_of_trials: number;
   };
-  splits: {
-    train: SplitRange;
-    val: SplitRange;
-    test: SplitRange;
-  };
   framework: 'xgboost' | 'pytorch';
   model: {
     experiment_name: string;
@@ -66,7 +56,7 @@ export interface ParamsYamlInput {
 
 export function generateParamsYaml(input: ParamsYamlInput): string {
   const {
-    execution_id, tuning, splits,
+    execution_id, tuning,
     framework, model, sample_fraction_for_tuning,
     hyperparams, tuneSettings, advanced,
   } = input;
@@ -87,11 +77,6 @@ export function generateParamsYaml(input: ParamsYamlInput): string {
         number_of_trials: tuning.number_of_trials,
       },
       skip_preprocessing: true,
-    },
-    splits: {
-      train: { start: splits.train.start, end: splits.train.end },
-      val:   { start: splits.val.start,   end: splits.val.end },
-      test:  { start: splits.test.start,  end: splits.test.end },
     },
     model: {
       framework,

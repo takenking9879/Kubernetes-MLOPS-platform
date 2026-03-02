@@ -75,9 +75,6 @@ _PYTORCH_TUNE_SETTINGS_DEFAULTS: dict[str, int] = {
     "max_epochs": 10,
 }
 
-_DATE_FMT = "%Y-%m-%d %H:%M:%S"
-
-
 def _s3_client():
     return boto3.client(
         "s3",
@@ -99,17 +96,6 @@ def _load_static_config() -> dict[str, Any]:
 # ─── Models ──────────────────────────────────────────────────────────────────
 
 
-class SplitRange(BaseModel):
-    start: str
-    end: str
-
-
-class Splits(BaseModel):
-    train: SplitRange
-    val: SplitRange
-    test: SplitRange
-
-
 class TuningConfig(BaseModel):
     enabled: bool = True
     number_of_trials: int = Field(3, ge=1)
@@ -127,7 +113,6 @@ class RunRequest(BaseModel):
     processed_table: str              # e.g. "iceberg.processed.network_traffic_raw_20260101_120000"
     execution_id: str = ""
     framework: Literal["xgboost", "pytorch"] = "xgboost"
-    splits: Splits
     tuning: TuningConfig = Field(default_factory=TuningConfig)
     model: ModelConfig = Field(default_factory=ModelConfig)
     sample_fraction_for_tuning: float = Field(0.2, ge=0.01, le=1.0)
@@ -157,55 +142,6 @@ class RunRequest(BaseModel):
                         f"hyperparams['{key}'] expected {exp_type.__name__}, "
                         f"got {type(val).__name__}"
                     )
-
-        return self
-
-    @model_validator(mode="after")
-    def validate_splits_no_overlap(self) -> "RunRequest":
-        """Validate split dates: format, positive duration, and no pairwise overlap."""
-
-        def _parse(s: str, label: str) -> datetime:
-            try:
-                return datetime.strptime(s, _DATE_FMT)
-            except ValueError:
-                raise ValueError(
-                    f"{label} must be YYYY-MM-DD HH:MM:SS, got '{s}'"
-                )
-
-        parsed: dict[str, tuple[datetime, datetime]] = {
-            "train": (
-                _parse(self.splits.train.start, "splits.train.start"),
-                _parse(self.splits.train.end,   "splits.train.end"),
-            ),
-            "val": (
-                _parse(self.splits.val.start, "splits.val.start"),
-                _parse(self.splits.val.end,   "splits.val.end"),
-            ),
-            "test": (
-                _parse(self.splits.test.start, "splits.test.start"),
-                _parse(self.splits.test.end,   "splits.test.end"),
-            ),
-        }
-
-        # Each split must have positive duration
-        for name, (s, e) in parsed.items():
-            if s >= e:
-                raise ValueError(
-                    f"splits.{name}.start must be before splits.{name}.end"
-                )
-
-        # No overlap between any two splits
-        pairs = [("train", "val"), ("train", "test"), ("val", "test")]
-        overlapping = []
-        for a, b in pairs:
-            a_start, a_end = parsed[a]
-            b_start, b_end = parsed[b]
-            if a_start < b_end and b_start < a_end:
-                overlapping.append(f"{a} and {b}")
-        if overlapping:
-            raise ValueError(
-                f"Splits overlap — conflicting pairs: {', '.join(overlapping)}"
-            )
 
         return self
 
@@ -331,11 +267,6 @@ def _generate_training_params_yaml(req: RunRequest, execution_id: str, cfg: dict
             },
             "skip_preprocessing": True,
             "processed_table": req.processed_table,
-        },
-        "splits": {
-            "train": {"start": req.splits.train.start, "end": req.splits.train.end},
-            "val":   {"start": req.splits.val.start,   "end": req.splits.val.end},
-            "test":  {"start": req.splits.test.start,  "end": req.splits.test.end},
         },
         "model": {
             "framework": req.framework,

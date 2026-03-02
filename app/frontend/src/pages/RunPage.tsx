@@ -1,12 +1,11 @@
 /**
  * RunPage — ML platform execution control surface.
  *
- * 5-step workflow stepper:
+ * 4-step workflow stepper:
  *   1. Dataset   — dataset, DSL version, execution ID
- *   2. Splits    — temporal boundaries with locked constraints
- *   3. Model     — framework, config, hyperparams (tune=false)
- *   4. Tuning    — tuning toggle + trial budget / search space
- *   5. Review    — summary + validation + launch
+ *   2. Model     — framework, config, hyperparams (tune=false)
+ *   3. Tuning    — tuning toggle + trial budget / search space
+ *   4. Review    — summary + validation + launch
  *
  * Right column: live YAML preview (params.yaml / raw / full / preprocessed).
  */
@@ -14,6 +13,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Check, ChevronDown, ChevronUp, Copy, RefreshCw } from 'lucide-react';
 import {
+  getDsl,
   getDslFeatures,
   getPreprocessParams,
   getRunStatus,
@@ -63,12 +63,6 @@ import {
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-const DEFAULT_SPLITS = {
-  train: { start: '2026-01-01 00:00:00', end: '2026-01-05 00:00:00' },
-  val:   { start: '2026-01-07 00:00:00', end: '2026-01-09 00:00:00' },
-  test:  { start: '2026-01-11 00:00:00', end: '2026-01-13 00:00:00' },
-};
-
 const DEFAULT_MODEL_CONFIG = {
   experiment_name: 'kuberay-attack-detection',
   registry_model_name: 'attack-detection',
@@ -77,8 +71,7 @@ const DEFAULT_MODEL_CONFIG = {
   seed: 42,
 };
 
-const DATE_RE = /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/;
-const STEP_LABELS = ['Dataset', 'Splits', 'Model', 'Tuning', 'Review'];
+const STEP_LABELS = ['Dataset', 'Model', 'Tuning', 'Review'];
 
 type Framework = 'xgboost' | 'pytorch';
 type TuneMode = 'predefined' | 'override';
@@ -97,20 +90,6 @@ function nowId(): string {
   ].join('');
 }
 
-function formatDuration(start: string, end: string): string {
-  if (!DATE_RE.test(start) || !DATE_RE.test(end)) return '—';
-  const ms =
-    Date.parse(end.replace(' ', 'T') + 'Z') -
-    Date.parse(start.replace(' ', 'T') + 'Z');
-  if (ms <= 0) return '⚠';
-  const h = Math.floor(ms / 3_600_000);
-  if (h >= 48) return `${Math.floor(h / 24)}d ${h % 24}h`;
-  if (h > 0) {
-    const m = Math.floor((ms % 3_600_000) / 60_000);
-    return m > 0 ? `${h}h ${m}m` : `${h}h`;
-  }
-  return `${Math.floor((ms % 3_600_000) / 60_000)}m`;
-}
 
 // ─── Style tokens ─────────────────────────────────────────────────────────────
 
@@ -283,50 +262,6 @@ function StepperHeader({
           </div>
         );
       })}
-    </div>
-  );
-}
-
-// ─── SplitRow ─────────────────────────────────────────────────────────────────
-
-function SplitRow({
-  label,
-  start,
-  end,
-  onStartChange,
-  onEndChange,
-  duration,
-}: {
-  label: string;
-  start: string;
-  end: string;
-  onStartChange: (v: string) => void;
-  onEndChange: (v: string) => void;
-  duration: string;
-}) {
-  return (
-    <div className="grid grid-cols-[52px_1fr_18px_1fr_48px] items-center gap-2">
-      <span className="text-xs font-medium text-slate-400">{label}</span>
-      <input
-        value={start}
-        onChange={(e) => onStartChange(e.target.value)}
-        placeholder="YYYY-MM-DD HH:MM:SS"
-        className={INPUT_CLS}
-      />
-      <span className="text-center text-xs text-slate-600">→</span>
-      <input
-        value={end}
-        onChange={(e) => onEndChange(e.target.value)}
-        placeholder="YYYY-MM-DD HH:MM:SS"
-        className={INPUT_CLS}
-      />
-      <span
-        className={`text-right font-mono text-[10px] ${
-          duration.startsWith('⚠') ? 'text-red-400' : 'text-slate-500'
-        }`}
-      >
-        {duration}
-      </span>
     </div>
   );
 }
@@ -577,7 +512,9 @@ export function RunPage() {
 
   // ── Params inspection modal ───────────────────────────────────────────────
   const [paramsModalOpen, setParamsModalOpen] = useState(false);
+  const [paramsModalTab, setParamsModalTab] = useState<'preprocess' | 'dsl'>('preprocess');
   const [paramsModalContent, setParamsModalContent] = useState('');
+  const [dslModalContent, setDslModalContent] = useState('');
   const [paramsModalLoading, setParamsModalLoading] = useState(false);
   const [paramsModalError, setParamsModalError] = useState('');
 
@@ -589,9 +526,6 @@ export function RunPage() {
   // ── Model ────────────────────────────────────────────────────────────────
   const [framework, setFramework] = useState<Framework>('xgboost');
   const [modelConfig, setModelConfig] = useState({ ...DEFAULT_MODEL_CONFIG });
-
-  // ── Splits ───────────────────────────────────────────────────────────────
-  const [splits, setSplits] = useState(DEFAULT_SPLITS);
 
   // ── Hyperparams (*_PARAMS) ────────────────────────────────────────────────
   const [hyperparams, setHyperparams] = useState<
@@ -718,7 +652,6 @@ export function RunPage() {
       dataset,
       dslS3Path: '',
       tuning: { enabled: tuningEnabled, number_of_trials: numberOfTrials },
-      splits,
       framework,
       model: modelConfig,
       sample_fraction_for_tuning: sampleFraction,
@@ -731,7 +664,6 @@ export function RunPage() {
       dataset,
       tuningEnabled,
       numberOfTrials,
-      splits,
       framework,
       modelConfig,
       sampleFraction,
@@ -780,52 +712,12 @@ export function RunPage() {
       }
       case 2: {
         const e: string[] = [];
-        const allFields: Array<[keyof typeof splits, 'start' | 'end']> = [
-          ['train', 'start'], ['train', 'end'],
-          ['val',   'start'], ['val',   'end'],
-          ['test',  'start'], ['test',  'end'],
-        ];
-        for (const [s, f] of allFields) {
-          if (!DATE_RE.test(splits[s][f]))
-            e.push(`${s}.${f}: must be YYYY-MM-DD HH:MM:SS`);
-        }
-        if (e.length === 0) {
-          const ts = (str: string) => Date.parse(str.replace(' ', 'T') + 'Z');
-          const parsed = {
-            train: [ts(splits.train.start), ts(splits.train.end)] as [number, number],
-            val:   [ts(splits.val.start),   ts(splits.val.end)]   as [number, number],
-            test:  [ts(splits.test.start),  ts(splits.test.end)]  as [number, number],
-          };
-          // Positive duration per split
-          const labels: Record<string, string> = { train: 'Train', val: 'Validation', test: 'Test' };
-          for (const [k, [s, en]] of Object.entries(parsed)) {
-            if (s >= en) e.push(`${labels[k]} start must be before ${labels[k]} end`);
-          }
-          // No pairwise overlap
-          const splitsOverlap = (
-            [as_, ae]: [number, number],
-            [bs, be]: [number, number],
-          ) => as_ < be && bs < ae;
-          const pairs: Array<[keyof typeof parsed, keyof typeof parsed, string]> = [
-            ['train', 'val',  '"Train" and "Validation"'],
-            ['train', 'test', '"Train" and "Test"'],
-            ['val',   'test', '"Validation" and "Test"'],
-          ];
-          for (const [a, b, label] of pairs) {
-            if (splitsOverlap(parsed[a], parsed[b]))
-              e.push(`${label} ranges overlap`);
-          }
-        }
-        return e;
-      }
-      case 3: {
-        const e: string[] = [];
         if (!modelConfig.target.trim()) e.push('Target column is required');
         if (modelConfig.num_classes < 2)
           e.push('num_classes must be at least 2');
         return e;
       }
-      case 4: {
+      case 3: {
         const e: string[] = [];
         if (tuningEnabled) {
           if (numberOfTrials < 1)
@@ -842,7 +734,7 @@ export function RunPage() {
 
   function validateForm(): string[] {
     const errors: string[] = [];
-    for (let s = 1; s <= 4; s++) errors.push(...getStepErrors(s));
+    for (let s = 1; s <= 3; s++) errors.push(...getStepErrors(s));
     if (!tuningEnabled) {
       const allowed = getAllowedKeys(framework);
       for (const k of Object.keys(hyperparams)) {
@@ -870,7 +762,7 @@ export function RunPage() {
       return;
     }
     setNavErrors([]);
-    setCurrentStep((s) => Math.min(s + 1, 5));
+    setCurrentStep((s) => Math.min(s + 1, 4));
   };
 
   const goBack = () => {
@@ -926,12 +818,20 @@ export function RunPage() {
     const entry = processingRuns.find((r) => r.processed_table_name === selectedProcessedTable);
     if (!entry) return;
     setParamsModalContent('');
+    setDslModalContent('');
     setParamsModalError('');
     setParamsModalLoading(true);
     setParamsModalOpen(true);
+    setParamsModalTab('preprocess');
     try {
-      const result = await getPreprocessParams(entry.execution_id);
-      setParamsModalContent(result.yaml_content);
+      const [paramsResult, dslResult] = await Promise.all([
+        getPreprocessParams(entry.execution_id),
+        rawDatasetFilter && dslVersion !== ''
+          ? getDsl(rawDatasetFilter, dslVersion as number)
+          : Promise.resolve(null),
+      ]);
+      setParamsModalContent(paramsResult.yaml_content);
+      if (dslResult) setDslModalContent(dslResult.yaml_content);
     } catch (e) {
       setParamsModalError(e instanceof Error ? e.message : String(e));
     } finally {
@@ -950,7 +850,6 @@ export function RunPage() {
         processed_table: selectedProcessedTable,
         execution_id: executionId.trim(),
         framework,
-        splits,
         tuning: { enabled: tuningEnabled, number_of_trials: numberOfTrials },
         model: modelConfig,
         sample_fraction_for_tuning: sampleFraction,
@@ -1011,17 +910,6 @@ export function RunPage() {
     setSearchSpaceOverrides((prev) => ({
       ...prev,
       [key]: { ...(prev[key] ?? { min: 0, max: 1 }), [field]: val },
-    }));
-  };
-
-  const updateSplit = (
-    split: 'train' | 'val' | 'test',
-    field: 'start' | 'end',
-    val: string,
-  ) => {
-    setSplits((prev) => ({
-      ...prev,
-      [split]: { ...prev[split], [field]: val },
     }));
   };
 
@@ -1204,87 +1092,8 @@ export function RunPage() {
             </div>
           )}
 
-          {/* ── STEP 2: Splits ── */}
+          {/* ── STEP 2: Model ── */}
           {currentStep === 2 && (
-            <div className="space-y-4">
-              <div>
-                <p className={SUB_HEADING}>Temporal Split Boundaries</p>
-                <p className="mt-1 text-xs text-slate-500">
-                  Each split is independent — ranges can have gaps or be in any
-                  order.{' '}
-                  <span className="font-mono text-slate-400">
-                    YYYY-MM-DD HH:MM:SS
-                  </span>
-                  . Overlaps between splits are not allowed.
-                </p>
-              </div>
-
-              <div className="space-y-2.5">
-                <SplitRow
-                  label="Train"
-                  start={splits.train.start}
-                  end={splits.train.end}
-                  onStartChange={(v) => updateSplit('train', 'start', v)}
-                  onEndChange={(v) => updateSplit('train', 'end', v)}
-                  duration={formatDuration(
-                    splits.train.start,
-                    splits.train.end,
-                  )}
-                />
-                <SplitRow
-                  label="Val"
-                  start={splits.val.start}
-                  end={splits.val.end}
-                  onStartChange={(v) => updateSplit('val', 'start', v)}
-                  onEndChange={(v) => updateSplit('val', 'end', v)}
-                  duration={formatDuration(splits.val.start, splits.val.end)}
-                />
-                <SplitRow
-                  label="Test"
-                  start={splits.test.start}
-                  end={splits.test.end}
-                  onStartChange={(v) => updateSplit('test', 'start', v)}
-                  onEndChange={(v) => updateSplit('test', 'end', v)}
-                  duration={formatDuration(
-                    splits.test.start,
-                    splits.test.end,
-                  )}
-                />
-              </div>
-
-              {/* Duration summary */}
-              {[splits.train, splits.val, splits.test].every(
-                (s) => DATE_RE.test(s.start) && DATE_RE.test(s.end),
-              ) && (
-                <div className="flex items-center gap-2 pt-1 text-[10px] text-slate-500">
-                  <span>Duration:</span>
-                  <span>
-                    train{' '}
-                    <span className="text-slate-300">
-                      {formatDuration(splits.train.start, splits.train.end)}
-                    </span>
-                  </span>
-                  <span>·</span>
-                  <span>
-                    val{' '}
-                    <span className="text-slate-300">
-                      {formatDuration(splits.val.start, splits.val.end)}
-                    </span>
-                  </span>
-                  <span>·</span>
-                  <span>
-                    test{' '}
-                    <span className="text-slate-300">
-                      {formatDuration(splits.test.start, splits.test.end)}
-                    </span>
-                  </span>
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* ── STEP 3: Model ── */}
-          {currentStep === 3 && (
             <div className="space-y-4">
               {/* Framework */}
               <div className="space-y-2">
@@ -1426,8 +1235,8 @@ export function RunPage() {
             </div>
           )}
 
-          {/* ── STEP 4: Tuning ── */}
-          {currentStep === 4 && (
+          {/* ── STEP 3: Tuning ── */}
+          {currentStep === 3 && (
             <div className="space-y-4">
               {/* Toggle */}
               <div className="flex items-center justify-between">
@@ -1647,8 +1456,8 @@ export function RunPage() {
             </div>
           )}
 
-          {/* ── STEP 5: Review & Run ── */}
-          {currentStep === 5 && (
+          {/* ── STEP 4: Review & Run ── */}
+          {currentStep === 4 && (
             <div className="space-y-3">
               <p className={SUB_HEADING}>Review Configuration</p>
 
@@ -1666,27 +1475,8 @@ export function RunPage() {
               />
 
               <SummaryCard
-                title="Splits"
-                onEdit={() => goToStep(2)}
-                items={[
-                  [
-                    'Train',
-                    `${splits.train.start}  →  ${splits.train.end}  (${formatDuration(splits.train.start, splits.train.end)})`,
-                  ],
-                  [
-                    'Val',
-                    `${splits.val.start}  →  ${splits.val.end}  (${formatDuration(splits.val.start, splits.val.end)})`,
-                  ],
-                  [
-                    'Test',
-                    `${splits.test.start}  →  ${splits.test.end}  (${formatDuration(splits.test.start, splits.test.end)})`,
-                  ],
-                ]}
-              />
-
-              <SummaryCard
                 title="Model"
-                onEdit={() => goToStep(3)}
+                onEdit={() => goToStep(2)}
                 items={[
                   ['Framework', framework],
                   [
@@ -1700,7 +1490,7 @@ export function RunPage() {
 
               <SummaryCard
                 title="Tuning"
-                onEdit={() => goToStep(4)}
+                onEdit={() => goToStep(3)}
                 items={
                   tuningEnabled
                     ? [
@@ -1806,7 +1596,7 @@ export function RunPage() {
         )}
 
         {/* Navigation buttons */}
-        {currentStep < 5 ? (
+        {currentStep < 4 ? (
           <div className="flex items-center justify-between">
             {currentStep > 1 ? (
               <button onClick={goBack} className={BTN_NEUTRAL}>
@@ -2063,14 +1853,34 @@ export function RunPage() {
         />
       </div>
 
-      {/* ── Modal: inspección de params_preprocess.yaml ── */}
+      {/* ── Modal: inspección de params_preprocess.yaml + dsl.yaml ── */}
       {paramsModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
-          <div className="flex w-[600px] max-h-[80vh] flex-col rounded-lg border border-slate-700 bg-slate-900 shadow-xl">
+          <div className="flex w-[680px] max-h-[80vh] flex-col rounded-lg border border-slate-700 bg-slate-900 shadow-xl">
             <div className="flex items-center justify-between border-b border-slate-700 px-4 py-3">
-              <p className="text-xs font-semibold text-slate-200">
-                params_preprocess.yaml — {selectedProcessedTable}
-              </p>
+              <div className="flex gap-1">
+                <button
+                  onClick={() => setParamsModalTab('preprocess')}
+                  className={`rounded px-2 py-0.5 text-[10px] font-medium transition-colors ${
+                    paramsModalTab === 'preprocess'
+                      ? 'bg-slate-700 text-slate-100'
+                      : 'text-slate-500 hover:text-slate-300'
+                  }`}
+                >
+                  params_preprocess.yaml
+                </button>
+                <button
+                  onClick={() => setParamsModalTab('dsl')}
+                  disabled={!dslModalContent}
+                  className={`rounded px-2 py-0.5 text-[10px] font-medium transition-colors disabled:opacity-40 ${
+                    paramsModalTab === 'dsl'
+                      ? 'bg-slate-700 text-slate-100'
+                      : 'text-slate-500 hover:text-slate-300'
+                  }`}
+                >
+                  dsl.yaml
+                </button>
+              </div>
               <button
                 onClick={() => setParamsModalOpen(false)}
                 className="text-xs text-slate-500 hover:text-slate-300"
@@ -2085,9 +1895,9 @@ export function RunPage() {
               {paramsModalError && (
                 <p className="text-xs text-red-400">{paramsModalError}</p>
               )}
-              {paramsModalContent && (
+              {!paramsModalLoading && !paramsModalError && (
                 <pre className="whitespace-pre font-mono text-[11px] leading-relaxed text-green-300">
-                  {paramsModalContent}
+                  {paramsModalTab === 'preprocess' ? paramsModalContent : dslModalContent}
                 </pre>
               )}
             </div>

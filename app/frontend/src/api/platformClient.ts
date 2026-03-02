@@ -135,11 +135,6 @@ export interface RunRequest {
   processed_table: string;
   execution_id?: string;
   framework: 'xgboost' | 'pytorch';
-  splits: {
-    train: SplitRange;
-    val: SplitRange;
-    test: SplitRange;
-  };
   tuning?: TuningConfig;
   model?: ModelConfig;
   sample_fraction_for_tuning?: number;
