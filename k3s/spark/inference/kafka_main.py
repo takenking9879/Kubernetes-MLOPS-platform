@@ -33,6 +33,22 @@ from src.prometheus import (
     PREDICTIONS_BY_CLASS_LAST_BATCH,
 )
 
+# ─── System constants (not user-configurable) ─────────────────────────────────
+
+# Schema names are internal system identifiers registered in SchemaRegistry.
+# They never vary per dataset run.
+_KAFKA_INPUT_SCHEMA  = "kafka_schema_features"
+_FEATURES_SCHEMA     = "schema_features"
+_KAFKA_OUTPUT_SCHEMA = "prediction_schema"
+
+# Output column naming conventions — system defaults, not user decisions.
+_PREDICTION_COLUMN = "label"    # name of the predicted class column
+_DEFAULT_ID_COLUMN = "event_id" # fallback when RAW_SCHEMA_S3_PATH is not set
+_DEFAULT_NUM_CLASSES = 6        # for Prometheus label initialisation
+
+_APP_NAME = "kafka-spark-inference"
+
+
 # ===== FUNCIONES STANDALONE PARA PREDICCIONES =====
 
 def _predict_partition_ray_online(
@@ -120,12 +136,10 @@ class KafkaSparkInference(BaseUtils):
         # ===== START PROMETHEUS METRICS SERVER =====
         self._start_prometheus_server()
 
-        # Cargar configuraciones desde params
+        # Cargar configuraciones
         self._load_kafka_config()
-        self._load_schema_config()
-        self._load_converter_config()
+        self._load_schemas()
         self._load_prediction_config()
-        self._load_output_config()
         self._load_checkpoint_config()
 
         self.converter_function = None
@@ -138,16 +152,16 @@ class KafkaSparkInference(BaseUtils):
         # Crear Spark session
         self.spark = self._create_spark_session()
 
-        # Cargar módulos y funciones
+        # Cargar converter (hardcoded — only one converter exists)
         self._load_converter_function()
 
         self.logger.info(
             "Router mode: Spark converts schema and forwards events to Ray Serve. "
             "DSL preprocessing + prediction run in Ray Serve (NumpyPipelineExecutor)."
         )
-    
+
     # ===== PROMETHEUS SERVER =====
-    
+
     def _start_prometheus_server(self):
         """Start Prometheus HTTP server on port 8000 for custom metrics."""
         try:
@@ -156,57 +170,96 @@ class KafkaSparkInference(BaseUtils):
             self.logger.info(f"✅ Prometheus metrics server started on port {prometheus_port}")
         except Exception as e:
             self.logger.warning(f"⚠️ Could not start Prometheus server: {e}")
-    
+
     # ===== CONFIGURATION LOADERS =====
+
     def _load_kafka_config(self):
-        """Carga configuración de Kafka desde params."""        
-        # Usar env vars con fallback a params.yaml
+        """Carga configuración de Kafka desde env vars y params."""
         self.kafka_bootstrap_servers = os.getenv('KAFKA_BOOTSTRAP_SERVERS')
         self.kafka_input_topic = os.getenv('KAFKA_TOPIC')
-        self.kafka_output_topic = os.getenv('KAFKA_TOPIC_OUTPUT')        
+        self.kafka_output_topic = os.getenv('KAFKA_TOPIC_OUTPUT')
         self.kafka_username = os.getenv('KAFKA_USERNAME')
         self.kafka_password = os.getenv('KAFKA_PASSWORD')
 
-        self.kafka_sasl_mechanism = os.getenv('KAFKA_SASL_MECHANISM','SCRAM-SHA-512')
+        self.kafka_sasl_mechanism = os.getenv('KAFKA_SASL_MECHANISM', 'SCRAM-SHA-512')
         self.kafka_security_protocol = os.getenv('KAFKA_SECURITY_PROTOCOL', 'SASL_PLAINTEXT')
-        
+
         self.kafka_sasl_jaas_config = (
             f'org.apache.kafka.common.security.scram.ScramLoginModule required '
             f'username="{self.kafka_username}" password="{self.kafka_password}";'
         )
-        
-        # Streaming options
+
+        # Streaming options (legitimately variable — kept in static params.yaml)
         streaming_config = self.params.get('streaming', {})
         self.online_processing_time = streaming_config.get('online_processing_time', '100 milliseconds')
         self.starting_offsets = streaming_config.get('starting_offsets', 'latest')
         self.fail_on_data_loss = streaming_config.get('fail_on_data_loss', False)
-        
+
         self.logger.info(f"✅ Kafka config: {self.kafka_input_topic} → {self.kafka_output_topic}")
-    
-    def _load_schema_config(self):
-        """Carga configuración de schemas desde params."""
-        schema_config = self.params.get('schemas', {})
-        
-        # Nombres de schemas
-        self.input_schema_name = schema_config.get('input_schema', 'kafka_schema_features')
-        self.features_schema_name = schema_config.get('features_schema', 'schema_features')
-        self.output_schema_name = schema_config.get('output_schema', 'prediction_schema')
-        
-        # Cargar schemas reales usando el registry
-        self.input_schema = get_schema(self.input_schema_name)
-        self.output_schema = get_schema(self.output_schema_name)
-        
+
+    def _load_schemas(self):
+        """Load Kafka input/output schemas from the schema registry.
+
+        Schema names are system constants — not user-configurable.
+        """
+        self.input_schema  = get_schema(_KAFKA_INPUT_SCHEMA)
+        self.output_schema = get_schema(_KAFKA_OUTPUT_SCHEMA)
         self.logger.info(
-            f"✅ Schemas loaded: input={self.input_schema_name}, "
-            f"output={self.output_schema_name}"
+            "✅ Schemas loaded: input=%s, output=%s",
+            _KAFKA_INPUT_SCHEMA, _KAFKA_OUTPUT_SCHEMA,
         )
-    
-    def _load_converter_config(self):
-        """Carga configuración de conversores desde params."""
-        converter_config = self.params.get('converters', {})
-        self.converter_name = converter_config.get('kafka_to_features', 'kafka_to_schema_features')
-        self.logger.info(f"✅ Converter configured: {self.converter_name}")
-    
+
+    def _read_id_field_from_s3(self) -> str:
+        """Download raw.yaml from RAW_SCHEMA_S3_PATH and read the id_field annotation.
+
+        Returns _DEFAULT_ID_COLUMN if env var is unset or the download fails.
+        """
+        s3_path = os.getenv('RAW_SCHEMA_S3_PATH', '')
+        if not s3_path:
+            return _DEFAULT_ID_COLUMN
+        try:
+            import boto3
+            import yaml
+            import re
+            match = re.match(r"s3://([^/]+)/(.+)", s3_path)
+            if not match:
+                return _DEFAULT_ID_COLUMN
+            bucket, key = match.group(1), match.group(2)
+            s3 = boto3.client(
+                "s3",
+                aws_access_key_id=os.getenv("AWS_ACCESS_KEY_ID"),
+                aws_secret_access_key=os.getenv("AWS_SECRET_ACCESS_KEY"),
+                region_name=os.getenv("AWS_REGION", "us-east-2"),
+            )
+            content = s3.get_object(Bucket=bucket, Key=key)["Body"].read().decode("utf-8")
+            schema = yaml.safe_load(content) or {}
+            id_field = schema.get("id_field", _DEFAULT_ID_COLUMN)
+            self.logger.info("✅ id_field='%s' read from %s", id_field, s3_path)
+            return str(id_field)
+        except Exception as exc:
+            self.logger.warning("⚠️ Could not read id_field from RAW_SCHEMA_S3_PATH: %s", exc)
+            return _DEFAULT_ID_COLUMN
+
+    def _get_raw_top_level_fields(self) -> List[str]:
+        """Return the top-level field names of the Kafka input schema.
+
+        Used to build the Kafka output value_columns without hard-coding them.
+        Falls back to a safe default list if introspection fails.
+        """
+        schema = self.input_schema
+        try:
+            # pyspark StructType exposes .fieldNames() or .names
+            if hasattr(schema, 'fieldNames'):
+                return list(schema.fieldNames())
+            if hasattr(schema, 'names'):
+                return list(schema.names)
+            if hasattr(schema, 'fields'):
+                return [f.name for f in schema.fields]
+        except Exception:
+            pass
+        # Fallback matching kafka_schema_features top-level structure
+        return ['timestamp', self.id_column, 'properties']
+
     def _normalize_serve_url(self, raw_url: str) -> str:
         """Normaliza URL de Ray Serve para tolerar http implícito y /infer/ trailing slash."""
         candidate = (raw_url or '').strip()
@@ -233,14 +286,19 @@ class KafkaSparkInference(BaseUtils):
         if parsed.query:
             normalized = f"{normalized}?{parsed.query}"
         return normalized
-    
+
     def _load_prediction_config(self):
-        """Carga configuración de predicción desde params."""
+        """Carga configuración de predicción desde params.
+
+        - prediction_column: system constant (_PREDICTION_COLUMN = 'label').
+        - id_column: dataset-specific; read from raw.yaml id_field annotation
+          via RAW_SCHEMA_S3_PATH env var, or overridden by KAFKA_ID_COLUMN.
+        """
         pred_config = self.params.get('prediction', {})
-        
+
         self.prediction_type = pred_config.get('type', 'ray_serve')
-        
-        # Configuración Ray Serve
+
+        # Ray Serve endpoint config (legitimately variable)
         if self.prediction_type == 'ray_serve':
             ray_config = pred_config.get('ray_serve', {})
             raw_ray_url = os.getenv(
@@ -253,24 +311,21 @@ class KafkaSparkInference(BaseUtils):
             self.ray_max_retries = ray_config.get('max_retries', 3)
             self.ray_payload_format = ray_config.get('request_payload_format', 'list')
             self.ray_pred_key = ray_config.get('prediction_key', 'predictions')
-        
-        # Configuración de columnas
-        columns_config = pred_config.get('columns', {})
-        self.id_column = columns_config.get('id_column', 'event_id')
-        self.prediction_column = columns_config.get('prediction_column', 'label')
-        
-        self.logger.info(f"✅ Prediction: {self.prediction_type} at {self.ray_url}")
-    
-    def _load_output_config(self):
-        """Carga configuración de salida desde params."""
-        output_config = self.params.get('output', {})
-        
-        self.output_format = output_config.get('format', 'json')
-        self.output_key_column = output_config.get('key_column', 'event_id')
-        self.output_value_columns = output_config.get('value_columns', ['timestamp', 'event_id', 'properties', 'label'])
-        
-        self.logger.info(f"✅ Output: format={self.output_format}")
-    
+
+        # prediction_column: always 'label' — system naming convention
+        self.prediction_column = _PREDICTION_COLUMN
+
+        # id_column: dataset-specific — read from raw.yaml via S3 or env override
+        self.id_column = os.getenv('KAFKA_ID_COLUMN') or self._read_id_field_from_s3()
+
+        # Derive output_value_columns: top-level raw schema fields + prediction column
+        self._raw_top_level_fields = self._get_raw_top_level_fields()
+
+        self.logger.info(
+            "✅ Prediction: type=%s, url=%s, id_column=%s, prediction_column=%s",
+            self.prediction_type, self.ray_url, self.id_column, self.prediction_column,
+        )
+
     def _load_checkpoint_config(self):
         """Carga configuración de checkpoint desde params."""
         checkpoint_config = self.params.get('checkpoint', {})
@@ -279,23 +334,29 @@ class KafkaSparkInference(BaseUtils):
             checkpoint_config.get('location', 's3a://k8s-mlops-platform-bucket/checkpoints/kafka-spark-inference')
         )
         self.logger.info(f"✅ Checkpoint: {self.checkpoint_location}")
-    
+
     # ===== MODULE LOADERS =====
+
     def _load_converter_function(self):
-        """Carga dinámicamente la función conversora."""
+        """Loads the schema converter.
+
+        kafka_to_schema_features is the only converter in the registry.
+        No dynamic lookup needed.
+        """
         try:
-            self.converter_function = get_converter(self.converter_name)
-            self.logger.info(f"✅ Converter function loaded: {self.converter_name}")
+            self.converter_function = get_converter("kafka_to_schema_features")
+            self.logger.info("✅ Converter function loaded: kafka_to_schema_features")
         except Exception as e:
             self.logger.error(f"Failed to load converter: {e}")
             raise
-    
+
     # ===== CONNECTION CHECKS =====
+
     def _check_kafka_connection(self):
         """Validación ligera de conectividad Kafka."""
         try:
             self.logger.info(f"Checking Kafka connection: {self.kafka_bootstrap_servers}")
-            
+
             conf = {
                 'bootstrap.servers': self.kafka_bootstrap_servers,
                 'group.id': 'kafka-connection-test',
@@ -308,33 +369,33 @@ class KafkaSparkInference(BaseUtils):
                 'socket.timeout.ms': 5000,
                 'api.version.request.timeout.ms': 5000
             }
-            
+
             consumer = Consumer(conf)
             metadata = consumer.list_topics(timeout=5)
             topics = metadata.topics
             consumer.close()
-            
+
             if topics:
                 self.logger.info(f"✅ Kafka connected: {len(topics)} topics available")
             else:
                 self.logger.warning("⚠️ Kafka connected but no topics found")
-            
+
         except KafkaException as e:
             self.logger.error(f"Kafka connection failed: {e}")
             raise
         except Exception as e:
             self.logger.error(f"Unexpected error during Kafka check: {e}")
             raise
-    
-    # ===== SPARK SESSION =====
-    
-    def _create_spark_session(self):
-        """Crea Spark session con configuración desde params."""
-        try:
-            self.logger.info("Creating SparkSession with Kafka and S3 support")            
-            builder = SparkSession.builder.appName(self.params['app_name'])
 
-            # Configuración S3
+    # ===== SPARK SESSION =====
+
+    def _create_spark_session(self):
+        """Crea Spark session con configuración S3 y Kafka."""
+        try:
+            self.logger.info("Creating SparkSession with Kafka and S3 support")
+            app_name = os.getenv('SPARK_APP_NAME', _APP_NAME)
+            builder = SparkSession.builder.appName(app_name)
+
             builder = (
                 builder
                 .config("spark.hadoop.fs.s3a.access.key", os.getenv("AWS_ACCESS_KEY_ID"))
@@ -350,15 +411,15 @@ class KafkaSparkInference(BaseUtils):
                 .config("spark.sql.adaptive.enabled", "false")
                 .config("spark.sql.streaming.metricsEnabled", "false")
             )
-            
+
             spark = builder.getOrCreate()
             self.logger.info("✅ SparkSession created")
             return spark
-            
+
         except Exception as e:
             self.logger.error(f"Failed to create SparkSession: {e}")
             raise
-    
+
     # ===== PIPELINE STEPS =====
 
     def read_from_kafka_online(self) -> DataFrame:
@@ -399,7 +460,7 @@ class KafkaSparkInference(BaseUtils):
         except Exception as e:
             self.logger.error(f"Schema conversion failed: {e}")
             raise
-    
+
     def predict_batch_online(self, df_converted: DataFrame) -> DataFrame:
         """
         Online mode: sends schema-converted rows to Ray Serve as raw events.
@@ -460,7 +521,7 @@ class KafkaSparkInference(BaseUtils):
                     .collect()
                 )
                 counts_by_cls = {int(r["cls"]): int(r["count"]) for r in rows if r["cls"] is not None}
-                for cls in range(self.params.get('num_classes', 2)):
+                for cls in range(_DEFAULT_NUM_CLASSES):
                     cnt = counts_by_cls.get(cls, 0)
                     PREDICTIONS_BY_CLASS_LAST_BATCH.labels(str(cls)).set(cnt)
                     if cnt:
@@ -490,29 +551,21 @@ class KafkaSparkInference(BaseUtils):
             BATCH_ERRORS_TOTAL.inc()
             self.logger.error(f"❌ Batch {batch_id} failed: {e}", exc_info=True)
             raise
-    
+
     def _write_to_kafka(self, df: DataFrame):
-        """Escribe resultados a Kafka según configuración."""
+        """Escribe resultados a Kafka.
+
+        Output columns are derived:
+          key   = id_column (event identifier from raw.yaml id_field)
+          value = JSON of all top-level raw schema fields + prediction column
+        """
         try:
-            # Seleccionar columnas según configuración
-            if isinstance(self.output_value_columns, list):
-                columns_expr = ', '.join(self.output_value_columns)
-            elif self.output_value_columns == 'all':
-                columns_expr = '*'
-            else:
-                # Por defecto, usar las columnas hardcodeadas originales
-                columns_expr = 'timestamp, event_id, properties, label'
-            
-            # Formatear salida
-            if self.output_format == 'json':
-                df_output = df.selectExpr(
-                    f"CAST({self.output_key_column} AS STRING) AS key",
-                    f"to_json(struct({columns_expr})) AS value"
-                )
-            else:
-                df_output = df
-            
-            # Escribir
+            value_cols = ', '.join(self._raw_top_level_fields + [self.prediction_column])
+            df_output = df.selectExpr(
+                f"CAST({self.id_column} AS STRING) AS key",
+                f"to_json(struct({value_cols})) AS value"
+            )
+
             (
                 df_output.write
                 .format("kafka")
@@ -523,11 +576,11 @@ class KafkaSparkInference(BaseUtils):
                 .option("kafka.sasl.jaas.config", self.kafka_sasl_jaas_config)
                 .save()
             )
-            
+
         except Exception as e:
             self.logger.error(f"Failed to write to Kafka: {e}")
             raise
-    
+
     # ===== MAIN PIPELINE =====
 
     def run_inference(self):
@@ -557,6 +610,7 @@ class KafkaSparkInference(BaseUtils):
         except Exception as e:
             self.logger.error("❌ Pipeline failed: %s", e, exc_info=True)
             raise
+
 
 # ===== ENTRY POINT =====
 def main():

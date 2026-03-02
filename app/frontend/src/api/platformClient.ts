@@ -181,6 +181,11 @@ export interface SchemaUploadResult {
   };
 }
 
+/** Lightweight schema response from /iceberg-schema — column list only, no rows. */
+export interface IcebergSchemaResult {
+  columns: ColumnMeta[];
+}
+
 // ─── Dataset API ──────────────────────────────────────────────────────────────
 
 export async function listDatasets(): Promise<DatasetInfo[]> {
@@ -231,6 +236,14 @@ export async function getIcebergSample(
   return _fetch<SampleResult>(
     `/api/v2/datasets/${datasetName}/sample?limit=${limit}`,
   );
+}
+
+/**
+ * Fetch column schema from iceberg.raw.{datasetName} without loading any rows.
+ * Used by the full.yaml editor "Load from Iceberg" button.
+ */
+export async function getIcebergSchema(datasetName: string): Promise<IcebergSchemaResult> {
+  return _fetch<IcebergSchemaResult>(`/api/v2/datasets/${datasetName}/iceberg-schema`);
 }
 
 // ─── DSL API ──────────────────────────────────────────────────────────────────

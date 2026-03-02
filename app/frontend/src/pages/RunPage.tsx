@@ -14,7 +14,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Check, ChevronDown, ChevronUp, Copy, RefreshCw } from 'lucide-react';
 import {
-  getIcebergSample,
+  getIcebergSchema,
   getPreprocessParams,
   getRunStatus,
   listDatasets,
@@ -41,6 +41,7 @@ import {
   type SchemaBuilderState,
   type SchemaColumn,
 } from '../lib/schemaYaml';
+import { type SparkDataType } from '../types/schema';
 import {
   XGBOOST_DEFAULTS,
   XGBOOST_TUNE_SETTINGS_DEFAULTS,
@@ -610,7 +611,7 @@ export function RunPage() {
     preprocessedColumns: [],
     targetColumn: '',
     idColumn: '',
-    predictionColumn: '',
+    typeOverrides: {},
   });
   const [schemaLoading, setSchemaLoading] = useState(false);
   const [schemaSaving, setSchemaSaving] = useState(false);
@@ -927,7 +928,7 @@ export function RunPage() {
     setSchemaLoading(true);
     setSchemaError('');
     try {
-      const r = await getIcebergSample(dataset, 10);
+      const r = await getIcebergSchema(dataset);
       const cols = r.columns as SchemaColumn[];
       setSchemaBuilder({
         allColumns: cols,
@@ -940,7 +941,7 @@ export function RunPage() {
         preprocessedColumns: [],
         targetColumn: '',
         idColumn: cols[0]?.name ?? '',
-        predictionColumn: 'label',
+        typeOverrides: {},
       });
     } catch (e) {
       setSchemaError(e instanceof Error ? e.message : String(e));
@@ -1858,17 +1859,18 @@ export function RunPage() {
                 <div className="space-y-1">
                   <p className={SUB_HEADING}>Column Assignment</p>
                   <div className="divide-y divide-slate-800 overflow-hidden rounded border border-slate-800">
-                    <div className="grid grid-cols-[1fr_80px_80px_80px_80px] bg-slate-800/50 px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                    <div className="grid grid-cols-[1fr_80px_80px_80px_80px_64px] bg-slate-800/50 px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-400">
                       <span>Column</span>
                       <span className="text-center">Top-level</span>
                       <span className="text-center">Properties</span>
                       <span className="text-center">Full</span>
                       <span className="text-center">Target</span>
+                      <span className="text-center">ID field</span>
                     </div>
                     {schemaBuilder.allColumns.map((col) => (
                       <div
                         key={col.name}
-                        className="grid grid-cols-[1fr_80px_80px_80px_80px] items-center px-3 py-1.5 hover:bg-slate-800/30"
+                        className="grid grid-cols-[1fr_80px_80px_80px_80px_64px] items-center px-3 py-1.5 hover:bg-slate-800/30"
                       >
                         <div>
                           <span className="font-mono text-xs text-slate-200">
@@ -1914,75 +1916,97 @@ export function RunPage() {
                             className="accent-blue-500"
                           />
                         </div>
+                        <div className="flex justify-center">
+                          <input
+                            type="radio"
+                            name="idColumn"
+                            checked={schemaBuilder.idColumn === col.name}
+                            onChange={() =>
+                              setSchemaBuilder((s) => ({
+                                ...s,
+                                idColumn: col.name,
+                              }))
+                            }
+                            className="accent-amber-400"
+                          />
+                        </div>
                       </div>
                     ))}
                   </div>
                 </div>
 
                 {/* Preprocessed features */}
-                <div className="space-y-1">
+                <div className="space-y-2">
                   <p className={SUB_HEADING}>Preprocessed Features (DSL output)</p>
-                  <div className="flex flex-wrap gap-2">
-                    {schemaBuilder.allColumns.map((col) => (
-                      <label
-                        key={col.name}
-                        className="flex cursor-pointer items-center gap-1"
-                      >
-                        <input
-                          type="checkbox"
-                          checked={schemaBuilder.preprocessedColumns.includes(
-                            col.name,
-                          )}
-                          onChange={(e) =>
-                            updateSchemaToggle(
-                              col.name,
-                              'preprocessedColumns',
-                              e.target.checked,
-                            )
-                          }
-                          className="accent-blue-500"
-                        />
-                        <span className="font-mono text-xs text-slate-300">
-                          {col.name}
-                        </span>
-                      </label>
-                    ))}
-                  </div>
-                </div>
-
-                {/* ID + prediction columns */}
-                <div className="grid grid-cols-2 gap-3">
-                  <Field label="ID Column">
-                    <select
-                      value={schemaBuilder.idColumn}
-                      onChange={(e) =>
-                        setSchemaBuilder((s) => ({
-                          ...s,
-                          idColumn: e.target.value,
-                        }))
-                      }
-                      className={SELECT_CLS}
-                    >
-                      <option value="">— none —</option>
-                      {schemaBuilder.allColumns.map((c) => (
-                        <option key={c.name} value={c.name}>
-                          {c.name}
-                        </option>
+                  <p className="text-[11px] text-slate-500">
+                    Column list is derived from the DSL pipeline — add columns
+                    to match your pipeline&apos;s final output features. All types
+                    default to <span className="font-mono">double</span>; override
+                    per column as needed.
+                  </p>
+                  {schemaBuilder.preprocessedColumns.length > 0 && (
+                    <div className="flex flex-wrap gap-1.5">
+                      {schemaBuilder.preprocessedColumns.map((name) => (
+                        <div
+                          key={name}
+                          className="flex items-center gap-1 rounded bg-slate-800 px-2 py-0.5 text-xs"
+                        >
+                          <span className="font-mono text-slate-200">{name}</span>
+                          <select
+                            value={schemaBuilder.typeOverrides?.[name] ?? 'double'}
+                            onChange={(e) =>
+                              setSchemaBuilder((s) => ({
+                                ...s,
+                                typeOverrides: {
+                                  ...s.typeOverrides,
+                                  [name]: e.target.value as SparkDataType,
+                                },
+                              }))
+                            }
+                            className="ml-1 rounded bg-slate-700 px-1 py-0 text-[10px] text-slate-300"
+                          >
+                            {(['double', 'integer', 'long'] as const).map((t) => (
+                              <option key={t} value={t}>{t}</option>
+                            ))}
+                          </select>
+                          <button
+                            type="button"
+                            onClick={() =>
+                              updateSchemaToggle(name, 'preprocessedColumns', false)
+                            }
+                            className="ml-0.5 text-slate-500 hover:text-red-400"
+                          >
+                            ×
+                          </button>
+                        </div>
                       ))}
+                    </div>
+                  )}
+                  <div className="flex items-center gap-2">
+                    <select
+                      className={SELECT_CLS}
+                      value=""
+                      onChange={(e) => {
+                        if (e.target.value) {
+                          updateSchemaToggle(e.target.value, 'preprocessedColumns', true);
+                          e.target.value = '';
+                        }
+                      }}
+                    >
+                      <option value="">Add feature column…</option>
+                      {schemaBuilder.allColumns
+                        .filter(
+                          (c) =>
+                            !schemaBuilder.preprocessedColumns.includes(c.name) &&
+                            c.name !== schemaBuilder.targetColumn,
+                        )
+                        .map((c) => (
+                          <option key={c.name} value={c.name}>
+                            {c.name}
+                          </option>
+                        ))}
                     </select>
-                  </Field>
-                  <Field label="Prediction Column">
-                    <input
-                      value={schemaBuilder.predictionColumn}
-                      onChange={(e) =>
-                        setSchemaBuilder((s) => ({
-                          ...s,
-                          predictionColumn: e.target.value,
-                        }))
-                      }
-                      className={INPUT_CLS}
-                    />
-                  </Field>
+                  </div>
                 </div>
 
                 {/* Schema errors */}

@@ -10,6 +10,8 @@
  * inline flow-style format: {name: x, type: y, nullable: z}
  */
 
+import type { SparkDataType } from '../types/schema';
+
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 export interface SchemaColumn {
@@ -31,10 +33,14 @@ export interface SchemaBuilderState {
   preprocessedColumns: string[];
   /** Name of the target column */
   targetColumn: string;
-  /** Name of the id column */
+  /** Name of the id column — written as id_field in raw.yaml */
   idColumn: string;
-  /** Name of the prediction column */
-  predictionColumn: string;
+  /**
+   * Per-column type overrides for preprocessed.yaml.
+   * By default all preprocessed columns are 'double'.
+   * Use this to override specific columns to 'long', 'integer', etc.
+   */
+  typeOverrides?: Record<string, SparkDataType>;
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -67,6 +73,9 @@ function structSubFieldLine(col: SchemaColumn): string {
 /**
  * Generate raw.yaml — raw Kafka input schema.
  *
+ * Includes id_field metadata at the top so kafka_main.py can derive
+ * the event identifier without per-run params configuration.
+ *
  * Top-level fields are flat. The 'properties' struct wraps its sub-fields
  * using block YAML style. This matches the existing raw.yaml format.
  */
@@ -74,12 +83,19 @@ export function generateRawYaml(
   state: SchemaBuilderState,
   datasetName = '',
 ): string {
-  const { allColumns, rawTopLevel, propertiesFields } = state;
+  const { allColumns, rawTopLevel, propertiesFields, idColumn } = state;
 
   const lines: string[] = [
     `# Schema: ${datasetName || '<dataset>'} — raw Kafka input`,
-    'fields:',
   ];
+
+  // id_field annotation: read by kafka_main.py to derive id_column + Kafka message key
+  if (idColumn) {
+    lines.push(`id_field: ${idColumn}`);
+    lines.push('');
+  }
+
+  lines.push('fields:');
 
   for (const name of rawTopLevel) {
     const col = lookupColumn(name, allColumns);
@@ -125,24 +141,25 @@ export function generateFullYaml(
 /**
  * Generate preprocessed.yaml — DSL output features.
  *
- * All preprocessed columns are type: double, nullable: true (DSL output convention).
- * If a column has a different type in allColumns, its actual type is used.
+ * All preprocessed columns default to type: double, nullable: true.
+ * Individual columns can be overridden via state.typeOverrides.
+ * The column list is DSL-derived and must NOT be manually edited by users.
  */
 export function generatePreprocessedYaml(
   state: SchemaBuilderState,
   datasetName = '',
 ): string {
-  const { allColumns, preprocessedColumns } = state;
+  const { preprocessedColumns, typeOverrides = {} } = state;
 
   const lines: string[] = [
     `# Schema: ${datasetName || '<dataset>'} — preprocessed (${preprocessedColumns.length} DSL output features)`,
+    '# Column list is derived from the DSL pipeline — do not edit manually.',
     'fields:',
   ];
 
   for (const name of preprocessedColumns) {
-    const col = lookupColumn(name, allColumns);
-    // DSL output features are always double by convention; preserve actual type if loaded
-    const type = col.sparkType !== 'string' ? col.sparkType : 'double';
+    // Apply user override if present; default to double (DSL output convention)
+    const type: string = typeOverrides[name] ?? 'double';
     lines.push(`  - {name: ${name}, type: ${type}, nullable: true}`);
   }
 
@@ -155,31 +172,42 @@ export function generatePreprocessedYaml(
  */
 export function validateSchemaBuilder(state: SchemaBuilderState): string[] {
   const errors: string[] = [];
-  const { fullColumns, preprocessedColumns, targetColumn } = state;
+  const { fullColumns, preprocessedColumns, targetColumn, propertiesFields, idColumn, rawTopLevel } = state;
 
+  // Target column checks
   if (!targetColumn) {
     errors.push('Schema: target column must be selected');
   }
-
-  if (targetColumn && fullColumns.includes(targetColumn)) {
-    // The target must be in fullColumns, but must NOT be in preprocessedColumns
-    if (preprocessedColumns.includes(targetColumn)) {
-      errors.push('Schema: target column must not be in preprocessed features');
-    }
+  if (targetColumn && !fullColumns.includes(targetColumn)) {
+    errors.push('Schema: target column must be included in full.yaml columns');
+  }
+  if (targetColumn && preprocessedColumns.includes(targetColumn)) {
+    errors.push('Schema: target column must not be in preprocessed features');
   }
 
+  // Duplicate checks
   const fullSet = new Set(fullColumns);
   if (fullSet.size !== fullColumns.length) {
     errors.push('Schema: full.yaml has duplicate columns');
   }
-
   const prepSet = new Set(preprocessedColumns);
   if (prepSet.size !== preprocessedColumns.length) {
     errors.push('Schema: preprocessed.yaml has duplicate columns');
   }
 
-  if (targetColumn && !fullColumns.includes(targetColumn)) {
-    errors.push('Schema: target column must be included in full.yaml columns');
+  // id_field check
+  if (idColumn && !rawTopLevel.includes(idColumn)) {
+    errors.push(`Schema: id_field '${idColumn}' must be a top-level field in raw.yaml`);
+  }
+
+  // Cross-schema: all properties.* fields must exist in full.yaml (non-target)
+  const fullNonTarget = new Set(fullColumns.filter((c) => c !== targetColumn));
+  for (const propField of propertiesFields) {
+    if (!fullNonTarget.has(propField)) {
+      errors.push(
+        `Schema: raw.yaml properties field '${propField}' is missing from full.yaml`,
+      );
+    }
   }
 
   return errors;

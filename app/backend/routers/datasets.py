@@ -2,13 +2,14 @@
 Dataset management router.
 
 Endpoints:
-  GET  /api/v2/datasets                        - list datasets (S3 raw/ prefixes)
-  POST /api/v2/datasets                        - create dataset (create S3 prefix)
-  POST /api/v2/datasets/{name}/upload          - upload parquet files to S3 raw/{name}/
-  POST /api/v2/datasets/{name}/ingest          - submit SparkApplication ingestion job
-  GET  /api/v2/datasets/{name}/ingest/{job}/status - poll ingestion job state
-  GET  /api/v2/datasets/{name}/sample          - fetch up to 3000 rows from iceberg.raw.{name}
-  POST /api/v2/datasets/{name}/schemas         - upload versioned schema YAMLs to S3
+  GET  /api/v2/datasets                              - list datasets (S3 raw/ prefixes)
+  POST /api/v2/datasets                              - create dataset (create S3 prefix)
+  POST /api/v2/datasets/{name}/upload                - upload parquet files to S3 raw/{name}/
+  POST /api/v2/datasets/{name}/ingest                - submit SparkApplication ingestion job
+  GET  /api/v2/datasets/{name}/ingest/{job}/status   - poll ingestion job state
+  GET  /api/v2/datasets/{name}/sample                - fetch up to 3000 rows from iceberg.raw.{name}
+  GET  /api/v2/datasets/{name}/iceberg-schema        - return column schema from iceberg.raw.{name}
+  POST /api/v2/datasets/{name}/schemas               - upload versioned schema YAMLs to S3
 """
 
 from __future__ import annotations
@@ -218,6 +219,50 @@ async def ingest_status(name: str, job_name: str):
     return {"state": state}
 
 
+def _iceberg_catalog():
+    """Return a pyiceberg GlueCatalog using the correct pyiceberg property keys."""
+    from pyiceberg.catalog import load_catalog
+    return load_catalog(
+        "glue",
+        **{
+            "type": "glue",
+            "client.region": AWS_REGION,
+            "client.access-key-id": os.getenv("AWS_ACCESS_KEY_ID", ""),
+            "client.secret-access-key": os.getenv("AWS_SECRET_ACCESS_KEY", ""),
+        },
+    )
+
+
+@router.get("/{name}/iceberg-schema")
+async def get_iceberg_schema(name: str):
+    """Return column schema from iceberg.raw.{name} without fetching any rows.
+
+    Used by the frontend 'Load from Iceberg' button in the full.yaml editor.
+    Response: { columns: [{name, sparkType, nullable}] }
+    """
+    _validate_dataset_name(name)
+    try:
+        catalog = _iceberg_catalog()
+        table = catalog.load_table(f"raw.{name}")
+        iceberg_schema = table.schema()
+    except Exception as exc:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to load Iceberg schema for iceberg.raw.{name}: {exc}",
+        ) from exc
+
+    columns = []
+    for field in iceberg_schema.fields:
+        type_str = str(field.field_type).lower()
+        spark_type = _iceberg_to_spark_type(type_str)
+        columns.append({
+            "name": field.name,
+            "sparkType": spark_type,
+            "nullable": field.optional,
+        })
+    return {"columns": columns}
+
+
 @router.get("/{name}/sample")
 async def get_sample(name: str, limit: int = 3000):
     """Fetch up to `limit` rows from iceberg.raw.{name} via pyiceberg."""
@@ -225,18 +270,7 @@ async def get_sample(name: str, limit: int = 3000):
     limit = min(limit, 3000)
 
     try:
-        from pyiceberg.catalog.glue import GlueCatalog
-
-        catalog = GlueCatalog(
-            "glue",
-            **{
-                "glue.region": AWS_REGION,
-                "s3.region": AWS_REGION,
-                "warehouse": f"s3://{S3_BUCKET}/warehouse/",
-                "aws_access_key_id": os.getenv("AWS_ACCESS_KEY_ID", ""),
-                "aws_secret_access_key": os.getenv("AWS_SECRET_ACCESS_KEY", ""),
-            },
-        )
+        catalog = _iceberg_catalog()
         table = catalog.load_table(f"raw.{name}")
         df = table.scan(limit=limit).to_pandas()
     except Exception as exc:
@@ -255,16 +289,18 @@ async def get_sample(name: str, limit: int = 3000):
 
 @router.get("/from-iceberg")
 async def get_schema_from_iceberg(table: str):
-    """Bridge for the DSL builder to load schema from any Iceberg table."""
-    # table is expected as 'catalog.db.table' or just 'table' (which we treat as iceberg.raw.{table})
-    # If it contains raw. we strip it to use get_sample
+    """Bridge for the DSL builder to load schema from any Iceberg table.
+
+    Fetches a small sample (10 rows) to provide schema + sampleRows.
+    'table' can be 'catalog.namespace.table' or just 'table_name'.
+    """
     name = table.split(".")[-1]
-    res = await get_sample(name)
+    res = await get_sample(name, limit=10)
     return {
         "columns": res["columns"],
-        "sampleRows": res["rows"][:10],
+        "sampleRows": res["rows"],
         "schemaHash": "iceberg",
-        "uploadedPath": f"iceberg:{table}"
+        "uploadedPath": f"iceberg:{table}",
     }
 
 
@@ -343,9 +379,23 @@ _PANDAS_TYPE_MAP = {
     "datetime64": "timestamp",
 }
 
+_ICEBERG_TYPE_MAP = {
+    "long": "long", "integer": "integer", "int": "integer",
+    "double": "double", "float": "double",
+    "string": "string", "boolean": "boolean",
+    "timestamp": "timestamp", "timestamptz": "timestamp",
+    "date": "timestamp", "binary": "string",
+}
+
 
 def _pandas_to_spark(dtype_str: str) -> str:
     for k, v in _PANDAS_TYPE_MAP.items():
         if k in dtype_str:
             return v
     return "string"
+
+
+def _iceberg_to_spark_type(iceberg_type_str: str) -> str:
+    """Map an Iceberg type string to a Spark type string."""
+    t = iceberg_type_str.lower().split("<")[0].strip()  # strip generics like list<...>
+    return _ICEBERG_TYPE_MAP.get(t, "string")

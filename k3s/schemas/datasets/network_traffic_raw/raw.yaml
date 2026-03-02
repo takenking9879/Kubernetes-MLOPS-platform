@@ -2,6 +2,10 @@
 # Equivalent to src/schemas/spark/schemas.py :: kafka_schema_features
 # Upload to: s3://k8s-mlops-platform-bucket/schemas/datasets/network_traffic_raw/raw.yaml
 
+# id_field: top-level field used as the event identifier.
+# Read by kafka_main.py (via RAW_SCHEMA_S3_PATH) to derive id_column and Kafka message key.
+id_field: event_id
+
 fields:
   - {name: timestamp, type: string, nullable: true}
   - {name: event_id,  type: string, nullable: false}

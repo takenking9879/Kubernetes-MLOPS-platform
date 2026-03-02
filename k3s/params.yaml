@@ -2,21 +2,41 @@
 # REFERENCIA PARA DESARROLLADORES — NO SE USA EN RUNTIME
 #
 # A partir de la separación de params (2026-02-27), los archivos de ejecución
-# reales son generados por el backend y subidos a S3 bajo params/{execution_id}/:
+# reales son generados por el backend y subidos a S3 bajo params/{execution_id}/
 #
 #   params_preprocess.yaml  — config de Spark preprocessing (escrito por processing_runs.py)
 #   params_training.yaml    — config de entrenamiento Ray (escrito por runs.py)
 #   params_serving.yaml     — config de serving Ray Serve (escrito por runs.py)
 #
-# Este archivo es solo una referencia de la estructura completa anterior.
+# Este archivo (k3s/params.yaml) es leído en runtime únicamente por:
+#   - k3s/spark/inference/kafka_main.py (Kafka streaming job, runs continuously)
+#
+# Solo quedan aquí los campos de dominio INFERENCE que kafka_main.py lee:
+#   spark.streaming.* — micro-batch timing, offsets
+#   spark.checkpoint.* — Spark streaming checkpoint location
+#   spark.operational.* — connection health checks
+#   spark.prediction.ray_serve.* — Ray Serve endpoint, batch, timeout, retries
+#
+# CAMPOS ELIMINADOS (anti-patterns detectados en auditoría 2026-02-27):
+#   spark.schemas.*         → constantes internas del SchemaRegistry (hardcoded en kafka_main.py)
+#   spark.converters.*      → un único converter existe; hardcoded en kafka_main.py
+#   spark.prediction.columns.prediction_column → siempre 'label'; constante del sistema
+#   spark.prediction.columns.id_column → ahora en raw.yaml::id_field
+#   spark.output.*          → derivado de raw.yaml + prediction_column
+#   spark.app_name          → constante en kafka_main.py (_APP_NAME)
+#   spark.num_classes       → duplicado de model.num_classes; constante en kafka_main.py
+#   spark.target            → duplicado de model.target
+#   spark.read_batch_size   → tuning operacional, no afecta reproducibilidad ML
+#   spark.write_batch_size  → idem
+#
 # Static infrastructure config lives in k3s/config.yaml.
 # ============================================================================
 
 # ---- Execution identity (set by UI / Airflow) ----
 execution:
   execution_id: ""          # e.g. "20260223_120000"
-  raw_table: ""             # e.g. "iceberg.raw.network_traffic_raw"
-  dsl_s3_path: ""           # e.g. "s3://k8s-mlops-platform-bucket/dsl/dsl_network_traffic_raw/v1.yaml"
+  raw_table: ""             # e.g. "iceberg.raw.network_traffic"
+  dsl_s3_path: ""           # e.g. "s3://k8s-mlops-platform-bucket/dsl/dsl_network_traffic/v1.yaml"
 
 # ---- Time splits ----
 splits:
@@ -103,46 +123,43 @@ kuberay:
     canary_probability: 0.10
     initial_replicas: 0
 
+# ============================================================================
+# SPARK INFERENCE CONFIG — read by kafka_main.py (streaming job)
+#
+# Only inference-domain fields remain here.
+# Fields removed (see header above): schemas, converters, output, prediction.columns,
+# app_name, num_classes, target, read_batch_size, write_batch_size.
+# ============================================================================
+
 spark:
-  app_name: "spark-preprocessing"
+  preprocessing:
+    dsl_path: "/app/repo/k3s/spark/preprocess/dsl_001.yaml"
+    artifacts:
+      bucket: "k8s-mlops-platform-bucket"
+      archives: ["config.json", "stages.json"]
+
+  # bucket: used by spark/main.py for schema S3 auto-discovery
   bucket: "k8s-mlops-platform-bucket"
-  read_batch_size: 512
-  write_batch_size: 100000
-  num_classes: 6
-  target: "attack"
 
-  schemas:
-    input_schema: "kafka_schema_features"
-    features_schema: "schema_features"
-    output_schema: "prediction_schema"
-    preprocessed_schema: "schema_preprocessed"
-    full_schema: "schema_full"
-
-  converters:
-    kafka_to_features: "kafka_to_schema_features"
+  # iceberg warehouse: fallback for spark/main.py catalog
+  iceberg:
+    warehouse: "s3a://k8s-mlops-platform-bucket/warehouse"
 
   prediction:
     type: "ray_serve"
     ray_serve:
       url: "http://model-serving-serve-svc.ray.svc.cluster.local:8000/infer"
-      batch_size: 256
+      batch_size: 100
       timeout: 30
       max_retries: 3
       request_payload_format: "list"
       response_format: "json"
       prediction_key: "predictions"
-    columns:
-      id_column: "event_id"
-      prediction_column: "label"
 
-  output:
-    format: "json"
-    key_column: "event_id"
-    value_columns:
-      - "timestamp"
-      - "event_id"
-      - "properties"
-      - "label"
+  streaming:
+    online_processing_time: "250 milliseconds"
+    starting_offsets: "latest"
+    fail_on_data_loss: false
 
   checkpoint:
     location: "s3a://k8s-mlops-platform-bucket/checkpoints/kafka-spark-inference"
@@ -152,19 +169,14 @@ spark:
     check_kafka_connection: true
     log_level: "INFO"
 
-  streaming:
-    online_processing_time: "250 milliseconds"
-    starting_offsets: "latest"
-    fail_on_data_loss: false
-
 iceberg_tables:
   warehouse: "s3://k8s-mlops-platform-bucket/warehouse"
 
   raw:
     catalog: "iceberg"
     namespace: "raw"
-    table: "network_traffic_raw"
-    full_name: "iceberg.raw.network_traffic_raw"
+    table: "network_traffic"
+    full_name: "iceberg.raw.network_traffic"
 
   metadata:
     catalog: "iceberg"
@@ -176,4 +188,4 @@ iceberg_tables:
     catalog: "iceberg"
     namespace: "processed"
     # Tables created as: iceberg.processed.{raw_table}_{artifact_id}
-    # e.g.              iceberg.processed.network_traffic_raw_20260223_050000
+    # e.g.              iceberg.processed.network_traffic_20260223_050000
