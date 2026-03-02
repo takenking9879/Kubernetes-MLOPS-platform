@@ -14,13 +14,16 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Check, ChevronDown, ChevronUp, Copy, RefreshCw } from 'lucide-react';
 import {
+  getDslFeatures,
   getPreprocessParams,
   getRunStatus,
   listDatasets,
+  listDsls,
   listProcessingRuns,
   submitRun,
   uploadSchemas,
   type DatasetInfo,
+  type DslVersion,
   type ProcessedTableEntry,
   type RunResult,
   type SchemaUploadResult,
@@ -39,6 +42,7 @@ import {
   generateRawYamlV2,
   generateFullYamlV2,
   generatePreprocessedYamlV2,
+  syncLegacyFields,
   validateSchemaBuilder,
   type SchemaBuilderState,
 } from '../lib/schemaYaml';
@@ -564,6 +568,8 @@ export function RunPage() {
   // rawDatasetFilter: selector de dataset fuente — NO se guarda en params.yaml
   const [rawDatasetFilter, setRawDatasetFilter] = useState('');
   const [dslVersion, setDslVersion] = useState<number | ''>('');
+  const [dslList, setDslList] = useState<DslVersion[]>([]);
+  const [dslListLoading, setDslListLoading] = useState(false);
   const [availableDatasets, setAvailableDatasets] = useState<DatasetInfo[]>([]);
   const [processingRuns, setProcessingRuns] = useState<ProcessedTableEntry[]>([]);
   const [selectedProcessedTable, setSelectedProcessedTable] = useState('');
@@ -654,32 +660,24 @@ export function RunPage() {
       .catch(() => setAvailableDatasets([]));
   }, []);
 
-  // Load processing runs filtered by rawDatasetFilter
+  // Load processing runs + DSL list when rawDatasetFilter changes
   useEffect(() => {
     if (!rawDatasetFilter) {
       setProcessingRuns([]);
+      setDslList([]);
       setSelectedProcessedTable('');
       setDslVersion('');
       return;
     }
-    listProcessingRuns(rawDatasetFilter)
+    void listProcessingRuns(rawDatasetFilter)
       .then((r) => setProcessingRuns(r.runs))
       .catch(() => setProcessingRuns([]));
+    setDslListLoading(true);
+    void listDsls(rawDatasetFilter)
+      .then((r) => setDslList(r.dsls))
+      .catch(() => setDslList([]))
+      .finally(() => setDslListLoading(false));
   }, [rawDatasetFilter]);
-
-  // Sync dslVersion when selectedProcessedTable changes
-  useEffect(() => {
-    if (selectedProcessedTable && processingRuns.length > 0) {
-      const match = processingRuns.find(
-        (r) => r.processed_table_name === selectedProcessedTable
-      );
-      if (match) {
-        setDslVersion(match.dsl_version);
-      }
-    } else {
-      setDslVersion('');
-    }
-  }, [selectedProcessedTable, processingRuns]);
 
   // dataset = rawDatasetFilter (ya no se deriva del entry)
   useEffect(() => {
@@ -890,6 +888,38 @@ export function RunPage() {
   // ── Handlers ──────────────────────────────────────────────────────────────
 
 
+  const handleDslSelectStep1 = async (version: number) => {
+    if (!rawDatasetFilter || !version) return;
+    setDslVersion(version);
+    // Infer processed table from matching run
+    const matchingRun = processingRuns.find((r) => r.dsl_version === version);
+    const processedTable = matchingRun?.processed_table_name ?? '';
+    setSelectedProcessedTable(processedTable);
+    // Load DSL features and pre-populate schemaBuilder
+    try {
+      const result = await getDslFeatures(rawDatasetFilter, version);
+      const preprocessedFields = result.finalFeatures.features.map((name) => ({
+        name,
+        source: 'dsl_derived' as const,
+        dslLocked: true,
+      }));
+      const generatedFrom = `${result.slug} / iceberg.raw.${rawDatasetFilter}`;
+      setSchemaBuilder((prev) =>
+        syncLegacyFields({
+          ...prev,
+          dataset: rawDatasetFilter,
+          dslName: result.slug,
+          dslVersion: version,
+          processedTableName: processedTable,
+          generatedFrom,
+          preprocessedFields,
+        }),
+      );
+    } catch {
+      // DSL feature load failure is non-blocking; Schema Builder can retry
+    }
+  };
+
   const handleInspectParams = async () => {
     const entry = processingRuns.find((r) => r.processed_table_name === selectedProcessedTable);
     if (!entry) return;
@@ -1062,12 +1092,12 @@ export function RunPage() {
           {/* ── STEP 1: Processed Table & Execution ── */}
           {currentStep === 1 && (
             <div className="space-y-4">
-              <p className={SUB_HEADING}>Processed Table & Execution</p>
+              <p className={SUB_HEADING}>DSL & Execution</p>
 
               <div className="space-y-3">
                 <p className="text-xs text-slate-500">
-                  Elige el dataset fuente para filtrar las tablas procesadas,
-                  luego selecciona la tabla sobre la que entrenar.
+                  Select the source dataset, then choose a DSL version.
+                  The processed table is inferred automatically from the DSL selection.
                 </p>
 
                 {/* Raw Dataset filter — solo filtra, NO se guarda en params_training.yaml */}
@@ -1099,25 +1129,34 @@ export function RunPage() {
                   )}
                 </Field>
 
-                {/* Processed Table — solo nombre, con botón de inspección */}
-                <Field label="Processed Table" tooltip="Tabla Iceberg generada por un run de preprocesamiento.">
+                {/* DSL Name — drives processed table inference */}
+                <Field label="DSL Name" tooltip="Select the DSL version used for preprocessing. The Processed Table is inferred automatically.">
                   <div className="flex gap-1">
                     <select
-                      value={selectedProcessedTable}
-                      onChange={(e) => setSelectedProcessedTable(e.target.value)}
+                      value={dslVersion === '' ? '' : String(dslVersion)}
+                      onChange={(e) => {
+                        const v = Number(e.target.value);
+                        if (v) void handleDslSelectStep1(v);
+                        else {
+                          setDslVersion('');
+                          setSelectedProcessedTable('');
+                        }
+                      }}
                       className={SELECT_CLS}
-                      disabled={!rawDatasetFilter || processingRuns.length === 0}
+                      disabled={!rawDatasetFilter || dslListLoading || dslList.length === 0}
                     >
                       <option value="">
                         {!rawDatasetFilter
                           ? '— select a dataset first —'
-                          : processingRuns.length === 0
-                            ? '— no processed tables found —'
-                            : '— select processed table —'}
+                          : dslListLoading
+                            ? '— loading DSLs… —'
+                            : dslList.length === 0
+                              ? '— no DSLs found —'
+                              : '— select DSL —'}
                       </option>
-                      {processingRuns.map((r) => (
-                        <option key={r.execution_id} value={r.processed_table_name}>
-                          {r.processed_table_name}
+                      {dslList.map((d) => (
+                        <option key={d.version} value={String(d.version)}>
+                          v{d.version} · {d.slug}
                         </option>
                       ))}
                     </select>
@@ -1130,6 +1169,14 @@ export function RunPage() {
                       🔍
                     </button>
                   </div>
+                  {selectedProcessedTable && (
+                    <p className="mt-1 text-[11px] text-slate-500">
+                      Processed table:{' '}
+                      <code className="rounded bg-slate-800 px-1 text-slate-400">
+                        {selectedProcessedTable}
+                      </code>
+                    </p>
+                  )}
                 </Field>
 
                 <Field
@@ -1793,7 +1840,6 @@ export function RunPage() {
             state={schemaBuilder}
             onChange={setSchemaBuilder}
             inferredDataset={rawDatasetFilter}
-            processingRuns={processingRuns}
             onSave={handleSaveSchemas}
             onDownload={downloadYaml}
             isSaving={schemaSaving}
