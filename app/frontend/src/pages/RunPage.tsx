@@ -14,7 +14,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Check, ChevronDown, ChevronUp, Copy, RefreshCw } from 'lucide-react';
 import {
-  getIcebergSchema,
   getPreprocessParams,
   getRunStatus,
   listDatasets,
@@ -37,11 +36,13 @@ import {
   generateRawYaml,
   generateFullYaml,
   generatePreprocessedYaml,
+  generateRawYamlV2,
+  generateFullYamlV2,
+  generatePreprocessedYamlV2,
   validateSchemaBuilder,
   type SchemaBuilderState,
-  type SchemaColumn,
 } from '../lib/schemaYaml';
-import { type SparkDataType } from '../types/schema';
+import { SchemaBuilderSection } from '../components/schema/SchemaBuilderSection';
 import {
   XGBOOST_DEFAULTS,
   XGBOOST_TUNE_SETTINGS_DEFAULTS,
@@ -604,7 +605,19 @@ export function RunPage() {
 
   // ── Schema builder ────────────────────────────────────────────────────────
   const [schemaBuilder, setSchemaBuilder] = useState<SchemaBuilderState>({
+    // V2 fields
+    dataset: '',
+    dslName: '',
+    dslVersion: '',
+    processedTableName: '',
+    generatedFrom: '',
     allColumns: [],
+    rawFields: [],
+    rawGroups: { properties: 'properties' },
+    idField: '',
+    fullFields: [],
+    preprocessedFields: [],
+    // V1 legacy compat
     rawTopLevel: [],
     propertiesFields: [],
     fullColumns: [],
@@ -613,9 +626,7 @@ export function RunPage() {
     idColumn: '',
     typeOverrides: {},
   });
-  const [schemaLoading, setSchemaLoading] = useState(false);
   const [schemaSaving, setSchemaSaving] = useState(false);
-  const [schemaError, setSchemaError] = useState('');
   const [schemaSaveResult, setSchemaSaveResult] =
     useState<SchemaUploadResult | null>(null);
 
@@ -736,27 +747,29 @@ export function RunPage() {
     () => generateParamsYaml(paramsInput),
     [paramsInput],
   );
-  const rawYamlPreview = useMemo(
-    () =>
-      schemaBuilder.allColumns.length
-        ? generateRawYaml(schemaBuilder, dataset)
-        : '# Load columns to preview schema',
-    [schemaBuilder, dataset],
-  );
-  const fullYamlPreview = useMemo(
-    () =>
-      schemaBuilder.allColumns.length
-        ? generateFullYaml(schemaBuilder, dataset)
-        : '# Load columns to preview schema',
-    [schemaBuilder, dataset],
-  );
-  const preprocessedYamlPreview = useMemo(
-    () =>
-      schemaBuilder.allColumns.length
-        ? generatePreprocessedYaml(schemaBuilder, dataset)
-        : '# Load columns to preview schema',
-    [schemaBuilder, dataset],
-  );
+  const rawYamlPreview = useMemo(() => {
+    if (schemaBuilder.rawFields.length > 0)
+      return generateRawYamlV2(schemaBuilder);
+    if (schemaBuilder.allColumns.length)
+      return generateRawYaml(schemaBuilder, schemaBuilder.dataset || dataset);
+    return '# Select a DSL and load Iceberg columns to preview schema';
+  }, [schemaBuilder, dataset]);
+
+  const fullYamlPreview = useMemo(() => {
+    if (schemaBuilder.fullFields.length > 0)
+      return generateFullYamlV2(schemaBuilder);
+    if (schemaBuilder.allColumns.length)
+      return generateFullYaml(schemaBuilder, schemaBuilder.dataset || dataset);
+    return '# Select a DSL and load Iceberg columns to preview schema';
+  }, [schemaBuilder, dataset]);
+
+  const preprocessedYamlPreview = useMemo(() => {
+    if (schemaBuilder.preprocessedFields.length > 0)
+      return generatePreprocessedYamlV2(schemaBuilder);
+    if (schemaBuilder.preprocessedColumns.length)
+      return generatePreprocessedYaml(schemaBuilder, schemaBuilder.dataset || dataset);
+    return '# Select a DSL to preview preprocessed features';
+  }, [schemaBuilder, dataset]);
 
   // ── Step validation ────────────────────────────────────────────────────────
 
@@ -920,41 +933,10 @@ export function RunPage() {
     }
   };
 
-  const handleLoadSchema = async () => {
-    if (!dataset) {
-      setSchemaError('Select a dataset first');
-      return;
-    }
-    setSchemaLoading(true);
-    setSchemaError('');
-    try {
-      const r = await getIcebergSchema(dataset);
-      const cols = r.columns as SchemaColumn[];
-      setSchemaBuilder({
-        allColumns: cols,
-        rawTopLevel: cols
-          .filter((c) => !c.name.includes('.'))
-          .slice(0, 3)
-          .map((c) => c.name),
-        propertiesFields: [],
-        fullColumns: cols.map((c) => c.name),
-        preprocessedColumns: [],
-        targetColumn: '',
-        idColumn: cols[0]?.name ?? '',
-        typeOverrides: {},
-      });
-    } catch (e) {
-      setSchemaError(e instanceof Error ? e.message : String(e));
-    } finally {
-      setSchemaLoading(false);
-    }
-  };
-
   const handleSaveSchemas = async () => {
     if (!dataset) return;
     setSchemaSaving(true);
     setSchemaSaveResult(null);
-    setSchemaError('');
     try {
       const r = await uploadSchemas(dataset, {
         raw: rawYamlPreview,
@@ -962,8 +944,8 @@ export function RunPage() {
         preprocessed: preprocessedYamlPreview,
       });
       setSchemaSaveResult(r);
-    } catch (e) {
-      setSchemaError(e instanceof Error ? e.message : String(e));
+    } catch {
+      // error surfaced via SchemaBuilderSection's onSave rejection
     } finally {
       setSchemaSaving(false);
     }
@@ -1009,26 +991,6 @@ export function RunPage() {
       ...prev,
       [split]: { ...prev[split], [field]: val },
     }));
-  };
-
-  const updateSchemaToggle = (
-    colName: string,
-    field:
-      | 'rawTopLevel'
-      | 'propertiesFields'
-      | 'fullColumns'
-      | 'preprocessedColumns',
-    checked: boolean,
-  ) => {
-    setSchemaBuilder((prev) => {
-      const arr = prev[field];
-      return {
-        ...prev,
-        [field]: checked
-          ? [...arr, colName]
-          : arr.filter((n) => n !== colName),
-      };
-    });
   };
 
   const stateColor = (state: string) =>
@@ -1827,250 +1789,19 @@ export function RunPage() {
             ) : undefined
           }
         >
-          <div className="space-y-3">
-            <p className="text-xs text-slate-500">
-              Generate versioned schema YAMLs from the Iceberg table. Saved to{' '}
-              <code className="rounded bg-slate-800 px-1">
-                s3://.../schemas/datasets/{'{name}'}/v{'{N}'}/
-              </code>
-            </p>
-
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => void handleLoadSchema()}
-                disabled={schemaLoading || !dataset}
-                className={BTN_NEUTRAL}
-              >
-                {schemaLoading ? 'Loading…' : 'Load columns from Iceberg'}
-              </button>
-              {schemaBuilder.allColumns.length > 0 && (
-                <span className="text-xs text-green-400">
-                  ✓ {schemaBuilder.allColumns.length} columns loaded
-                </span>
-              )}
-              {schemaError && (
-                <span className="text-xs text-red-400">{schemaError}</span>
-              )}
-            </div>
-
-            {schemaBuilder.allColumns.length > 0 && (
-              <>
-                {/* Column assignment */}
-                <div className="space-y-1">
-                  <p className={SUB_HEADING}>Column Assignment</p>
-                  <div className="divide-y divide-slate-800 overflow-hidden rounded border border-slate-800">
-                    <div className="grid grid-cols-[1fr_80px_80px_80px_80px_64px] bg-slate-800/50 px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                      <span>Column</span>
-                      <span className="text-center">Top-level</span>
-                      <span className="text-center">Properties</span>
-                      <span className="text-center">Full</span>
-                      <span className="text-center">Target</span>
-                      <span className="text-center">ID field</span>
-                    </div>
-                    {schemaBuilder.allColumns.map((col) => (
-                      <div
-                        key={col.name}
-                        className="grid grid-cols-[1fr_80px_80px_80px_80px_64px] items-center px-3 py-1.5 hover:bg-slate-800/30"
-                      >
-                        <div>
-                          <span className="font-mono text-xs text-slate-200">
-                            {col.name}
-                          </span>
-                          <span className="ml-2 text-[10px] text-slate-500">
-                            {col.sparkType}
-                          </span>
-                        </div>
-                        {(
-                          [
-                            'rawTopLevel',
-                            'propertiesFields',
-                            'fullColumns',
-                          ] as const
-                        ).map((field) => (
-                          <div key={field} className="flex justify-center">
-                            <input
-                              type="checkbox"
-                              checked={schemaBuilder[field].includes(col.name)}
-                              onChange={(e) =>
-                                updateSchemaToggle(
-                                  col.name,
-                                  field,
-                                  e.target.checked,
-                                )
-                              }
-                              className="accent-blue-500"
-                            />
-                          </div>
-                        ))}
-                        <div className="flex justify-center">
-                          <input
-                            type="radio"
-                            name="targetColumn"
-                            checked={schemaBuilder.targetColumn === col.name}
-                            onChange={() =>
-                              setSchemaBuilder((s) => ({
-                                ...s,
-                                targetColumn: col.name,
-                              }))
-                            }
-                            className="accent-blue-500"
-                          />
-                        </div>
-                        <div className="flex justify-center">
-                          <input
-                            type="radio"
-                            name="idColumn"
-                            checked={schemaBuilder.idColumn === col.name}
-                            onChange={() =>
-                              setSchemaBuilder((s) => ({
-                                ...s,
-                                idColumn: col.name,
-                              }))
-                            }
-                            className="accent-amber-400"
-                          />
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Preprocessed features */}
-                <div className="space-y-2">
-                  <p className={SUB_HEADING}>Preprocessed Features (DSL output)</p>
-                  <p className="text-[11px] text-slate-500">
-                    Column list is derived from the DSL pipeline — add columns
-                    to match your pipeline&apos;s final output features. All types
-                    default to <span className="font-mono">double</span>; override
-                    per column as needed.
-                  </p>
-                  {schemaBuilder.preprocessedColumns.length > 0 && (
-                    <div className="flex flex-wrap gap-1.5">
-                      {schemaBuilder.preprocessedColumns.map((name) => (
-                        <div
-                          key={name}
-                          className="flex items-center gap-1 rounded bg-slate-800 px-2 py-0.5 text-xs"
-                        >
-                          <span className="font-mono text-slate-200">{name}</span>
-                          <select
-                            value={schemaBuilder.typeOverrides?.[name] ?? 'double'}
-                            onChange={(e) =>
-                              setSchemaBuilder((s) => ({
-                                ...s,
-                                typeOverrides: {
-                                  ...s.typeOverrides,
-                                  [name]: e.target.value as SparkDataType,
-                                },
-                              }))
-                            }
-                            className="ml-1 rounded bg-slate-700 px-1 py-0 text-[10px] text-slate-300"
-                          >
-                            {(['double', 'integer', 'long'] as const).map((t) => (
-                              <option key={t} value={t}>{t}</option>
-                            ))}
-                          </select>
-                          <button
-                            type="button"
-                            onClick={() =>
-                              updateSchemaToggle(name, 'preprocessedColumns', false)
-                            }
-                            className="ml-0.5 text-slate-500 hover:text-red-400"
-                          >
-                            ×
-                          </button>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                  <div className="flex items-center gap-2">
-                    <select
-                      className={SELECT_CLS}
-                      value=""
-                      onChange={(e) => {
-                        if (e.target.value) {
-                          updateSchemaToggle(e.target.value, 'preprocessedColumns', true);
-                          e.target.value = '';
-                        }
-                      }}
-                    >
-                      <option value="">Add feature column…</option>
-                      {schemaBuilder.allColumns
-                        .filter(
-                          (c) =>
-                            !schemaBuilder.preprocessedColumns.includes(c.name) &&
-                            c.name !== schemaBuilder.targetColumn,
-                        )
-                        .map((c) => (
-                          <option key={c.name} value={c.name}>
-                            {c.name}
-                          </option>
-                        ))}
-                    </select>
-                  </div>
-                </div>
-
-                {/* Schema errors */}
-                {(() => {
-                  const errs = validateSchemaBuilder(schemaBuilder);
-                  return errs.length > 0 ? (
-                    <div className="space-y-0.5 rounded border border-red-800/40 bg-red-900/20 px-3 py-2">
-                      {errs.map((e, i) => (
-                        <p key={i} className="text-xs text-red-400">
-                          {e}
-                        </p>
-                      ))}
-                    </div>
-                  ) : null;
-                })()}
-
-                {/* Actions */}
-                <div className="flex flex-wrap gap-2 pt-1">
-                  <button
-                    onClick={() => downloadYaml(rawYamlPreview, 'raw.yaml')}
-                    className={BTN_NEUTRAL}
-                  >
-                    ↓ raw.yaml
-                  </button>
-                  <button
-                    onClick={() => downloadYaml(fullYamlPreview, 'full.yaml')}
-                    className={BTN_NEUTRAL}
-                  >
-                    ↓ full.yaml
-                  </button>
-                  <button
-                    onClick={() =>
-                      downloadYaml(preprocessedYamlPreview, 'preprocessed.yaml')
-                    }
-                    className={BTN_NEUTRAL}
-                  >
-                    ↓ preprocessed.yaml
-                  </button>
-                  <button
-                    onClick={() => void handleSaveSchemas()}
-                    disabled={schemaSaving || !dataset}
-                    className={BTN_PRIMARY}
-                  >
-                    {schemaSaving ? 'Saving…' : 'Save schemas to S3'}
-                  </button>
-                </div>
-
-                {schemaSaveResult && (
-                  <div className="space-y-1 rounded border border-green-800/40 bg-green-900/10 px-3 py-2 text-xs text-green-400">
-                    <p className="font-medium">
-                      Schemas saved — version {schemaSaveResult.version}
-                    </p>
-                    {Object.entries(schemaSaveResult.uploaded).map(
-                      ([k, v]) => (
-                        <p key={k} className="text-slate-400">
-                          <span className="text-green-500">{k}:</span> {v}
-                        </p>
-                      ),
-                    )}
-                  </div>
-                )}
-              </>
-            )}
-          </div>
+          <SchemaBuilderSection
+            state={schemaBuilder}
+            onChange={setSchemaBuilder}
+            inferredDataset={rawDatasetFilter}
+            processingRuns={processingRuns}
+            onSave={handleSaveSchemas}
+            onDownload={downloadYaml}
+            isSaving={schemaSaving}
+            saveResult={schemaSaveResult}
+            rawYaml={rawYamlPreview}
+            fullYaml={fullYamlPreview}
+            preprocessedYaml={preprocessedYamlPreview}
+          />
         </AccordionSection>
 
         {/* ── Advanced Configuration ── */}

@@ -77,6 +77,21 @@ export interface SaveDslResult {
   key: string;
 }
 
+export interface DslFinalFeatures {
+  features: string[];
+  target: string[];
+  metadata: string[];
+  passthrough: string[];
+}
+
+export interface DslFeaturesResult {
+  version: number;
+  slug: string;
+  finalFeatures: DslFinalFeatures;
+  /** Original yaml_content for reference. */
+  rawYaml: string;
+}
+
 // ─── Run types ────────────────────────────────────────────────────────────────
 
 export interface ArtifactCheckResult {
@@ -257,6 +272,44 @@ export async function getDsl(
   version: number,
 ): Promise<DslContent> {
   return _fetch<DslContent>(`/api/v2/datasets/${datasetName}/dsls/${version}`);
+}
+
+/**
+ * Fetch a DSL by version and parse its final_features block.
+ * Returns the structured feature lists ready for the schema builder.
+ * Throws if the DSL YAML does not contain a final_features key.
+ */
+export async function getDslFeatures(
+  datasetName: string,
+  version: number,
+): Promise<DslFeaturesResult> {
+  const dsl = await getDsl(datasetName, version);
+  const { parse } = await import('yaml');
+  const parsed = parse(dsl.yaml_content) as {
+    final_features?: {
+      features?: string[];
+      target?: string[];
+      metadata?: string[];
+      passthrough?: string[];
+    };
+  };
+  const ff = parsed.final_features;
+  if (!ff) {
+    throw new Error(
+      `DSL v${version} ('${dsl.slug}') has no final_features block`,
+    );
+  }
+  return {
+    version: dsl.version,
+    slug: dsl.slug,
+    finalFeatures: {
+      features: ff.features ?? [],
+      target: ff.target ?? [],
+      metadata: ff.metadata ?? [],
+      passthrough: ff.passthrough ?? [],
+    },
+    rawYaml: dsl.yaml_content,
+  };
 }
 
 export async function saveDsl(
