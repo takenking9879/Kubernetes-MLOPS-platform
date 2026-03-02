@@ -42,8 +42,8 @@ _FEATURES_SCHEMA     = "schema_features"
 _KAFKA_OUTPUT_SCHEMA = "prediction_schema"
 
 # Output column naming conventions — system defaults, not user decisions.
-_PREDICTION_COLUMN = "label"    # name of the predicted class column
-_DEFAULT_ID_COLUMN = "event_id" # fallback when RAW_SCHEMA_S3_PATH is not set
+_PREDICTION_COLUMN  = "label"                # name of the predicted class column
+_INTERNAL_ID_COLUMN = "__internal_row_id"    # Spark-Ray join key + Kafka key fallback
 _DEFAULT_NUM_CLASSES = 6        # for Prometheus label initialisation
 
 _APP_NAME = "kafka-spark-inference"
@@ -64,7 +64,7 @@ def _predict_partition_ray_online(
     """
     url = config['url']
     timeout = config['timeout']
-    id_column = config['id_column']
+    internal_id = config.get('internal_id_column', '__internal_row_id')
     pred_column = config['prediction_column']
     pred_key = config.get('prediction_key', 'predictions')
     batch_size = max(1, int(config.get('batch_size', 100)))
@@ -82,12 +82,12 @@ def _predict_partition_ray_online(
 
     def _emit_default(rows_batch: List[Row]) -> Iterator[Row]:
         for row in rows_batch:
-            yield Row(**{id_column: row[id_column], pred_column: 0})
+            yield Row(**{internal_id: row[internal_id], pred_column: 0})
 
     with requests.Session() as session:
         for rows_batch in _chunk_rows(partition, batch_size):
             raw_batch = [row.asDict() for row in rows_batch]
-            event_ids = [row[id_column] for row in rows_batch]
+            row_ids = [row[internal_id] for row in rows_batch]
 
             delivered = False
             for attempt in range(max_retries + 1):
@@ -97,13 +97,13 @@ def _predict_partition_ray_online(
                     body = response.json()
                     preds = body.get(pred_key, [])
 
-                    if not isinstance(preds, list) or len(preds) != len(event_ids):
+                    if not isinstance(preds, list) or len(preds) != len(row_ids):
                         raise ValueError(
-                            f"Invalid prediction response size. expected={len(event_ids)}, got={len(preds) if isinstance(preds, list) else 'non-list'}"
+                            f"Invalid prediction response size. expected={len(row_ids)}, got={len(preds) if isinstance(preds, list) else 'non-list'}"
                         )
 
-                    for event_id, pred in zip(event_ids, preds):
-                        yield Row(**{id_column: event_id, pred_column: int(pred)})
+                    for row_id, pred in zip(row_ids, preds):
+                        yield Row(**{internal_id: row_id, pred_column: int(pred)})
 
                     delivered = True
                     break
@@ -209,21 +209,22 @@ class KafkaSparkInference(BaseUtils):
             _KAFKA_INPUT_SCHEMA, _KAFKA_OUTPUT_SCHEMA,
         )
 
-    def _read_id_field_from_s3(self) -> str:
-        """Download raw.yaml from RAW_SCHEMA_S3_PATH and read the id_field annotation.
+    def _read_id_field_from_s3(self) -> Optional[str]:
+        """Download raw.yaml from RAW_SCHEMA_S3_PATH and read the optional id_field annotation.
 
-        Returns _DEFAULT_ID_COLUMN if env var is unset or the download fails.
+        Returns None if the env var is unset, the download fails, or id_field is absent.
+        None signals that __internal_row_id should be used as the Kafka key fallback.
         """
         s3_path = os.getenv('RAW_SCHEMA_S3_PATH', '')
         if not s3_path:
-            return _DEFAULT_ID_COLUMN
+            return None
         try:
             import boto3
             import yaml
             import re
             match = re.match(r"s3://([^/]+)/(.+)", s3_path)
             if not match:
-                return _DEFAULT_ID_COLUMN
+                return None
             bucket, key = match.group(1), match.group(2)
             s3 = boto3.client(
                 "s3",
@@ -233,12 +234,13 @@ class KafkaSparkInference(BaseUtils):
             )
             content = s3.get_object(Bucket=bucket, Key=key)["Body"].read().decode("utf-8")
             schema = yaml.safe_load(content) or {}
-            id_field = schema.get("id_field", _DEFAULT_ID_COLUMN)
-            self.logger.info("✅ id_field='%s' read from %s", id_field, s3_path)
-            return str(id_field)
+            id_field = schema.get("id_field")  # None when annotation is absent
+            if id_field:
+                self.logger.info("✅ id_field='%s' read from %s", id_field, s3_path)
+            return str(id_field) if id_field else None
         except Exception as exc:
             self.logger.warning("⚠️ Could not read id_field from RAW_SCHEMA_S3_PATH: %s", exc)
-            return _DEFAULT_ID_COLUMN
+            return None
 
     def _get_raw_top_level_fields(self) -> List[str]:
         """Return the top-level field names of the Kafka input schema.
@@ -257,8 +259,8 @@ class KafkaSparkInference(BaseUtils):
                 return [f.name for f in schema.fields]
         except Exception:
             pass
-        # Fallback matching kafka_schema_features top-level structure
-        return ['timestamp', self.id_column, 'properties']
+        # Minimal safe fallback — no id assumption
+        return ['timestamp', 'properties']
 
     def _normalize_serve_url(self, raw_url: str) -> str:
         """Normaliza URL de Ray Serve para tolerar http implícito y /infer/ trailing slash."""
@@ -315,15 +317,17 @@ class KafkaSparkInference(BaseUtils):
         # prediction_column: always 'label' — system naming convention
         self.prediction_column = _PREDICTION_COLUMN
 
-        # id_column: dataset-specific — read from raw.yaml via S3 or env override
-        self.id_column = os.getenv('KAFKA_ID_COLUMN') or self._read_id_field_from_s3()
+        # id_column: optional — P1: KAFKA_ID_COLUMN env, P2: raw.yaml id_field, P3: None → __internal_row_id
+        self.id_column: Optional[str] = os.getenv('KAFKA_ID_COLUMN') or self._read_id_field_from_s3()
 
         # Derive output_value_columns: top-level raw schema fields + prediction column
         self._raw_top_level_fields = self._get_raw_top_level_fields()
 
         self.logger.info(
-            "✅ Prediction: type=%s, url=%s, id_column=%s, prediction_column=%s",
-            self.prediction_type, self.ray_url, self.id_column, self.prediction_column,
+            "✅ Prediction: type=%s, url=%s, kafka_key=%s, prediction_column=%s",
+            self.prediction_type, self.ray_url,
+            self.id_column or f"<{_INTERNAL_ID_COLUMN}>",
+            self.prediction_column,
         )
 
     def _load_checkpoint_config(self):
@@ -453,10 +457,12 @@ class KafkaSparkInference(BaseUtils):
             raise
 
     def convert_schema(self, df: DataFrame) -> DataFrame:
-        """Convierte schema usando el conversor configurado."""
+        """Convierte schema usando el conversor configurado y añade ID interno para el join."""
         try:
+            from pyspark.sql.functions import monotonically_increasing_id
             df_converted = self.converter_function(df)
-            return df_converted
+            # Añadir ID interno para asegurar un join robusto con Ray Serve sin depender de id_field
+            return df_converted.withColumn(_INTERNAL_ID_COLUMN, monotonically_increasing_id())
         except Exception as e:
             self.logger.error(f"Schema conversion failed: {e}")
             raise
@@ -465,22 +471,28 @@ class KafkaSparkInference(BaseUtils):
         """
         Online mode: sends schema-converted rows to Ray Serve as raw events.
 
-        Each row becomes {"raw": <schema_dict>}. Ray Serve runs the NumPy DSL
-        executor and the model, returning one prediction per event.
+        Includes an internal row identifier to ensure robust joins even
+        if the dataset doesn't have a unique ID.
         """
+        from pyspark.sql.types import StructType, StructField, LongType, IntegerType
         pred_config = {
             'url': str(self.ray_url),
             'timeout': int(self.ray_timeout),
             'batch_size': int(self.ray_batch_size),
             'max_retries': int(self.ray_max_retries),
-            'id_column': str(self.id_column),
+            'internal_id_column': _INTERNAL_ID_COLUMN,
             'prediction_column': str(self.prediction_column),
             'prediction_key': str(self.ray_pred_key),
         }
         predictions_rdd = df_converted.rdd.mapPartitions(
             lambda p: _predict_partition_ray_online(p, pred_config)
         )
-        return self.spark.createDataFrame(predictions_rdd, schema=self.output_schema)
+        # Internal schema for the prediction join
+        join_schema = StructType([
+            StructField(_INTERNAL_ID_COLUMN, LongType(), False),
+            StructField(self.prediction_column, IntegerType(), False)
+        ])
+        return self.spark.createDataFrame(predictions_rdd, schema=join_schema)
 
     def process_batch(self, batch_df: DataFrame, batch_id: int):
         """
@@ -501,8 +513,12 @@ class KafkaSparkInference(BaseUtils):
                 self.logger.info(f"⏭️ Batch {batch_id} is empty, skipping")
                 return
 
-            # 1. Schema conversion (kafka_to_schema_features)
+            # 1. Schema conversion (kafka_to_schema_features) + Internal ID generation
             df_features = self.convert_schema(batch_df)
+
+            # Para poder hacer el join final, batch_df también necesita el ID interno
+            from pyspark.sql.functions import monotonically_increasing_id
+            batch_df_with_id = batch_df.withColumn(_INTERNAL_ID_COLUMN, monotonically_increasing_id())
 
             # 2. Predict via Ray Serve (DSL NumPy + model inference)
             inference_start = time.time()
@@ -529,8 +545,8 @@ class KafkaSparkInference(BaseUtils):
             except Exception as e:
                 self.logger.warning(f"⚠️ Could not compute prediction class distribution: {e}")
 
-            # 4. Join con datos originales
-            output_df = batch_df.join(predictions_df, on=self.id_column, how='inner')
+            # 4. Join con datos originales usando el ID interno temporal
+            output_df = batch_df_with_id.join(predictions_df, on=_INTERNAL_ID_COLUMN, how='inner')
 
             # 5. Escribir a Kafka
             kafka_write_start = time.time()
@@ -555,14 +571,17 @@ class KafkaSparkInference(BaseUtils):
     def _write_to_kafka(self, df: DataFrame):
         """Escribe resultados a Kafka.
 
-        Output columns are derived:
-          key   = id_column (event identifier from raw.yaml id_field)
-          value = JSON of all top-level raw schema fields + prediction column
+        Kafka key resolution (in priority order):
+          P1 — KAFKA_ID_COLUMN env var   (explicit deploy-time override)
+          P2 — id_field from raw.yaml    (user-declared semantic business key)
+          P3 — __internal_row_id         (system fallback — always valid)
+        value = JSON of all top-level raw schema fields + prediction column
         """
         try:
+            kafka_key_col = self.id_column or _INTERNAL_ID_COLUMN
             value_cols = ', '.join(self._raw_top_level_fields + [self.prediction_column])
             df_output = df.selectExpr(
-                f"CAST({self.id_column} AS STRING) AS key",
+                f"CAST({kafka_key_col} AS STRING) AS key",
                 f"to_json(struct({value_cols})) AS value"
             )
 
