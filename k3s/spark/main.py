@@ -92,42 +92,28 @@ class SparkPreprocessIceberg(BaseUtils):
         """Return the schema for full raw data (features + target label).
 
         Resolution order:
-        1. SCHEMA_S3_PATH env var — explicit S3 URI to a schema YAML
-        2. Auto-derived from raw_table: s3://{bucket}/schemas/datasets/{table}/full.yaml
-        3. Static fallback: schema name from params.yaml (existing behaviour)
+        1. SCHEMA_S3_PATH env var — explicit override (e.g. for manual runs)
+        2. params.schema_ref.full — explicit path from params_preprocess.yaml (preferred)
 
-        If SCHEMA_ALLOW_STATIC_FALLBACK=false and S3 loading fails, an error
-        is raised to make the failure explicit rather than silently using a
-        potentially wrong schema.
+        The old auto-derivation from raw_table name is removed: it was fragile
+        (ignored schema versioning) and not dataset-agnostic.
         """
         from src.schemas.spark.schema_registry import SchemaRegistry
 
-        allow_static_fallback = os.getenv("SCHEMA_ALLOW_STATIC_FALLBACK", "true").lower() in ("1", "true", "yes")
-
-        schema_s3 = os.getenv("SCHEMA_S3_PATH")
+        schema_s3 = (
+            os.getenv("SCHEMA_S3_PATH")
+            or self.params.get("schema_ref", {}).get("full")
+        )
         if not schema_s3:
-            # Derive path from raw_table name:
-            #   iceberg.raw.network_traffic_raw → network_traffic_raw
-            raw_table_short = self.raw_table.split(".")[-1]
-            bucket = self.spark_params.get("bucket", "k8s-mlops-platform-bucket")
-            schema_s3 = f"s3://{bucket}/schemas/datasets/{raw_table_short}/full.yaml"
-
-        try:
-            schema = SchemaRegistry.load_from_s3(schema_s3)
-            self.logger.info(f"Schema loaded from S3: {schema_s3}")
-            return schema
-        except Exception as e:
-            if allow_static_fallback:
-                self.logger.warning(
-                    f"Could not load schema from S3 ({schema_s3}): {e}. "
-                    "Falling back to static schema from params.yaml."
-                )
-                schema_name = self.spark_params.get('schemas', {}).get('full_schema')
-                return get_schema(schema_name)
             raise RuntimeError(
-                f"Schema S3 load failed for {schema_s3!r} and static fallback is disabled. "
-                f"Original error: {e}"
-            ) from e
+                "No schema path available. "
+                "Set SCHEMA_S3_PATH env var or include schema_ref.full in params_preprocess.yaml. "
+                "Define the schema on the Processing page before submitting a run."
+            )
+
+        schema = SchemaRegistry.load_from_s3(schema_s3)
+        self.logger.info(f"Schema loaded from params.schema_ref.full: {schema_s3}")
+        return schema
 
     def _load_artifacts_config(self):
         """Carga configuración de artifacts desde params."""

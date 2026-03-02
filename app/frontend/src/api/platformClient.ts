@@ -99,11 +99,31 @@ export interface ArtifactCheckResult {
   processed_table: string | null;
 }
 
+/** @deprecated Use ProcessingRunResult or TrainingRunResult for specific run types. */
 export interface RunResult {
   dag_run_id: string;
   execution_id: string;
   params_s3_path: string;
   dsl_s3_path?: string;
+}
+
+/** Result from POST /api/v2/processing-runs */
+export interface ProcessingRunResult {
+  dag_run_id: string;
+  preprocess_run_id: string;
+  artifact_set_id: string;
+  preprocess_params_s3_path: string;
+  dsl_s3_path: string;
+  schema_version: number;
+}
+
+/** Result from POST /api/v2/runs */
+export interface TrainingRunResult {
+  dag_run_id: string;
+  train_run_id: string;
+  preprocess_run_id: string;
+  train_params_s3_path: string;
+  processed_table: string;
 }
 
 export interface RunStatus {
@@ -132,7 +152,7 @@ export interface ModelConfig {
 }
 
 export interface RunRequest {
-  processed_table: string;
+  preprocess_run_id: string;   // replaces processed_table
   execution_id?: string;
   framework: 'xgboost' | 'pytorch';
   tuning?: TuningConfig;
@@ -140,6 +160,43 @@ export interface RunRequest {
   sample_fraction_for_tuning?: number;
   hyperparams?: Record<string, unknown>;
   tune_settings?: Record<string, unknown>;
+}
+
+/** Entry from GET /api/v2/processing-runs/ids */
+export interface PreprocessRunId {
+  preprocess_run_id: string;
+  dataset: string;
+}
+
+/** Entry from GET /api/v2/runs/ids */
+export interface TrainingRunId {
+  train_run_id: string;
+  dataset: string;
+}
+
+export interface SchemaUploadSingleResult {
+  version: number;
+  s3_path: string;
+}
+
+export interface ServingConfigRequest {
+  train_run_id: string;
+  raw_schema_s3_path: string;
+  alias?: string;
+  canary?: boolean;
+  canary_alias?: string;
+  canary_probability?: number;
+  initial_replicas?: number;
+  webhook_public_base_url?: string;
+  webhook_path?: string;
+  webhook_max_timestamp_age_seconds?: number;
+}
+
+export interface ServingConfigResult {
+  serve_run_id: string;
+  params_s3_path: string;
+  dataset: string;
+  train_run_id: string;
 }
 
 // ─── Processing run types ─────────────────────────────────────────────────────
@@ -329,11 +386,15 @@ export async function checkArtifact(
   );
 }
 
-export async function submitRun(request: RunRequest): Promise<RunResult> {
-  return _fetch<RunResult>('/api/v2/runs', {
+export async function submitRun(request: RunRequest): Promise<TrainingRunResult> {
+  return _fetch<TrainingRunResult>('/api/v2/runs', {
     method: 'POST',
     body: JSON.stringify(request),
   });
+}
+
+export async function listTrainingRunIds(): Promise<{ runs: TrainingRunId[] }> {
+  return _fetch<{ runs: TrainingRunId[] }>('/api/v2/runs/ids');
 }
 
 export async function getRunStatus(dagRunId: string): Promise<RunStatus> {
@@ -344,11 +405,15 @@ export async function getRunStatus(dagRunId: string): Promise<RunStatus> {
 
 export async function submitProcessingRun(
   request: ProcessingRunRequest,
-): Promise<RunResult> {
-  return _fetch<RunResult>('/api/v2/processing-runs', {
+): Promise<ProcessingRunResult> {
+  return _fetch<ProcessingRunResult>('/api/v2/processing-runs', {
     method: 'POST',
     body: JSON.stringify(request),
   });
+}
+
+export async function listPreprocessRunIds(): Promise<{ runs: PreprocessRunId[] }> {
+  return _fetch<{ runs: PreprocessRunId[] }>('/api/v2/processing-runs/ids');
 }
 
 export async function listProcessingRuns(rawDataset?: string): Promise<ProcessingRunsResult> {
@@ -377,5 +442,36 @@ export async function uploadSchemas(
   return _fetch<SchemaUploadResult>(`/api/v2/datasets/${encodeURIComponent(datasetName)}/schemas`, {
     method: 'POST',
     body: JSON.stringify(schemas),
+  });
+}
+
+export async function uploadFullSchema(
+  dataset: string,
+  yamlContent: string,
+): Promise<SchemaUploadSingleResult> {
+  return _fetch<SchemaUploadSingleResult>(`/api/v2/schemas/${encodeURIComponent(dataset)}/full`, {
+    method: 'POST',
+    body: JSON.stringify({ yaml_content: yamlContent }),
+  });
+}
+
+export async function uploadRawSchema(
+  dataset: string,
+  yamlContent: string,
+): Promise<SchemaUploadSingleResult> {
+  return _fetch<SchemaUploadSingleResult>(`/api/v2/schemas/${encodeURIComponent(dataset)}/raw`, {
+    method: 'POST',
+    body: JSON.stringify({ yaml_content: yamlContent }),
+  });
+}
+
+// ─── Serving Configs API ──────────────────────────────────────────────────────
+
+export async function submitServingConfig(
+  request: ServingConfigRequest,
+): Promise<ServingConfigResult> {
+  return _fetch<ServingConfigResult>('/api/v2/serving-configs', {
+    method: 'POST',
+    body: JSON.stringify(request),
   });
 }

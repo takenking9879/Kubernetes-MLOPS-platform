@@ -10,13 +10,16 @@ Endpoints:
 from __future__ import annotations
 
 import os
+import secrets
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Literal
+from urllib.parse import urlparse
 
 import boto3
 import requests as _requests
 import yaml as _yaml
+from botocore.exceptions import ClientError
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field, model_validator
 
@@ -31,17 +34,15 @@ AIRFLOW_NAMESPACE = os.getenv("AIRFLOW_NAMESPACE", "airflow")
 AIRFLOW_PORT = os.getenv("AIRFLOW_PORT", "8080")
 AIRFLOW_USER = os.getenv("AIRFLOW_USER", "admin")
 AIRFLOW_PASSWORD = os.getenv("AIRFLOW_PASSWORD", "admin")
-DAG_ID = "ml_pipeline"
+DAG_ID = "training_pipeline"
 
-# Path to k3s/config.yaml (static infra config — used for backward-compat block)
+# Path to k3s/config.yaml (static infra config)
 _REPO_CONFIG_PATH = os.getenv(
     "REPO_CONFIG_PATH",
     "/git-data/repo/k3s/config.yaml",
 )
 
 # ─── Hyperparameter validation data ──────────────────────────────────────────
-# Mirrors src/schemas/model/*_params.py exactly.
-# Defined here to avoid cross-package import issues at the boundary layer.
 
 _XGBOOST_ALLOWED_KEYS: frozenset = frozenset({
     "num_boost_round", "objective", "eval_metric", "booster",
@@ -53,7 +54,6 @@ _PYTORCH_ALLOWED_KEYS: frozenset = frozenset({
     "batch_size", "max_epochs", "lr", "weight_decay",
 })
 
-# Expected Python types for each parameter (int/float overlap handled explicitly)
 _XGBOOST_PARAM_TYPES: dict[str, type] = {
     "num_boost_round": int, "objective": str, "eval_metric": list,
     "booster": str, "tree_method": str, "verbosity": int,
@@ -75,6 +75,7 @@ _PYTORCH_TUNE_SETTINGS_DEFAULTS: dict[str, int] = {
     "max_epochs": 10,
 }
 
+
 def _s3_client():
     return boto3.client(
         "s3",
@@ -85,7 +86,7 @@ def _s3_client():
 
 
 def _load_static_config() -> dict[str, Any]:
-    """Load k3s/config.yaml for use in the backward-compat block of params.yaml."""
+    """Load k3s/config.yaml for MLflow/serving defaults."""
     path = Path(_REPO_CONFIG_PATH)
     if path.exists():
         with open(path) as fh:
@@ -110,14 +111,14 @@ class ModelConfig(BaseModel):
 
 
 class RunRequest(BaseModel):
-    processed_table: str              # e.g. "iceberg.processed.network_traffic_raw_20260101_120000"
-    execution_id: str = ""
+    preprocess_run_id: str            # references the preprocessing run; replaces processed_table
+    execution_id: str = ""            # auto-generated if empty; becomes train_run_id
     framework: Literal["xgboost", "pytorch"] = "xgboost"
     tuning: TuningConfig = Field(default_factory=TuningConfig)
     model: ModelConfig = Field(default_factory=ModelConfig)
     sample_fraction_for_tuning: float = Field(0.2, ge=0.01, le=1.0)
-    hyperparams: dict[str, Any] = {}       # *_PARAMS overrides
-    tune_settings: dict[str, Any] = {}    # *_TUNE_SETTINGS overrides
+    hyperparams: dict[str, Any] = {}
+    tune_settings: dict[str, Any] = {}
 
     @model_validator(mode="after")
     def validate_hyperparams(self) -> "RunRequest":
@@ -134,7 +135,6 @@ class RunRequest(BaseModel):
                 )
             exp_type = expected_types.get(key)
             if exp_type is not None and not isinstance(val, exp_type):
-                # Allow int where float is expected (JSON numbers)
                 if exp_type is float and isinstance(val, int):
                     pass
                 else:
@@ -149,17 +149,42 @@ class RunRequest(BaseModel):
 # ─── Helpers ─────────────────────────────────────────────────────────────────
 
 
-def _airflow_request(method: str, path: str, body=None):
-    """Make an Airflow API call via the k8s client.
+def _generate_train_run_id(dataset: str, preprocess_run_id: str) -> str:
+    """Generate a unique, typed training run ID that embeds the preprocess suffix."""
+    ts = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S")
+    pre_suffix = preprocess_run_id[-6:]
+    rand = secrets.token_hex(3)
+    return f"train-{dataset}-{pre_suffix}-{ts}Z-{rand}"
 
-    Airflow 3.x requires JWT Bearer auth. We first POST to /auth/token with
-    username/password in the request body, then use the returned access_token
-    as a Bearer header for the actual API call.
 
-    - In-cluster: direct HTTP using cluster-local DNS.
-    - Local (kubeconfig): route through the k8s API-server proxy so the
-      cluster-internal service name resolves (k3s uses client-cert auth).
+def _fetch_preprocess_params(preprocess_run_id: str, s3, bucket: str) -> dict:
+    """Load params_preprocess.yaml for the given run ID from S3.
+
+    Tries new path first, then legacy path for historical runs.
     """
+    def _get(key: str) -> str | None:
+        try:
+            obj = s3.get_object(Bucket=bucket, Key=key)
+            return obj["Body"].read().decode("utf-8")
+        except ClientError as e:
+            if e.response["Error"]["Code"] in ("NoSuchKey", "404"):
+                return None
+            raise
+
+    yaml_content = _get(f"runs/preprocessing/{preprocess_run_id}/params_preprocess.yaml")
+    if yaml_content is None:
+        yaml_content = _get(f"params/{preprocess_run_id}/params_preprocess.yaml")
+    if yaml_content is None:
+        raise HTTPException(
+            status_code=404,
+            detail=f"params_preprocess.yaml not found for preprocess_run_id '{preprocess_run_id}'. "
+                   "Run a preprocessing job first.",
+        )
+    return _yaml.safe_load(yaml_content) or {}
+
+
+def _airflow_request(method: str, path: str, body=None):
+    """Make an Airflow API call via the k8s client."""
     import json as _json
     from kubernetes import client as _k8s_client, config as _k8s_config
 
@@ -175,7 +200,6 @@ def _airflow_request(method: str, path: str, body=None):
             f"http://{AIRFLOW_SERVICE}.{AIRFLOW_NAMESPACE}.svc.cluster.local"
             f":{AIRFLOW_PORT}"
         )
-        # Airflow 3.x: obtain JWT token
         token_resp = _requests.post(
             f"{base_url}/auth/token",
             json={"username": AIRFLOW_USER, "password": AIRFLOW_PASSWORD},
@@ -196,7 +220,6 @@ def _airflow_request(method: str, path: str, body=None):
             data = {"raw": resp.text}
         return resp.status_code, data
 
-    # Local dev: proxy via k8s API server (k3s uses client-cert auth)
     api = _k8s_client.ApiClient()
 
     def _proxy(m: str, p: str, b=None, extra_headers: dict | None = None):
@@ -214,7 +237,6 @@ def _airflow_request(method: str, path: str, body=None):
             timeout=15.0,
         )
 
-    # Airflow 3.x: obtain JWT token through the proxy
     token_resp = _proxy("POST", "auth/token", b={"username": AIRFLOW_USER, "password": AIRFLOW_PASSWORD})
     token = _json.loads(token_resp.data).get("access_token", "")
 
@@ -226,48 +248,42 @@ def _airflow_request(method: str, path: str, body=None):
     return http_resp.status, data
 
 
-def _resolve_dsl_s3_path(dataset: str, version: int) -> str:
-    """Find the S3 key for dsl/dsl_{dataset}/v{version}__*.yaml."""
-    s3 = _s3_client()
-    prefix = f"dsl/dsl_{dataset}/v{version}__"
-    resp = s3.list_objects_v2(Bucket=S3_BUCKET, Prefix=prefix, MaxKeys=5)
-    objs = [o for o in resp.get("Contents", []) if o["Key"].endswith(".yaml")]
-    if not objs:
-        raise HTTPException(
-            status_code=404,
-            detail=f"DSL version {version} not found for dataset '{dataset}' in S3.",
-        )
-    return f"s3://{S3_BUCKET}/{objs[0]['Key']}"
-
-
-def _generate_training_params_yaml(req: RunRequest, execution_id: str, cfg: dict) -> str:
-    """Build params_training.yaml: solo config de entrenamiento (sin spark, sin serving/canary)."""
+def _generate_training_params_yaml(
+    req: RunRequest,
+    train_run_id: str,
+    lineage: dict,
+    cfg: dict,
+) -> str:
+    """Build params_training.yaml with lineage block and full training config."""
     mlflow_cfg = cfg.get("mlflow", {})
 
-    # ── Resolved *_TUNE_SETTINGS (merge defaults + overrides) ─────────────
     tune_defaults = (
         _XGBOOST_TUNE_SETTINGS_DEFAULTS if req.framework == "xgboost"
         else _PYTORCH_TUNE_SETTINGS_DEFAULTS
     )
     resolved_tune_settings = {**tune_defaults, **req.tune_settings}
 
-    # ── Hyperparams block ──────────────────────────────────────────────────
-    hyperparams_block: dict[str, Any] = {
-        req.framework: req.hyperparams,
-    }
+    hyperparams_block: dict[str, Any] = {req.framework: req.hyperparams}
     if req.tuning.enabled:
         hyperparams_block["tuning"] = resolved_tune_settings
 
     params: dict[str, Any] = {
+        "run_metadata": {
+            "run_id": train_run_id,
+            "run_type": "training",
+            "dataset": lineage.get("dataset", ""),
+            "generated_at": datetime.now(timezone.utc).isoformat(),
+        },
+        "lineage": lineage,
         "execution": {
-            "execution_id": execution_id,
+            "train_run_id": train_run_id,
+            "processed_table": lineage["processed_table"],
             "tuning": {
                 "enabled": req.tuning.enabled,
                 "number_of_trials": req.tuning.number_of_trials,
             },
-            "skip_preprocessing": True,
-            "processed_table": req.processed_table,
         },
+        "splits": lineage.get("splits", {}),
         "model": {
             "framework": req.framework,
             "experiment_name": req.model.experiment_name,
@@ -279,7 +295,6 @@ def _generate_training_params_yaml(req: RunRequest, execution_id: str, cfg: dict
             "seed": req.model.seed,
         },
         "hyperparams": hyperparams_block,
-        # kuberay.model — config de entrenamiento y registro MLflow
         "kuberay": {
             "model": {
                 "tune": req.tuning.enabled,
@@ -316,35 +331,49 @@ def _generate_training_params_yaml(req: RunRequest, execution_id: str, cfg: dict
     return _yaml.dump(params, default_flow_style=False, allow_unicode=True)
 
 
-def _generate_serving_params_yaml(execution_id: str, cfg: dict) -> str:
-    """Build params_serving.yaml: config de despliegue Ray Serve (alias, canary, webhook)."""
-    serving_cfg = cfg.get("serving", {})
+def _build_lineage(preprocess_run_id: str, preprocess_params: dict, bucket: str) -> dict:
+    """Build the lineage block for params_training.yaml from preprocessing params."""
+    exec_cfg = preprocess_params.get("execution", {})
+    dataset = exec_cfg.get("raw_dataset_name", "")
+    artifact_set_id = preprocess_run_id[-6:]
+    processed_table = f"iceberg.processed.{dataset}_{artifact_set_id}" if dataset else ""
 
-    params: dict[str, Any] = {
-        "execution": {
-            "execution_id": execution_id,
-        },
-        "serving": {
-            "alias": serving_cfg.get("alias", "champion"),
-            "canary": False,
-            "webhook_public_base_url": serving_cfg.get("webhook_base_url", ""),
-            "webhook_path": serving_cfg.get("webhook_path", "/infer/webhook"),
-            "webhook_name": serving_cfg.get("webhook_name", ""),
-            "webhook_max_timestamp_age_seconds": serving_cfg.get(
-                "webhook_max_timestamp_age_seconds", 300
-            ),
-        },
-        "canary": {
-            "alias": serving_cfg.get("canary_alias", "challenger"),
-            "canary_probability": serving_cfg.get("canary_probability", 0.10),
-            "initial_replicas": 0,
-        },
+    return {
+        "preprocess_run_id": preprocess_run_id,
+        "preprocess_params_s3_path": (
+            f"s3://{bucket}/runs/preprocessing/{preprocess_run_id}/params_preprocess.yaml"
+        ),
+        "processed_table": processed_table,
+        "dsl_s3_path": exec_cfg.get("dsl_s3_path", ""),
+        "dsl_version": exec_cfg.get("dsl_version", ""),
+        "schema_version": preprocess_params.get("schema_ref", {}).get("version", ""),
+        "dataset": dataset,
+        "splits": preprocess_params.get("splits", {}),
     }
-
-    return _yaml.dump(params, default_flow_style=False, allow_unicode=True)
 
 
 # ─── Endpoints ───────────────────────────────────────────────────────────────
+
+
+@router.get("/ids")
+async def list_training_run_ids():
+    """List training run IDs from S3 (new-style runs in runs/training/)."""
+    import re as _re
+    s3 = _s3_client()
+    resp = s3.list_objects_v2(
+        Bucket=S3_BUCKET,
+        Prefix="runs/training/",
+        Delimiter="/",
+    )
+    runs = []
+    for prefix_obj in resp.get("CommonPrefixes", []):
+        run_id = prefix_obj["Prefix"].rstrip("/").rsplit("/", 1)[-1]
+        m = _re.match(r"^train-(.+)-[0-9a-f]{6}-(\d{8}T\d{6}Z)-([0-9a-f]{6})$", run_id)
+        dataset = m.group(1) if m else ""
+        runs.append({"train_run_id": run_id, "dataset": dataset})
+    # Newest first (run IDs contain timestamps)
+    runs.sort(key=lambda r: r["train_run_id"], reverse=True)
+    return {"runs": runs}
 
 
 @router.get("/check")
@@ -380,20 +409,24 @@ async def check_artifact(execution_id: str, dataset: str):
 
 @router.post("", status_code=201)
 async def submit_run(request: RunRequest):
-    """Generate params.yaml, upload to S3, and trigger the Airflow ml_pipeline DAG."""
+    """Generate params_training.yaml, upload to S3, and trigger training_pipeline DAG."""
+    s3 = _s3_client()
 
-    execution_id = request.execution_id.strip() or datetime.now(timezone.utc).strftime(
-        "%Y%m%d_%H%M%S"
+    # Fetch preprocessing params to build lineage
+    preprocess_params = _fetch_preprocess_params(request.preprocess_run_id, s3, S3_BUCKET)
+    lineage = _build_lineage(request.preprocess_run_id, preprocess_params, S3_BUCKET)
+
+    dataset = lineage["dataset"]
+    train_run_id = (
+        request.execution_id.strip()
+        or _generate_train_run_id(dataset, request.preprocess_run_id)
     )
 
     cfg = _load_static_config()
-    training_yaml_str = _generate_training_params_yaml(request, execution_id, cfg)
-    serving_yaml_str = _generate_serving_params_yaml(execution_id, cfg)
+    training_yaml_str = _generate_training_params_yaml(request, train_run_id, lineage, cfg)
 
-    # Upload params_training.yaml y params_serving.yaml a S3
-    s3 = _s3_client()
-
-    training_key = f"params/{execution_id}/params_training.yaml"
+    # Write ONLY to new path: runs/training/{train_run_id}/
+    training_key = f"runs/training/{train_run_id}/params_training.yaml"
     s3.put_object(
         Bucket=S3_BUCKET,
         Key=training_key,
@@ -402,25 +435,15 @@ async def submit_run(request: RunRequest):
     )
     train_params_s3_path = f"s3://{S3_BUCKET}/{training_key}"
 
-    serving_key = f"params/{execution_id}/params_serving.yaml"
-    s3.put_object(
-        Bucket=S3_BUCKET,
-        Key=serving_key,
-        Body=serving_yaml_str.encode("utf-8"),
-        ContentType="application/x-yaml",
-    )
-    serving_params_s3_path = f"s3://{S3_BUCKET}/{serving_key}"
-
-    # Trigger Airflow DAG (training_only — Spark preprocessing skipped)
+    # Trigger Airflow training_pipeline DAG
     dag_conf: dict[str, Any] = {
-        "execution_id": execution_id,
-        "raw_table": "",
-        "dsl_s3_path": "",
+        "train_run_id": train_run_id,
+        "preprocess_run_id": request.preprocess_run_id,
+        "dataset": dataset,
+        "processed_table": lineage["processed_table"],
+        "dsl_s3_path": lineage["dsl_s3_path"],
         "train_params_s3_path": train_params_s3_path,
-        "serving_params_s3_path": serving_params_s3_path,
         "model_type": request.framework,
-        "pipeline_mode": "training_only",
-        "processed_table": request.processed_table,
     }
     try:
         status, data = _airflow_request(
@@ -441,9 +464,10 @@ async def submit_run(request: RunRequest):
 
     return {
         "dag_run_id": dag_run_id,
-        "execution_id": execution_id,
+        "train_run_id": train_run_id,
+        "preprocess_run_id": request.preprocess_run_id,
         "train_params_s3_path": train_params_s3_path,
-        "serving_params_s3_path": serving_params_s3_path,
+        "processed_table": lineage["processed_table"],
     }
 
 

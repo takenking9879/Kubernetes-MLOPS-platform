@@ -5,13 +5,17 @@ Endpoints:
   POST /api/v2/processing-runs                 - trigger Spark-only preprocessing DAG
   GET  /api/v2/processing-runs                 - list processed tables from Iceberg metadata
   GET  /api/v2/processing-runs/{dag_run_id}/status - poll Airflow DAG run state
+  GET  /api/v2/processing-runs/{run_id}/params - fetch params_preprocess.yaml for a run
 """
 
 from __future__ import annotations
 
 import os
+import re
+import secrets
 from datetime import datetime, timezone
 from typing import Any
+from urllib.parse import urlparse
 
 import boto3
 import requests as _requests
@@ -30,7 +34,7 @@ AIRFLOW_NAMESPACE = os.getenv("AIRFLOW_NAMESPACE", "airflow")
 AIRFLOW_PORT = os.getenv("AIRFLOW_PORT", "8080")
 AIRFLOW_USER = os.getenv("AIRFLOW_USER", "admin")
 AIRFLOW_PASSWORD = os.getenv("AIRFLOW_PASSWORD", "admin")
-DAG_ID = "ml_pipeline"
+DAG_ID = "preprocessing_pipeline"
 
 _DATE_FMT = "%Y-%m-%d %H:%M:%S"
 
@@ -114,6 +118,13 @@ class ProcessedTableEntry(BaseModel):
 
 
 # ─── Helpers ─────────────────────────────────────────────────────────────────
+
+
+def _generate_preprocess_run_id(dataset: str) -> str:
+    """Generate a unique, typed preprocess run ID."""
+    ts = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S")
+    rand = secrets.token_hex(3)
+    return f"pre-{dataset}-{ts}Z-{rand}"
 
 
 def _airflow_request(method: str, path: str, body=None):
@@ -207,28 +218,96 @@ def _resolve_dsl_s3_path(dataset: str, version: int) -> str:
     return f"s3://{S3_BUCKET}/{objs[0]['Key']}"
 
 
+def _get_latest_schema_version(dataset: str, s3_client, bucket: str) -> int:
+    """List schemas/datasets/{dataset}/v*/ prefixes and return the highest version. 0 if none."""
+    resp = s3_client.list_objects_v2(
+        Bucket=bucket,
+        Prefix=f"schemas/datasets/{dataset}/v",
+        Delimiter="/",
+    )
+    versions = []
+    for prefix_obj in resp.get("CommonPrefixes", []):
+        match = re.search(r"/v(\d+)/$", prefix_obj["Prefix"])
+        if match:
+            versions.append(int(match.group(1)))
+    return max(versions, default=0)
+
+
+def _build_schema_ref(dataset: str, bucket: str, s3_client) -> dict:
+    """Build schema_ref using the latest available schema version.
+
+    Auto-detects version from S3. Never derives paths from table names.
+    Raises 404 if no schema exists for the dataset.
+    """
+    version = _get_latest_schema_version(dataset, s3_client, bucket)
+    if version == 0:
+        raise HTTPException(
+            status_code=404,
+            detail=(
+                f"No schema found for dataset '{dataset}'. "
+                "Define and save full.yaml on the Processing page first."
+            ),
+        )
+    base = f"s3://{bucket}/schemas/datasets/{dataset}/v{version}"
+    return {"version": version, "full": f"{base}/full.yaml"}
+
+
+def _validate_schema_ref_exists(schema_ref: dict, s3_client, bucket: str) -> None:
+    """Head-object check for each schema URI. Raises HTTPException(404) if missing."""
+    for key, uri in schema_ref.items():
+        if key == "version":
+            continue
+        parsed = urlparse(uri)
+        try:
+            s3_client.head_object(Bucket=parsed.netloc, Key=parsed.path.lstrip("/"))
+        except ClientError as e:
+            if e.response["Error"]["Code"] in ("404", "NoSuchKey"):
+                raise HTTPException(
+                    status_code=404,
+                    detail=f"Schema '{key}' not found at {uri}. Define it on the Processing page.",
+                )
+            raise
+
+
 # ─── Endpoints ───────────────────────────────────────────────────────────────
 
 
 @router.post("", status_code=201)
 async def submit_processing_run(request: ProcessingRunRequest):
-    """Trigger the Airflow ml_pipeline DAG in preprocessing_only mode."""
-    execution_id = request.execution_id.strip() or datetime.now(timezone.utc).strftime(
-        "%Y%m%d_%H%M%S"
+    """Trigger the Airflow preprocessing_pipeline DAG."""
+    preprocess_run_id = (
+        request.execution_id.strip()
+        or _generate_preprocess_run_id(request.dataset)
     )
 
     dsl_s3_path = _resolve_dsl_s3_path(request.dataset, request.dsl_version)
 
-    # Upload params_preprocess.yaml: solo config de preprocesamiento (sin model/kuberay/serving)
+    s3 = _s3_client()
+
+    # Build schema_ref (auto-detects latest version from S3)
+    schema_ref = _build_schema_ref(request.dataset, S3_BUCKET, s3)
+    _validate_schema_ref_exists(schema_ref, s3, S3_BUCKET)
+
+    # artifact_set_id for Spark: last 6 chars of the run ID
+    artifact_set_id = preprocess_run_id[-6:]
+
     import yaml as _yaml
 
     params: dict[str, Any] = {
+        "run_metadata": {
+            "run_id": preprocess_run_id,
+            "run_type": "preprocessing",
+            "dataset": request.dataset,
+            "generated_at": datetime.now(timezone.utc).isoformat(),
+        },
         "execution": {
-            "execution_id": execution_id,
+            "preprocess_run_id": preprocess_run_id,
             "raw_table": f"iceberg.raw.{request.dataset}",
             "raw_dataset_name": request.dataset,
             "dsl_s3_path": dsl_s3_path,
+            "dsl_version": request.dsl_version,
         },
+        "schema_ref": schema_ref,
         "splits": {
             "train": {"start": request.splits.train.start, "end": request.splits.train.end},
             "val":   {"start": request.splits.val.start,   "end": request.splits.val.end},
@@ -251,13 +330,14 @@ async def submit_processing_run(request: ProcessingRunRequest):
             "processed": {
                 "catalog": "iceberg",
                 "namespace": "processed",
+                "table_prefix": request.dataset,
             },
         },
     }
     params_yaml_str = _yaml.dump(params, default_flow_style=False, allow_unicode=True)
 
-    s3 = _s3_client()
-    params_key = f"params/{execution_id}/params_preprocess.yaml"
+    # Write ONLY to new path: runs/preprocessing/{run_id}/
+    params_key = f"runs/preprocessing/{preprocess_run_id}/params_preprocess.yaml"
     s3.put_object(
         Bucket=S3_BUCKET,
         Key=params_key,
@@ -266,7 +346,7 @@ async def submit_processing_run(request: ProcessingRunRequest):
     )
     preprocess_params_s3_path = f"s3://{S3_BUCKET}/{params_key}"
 
-    # Trigger Airflow DAG with preprocessing_only mode
+    # Trigger Airflow preprocessing_pipeline DAG
     try:
         status, data = _airflow_request(
             "POST",
@@ -274,11 +354,13 @@ async def submit_processing_run(request: ProcessingRunRequest):
             body={
                 "logical_date": datetime.now(timezone.utc).isoformat(),
                 "conf": {
-                    "execution_id": execution_id,
+                    "preprocess_run_id": preprocess_run_id,
+                    "artifact_set_id": artifact_set_id,
+                    "dataset": request.dataset,
                     "raw_table": f"iceberg.raw.{request.dataset}",
                     "dsl_s3_path": dsl_s3_path,
                     "preprocess_params_s3_path": preprocess_params_s3_path,
-                    "pipeline_mode": "preprocessing_only",
+                    "schema_s3_path": schema_ref["full"],
                 },
             },
         )
@@ -295,9 +377,11 @@ async def submit_processing_run(request: ProcessingRunRequest):
 
     return {
         "dag_run_id": dag_run_id,
-        "execution_id": execution_id,
+        "preprocess_run_id": preprocess_run_id,
+        "artifact_set_id": artifact_set_id,
         "preprocess_params_s3_path": preprocess_params_s3_path,
         "dsl_s3_path": dsl_s3_path,
+        "schema_version": schema_ref["version"],
     }
 
 
@@ -329,8 +413,8 @@ async def list_processing_runs(dataset: str | None = Query(None, description="Fi
     for _, row in df.iterrows():
         table_name: str = str(row.get("processed_table_name", ""))
 
-        # raw_dataset_name: leer directamente de la columna (post-migración)
-        # Fallback: parsear del nombre de tabla para filas históricas con NULL
+        # raw_dataset_name: read directly from column (post-migration)
+        # Fallback: parse from table name for historical rows with NULL
         raw_dataset_name = str(row.get("raw_dataset_name") or "")
         if not raw_dataset_name and "." in table_name:
             tail = table_name.rsplit(".", 1)[-1]
@@ -350,7 +434,7 @@ async def list_processing_runs(dataset: str | None = Query(None, description="Fi
             )
         )
 
-    # Filtro por dataset si se especifica
+    # Filter by dataset if specified
     if dataset:
         runs = [r for r in runs if r.raw_dataset_name == dataset]
 
@@ -359,11 +443,32 @@ async def list_processing_runs(dataset: str | None = Query(None, description="Fi
     return {"runs": [r.model_dump() for r in runs]}
 
 
-@router.get("/{execution_id}/params")
-async def get_preprocess_params(execution_id: str):
-    """Fetch params_preprocess.yaml for a given execution_id from S3.
+@router.get("/ids")
+async def list_preprocess_run_ids():
+    """List preprocessing run IDs from S3 (new-style runs in runs/preprocessing/)."""
+    s3 = _s3_client()
+    resp = s3.list_objects_v2(
+        Bucket=S3_BUCKET,
+        Prefix="runs/preprocessing/",
+        Delimiter="/",
+    )
+    runs = []
+    for prefix_obj in resp.get("CommonPrefixes", []):
+        run_id = prefix_obj["Prefix"].rstrip("/").rsplit("/", 1)[-1]
+        m = re.match(r"^pre-(.+)-(\d{8}T\d{6}Z)-([0-9a-f]{6})$", run_id)
+        dataset = m.group(1) if m else ""
+        runs.append({"preprocess_run_id": run_id, "dataset": dataset})
+    # Newest first (run IDs contain timestamps)
+    runs.sort(key=lambda r: r["preprocess_run_id"], reverse=True)
+    return {"runs": runs}
 
-    Backward-compat: si no existe params_preprocess.yaml, intenta con el antiguo params.yaml.
+
+@router.get("/{run_id}/params")
+async def get_preprocess_params(run_id: str):
+    """Fetch params_preprocess.yaml for a given run_id from S3.
+
+    Tries new path first (runs/preprocessing/{run_id}/), then legacy path
+    (params/{run_id}/) for historical runs.
     """
     s3 = _s3_client()
 
@@ -376,16 +481,19 @@ async def get_preprocess_params(execution_id: str):
                 return None
             raise HTTPException(status_code=500, detail=f"S3 error: {e}") from e
 
-    yaml_content = _fetch_key(f"params/{execution_id}/params_preprocess.yaml")
+    # New path first
+    yaml_content = _fetch_key(f"runs/preprocessing/{run_id}/params_preprocess.yaml")
     if yaml_content is None:
-        # Backward-compat: monolithic params.yaml de runs anteriores a la separación
-        yaml_content = _fetch_key(f"params/{execution_id}/params.yaml")
+        # Legacy fallback for historical runs (read-only — new runs never write here)
+        yaml_content = _fetch_key(f"params/{run_id}/params_preprocess.yaml")
+    if yaml_content is None:
+        yaml_content = _fetch_key(f"params/{run_id}/params.yaml")
     if yaml_content is None:
         raise HTTPException(
             status_code=404,
-            detail=f"No params file found for execution_id '{execution_id}'",
+            detail=f"No params file found for run_id '{run_id}'",
         )
-    return {"execution_id": execution_id, "yaml_content": yaml_content}
+    return {"run_id": run_id, "yaml_content": yaml_content}
 
 
 @router.get("/{dag_run_id}/status")

@@ -1,52 +1,25 @@
 /**
- * RunPage — ML platform execution control surface.
+ * RunPage — ML training pipeline.
  *
  * 4-step workflow stepper:
- *   1. Dataset   — dataset, DSL version, execution ID
+ *   1. Preprocessing Run — select preprocess_run_id, auto-load lineage info
  *   2. Model     — framework, config, hyperparams (tune=false)
  *   3. Tuning    — tuning toggle + trial budget / search space
- *   4. Review    — summary + validation + launch
+ *   4. Review    — summary + launch
  *
- * Right column: live YAML preview (params.yaml / raw / full / preprocessed).
+ * Right column: live params_training.yaml preview.
  */
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Check, ChevronDown, ChevronUp, Copy, RefreshCw } from 'lucide-react';
 import {
-  getDsl,
-  getDslFeatures,
   getPreprocessParams,
   getRunStatus,
-  listDatasets,
-  listDsls,
-  listProcessingRuns,
+  listPreprocessRunIds,
   submitRun,
-  uploadSchemas,
-  type DatasetInfo,
-  type DslVersion,
-  type ProcessedTableEntry,
-  type RunResult,
-  type SchemaUploadResult,
+  type PreprocessRunId,
+  type TrainingRunResult,
 } from '../api/platformClient';
-
-import {
-  generateParamsYaml,
-  DEFAULT_ADVANCED_CONFIG,
-  type AdvancedConfig,
-  type ParamsYamlInput,
-} from '../lib/paramsYaml';
-import {
-  generateRawYaml,
-  generateFullYaml,
-  generatePreprocessedYaml,
-  generateRawYamlV2,
-  generateFullYamlV2,
-  generatePreprocessedYamlV2,
-  syncLegacyFields,
-  validateSchemaBuilder,
-  type SchemaBuilderState,
-} from '../lib/schemaYaml';
-import { SchemaBuilderSection } from '../components/schema/SchemaBuilderSection';
 import {
   XGBOOST_DEFAULTS,
   XGBOOST_TUNE_SETTINGS_DEFAULTS,
@@ -71,25 +44,10 @@ const DEFAULT_MODEL_CONFIG = {
   seed: 42,
 };
 
-const STEP_LABELS = ['Dataset', 'Model', 'Tuning', 'Review'];
+const STEP_LABELS = ['Preprocessing Run', 'Model', 'Tuning', 'Review'];
 
 type Framework = 'xgboost' | 'pytorch';
 type TuneMode = 'predefined' | 'override';
-type PreviewTab = 'params.yaml' | 'raw.yaml' | 'full.yaml' | 'preprocessed.yaml';
-
-function nowId(): string {
-  const d = new Date();
-  return [
-    d.getUTCFullYear(),
-    String(d.getUTCMonth() + 1).padStart(2, '0'),
-    String(d.getUTCDate()).padStart(2, '0'),
-    '_',
-    String(d.getUTCHours()).padStart(2, '0'),
-    String(d.getUTCMinutes()).padStart(2, '0'),
-    String(d.getUTCSeconds()).padStart(2, '0'),
-  ].join('');
-}
-
 
 // ─── Style tokens ─────────────────────────────────────────────────────────────
 
@@ -161,39 +119,6 @@ function ReadOnlyBadge({ children }: { children: React.ReactNode }) {
     <span className="rounded bg-slate-700 px-1.5 py-0.5 font-mono text-[10px] text-slate-400">
       {children}
     </span>
-  );
-}
-
-function AccordionSection({
-  title,
-  defaultOpen = false,
-  badge,
-  children,
-}: {
-  title: string;
-  defaultOpen?: boolean;
-  badge?: React.ReactNode;
-  children: React.ReactNode;
-}) {
-  const [open, setOpen] = useState(defaultOpen);
-  return (
-    <div className="rounded-lg border border-slate-700 bg-slate-900">
-      <button
-        onClick={() => setOpen((o) => !o)}
-        className="flex w-full items-center justify-between px-4 py-3 text-sm font-medium text-slate-300 hover:text-slate-100"
-      >
-        <span className="flex items-center gap-2">
-          {title}
-          {badge}
-        </span>
-        {open ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
-      </button>
-      {open && (
-        <div className="space-y-3 border-t border-slate-700 px-4 pb-4 pt-3">
-          {children}
-        </div>
-      )}
-    </div>
   );
 }
 
@@ -337,15 +262,12 @@ function SearchSpaceRow({
 }) {
   const renderRange = () => {
     if (entry.type === 'fixed') {
-      const v = Array.isArray(entry.value)
-        ? entry.value.join(', ')
-        : String(entry.value);
+      const v = Array.isArray(entry.value) ? entry.value.join(', ') : String(entry.value);
       return <ReadOnlyBadge>fixed: {v}</ReadOnlyBadge>;
     }
     if (entry.type === 'choice') {
       return <ReadOnlyBadge>choice: [{entry.options.join(', ')}]</ReadOnlyBadge>;
     }
-    // narrowed to 'randint' | 'uniform' | 'loguniform'
     if (overrideMode) {
       return (
         <div className="flex items-center gap-1">
@@ -354,9 +276,7 @@ function SearchSpaceRow({
             className="w-20 rounded bg-slate-800 px-1.5 py-0.5 text-xs text-slate-100 outline-none focus:ring-1 focus:ring-blue-500"
             value={override?.min ?? entry.min}
             step="any"
-            onChange={(e) =>
-              onOverrideChange?.(paramKey, 'min', parseFloat(e.target.value))
-            }
+            onChange={(e) => onOverrideChange?.(paramKey, 'min', parseFloat(e.target.value))}
           />
           <span className="text-xs text-slate-500">–</span>
           <input
@@ -364,25 +284,15 @@ function SearchSpaceRow({
             className="w-20 rounded bg-slate-800 px-1.5 py-0.5 text-xs text-slate-100 outline-none focus:ring-1 focus:ring-blue-500"
             value={override?.max ?? entry.max}
             step="any"
-            onChange={(e) =>
-              onOverrideChange?.(paramKey, 'max', parseFloat(e.target.value))
-            }
+            onChange={(e) => onOverrideChange?.(paramKey, 'max', parseFloat(e.target.value))}
           />
         </div>
       );
     }
     if (entry.type === 'randint')
-      return (
-        <ReadOnlyBadge>
-          randint({entry.min}, {entry.max})
-        </ReadOnlyBadge>
-      );
+      return <ReadOnlyBadge>randint({entry.min}, {entry.max})</ReadOnlyBadge>;
     if (entry.type === 'uniform')
-      return (
-        <ReadOnlyBadge>
-          uniform({entry.min}, {entry.max})
-        </ReadOnlyBadge>
-      );
+      return <ReadOnlyBadge>uniform({entry.min}, {entry.max})</ReadOnlyBadge>;
     return (
       <ReadOnlyBadge>
         loguniform({entry.min.toExponential(0)}, {entry.max})
@@ -414,21 +324,16 @@ function SummaryCard({
       <div className="mb-2 flex items-center justify-between">
         <span className={SUB_HEADING}>{title}</span>
         {onEdit && (
-          <button
-            onClick={onEdit}
-            className="text-[10px] text-blue-400 hover:text-blue-300"
-          >
+          <button onClick={onEdit} className="text-[10px] text-blue-400 hover:text-blue-300">
             Edit
           </button>
         )}
       </div>
-      <div className="grid grid-cols-[120px_1fr] gap-x-3 gap-y-1">
+      <div className="grid grid-cols-[140px_1fr] gap-x-3 gap-y-1">
         {items.map(([k, v]) => (
           <div key={k} className="contents">
             <span className="text-[11px] text-slate-500">{k}</span>
-            <span className="break-all font-mono text-[11px] text-slate-200">
-              {v || '—'}
-            </span>
+            <span className="break-all font-mono text-[11px] text-slate-200">{v || '—'}</span>
           </div>
         ))}
       </div>
@@ -438,17 +343,8 @@ function SummaryCard({
 
 // ─── YamlPreviewPanel ─────────────────────────────────────────────────────────
 
-function YamlPreviewPanel({
-  tabs,
-  activeTab,
-  onTabChange,
-}: {
-  tabs: Array<{ key: PreviewTab; label: string; content: string }>;
-  activeTab: PreviewTab;
-  onTabChange: (tab: PreviewTab) => void;
-}) {
+function YamlPreviewPanel({ content }: { content: string }) {
   const [copied, setCopied] = useState(false);
-  const content = tabs.find((t) => t.key === activeTab)?.content ?? '';
 
   const handleCopy = () => {
     void navigator.clipboard.writeText(content).then(() => {
@@ -460,21 +356,7 @@ function YamlPreviewPanel({
   return (
     <div className="flex h-full flex-col overflow-hidden rounded-lg border border-slate-700 bg-slate-900">
       <div className="flex shrink-0 items-center justify-between border-b border-slate-700 px-3 py-2">
-        <div className="flex gap-1">
-          {tabs.map((t) => (
-            <button
-              key={t.key}
-              onClick={() => onTabChange(t.key)}
-              className={`rounded px-2 py-0.5 text-[10px] font-medium transition-colors ${
-                activeTab === t.key
-                  ? 'bg-slate-700 text-slate-100'
-                  : 'text-slate-500 hover:text-slate-300'
-              }`}
-            >
-              {t.label}
-            </button>
-          ))}
-        </div>
+        <span className="text-[10px] font-medium text-slate-400">params_training.yaml preview</span>
         <button
           onClick={handleCopy}
           className="flex items-center gap-1 rounded px-2 py-0.5 text-[10px] text-slate-400 hover:bg-slate-800 hover:text-slate-200"
@@ -491,6 +373,56 @@ function YamlPreviewPanel({
   );
 }
 
+// ─── buildPreviewYaml ─────────────────────────────────────────────────────────
+
+function buildPreviewYaml(opts: {
+  preprocess_run_id: string;
+  framework: Framework;
+  tuningEnabled: boolean;
+  numberOfTrials: number;
+  sampleFraction: number;
+  modelConfig: typeof DEFAULT_MODEL_CONFIG;
+  hyperparams: Record<string, number | string | string[]>;
+  tuneSettings: Record<string, number>;
+}): string {
+  const lines: string[] = [
+    '# params_training.yaml preview',
+    '',
+    'execution:',
+    `  preprocess_run_id: ${opts.preprocess_run_id || '(not selected)'}`,
+    `  framework: ${opts.framework}`,
+    '',
+    'model:',
+    `  target: ${opts.modelConfig.target}`,
+    `  num_classes: ${opts.modelConfig.num_classes}`,
+    `  experiment_name: ${opts.modelConfig.experiment_name}`,
+    `  registry_model_name: ${opts.modelConfig.registry_model_name}`,
+    `  seed: ${opts.modelConfig.seed}`,
+    '',
+    'tuning:',
+    `  enabled: ${opts.tuningEnabled}`,
+  ];
+  if (opts.tuningEnabled) {
+    lines.push(`  number_of_trials: ${opts.numberOfTrials}`);
+    lines.push(`  sample_fraction_for_tuning: ${opts.sampleFraction.toFixed(2)}`);
+  }
+  if (!opts.tuningEnabled && Object.keys(opts.hyperparams).length > 0) {
+    lines.push('');
+    lines.push('hyperparams:');
+    for (const [k, v] of Object.entries(opts.hyperparams)) {
+      lines.push(`  ${k}: ${String(v)}`);
+    }
+  }
+  if (opts.tuningEnabled && Object.keys(opts.tuneSettings).length > 0) {
+    lines.push('');
+    lines.push('tune_settings:');
+    for (const [k, v] of Object.entries(opts.tuneSettings)) {
+      lines.push(`  ${k}: ${String(v)}`);
+    }
+  }
+  return lines.join('\n') + '\n';
+}
+
 // ─── RunPage ──────────────────────────────────────────────────────────────────
 
 export function RunPage() {
@@ -498,41 +430,35 @@ export function RunPage() {
   const [currentStep, setCurrentStep] = useState(1);
   const [navErrors, setNavErrors] = useState<string[]>([]);
 
-  // ── Execution ────────────────────────────────────────────────────────────
-  const [dataset, setDataset] = useState('');
-  // rawDatasetFilter: selector de dataset fuente — NO se guarda en params.yaml
-  const [rawDatasetFilter, setRawDatasetFilter] = useState('');
-  const [dslVersion, setDslVersion] = useState<number | ''>('');
-  const [dslList, setDslList] = useState<DslVersion[]>([]);
-  const [dslListLoading, setDslListLoading] = useState(false);
-  const [availableDatasets, setAvailableDatasets] = useState<DatasetInfo[]>([]);
-  const [processingRuns, setProcessingRuns] = useState<ProcessedTableEntry[]>([]);
-  const [selectedProcessedTable, setSelectedProcessedTable] = useState('');
-  const [executionId, setExecutionId] = useState(nowId);
+  // ── Step 1: Preprocessing Run ─────────────────────────────────────────────
+  const [preprocessRunIds, setPreprocessRunIds] = useState<PreprocessRunId[]>([]);
+  const [preprocessIdsLoading, setPreprocessIdsLoading] = useState(false);
+  const [selectedPreprocessRunId, setSelectedPreprocessRunId] = useState('');
+  const [preprocessInfo, setPreprocessInfo] = useState<{
+    dataset: string;
+    dsl_version: number | null;
+    dsl_s3_path: string;
+    schema_version: number | null;
+  } | null>(null);
+  const [preprocessInfoLoading, setPreprocessInfoLoading] = useState(false);
+  const [preprocessInfoError, setPreprocessInfoError] = useState('');
 
   // ── Params inspection modal ───────────────────────────────────────────────
   const [paramsModalOpen, setParamsModalOpen] = useState(false);
-  const [paramsModalTab, setParamsModalTab] = useState<'preprocess' | 'dsl'>('preprocess');
   const [paramsModalContent, setParamsModalContent] = useState('');
-  const [dslModalContent, setDslModalContent] = useState('');
   const [paramsModalLoading, setParamsModalLoading] = useState(false);
   const [paramsModalError, setParamsModalError] = useState('');
 
-  // ── Tuning ───────────────────────────────────────────────────────────────
-  const [tuningEnabled, setTuningEnabled] = useState(true);
-  const [numberOfTrials, setNumberOfTrials] = useState(3);
-  const [sampleFraction, setSampleFraction] = useState(0.2);
-
-  // ── Model ────────────────────────────────────────────────────────────────
+  // ── Model ─────────────────────────────────────────────────────────────────
   const [framework, setFramework] = useState<Framework>('xgboost');
   const [modelConfig, setModelConfig] = useState({ ...DEFAULT_MODEL_CONFIG });
 
-  // ── Hyperparams (*_PARAMS) ────────────────────────────────────────────────
-  const [hyperparams, setHyperparams] = useState<
-    Record<string, number | string | string[]>
-  >(() => ({ ...XGBOOST_DEFAULTS }));
+  // ── Hyperparams ───────────────────────────────────────────────────────────
+  const [hyperparams, setHyperparams] = useState<Record<string, number | string | string[]>>(
+    () => ({ ...XGBOOST_DEFAULTS }),
+  );
 
-  // ── Tune settings (*_TUNE_SETTINGS) ──────────────────────────────────────
+  // ── Tune settings ─────────────────────────────────────────────────────────
   const [tuneSettings, setTuneSettings] = useState<Record<string, number>>(
     () => ({ ...XGBOOST_TUNE_SETTINGS_DEFAULTS }),
   );
@@ -543,80 +469,60 @@ export function RunPage() {
     Record<string, { min: number; max: number }>
   >({});
 
-  // ── Schema builder ────────────────────────────────────────────────────────
-  const [schemaBuilder, setSchemaBuilder] = useState<SchemaBuilderState>({
-    // V2 fields
-    dataset: '',
-    dslName: '',
-    dslVersion: '',
-    processedTableName: '',
-    generatedFrom: '',
-    allColumns: [],
-    rawFields: [],
-    rawGroups: { properties: 'properties' },
-    idField: '',
-    fullFields: [],
-    preprocessedFields: [],
-    // V1 legacy compat
-    rawTopLevel: [],
-    propertiesFields: [],
-    fullColumns: [],
-    preprocessedColumns: [],
-    targetColumn: '',
-    idColumn: '',
-    typeOverrides: {},
-  });
-  const [schemaSaving, setSchemaSaving] = useState(false);
-  const [schemaSaveResult, setSchemaSaveResult] =
-    useState<SchemaUploadResult | null>(null);
-
-  // ── Advanced ─────────────────────────────────────────────────────────────
-  const [advanced, setAdvanced] = useState<AdvancedConfig>({
-    ...DEFAULT_ADVANCED_CONFIG,
-  });
-
-  // ── Preview ───────────────────────────────────────────────────────────────
-  const [activePreviewTab, setActivePreviewTab] =
-    useState<PreviewTab>('params.yaml');
+  // ── Tuning ────────────────────────────────────────────────────────────────
+  const [tuningEnabled, setTuningEnabled] = useState(true);
+  const [numberOfTrials, setNumberOfTrials] = useState(3);
+  const [sampleFraction, setSampleFraction] = useState(0.2);
 
   // ── Submission ────────────────────────────────────────────────────────────
-  const [submitResult, setSubmitResult] = useState<RunResult | null>(null);
+  const [submitResult, setSubmitResult] = useState<TrainingRunResult | null>(null);
   const [submitError, setSubmitError] = useState('');
   const [runStatus, setRunStatus] = useState('');
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // ── Effects ───────────────────────────────────────────────────────────────
 
-  // Load available datasets on mount (para el selector de Raw Dataset)
-  useEffect(() => {
-    listDatasets()
-      .then((ds) => setAvailableDatasets(ds))
-      .catch(() => setAvailableDatasets([]));
+  const loadPreprocessIds = useCallback(() => {
+    setPreprocessIdsLoading(true);
+    listPreprocessRunIds()
+      .then((r) => setPreprocessRunIds(r.runs))
+      .catch(() => setPreprocessRunIds([]))
+      .finally(() => setPreprocessIdsLoading(false));
   }, []);
 
-  // Load processing runs + DSL list when rawDatasetFilter changes
   useEffect(() => {
-    if (!rawDatasetFilter) {
-      setProcessingRuns([]);
-      setDslList([]);
-      setSelectedProcessedTable('');
-      setDslVersion('');
+    loadPreprocessIds();
+  }, [loadPreprocessIds]);
+
+  useEffect(() => {
+    if (!selectedPreprocessRunId) {
+      setPreprocessInfo(null);
+      setPreprocessInfoError('');
       return;
     }
-    void listProcessingRuns(rawDatasetFilter)
-      .then((r) => setProcessingRuns(r.runs))
-      .catch(() => setProcessingRuns([]));
-    setDslListLoading(true);
-    void listDsls(rawDatasetFilter)
-      .then((r) => setDslList(r.dsls))
-      .catch(() => setDslList([]))
-      .finally(() => setDslListLoading(false));
-  }, [rawDatasetFilter]);
-
-  // dataset = rawDatasetFilter (ya no se deriva del entry)
-  useEffect(() => {
-    setDataset(rawDatasetFilter);
-  }, [rawDatasetFilter]);
+    setPreprocessInfoLoading(true);
+    setPreprocessInfoError('');
+    setPreprocessInfo(null);
+    getPreprocessParams(selectedPreprocessRunId)
+      .then(async (r) => {
+        const { parse } = await import('yaml');
+        const parsed = parse(r.yaml_content) as {
+          execution?: { dsl_s3_path?: string };
+          schema_ref?: { version?: number };
+          run_metadata?: { dataset?: string; dsl_version?: number };
+        };
+        setPreprocessInfo({
+          dataset: parsed.run_metadata?.dataset ?? '',
+          dsl_version: parsed.run_metadata?.dsl_version ?? null,
+          dsl_s3_path: parsed.execution?.dsl_s3_path ?? '',
+          schema_version: parsed.schema_ref?.version ?? null,
+        });
+      })
+      .catch((e) =>
+        setPreprocessInfoError(e instanceof Error ? e.message : String(e)),
+      )
+      .finally(() => setPreprocessInfoLoading(false));
+  }, [selectedPreprocessRunId]);
 
   useEffect(() => {
     setHyperparams({ ...getDefaults(framework) });
@@ -644,62 +550,31 @@ export function RunPage() {
     };
   }, [submitResult]);
 
-  // ── useMemo — YAML previews ────────────────────────────────────────────────
+  // ── YAML preview ──────────────────────────────────────────────────────────
 
-  const paramsInput = useMemo<ParamsYamlInput>(
-    () => ({
-      execution_id: executionId,
-      dataset,
-      dslS3Path: '',
-      tuning: { enabled: tuningEnabled, number_of_trials: numberOfTrials },
-      framework,
-      model: modelConfig,
-      sample_fraction_for_tuning: sampleFraction,
-      hyperparams,
-      tuneSettings: tuningEnabled ? tuneSettings : {},
-      advanced,
-    }),
+  const previewYaml = useMemo(
+    () =>
+      buildPreviewYaml({
+        preprocess_run_id: selectedPreprocessRunId,
+        framework,
+        tuningEnabled,
+        numberOfTrials,
+        sampleFraction,
+        modelConfig,
+        hyperparams,
+        tuneSettings,
+      }),
     [
-      executionId,
-      dataset,
+      selectedPreprocessRunId,
+      framework,
       tuningEnabled,
       numberOfTrials,
-      framework,
-      modelConfig,
       sampleFraction,
+      modelConfig,
       hyperparams,
       tuneSettings,
-      advanced,
     ],
   );
-
-  const paramsYamlPreview = useMemo(
-    () => generateParamsYaml(paramsInput),
-    [paramsInput],
-  );
-  const rawYamlPreview = useMemo(() => {
-    if (schemaBuilder.rawFields.length > 0)
-      return generateRawYamlV2(schemaBuilder);
-    if (schemaBuilder.allColumns.length)
-      return generateRawYaml(schemaBuilder, schemaBuilder.dataset || dataset);
-    return '# Select a DSL and load Iceberg columns to preview schema';
-  }, [schemaBuilder, dataset]);
-
-  const fullYamlPreview = useMemo(() => {
-    if (schemaBuilder.fullFields.length > 0)
-      return generateFullYamlV2(schemaBuilder);
-    if (schemaBuilder.allColumns.length)
-      return generateFullYaml(schemaBuilder, schemaBuilder.dataset || dataset);
-    return '# Select a DSL and load Iceberg columns to preview schema';
-  }, [schemaBuilder, dataset]);
-
-  const preprocessedYamlPreview = useMemo(() => {
-    if (schemaBuilder.preprocessedFields.length > 0)
-      return generatePreprocessedYamlV2(schemaBuilder);
-    if (schemaBuilder.preprocessedColumns.length)
-      return generatePreprocessedYaml(schemaBuilder, schemaBuilder.dataset || dataset);
-    return '# Select a DSL to preview preprocessed features';
-  }, [schemaBuilder, dataset]);
 
   // ── Step validation ────────────────────────────────────────────────────────
 
@@ -707,21 +582,19 @@ export function RunPage() {
     switch (step) {
       case 1: {
         const e: string[] = [];
-        if (!selectedProcessedTable) e.push('Select a processed table');
+        if (!selectedPreprocessRunId) e.push('Select a preprocessing run');
         return e;
       }
       case 2: {
         const e: string[] = [];
         if (!modelConfig.target.trim()) e.push('Target column is required');
-        if (modelConfig.num_classes < 2)
-          e.push('num_classes must be at least 2');
+        if (modelConfig.num_classes < 2) e.push('num_classes must be at least 2');
         return e;
       }
       case 3: {
         const e: string[] = [];
         if (tuningEnabled) {
-          if (numberOfTrials < 1)
-            e.push('number_of_trials must be at least 1');
+          if (numberOfTrials < 1) e.push('number_of_trials must be at least 1');
           if (sampleFraction < 0.01 || sampleFraction > 1.0)
             e.push('sample_fraction must be 0.01–1.0');
         }
@@ -741,15 +614,12 @@ export function RunPage() {
         if (!allowed.has(k)) errors.push(`Unknown hyperparameter key: "${k}"`);
       }
     }
-    errors.push(...validateSchemaBuilder(schemaBuilder));
     return errors;
   }
 
   // ── Step navigation ────────────────────────────────────────────────────────
 
-  const stepStatus = (
-    n: number,
-  ): 'active' | 'completed' | 'error' | 'pending' => {
+  const stepStatus = (n: number): 'active' | 'completed' | 'error' | 'pending' => {
     if (n === currentStep) return 'active';
     if (n > currentStep) return 'pending';
     return getStepErrors(n).length === 0 ? 'completed' : 'error';
@@ -757,10 +627,7 @@ export function RunPage() {
 
   const goForward = () => {
     const errs = getStepErrors(currentStep);
-    if (errs.length > 0) {
-      setNavErrors(errs);
-      return;
-    }
+    if (errs.length > 0) { setNavErrors(errs); return; }
     setNavErrors([]);
     setCurrentStep((s) => Math.min(s + 1, 4));
   };
@@ -771,67 +638,20 @@ export function RunPage() {
   };
 
   const goToStep = (n: number) => {
-    if (n <= currentStep) {
-      setNavErrors([]);
-      setCurrentStep(n);
-    }
+    if (n <= currentStep) { setNavErrors([]); setCurrentStep(n); }
   };
 
   // ── Handlers ──────────────────────────────────────────────────────────────
 
-
-  const handleDslSelectStep1 = async (version: number) => {
-    if (!rawDatasetFilter || !version) return;
-    setDslVersion(version);
-    // Infer processed table from matching run by dsl_name (e.g. "v1__network_traffic.yaml")
-    const dslInfo = dslList.find((d) => d.version === version);
-    const dslFileName = dslInfo ? `v${dslInfo.version}__${dslInfo.slug}.yaml` : '';
-    const matchingRun = processingRuns.find((r) => r.dsl_name === dslFileName);
-    const processedTable = matchingRun?.processed_table_name ?? '';
-    setSelectedProcessedTable(processedTable);
-    // Load DSL features and pre-populate schemaBuilder
-    try {
-      const result = await getDslFeatures(rawDatasetFilter, version);
-      const preprocessedFields = result.finalFeatures.features.map((name) => ({
-        name,
-        source: 'dsl_derived' as const,
-        dslLocked: true,
-      }));
-      const generatedFrom = `${result.slug} / iceberg.raw.${rawDatasetFilter}`;
-      setSchemaBuilder((prev) =>
-        syncLegacyFields({
-          ...prev,
-          dataset: rawDatasetFilter,
-          dslName: result.slug,
-          dslVersion: version,
-          processedTableName: processedTable,
-          generatedFrom,
-          preprocessedFields,
-        }),
-      );
-    } catch {
-      // DSL feature load failure is non-blocking; Schema Builder can retry
-    }
-  };
-
   const handleInspectParams = async () => {
-    const entry = processingRuns.find((r) => r.processed_table_name === selectedProcessedTable);
-    if (!entry) return;
+    if (!selectedPreprocessRunId) return;
     setParamsModalContent('');
-    setDslModalContent('');
     setParamsModalError('');
     setParamsModalLoading(true);
     setParamsModalOpen(true);
-    setParamsModalTab('preprocess');
     try {
-      const [paramsResult, dslResult] = await Promise.all([
-        getPreprocessParams(entry.execution_id),
-        rawDatasetFilter && dslVersion !== ''
-          ? getDsl(rawDatasetFilter, dslVersion as number)
-          : Promise.resolve(null),
-      ]);
-      setParamsModalContent(paramsResult.yaml_content);
-      if (dslResult) setDslModalContent(dslResult.yaml_content);
+      const r = await getPreprocessParams(selectedPreprocessRunId);
+      setParamsModalContent(r.yaml_content);
     } catch (e) {
       setParamsModalError(e instanceof Error ? e.message : String(e));
     } finally {
@@ -846,17 +666,15 @@ export function RunPage() {
     const errors = validateForm();
     if (errors.length > 0) return;
     try {
-      const requestBody = {
-        processed_table: selectedProcessedTable,
-        execution_id: executionId.trim(),
+      const result = await submitRun({
+        preprocess_run_id: selectedPreprocessRunId,
         framework,
         tuning: { enabled: tuningEnabled, number_of_trials: numberOfTrials },
         model: modelConfig,
         sample_fraction_for_tuning: sampleFraction,
         hyperparams: tuningEnabled ? {} : hyperparams,
         tune_settings: tuningEnabled ? tuneSettings : {},
-      };
-      const result = await submitRun(requestBody);
+      });
       setSubmitResult(result);
       setRunStatus('queued');
     } catch (e) {
@@ -864,54 +682,30 @@ export function RunPage() {
     }
   };
 
-  const handleSaveSchemas = async () => {
-    if (!dataset) return;
-    setSchemaSaving(true);
-    setSchemaSaveResult(null);
-    try {
-      const r = await uploadSchemas(dataset, {
-        raw: rawYamlPreview,
-        full: fullYamlPreview,
-        preprocessed: preprocessedYamlPreview,
-      });
-      setSchemaSaveResult(r);
-    } catch {
-      // error surfaced via SchemaBuilderSection's onSave rejection
-    } finally {
-      setSchemaSaving(false);
-    }
-  };
+  // ── Derived values ────────────────────────────────────────────────────────
 
-  const downloadYaml = (content: string, filename: string) => {
-    const blob = new Blob([content], { type: 'text/yaml' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = filename;
-    a.click();
-    URL.revokeObjectURL(url);
-  };
+  const searchSpace = getSearchSpace(framework);
+  const paramMeta = getParamMeta(framework);
+  const tuneSettingsMeta = getTuneSettingsMeta(framework);
+  const nonTunableKeys = getNonTunableKeys(framework);
 
-  // ── Helpers ───────────────────────────────────────────────────────────────
+  const maxTKey = framework === 'xgboost' ? 'num_boost_round' : 'max_epochs';
+  const roundsPerTrial = (tuneSettings[maxTKey] as number | undefined) ?? 10;
+  const totalSteps = numberOfTrials * roundsPerTrial;
 
-  const updateHyperparam = (key: string, val: number | string | string[]) => {
+  const fullValidationErrors = validateForm();
+
+  const updateHyperparam = (key: string, val: number | string | string[]) =>
     setHyperparams((prev) => ({ ...prev, [key]: val }));
-  };
 
-  const updateTuneSetting = (key: string, val: number) => {
+  const updateTuneSetting = (key: string, val: number) =>
     setTuneSettings((prev) => ({ ...prev, [key]: val }));
-  };
 
-  const updateSearchSpaceOverride = (
-    key: string,
-    field: 'min' | 'max',
-    val: number,
-  ) => {
+  const updateSearchSpaceOverride = (key: string, field: 'min' | 'max', val: number) =>
     setSearchSpaceOverrides((prev) => ({
       ...prev,
       [key]: { ...(prev[key] ?? { min: 0, max: 1 }), [field]: val },
     }));
-  };
 
   const stateColor = (state: string) =>
     state === 'success'
@@ -922,44 +716,6 @@ export function RunPage() {
           ? 'text-red-400'
           : 'text-slate-400';
 
-  // ── Derived values ────────────────────────────────────────────────────────
-
-  const searchSpace = getSearchSpace(framework);
-  const paramMeta = getParamMeta(framework);
-  const tuneSettingsMeta = getTuneSettingsMeta(framework);
-  const nonTunableKeys = getNonTunableKeys(framework);
-
-  const maxTKey =
-    framework === 'xgboost' ? 'num_boost_round' : 'max_epochs';
-  const roundsPerTrial =
-    (tuneSettings[maxTKey] as number | undefined) ?? 10;
-  const totalSteps = numberOfTrials * roundsPerTrial;
-
-  const fullValidationErrors = validateForm();
-
-  const previewTabs = [
-    {
-      key: 'params.yaml' as PreviewTab,
-      label: 'params.yaml',
-      content: paramsYamlPreview,
-    },
-    {
-      key: 'raw.yaml' as PreviewTab,
-      label: 'raw.yaml',
-      content: rawYamlPreview,
-    },
-    {
-      key: 'full.yaml' as PreviewTab,
-      label: 'full.yaml',
-      content: fullYamlPreview,
-    },
-    {
-      key: 'preprocessed.yaml' as PreviewTab,
-      label: 'preprocessed.yaml',
-      content: preprocessedYamlPreview,
-    },
-  ];
-
   // ─────────────────────────────────────────────────────────────────────────────
   // RENDER
   // ─────────────────────────────────────────────────────────────────────────────
@@ -969,126 +725,100 @@ export function RunPage() {
       {/* ── LEFT: scrollable form ── */}
       <div className="min-w-0 flex-1 space-y-3 overflow-y-auto p-4">
 
-        {/* Stepper header */}
         <StepperHeader
           currentStep={currentStep}
           stepStatus={stepStatus}
           onStepClick={goToStep}
         />
 
-        {/* Step content card */}
         <div className="rounded-lg border border-slate-700 bg-slate-900 px-4 py-4">
 
-          {/* ── STEP 1: Processed Table & Execution ── */}
+          {/* ── STEP 1: Preprocessing Run ── */}
           {currentStep === 1 && (
             <div className="space-y-4">
-              <p className={SUB_HEADING}>DSL & Execution</p>
+              <p className={SUB_HEADING}>Select Preprocessing Run</p>
 
-              <div className="space-y-3">
-                <p className="text-xs text-slate-500">
-                  Select the source dataset, then choose a DSL version.
-                  The processed table is inferred automatically from the DSL selection.
-                </p>
+              <p className="text-xs text-slate-500">
+                Select the preprocessing run whose processed table this training job will use.
+                The dataset, DSL version, and schema version are auto-loaded from the run params.
+              </p>
 
-                {/* Raw Dataset filter — solo filtra, NO se guarda en params_training.yaml */}
-                <Field label="Raw Dataset" tooltip="Filtra las tablas procesadas por dataset fuente. No se incluye en params_training.yaml.">
-                  {availableDatasets.length > 0 ? (
-                    <select
-                      value={rawDatasetFilter}
-                      onChange={(e) => {
-                        setRawDatasetFilter(e.target.value);
-                        setSelectedProcessedTable('');
-                      }}
-                      className={SELECT_CLS}
-                    >
-                      <option value="">— select dataset —</option>
-                      {availableDatasets.map((d) => (
-                        <option key={d.name} value={d.name}>{d.name}</option>
-                      ))}
-                    </select>
-                  ) : (
-                    <input
-                      value={rawDatasetFilter}
-                      onChange={(e) => {
-                        setRawDatasetFilter(e.target.value);
-                        setSelectedProcessedTable('');
-                      }}
-                      placeholder="network_traffic"
-                      className={INPUT_CLS}
-                    />
-                  )}
-                </Field>
-
-                {/* DSL Name — drives processed table inference */}
-                <Field label="DSL Name" tooltip="Select the DSL version used for preprocessing. The Processed Table is inferred automatically.">
-                  <div className="flex gap-1">
-                    <select
-                      value={dslVersion === '' ? '' : String(dslVersion)}
-                      onChange={(e) => {
-                        const v = Number(e.target.value);
-                        if (v) void handleDslSelectStep1(v);
-                        else {
-                          setDslVersion('');
-                          setSelectedProcessedTable('');
-                        }
-                      }}
-                      className={SELECT_CLS}
-                      disabled={!rawDatasetFilter || dslListLoading || dslList.length === 0}
-                    >
-                      <option value="">
-                        {!rawDatasetFilter
-                          ? '— select a dataset first —'
-                          : dslListLoading
-                            ? '— loading DSLs… —'
-                            : dslList.length === 0
-                              ? '— no DSLs found —'
-                              : '— select DSL —'}
+              <Field
+                label="Preprocessing Run"
+                tooltip="Identifies the Spark preprocessing run and its processed Iceberg table."
+              >
+                <div className="flex gap-1">
+                  <select
+                    value={selectedPreprocessRunId}
+                    onChange={(e) => setSelectedPreprocessRunId(e.target.value)}
+                    className={SELECT_CLS}
+                    disabled={preprocessIdsLoading}
+                  >
+                    <option value="">
+                      {preprocessIdsLoading ? '— loading… —' : '— select run —'}
+                    </option>
+                    {preprocessRunIds.map((r) => (
+                      <option key={r.preprocess_run_id} value={r.preprocess_run_id}>
+                        {r.preprocess_run_id}
+                        {r.dataset ? ` · ${r.dataset}` : ''}
                       </option>
-                      {dslList.map((d) => (
-                        <option key={d.version} value={String(d.version)}>
-                          v{d.version} · {d.slug}
-                        </option>
-                      ))}
-                    </select>
-                    <button
-                      onClick={() => void handleInspectParams()}
-                      disabled={!selectedProcessedTable}
-                      className={BTN_NEUTRAL}
-                      title="Inspeccionar params_preprocess.yaml de esta tabla"
-                    >
-                      🔍
-                    </button>
-                  </div>
-                  {selectedProcessedTable && (
-                    <p className="mt-1 text-[11px] text-slate-500">
-                      Processed table:{' '}
-                      <code className="rounded bg-slate-800 px-1 text-slate-400">
-                        {selectedProcessedTable}
-                      </code>
-                    </p>
-                  )}
-                </Field>
+                    ))}
+                  </select>
+                  <button
+                    onClick={loadPreprocessIds}
+                    disabled={preprocessIdsLoading}
+                    className={BTN_NEUTRAL}
+                    title="Refresh list"
+                  >
+                    <RefreshCw size={12} />
+                  </button>
+                  <button
+                    onClick={() => void handleInspectParams()}
+                    disabled={!selectedPreprocessRunId}
+                    className={BTN_NEUTRAL}
+                    title="Inspect params_preprocess.yaml"
+                  >
+                    🔍
+                  </button>
+                </div>
+              </Field>
 
-                <Field
-                  label="Execution ID"
-                  tooltip="Unique run identifier. Auto-generated, editable."
-                >
-                  <div className="flex gap-1">
-                    <input
-                      value={executionId}
-                      onChange={(e) => setExecutionId(e.target.value)}
-                      className={INPUT_CLS}
-                    />
-                    <button
-                      onClick={() => setExecutionId(nowId())}
-                      className={BTN_NEUTRAL}
-                      title="Regenerate"
-                    >
-                      <RefreshCw size={12} />
-                    </button>
+              {/* Auto-loaded lineage info */}
+              {preprocessInfoLoading && (
+                <p className="text-xs text-slate-500">Loading run info…</p>
+              )}
+              {preprocessInfoError && (
+                <p className="text-xs text-red-400">{preprocessInfoError}</p>
+              )}
+              {preprocessInfo && (
+                <div className="rounded border border-slate-700 bg-slate-800/40 px-3 py-2.5">
+                  <p className={`${SUB_HEADING} mb-2`}>Run Info</p>
+                  <div className="grid grid-cols-[120px_1fr] gap-x-3 gap-y-1">
+                    <span className="text-[11px] text-slate-500">Dataset</span>
+                    <span className="font-mono text-[11px] text-slate-200">
+                      {preprocessInfo.dataset || '—'}
+                    </span>
+                    <span className="text-[11px] text-slate-500">DSL version</span>
+                    <span className="font-mono text-[11px] text-slate-200">
+                      {preprocessInfo.dsl_version != null ? `v${preprocessInfo.dsl_version}` : '—'}
+                    </span>
+                    <span className="text-[11px] text-slate-500">Schema version</span>
+                    <span className="font-mono text-[11px] text-slate-200">
+                      {preprocessInfo.schema_version != null
+                        ? `v${preprocessInfo.schema_version}`
+                        : '—'}
+                    </span>
+                    {preprocessInfo.dsl_s3_path && (
+                      <>
+                        <span className="text-[11px] text-slate-500">DSL path</span>
+                        <span className="break-all font-mono text-[11px] text-slate-400">
+                          {preprocessInfo.dsl_s3_path}
+                        </span>
+                      </>
+                    )}
                   </div>
-                </Field>
-              </div>
+                </div>
+              )}
             </div>
           )}
 
@@ -1122,10 +852,7 @@ export function RunPage() {
                     <input
                       value={modelConfig.experiment_name}
                       onChange={(e) =>
-                        setModelConfig((m) => ({
-                          ...m,
-                          experiment_name: e.target.value,
-                        }))
+                        setModelConfig((m) => ({ ...m, experiment_name: e.target.value }))
                       }
                       className={INPUT_CLS}
                     />
@@ -1134,10 +861,7 @@ export function RunPage() {
                     <input
                       value={modelConfig.registry_model_name}
                       onChange={(e) =>
-                        setModelConfig((m) => ({
-                          ...m,
-                          registry_model_name: e.target.value,
-                        }))
+                        setModelConfig((m) => ({ ...m, registry_model_name: e.target.value }))
                       }
                       className={INPUT_CLS}
                     />
@@ -1153,18 +877,12 @@ export function RunPage() {
                     <input
                       value={modelConfig.target}
                       onChange={(e) =>
-                        setModelConfig((m) => ({
-                          ...m,
-                          target: e.target.value,
-                        }))
+                        setModelConfig((m) => ({ ...m, target: e.target.value }))
                       }
                       className={INPUT_CLS}
                     />
                   </Field>
-                  <Field
-                    label="Num Classes"
-                    tooltip="Number of output classes (≥ 2)."
-                  >
+                  <Field label="Num Classes" tooltip="Number of output classes (≥ 2).">
                     <input
                       type="number"
                       min={2}
@@ -1183,10 +901,7 @@ export function RunPage() {
                       type="number"
                       value={modelConfig.seed}
                       onChange={(e) =>
-                        setModelConfig((m) => ({
-                          ...m,
-                          seed: parseInt(e.target.value) || 0,
-                        }))
+                        setModelConfig((m) => ({ ...m, seed: parseInt(e.target.value) || 0 }))
                       }
                       className={INPUT_CLS}
                     />
@@ -1198,8 +913,7 @@ export function RunPage() {
               {!tuningEnabled ? (
                 <div className="space-y-2">
                   <p className={SUB_HEADING}>
-                    {framework === 'xgboost' ? 'XGBoost' : 'PyTorch'}{' '}
-                    Parameters
+                    {framework === 'xgboost' ? 'XGBoost' : 'PyTorch'} Parameters
                   </p>
                   <p className="text-xs text-slate-500">
                     Fixed parameters for training (tuning is disabled).
@@ -1208,13 +922,12 @@ export function RunPage() {
                     {Object.keys(getDefaults(framework)).map((key) => {
                       const meta: ParamMeta | undefined = paramMeta[key];
                       if (!meta) return null;
-                      const m = meta;
                       return (
                         <Field key={key} label={key}>
                           <ParamInput
                             paramKey={key}
-                            meta={m}
-                            value={hyperparams[key] ?? m.defaultValue}
+                            meta={meta}
+                            value={hyperparams[key] ?? meta.defaultValue}
                             onChange={updateHyperparam}
                           />
                         </Field>
@@ -1225,8 +938,7 @@ export function RunPage() {
               ) : (
                 <div className="rounded border border-slate-700 bg-slate-800/30 px-3 py-2.5">
                   <p className="text-xs text-slate-400">
-                    Tuning is enabled — hyperparameter ranges are configured in
-                    the{' '}
+                    Tuning is enabled — hyperparameter ranges are configured in the{' '}
                     <span className="text-blue-400">Tuning</span> step.
                     Non-tunable parameters will use defaults.
                   </p>
@@ -1238,35 +950,24 @@ export function RunPage() {
           {/* ── STEP 3: Tuning ── */}
           {currentStep === 3 && (
             <div className="space-y-4">
-              {/* Toggle */}
               <div className="flex items-center justify-between">
                 <p className={SUB_HEADING}>Hyperparameter Tuning</p>
                 <div className="flex gap-1">
-                  <ToggleButton
-                    active={tuningEnabled}
-                    onClick={() => setTuningEnabled(true)}
-                  >
+                  <ToggleButton active={tuningEnabled} onClick={() => setTuningEnabled(true)}>
                     Enabled
                   </ToggleButton>
-                  <ToggleButton
-                    active={!tuningEnabled}
-                    onClick={() => setTuningEnabled(false)}
-                  >
+                  <ToggleButton active={!tuningEnabled} onClick={() => setTuningEnabled(false)}>
                     Disabled
                   </ToggleButton>
                 </div>
               </div>
 
               {!tuningEnabled ? (
-                /* Disabled — muted parameter summary */
                 <div className="space-y-2 rounded border border-slate-700 bg-slate-800/30 px-4 py-3">
                   <p className="text-xs text-slate-400">
-                    Training will run with fixed parameters for the full number
-                    of rounds/epochs.
+                    Training will run with fixed parameters for the full number of rounds/epochs.
                   </p>
-                  <p className="text-xs text-slate-500">
-                    Active parameters (from Model step):
-                  </p>
+                  <p className="text-xs text-slate-500">Active parameters (from Model step):</p>
                   <div className="flex flex-wrap gap-1.5">
                     {Object.entries(hyperparams)
                       .slice(0, 9)
@@ -1281,21 +982,18 @@ export function RunPage() {
                   </div>
                 </div>
               ) : (
-                /* Enabled — three sub-panels */
                 <div className="space-y-4">
                   {/* Budget controls */}
                   <div className="grid grid-cols-2 gap-3">
                     <Field
                       label="Number of Trials"
-                      tooltip="Total Ray Tune trials. Stored in execution.tuning.number_of_trials."
+                      tooltip="Total Ray Tune trials."
                     >
                       <input
                         type="number"
                         min={1}
                         value={numberOfTrials}
-                        onChange={(e) =>
-                          setNumberOfTrials(parseInt(e.target.value) || 1)
-                        }
+                        onChange={(e) => setNumberOfTrials(parseInt(e.target.value) || 1)}
                         className={INPUT_CLS}
                       />
                     </Field>
@@ -1310,9 +1008,7 @@ export function RunPage() {
                           max={1}
                           step={0.01}
                           value={sampleFraction}
-                          onChange={(e) =>
-                            setSampleFraction(parseFloat(e.target.value))
-                          }
+                          onChange={(e) => setSampleFraction(parseFloat(e.target.value))}
                           className="flex-1 accent-blue-500"
                         />
                         <span className="w-10 text-right text-xs text-slate-300">
@@ -1326,7 +1022,7 @@ export function RunPage() {
                   <div className="space-y-2">
                     <p
                       className={SUB_HEADING}
-                      title="How long each trial runs. Overrides *_PARAMS training-length for the tuning phase."
+                      title="How long each trial runs."
                     >
                       Trial Execution Budget
                     </p>
@@ -1335,22 +1031,17 @@ export function RunPage() {
                     </p>
                     <div className="grid grid-cols-2 gap-2">
                       {Object.keys(tuneSettingsMeta).map((key) => {
-                        const meta: ParamMeta | undefined =
-                          tuneSettingsMeta[key];
+                        const meta: ParamMeta | undefined = tuneSettingsMeta[key];
                         if (!meta) return null;
-                        const m = meta;
                         return (
                           <Field key={key} label={key}>
                             <input
                               type="number"
-                              min={m.min}
-                              step={m.step ?? 1}
-                              value={tuneSettings[key] ?? m.defaultValue}
+                              min={meta.min}
+                              step={meta.step ?? 1}
+                              value={tuneSettings[key] ?? meta.defaultValue}
                               onChange={(e) =>
-                                updateTuneSetting(
-                                  key,
-                                  parseInt(e.target.value) || 1,
-                                )
+                                updateTuneSetting(key, parseInt(e.target.value) || 1)
                               }
                               className={INPUT_CLS}
                             />
@@ -1363,10 +1054,7 @@ export function RunPage() {
                   {/* Search Space */}
                   <div className="space-y-2">
                     <div className="flex items-center justify-between">
-                      <p
-                        className={SUB_HEADING}
-                        title="Parameters Ray Tune optimizes across trials."
-                      >
+                      <p className={SUB_HEADING} title="Parameters Ray Tune optimizes.">
                         Optimized Parameters (Ray Tune)
                       </p>
                       <div className="flex gap-1">
@@ -1387,9 +1075,7 @@ export function RunPage() {
                     {tuneMode === 'override' && (
                       <p className="text-xs italic text-slate-500">
                         UI preview only — backend reads from{' '}
-                        <code className="rounded bg-slate-800 px-1">
-                          src/schemas/model/
-                        </code>
+                        <code className="rounded bg-slate-800 px-1">src/schemas/model/</code>
                       </p>
                     )}
                     <div className="space-y-0.5 rounded border border-slate-800 bg-slate-950 px-3 py-2">
@@ -1409,27 +1095,19 @@ export function RunPage() {
                   {/* Non-Tunable Constants */}
                   {nonTunableKeys.length > 0 && (
                     <div className="space-y-2">
-                      <p
-                        className={SUB_HEADING}
-                        title="These *_PARAMS values apply as constants to every trial."
-                      >
+                      <p className={SUB_HEADING} title="Applied as constants to every trial.">
                         Non-Tunable Constants
                       </p>
                       <div className="grid grid-cols-2 gap-2">
                         {nonTunableKeys.map((key) => {
                           const meta: ParamMeta | undefined = paramMeta[key];
                           if (!meta) return null;
-                          const m = meta;
                           return (
-                            <Field
-                              key={key}
-                              label={key}
-                              tooltip="Constant fallback across all trials."
-                            >
+                            <Field key={key} label={key} tooltip="Constant fallback across all trials.">
                               <ParamInput
                                 paramKey={key}
-                                meta={m}
-                                value={hyperparams[key] ?? m.defaultValue}
+                                meta={meta}
+                                value={hyperparams[key] ?? meta.defaultValue}
                                 onChange={updateHyperparam}
                               />
                             </Field>
@@ -1441,15 +1119,10 @@ export function RunPage() {
 
                   {/* Estimate */}
                   <div className="rounded border border-slate-700 bg-slate-800/30 px-3 py-2.5 text-xs text-slate-400">
-                    <span className="text-slate-200">{numberOfTrials}</span>{' '}
-                    trials ×{' '}
-                    <span className="text-slate-200">{roundsPerTrial}</span>{' '}
-                    rounds ={' '}
-                    <span className="text-slate-200">~{totalSteps}</span> total
-                    training steps
-                    <span className="ml-1 text-slate-600">
-                      (ASHA may terminate trials early)
-                    </span>
+                    <span className="text-slate-200">{numberOfTrials}</span> trials ×{' '}
+                    <span className="text-slate-200">{roundsPerTrial}</span> rounds ={' '}
+                    <span className="text-slate-200">~{totalSteps}</span> total training steps
+                    <span className="ml-1 text-slate-600">(ASHA may terminate trials early)</span>
                   </div>
                 </div>
               )}
@@ -1462,15 +1135,13 @@ export function RunPage() {
               <p className={SUB_HEADING}>Review Configuration</p>
 
               <SummaryCard
-                title="Dataset"
+                title="Preprocessing Run"
                 onEdit={() => goToStep(1)}
                 items={[
-                  ['Dataset', dataset],
-                  [
-                    'DSL Version',
-                    dslVersion !== '' ? `v${dslVersion}` : '—',
-                  ],
-                  ['Execution ID', executionId],
+                  ['Preprocess Run ID', selectedPreprocessRunId],
+                  ['Dataset', preprocessInfo?.dataset ?? '—'],
+                  ['DSL version', preprocessInfo?.dsl_version != null ? `v${preprocessInfo.dsl_version}` : '—'],
+                  ['Schema version', preprocessInfo?.schema_version != null ? `v${preprocessInfo.schema_version}` : '—'],
                 ]}
               />
 
@@ -1479,10 +1150,7 @@ export function RunPage() {
                 onEdit={() => goToStep(2)}
                 items={[
                   ['Framework', framework],
-                  [
-                    'Target',
-                    `${modelConfig.target} (${modelConfig.num_classes} classes)`,
-                  ],
+                  ['Target', `${modelConfig.target} (${modelConfig.num_classes} classes)`],
                   ['Experiment', modelConfig.experiment_name],
                   ['Registry', modelConfig.registry_model_name],
                 ]}
@@ -1503,7 +1171,7 @@ export function RunPage() {
                 }
               />
 
-              {/* Validation result */}
+              {/* Validation */}
               {fullValidationErrors.length > 0 ? (
                 <div className="space-y-1 rounded border border-red-800/40 bg-red-900/20 px-3 py-2">
                   <p className="text-xs font-semibold text-red-400">
@@ -1517,39 +1185,27 @@ export function RunPage() {
                 </div>
               ) : (
                 <div className="rounded border border-green-800/30 bg-green-900/10 px-3 py-2">
-                  <p className="text-xs text-green-400">
-                    ✓ All configuration valid
-                  </p>
+                  <p className="text-xs text-green-400">✓ All configuration valid</p>
                 </div>
               )}
 
               {/* Launch / Result */}
               {submitResult ? (
                 <div className="space-y-2 rounded-lg border border-slate-700 bg-slate-800/40 p-4">
-                  <p className="text-sm font-medium text-green-400">
-                    ✓ Pipeline launched
-                  </p>
+                  <p className="text-sm font-medium text-green-400">✓ Training pipeline launched</p>
                   <div className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1.5 text-xs">
                     <span className="text-slate-400">DAG run ID</span>
+                    <span className="break-all text-slate-200">{submitResult.dag_run_id}</span>
+                    <span className="text-slate-400">Train run ID</span>
+                    <span className="break-all text-slate-200">{submitResult.train_run_id}</span>
+                    <span className="text-slate-400">Processed table</span>
+                    <span className="break-all text-slate-200">{submitResult.processed_table}</span>
+                    <span className="text-slate-400">params S3 path</span>
                     <span className="break-all text-slate-200">
-                      {submitResult.dag_run_id}
-                    </span>
-                    <span className="text-slate-400">Execution ID</span>
-                    <span className="text-slate-200">
-                      {submitResult.execution_id}
-                    </span>
-                    <span className="text-slate-400">params.yaml</span>
-                    <span className="break-all text-slate-200">
-                      {submitResult.params_s3_path}
-                    </span>
-                    <span className="text-slate-400">DSL</span>
-                    <span className="break-all text-slate-200">
-                      {submitResult.dsl_s3_path}
+                      {submitResult.train_params_s3_path}
                     </span>
                     <span className="text-slate-400">State</span>
-                    <span
-                      className={`font-semibold ${stateColor(runStatus.toLowerCase())}`}
-                    >
+                    <span className={`font-semibold ${stateColor(runStatus.toLowerCase())}`}>
                       {runStatus || 'queued'}
                     </span>
                   </div>
@@ -1576,7 +1232,7 @@ export function RunPage() {
                     disabled={fullValidationErrors.length > 0}
                     className="w-full rounded bg-blue-600 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-blue-500 disabled:opacity-40"
                   >
-                    Launch Pipeline
+                    Launch Training Pipeline
                   </button>
                 </>
               )}
@@ -1616,271 +1272,21 @@ export function RunPage() {
             </button>
           </div>
         )}
-
-        {/* ── Dataset Schema Builder ── */}
-        <AccordionSection
-          title="Dataset Schema Builder"
-          badge={
-            schemaSaveResult ? (
-              <span className="rounded-full bg-green-900/50 px-2 py-0.5 text-[10px] text-green-400">
-                v{schemaSaveResult.version} saved
-              </span>
-            ) : undefined
-          }
-        >
-          <SchemaBuilderSection
-            state={schemaBuilder}
-            onChange={setSchemaBuilder}
-            inferredDataset={rawDatasetFilter}
-            onSave={handleSaveSchemas}
-            onDownload={downloadYaml}
-            isSaving={schemaSaving}
-            saveResult={schemaSaveResult}
-            rawYaml={rawYamlPreview}
-            fullYaml={fullYamlPreview}
-            preprocessedYaml={preprocessedYamlPreview}
-          />
-        </AccordionSection>
-
-        {/* ── Advanced Configuration ── */}
-        <AccordionSection title="Advanced Configuration">
-          <div className="space-y-4">
-            <div className="space-y-2">
-              <p className={SUB_HEADING}>KubeRay / MLflow</p>
-              <div className="grid grid-cols-2 gap-3">
-                <Field label="MLflow Tracking URI">
-                  <input
-                    value={advanced.mlflow_tracking_uri}
-                    onChange={(e) =>
-                      setAdvanced((a) => ({
-                        ...a,
-                        mlflow_tracking_uri: e.target.value,
-                      }))
-                    }
-                    className={INPUT_CLS}
-                  />
-                </Field>
-                <Field label="MLflow Artifact Location">
-                  <input
-                    value={advanced.mlflow_artifact_location}
-                    onChange={(e) =>
-                      setAdvanced((a) => ({
-                        ...a,
-                        mlflow_artifact_location: e.target.value,
-                      }))
-                    }
-                    className={INPUT_CLS}
-                  />
-                </Field>
-                <Field label="Serving Alias">
-                  <input
-                    value={advanced.serving_alias}
-                    onChange={(e) =>
-                      setAdvanced((a) => ({
-                        ...a,
-                        serving_alias: e.target.value,
-                      }))
-                    }
-                    className={INPUT_CLS}
-                  />
-                </Field>
-                <Field label="Canary">
-                  <div className="flex gap-1 pt-0.5">
-                    <ToggleButton
-                      active={advanced.canary}
-                      onClick={() =>
-                        setAdvanced((a) => ({ ...a, canary: true }))
-                      }
-                    >
-                      On
-                    </ToggleButton>
-                    <ToggleButton
-                      active={!advanced.canary}
-                      onClick={() =>
-                        setAdvanced((a) => ({ ...a, canary: false }))
-                      }
-                    >
-                      Off
-                    </ToggleButton>
-                  </div>
-                </Field>
-                {advanced.canary && (
-                  <>
-                    <Field label="Canary Alias">
-                      <input
-                        value={advanced.canary_alias}
-                        onChange={(e) =>
-                          setAdvanced((a) => ({
-                            ...a,
-                            canary_alias: e.target.value,
-                          }))
-                        }
-                        className={INPUT_CLS}
-                      />
-                    </Field>
-                    <Field label="Canary Probability">
-                      <input
-                        type="number"
-                        min={0}
-                        max={1}
-                        step={0.01}
-                        value={advanced.canary_probability}
-                        onChange={(e) =>
-                          setAdvanced((a) => ({
-                            ...a,
-                            canary_probability: parseFloat(e.target.value),
-                          }))
-                        }
-                        className={INPUT_CLS}
-                      />
-                    </Field>
-                  </>
-                )}
-                <Field label="Webhook Base URL">
-                  <input
-                    value={advanced.webhook_public_base_url}
-                    onChange={(e) =>
-                      setAdvanced((a) => ({
-                        ...a,
-                        webhook_public_base_url: e.target.value,
-                      }))
-                    }
-                    className={INPUT_CLS}
-                  />
-                </Field>
-                <Field label="Webhook Path">
-                  <input
-                    value={advanced.webhook_path}
-                    onChange={(e) =>
-                      setAdvanced((a) => ({
-                        ...a,
-                        webhook_path: e.target.value,
-                      }))
-                    }
-                    className={INPUT_CLS}
-                  />
-                </Field>
-                <Field label="Webhook Name">
-                  <input
-                    value={advanced.webhook_name}
-                    onChange={(e) =>
-                      setAdvanced((a) => ({
-                        ...a,
-                        webhook_name: e.target.value,
-                      }))
-                    }
-                    className={INPUT_CLS}
-                  />
-                </Field>
-                <Field label="Webhook Max Age (s)">
-                  <input
-                    type="number"
-                    min={0}
-                    value={advanced.webhook_max_timestamp_age_seconds}
-                    onChange={(e) =>
-                      setAdvanced((a) => ({
-                        ...a,
-                        webhook_max_timestamp_age_seconds:
-                          parseInt(e.target.value) || 0,
-                      }))
-                    }
-                    className={INPUT_CLS}
-                  />
-                </Field>
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <p className={SUB_HEADING}>Spark</p>
-              <div className="grid grid-cols-2 gap-3">
-                <Field label="Read Batch Size">
-                  <input
-                    type="number"
-                    min={1}
-                    value={advanced.spark_read_batch_size}
-                    onChange={(e) =>
-                      setAdvanced((a) => ({
-                        ...a,
-                        spark_read_batch_size: parseInt(e.target.value) || 512,
-                      }))
-                    }
-                    className={INPUT_CLS}
-                  />
-                </Field>
-                <Field label="Write Batch Size">
-                  <input
-                    type="number"
-                    min={1}
-                    value={advanced.spark_write_batch_size}
-                    onChange={(e) =>
-                      setAdvanced((a) => ({
-                        ...a,
-                        spark_write_batch_size:
-                          parseInt(e.target.value) || 100000,
-                      }))
-                    }
-                    className={INPUT_CLS}
-                  />
-                </Field>
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <p className={SUB_HEADING}>Iceberg</p>
-              <Field label="Warehouse Path">
-                <input
-                  value={advanced.iceberg_warehouse}
-                  onChange={(e) =>
-                    setAdvanced((a) => ({
-                      ...a,
-                      iceberg_warehouse: e.target.value,
-                    }))
-                  }
-                  className={INPUT_CLS}
-                />
-              </Field>
-            </div>
-          </div>
-        </AccordionSection>
       </div>
 
       {/* ── RIGHT: sticky YAML preview ── */}
-      <div className="w-[440px] shrink-0 min-h-0 p-4">
-        <YamlPreviewPanel
-          tabs={previewTabs}
-          activeTab={activePreviewTab}
-          onTabChange={setActivePreviewTab}
-        />
+      <div className="w-[420px] shrink-0 min-h-0 p-4">
+        <YamlPreviewPanel content={previewYaml} />
       </div>
 
-      {/* ── Modal: inspección de params_preprocess.yaml + dsl.yaml ── */}
+      {/* ── Modal: params_preprocess.yaml inspection ── */}
       {paramsModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
           <div className="flex w-[680px] max-h-[80vh] flex-col rounded-lg border border-slate-700 bg-slate-900 shadow-xl">
             <div className="flex items-center justify-between border-b border-slate-700 px-4 py-3">
-              <div className="flex gap-1">
-                <button
-                  onClick={() => setParamsModalTab('preprocess')}
-                  className={`rounded px-2 py-0.5 text-[10px] font-medium transition-colors ${
-                    paramsModalTab === 'preprocess'
-                      ? 'bg-slate-700 text-slate-100'
-                      : 'text-slate-500 hover:text-slate-300'
-                  }`}
-                >
-                  params_preprocess.yaml
-                </button>
-                <button
-                  onClick={() => setParamsModalTab('dsl')}
-                  disabled={!dslModalContent}
-                  className={`rounded px-2 py-0.5 text-[10px] font-medium transition-colors disabled:opacity-40 ${
-                    paramsModalTab === 'dsl'
-                      ? 'bg-slate-700 text-slate-100'
-                      : 'text-slate-500 hover:text-slate-300'
-                  }`}
-                >
-                  dsl.yaml
-                </button>
-              </div>
+              <span className="text-xs font-medium text-slate-300">
+                params_preprocess.yaml — {selectedPreprocessRunId}
+              </span>
               <button
                 onClick={() => setParamsModalOpen(false)}
                 className="text-xs text-slate-500 hover:text-slate-300"
@@ -1897,7 +1303,7 @@ export function RunPage() {
               )}
               {!paramsModalLoading && !paramsModalError && (
                 <pre className="whitespace-pre font-mono text-[11px] leading-relaxed text-green-300">
-                  {paramsModalTab === 'preprocess' ? paramsModalContent : dslModalContent}
+                  {paramsModalContent}
                 </pre>
               )}
             </div>

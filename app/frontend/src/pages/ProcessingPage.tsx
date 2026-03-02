@@ -8,17 +8,36 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { RefreshCw } from 'lucide-react';
+import { ChevronDown, ChevronUp, RefreshCw } from 'lucide-react';
 import {
   getProcessingRunStatus,
   listDatasets,
   listDsls,
   submitProcessingRun,
+  uploadFullSchema,
   type DatasetInfo,
   type DslVersion,
-  type RunResult,
+  type ProcessingRunResult,
+  type SchemaUploadSingleResult,
 } from '../api/platformClient';
+import { FullYamlEditor } from '../components/schema/FullYamlEditor';
+import type { FullFieldEntry } from '../lib/schemaYaml';
 import { useDatasetStore } from '../store/datasetStore';
+
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+
+function generateFullYamlContent(fields: FullFieldEntry[], dataset: string): string {
+  const lines = [
+    `# Schema: ${dataset} — full (features + target label)`,
+    'fields:',
+  ];
+  for (const f of fields) {
+    const name = f.editedName ?? f.name;
+    const type = f.editedType ?? f.sparkType;
+    lines.push(`  - {name: ${name}, type: ${type}, nullable: ${f.nullable}}`);
+  }
+  return lines.join('\n') + '\n';
+}
 
 // ─── Style tokens (mirror RunPage) ───────────────────────────────────────────
 
@@ -142,8 +161,15 @@ export function ProcessingPage() {
   // ── Splits ────────────────────────────────────────────────────────────────
   const [splits, setSplits] = useState<Splits>(DEFAULT_SPLITS);
 
+  // ── Schema state ──────────────────────────────────────────────────────────
+  const [schemaOpen, setSchemaOpen] = useState(false);
+  const [fullFields, setFullFields] = useState<FullFieldEntry[]>([]);
+  const [isSavingSchema, setIsSavingSchema] = useState(false);
+  const [schemaResult, setSchemaResult] = useState<SchemaUploadSingleResult | null>(null);
+  const [schemaError, setSchemaError] = useState('');
+
   // ── Submission state ──────────────────────────────────────────────────────
-  const [submitResult, setSubmitResult] = useState<RunResult | null>(null);
+  const [submitResult, setSubmitResult] = useState<ProcessingRunResult | null>(null);
   const [submitError, setSubmitError] = useState('');
   const [runStatus, setRunStatus] = useState('');
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -245,6 +271,22 @@ export function ProcessingPage() {
     return e;
   };
 
+  const handleSaveSchema = async () => {
+    if (!dataset || fullFields.length === 0) return;
+    setIsSavingSchema(true);
+    setSchemaError('');
+    setSchemaResult(null);
+    try {
+      const yaml = generateFullYamlContent(fullFields, dataset);
+      const result = await uploadFullSchema(dataset, yaml);
+      setSchemaResult(result);
+    } catch (e) {
+      setSchemaError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setIsSavingSchema(false);
+    }
+  };
+
   const goForward = () => {
     const errs = stepErrors();
     if (currentStep === 1 && errs.length > 0) return;
@@ -281,6 +323,10 @@ export function ProcessingPage() {
     setDslSearchStatus('idle');
     setDslSearchMessage('');
     setSplits(DEFAULT_SPLITS);
+    setSchemaOpen(false);
+    setFullFields([]);
+    setSchemaResult(null);
+    setSchemaError('');
   };
 
   const stateColor = (state: string) =>
@@ -445,6 +491,54 @@ export function ProcessingPage() {
               </div>
             )}
 
+            {/* ── Input Schema (full.yaml) ── */}
+            <div className="rounded-lg border border-slate-700 bg-slate-900">
+              <button
+                onClick={() => setSchemaOpen((o) => !o)}
+                className="flex w-full items-center justify-between px-4 py-3 text-sm font-medium text-slate-300 hover:text-slate-100"
+              >
+                <span className="flex items-center gap-2">
+                  Input Schema (full.yaml)
+                  {schemaResult && (
+                    <span className="rounded bg-green-900/40 px-1.5 py-0.5 text-[10px] font-bold text-green-400 ring-1 ring-green-700/50">
+                      Saved as v{schemaResult.version}
+                    </span>
+                  )}
+                </span>
+                {schemaOpen ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+              </button>
+              {schemaOpen && (
+                <div className="space-y-3 border-t border-slate-700 px-4 pb-4 pt-3">
+                  <p className="text-xs text-slate-500">
+                    Define columns for <code className="rounded bg-slate-800 px-1">iceberg.raw.{dataset || '<dataset>'}</code>.
+                    Save before launching — the backend auto-detects the latest version.
+                  </p>
+                  <FullYamlEditor
+                    fields={fullFields}
+                    onChange={setFullFields}
+                    dataset={dataset}
+                  />
+                  <div className="flex items-center gap-2 border-t border-slate-800 pt-2">
+                    <button
+                      onClick={() => void handleSaveSchema()}
+                      disabled={isSavingSchema || !dataset || fullFields.length === 0}
+                      className={BTN_PRIMARY}
+                    >
+                      {isSavingSchema ? 'Saving…' : 'Save full.yaml to S3'}
+                    </button>
+                    {schemaResult && (
+                      <span className="text-xs text-green-400">
+                        ✓ Saved as v{schemaResult.version}
+                      </span>
+                    )}
+                    {schemaError && (
+                      <span className="text-xs text-red-400">{schemaError}</span>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+
             <button
               onClick={goForward}
               disabled={errors.length > 0}
@@ -530,15 +624,21 @@ export function ProcessingPage() {
                 </span>
               </div>
               <div className="flex justify-between">
-                <span className="text-slate-400">Execution ID</span>
+                <span className="text-slate-400">Preprocess Run ID</span>
+                <span className="font-mono text-slate-100 text-[11px]">
+                  {submitResult.preprocess_run_id}
+                </span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-slate-400">Schema version</span>
                 <span className="font-mono text-slate-100">
-                  {submitResult.execution_id}
+                  v{submitResult.schema_version}
                 </span>
               </div>
               <div className="flex justify-between">
                 <span className="text-slate-400">params.yaml</span>
                 <span className="font-mono text-slate-500 text-[10px]">
-                  {submitResult.params_s3_path}
+                  {submitResult.preprocess_params_s3_path}
                 </span>
               </div>
               <div className="flex justify-between">
