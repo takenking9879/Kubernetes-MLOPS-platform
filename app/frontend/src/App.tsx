@@ -106,7 +106,9 @@ export default function App() {
       </nav>
 
       {/* ── Page content ── */}
-      <div className="flex-1 min-h-0 overflow-hidden">
+      <div
+        className={`flex-1 min-h-0 ${page === 'dsl-builder' ? 'overflow-hidden' : 'overflow-y-auto'}`}
+      >
         {page === 'datasets' && <DatasetPage />}
 
         {/* ReactFlowProvider only wraps the DSL Builder */}
