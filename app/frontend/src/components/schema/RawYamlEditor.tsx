@@ -1,6 +1,6 @@
 import { useRef, useState } from 'react';
 import { ChevronDown, ChevronRight, GripVertical, Plus, RefreshCw } from 'lucide-react';
-import type { RawFieldEntry, RawFieldRole } from '../../lib/schemaYaml';
+import type { RawFieldEntry } from '../../lib/schemaYaml';
 import type { SparkDataType } from '../../types/schema';
 import { getIcebergSchema } from '../../api/platformClient';
 import { SourceBadge } from './SourceBadge';
@@ -21,9 +21,8 @@ const SPARK_TYPES: SparkDataType[] = [
 const NUMERIC_TYPES = new Set<SparkDataType>(['integer', 'long', 'double']);
 const CATEGORICAL_TYPES = new Set<SparkDataType>(['string', 'boolean']);
 
-const ROLES: RawFieldRole[] = [
-  'unassigned', 'feature', 'target', 'id', 'metadata',
-];
+// grid: drag | check | name | type | source | remove
+const ROW_GRID = 'grid-cols-[20px_20px_1fr_90px_80px_24px]';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -37,8 +36,6 @@ interface RawYamlEditorProps {
     idField: string,
   ) => void;
   dataset: string;
-  /** Live YAML preview string — computed by RunPage useMemo, passed in. */
-  yamlPreview: string;
 }
 
 // ─── Component ────────────────────────────────────────────────────────────────
@@ -49,7 +46,6 @@ export function RawYamlEditor({
   idField,
   onChange,
   dataset,
-  yamlPreview,
 }: RawYamlEditorProps) {
   // Drag-and-drop refs (avoid re-renders during dragOver at 60fps)
   const dragSrcRef = useRef<number | null>(null);
@@ -88,8 +84,8 @@ export function RawYamlEditor({
         name: c.name,
         sparkType: c.sparkType as SparkDataType,
         nullable: c.nullable,
-        role: 'unassigned',
-        source: 'iceberg',
+        role: 'unassigned' as const,
+        source: 'iceberg' as const,
       }));
       // Only add columns not already in fields
       const existingNames = new Set(fields.map((f) => f.name));
@@ -266,7 +262,7 @@ export function RawYamlEditor({
     const src = dragSrcRef.current;
 
     if (dragGroupRef.current !== null) {
-      // Drop onto group header → move field into that group
+      // Drop onto group header → assign field to that group
       const groupKey = dragGroupRef.current;
       if (src !== null) {
         const updated = fields.map((f, i) =>
@@ -277,10 +273,15 @@ export function RawYamlEditor({
     } else if (dragTargetRef.current !== null) {
       const tgt = dragTargetRef.current;
       if (src !== null && src !== tgt) {
+        // Inherit group from the target field — this moves a grouped field back
+        // to top-level when dropped onto a top-level field (group: undefined).
+        const targetGroup = fields[tgt]?.group;
         const next = [...fields];
-        const moved = next.splice(src, 1)[0];
+        const [moved] = next.splice(src, 1);
         if (moved !== undefined) {
-          next.splice(tgt, 0, moved);
+          // Removing src shifts all indices after it down by 1
+          const adjustedTgt = src < tgt ? tgt - 1 : tgt;
+          next.splice(adjustedTgt, 0, { ...moved, group: targetGroup });
           onChange(next, groups, idField);
         }
       }
@@ -307,7 +308,7 @@ export function RawYamlEditor({
         key={f.name}
         role="row"
         tabIndex={0}
-        aria-label={`Field ${f.name}, type ${f.sparkType}, role ${f.role}`}
+        aria-label={`Field ${f.name}, type ${f.sparkType}`}
         draggable
         onDragStart={(e) => handleDragStart(e, index)}
         onDragOver={(e) => handleDragOver(e, index)}
@@ -316,7 +317,7 @@ export function RawYamlEditor({
         onKeyDown={(e) => {
           if (e.key === ' ') { e.preventDefault(); toggleSelect(f.name); }
         }}
-        className={`grid grid-cols-[20px_20px_1fr_90px_110px_80px_24px] items-center gap-1 px-2 py-1.5 hover:bg-slate-800/20 focus:outline-none focus:bg-slate-800/30 ${
+        className={`grid ${ROW_GRID} items-center gap-1 px-2 py-1.5 hover:bg-slate-800/20 focus:outline-none focus:bg-slate-800/30 ${
           isSelected ? 'bg-blue-900/10' : ''
         } ${f.group ? 'pl-6' : ''}`}
       >
@@ -359,22 +360,6 @@ export function RawYamlEditor({
           ))}
         </select>
 
-        {/* Role */}
-        <select
-          value={f.role}
-          onChange={(e) =>
-            updateField(f.name, { role: e.target.value as RawFieldRole })
-          }
-          className="rounded bg-slate-800 px-1 py-0.5 text-[11px] text-slate-300 outline-none focus:ring-1 focus:ring-blue-500"
-          onClick={(e) => e.stopPropagation()}
-        >
-          {ROLES.map((r) => (
-            <option key={r} value={r}>
-              {r}
-            </option>
-          ))}
-        </select>
-
         {/* Source badge */}
         <SourceBadge source={f.source} />
 
@@ -392,7 +377,7 @@ export function RawYamlEditor({
     );
   };
 
-  // Build ordered render list: top-level fields, then each group block
+  // Build ordered render list: top-level fields first, then groups
   const topLevelFields = fields.filter((f) => !f.group);
   const topLevelIndices = topLevelFields.map((f) => fields.indexOf(f));
 
@@ -450,287 +435,265 @@ export function RawYamlEditor({
         </div>
       )}
 
-      {/* Main grid: tree editor + YAML preview */}
-      <div
-        className={
-          fields.length > 0
-            ? 'grid grid-cols-[1fr_280px] gap-3'
-            : 'space-y-2'
-        }
-      >
-        {/* ── Left: tree editor ── */}
-        <div className="space-y-2">
-          {/* Bulk selection toolbar */}
-          {fields.length > 0 && (
-            <div className="flex flex-wrap items-center gap-1.5 rounded border border-slate-800 bg-slate-800/30 px-2 py-1.5">
-              <span className="text-[10px] text-slate-500 font-medium uppercase tracking-wider mr-1">
-                Select:
-              </span>
-              <button onClick={selectAll} className={`${BTN_NEUTRAL} py-0.5 text-[10px]`}>
-                All
-              </button>
-              <button onClick={selectNone} className={`${BTN_NEUTRAL} py-0.5 text-[10px]`}>
-                None
+      {/* Tree editor */}
+      <div className="space-y-2">
+        {/* Bulk selection toolbar */}
+        {fields.length > 0 && (
+          <div className="flex flex-wrap items-center gap-1.5 rounded border border-slate-800 bg-slate-800/30 px-2 py-1.5">
+            <span className="text-[10px] text-slate-500 font-medium uppercase tracking-wider mr-1">
+              Select:
+            </span>
+            <button onClick={selectAll} className={`${BTN_NEUTRAL} py-0.5 text-[10px]`}>
+              All
+            </button>
+            <button onClick={selectNone} className={`${BTN_NEUTRAL} py-0.5 text-[10px]`}>
+              None
+            </button>
+            <button
+              onClick={() => selectByType(NUMERIC_TYPES)}
+              className={`${BTN_NEUTRAL} py-0.5 text-[10px]`}
+            >
+              Numeric
+            </button>
+            <button
+              onClick={() => selectByType(CATEGORICAL_TYPES)}
+              className={`${BTN_NEUTRAL} py-0.5 text-[10px]`}
+            >
+              Categorical
+            </button>
+            <div className="flex items-center gap-1">
+              <input
+                value={patternInput}
+                onChange={(e) => setPatternInput(e.target.value)}
+                placeholder="regex…"
+                className="rounded bg-slate-800 px-1.5 py-0.5 text-[11px] text-slate-300 outline-none w-[80px] focus:ring-1 focus:ring-blue-500"
+              />
+              <button
+                onClick={selectByPattern}
+                className={`${BTN_NEUTRAL} py-0.5 text-[10px]`}
+                title="Select by pattern"
+              >
+                + match
               </button>
               <button
-                onClick={() => selectByType(NUMERIC_TYPES)}
+                onClick={deselectByPattern}
                 className={`${BTN_NEUTRAL} py-0.5 text-[10px]`}
+                title="Deselect by pattern"
               >
-                Numeric
+                − match
               </button>
-              <button
-                onClick={() => selectByType(CATEGORICAL_TYPES)}
-                className={`${BTN_NEUTRAL} py-0.5 text-[10px]`}
-              >
-                Categorical
-              </button>
-              <div className="flex items-center gap-1">
-                <input
-                  value={patternInput}
-                  onChange={(e) => setPatternInput(e.target.value)}
-                  placeholder="regex…"
-                  className="rounded bg-slate-800 px-1.5 py-0.5 text-[11px] text-slate-300 outline-none w-[80px] focus:ring-1 focus:ring-blue-500"
-                />
-                <button
-                  onClick={selectByPattern}
-                  className={`${BTN_NEUTRAL} py-0.5 text-[10px]`}
-                  title="Select by pattern"
-                >
-                  + match
-                </button>
-                <button
-                  onClick={deselectByPattern}
-                  className={`${BTN_NEUTRAL} py-0.5 text-[10px]`}
-                  title="Deselect by pattern"
-                >
-                  − match
-                </button>
-              </div>
+            </div>
 
-              {selectedNames.size > 0 && (
-                <>
-                  <span className="text-[10px] text-blue-400 ml-1">
-                    {selectedNames.size} selected →
-                  </span>
-                  <div className="flex items-center gap-1">
-                    <select
-                      value={bulkTargetGroup}
-                      onChange={(e) => setBulkTargetGroup(e.target.value)}
-                      className="rounded bg-slate-800 px-1 py-0.5 text-[11px] text-slate-300 outline-none focus:ring-1 focus:ring-blue-500"
-                    >
-                      <option value="">Move to group…</option>
-                      {Object.keys(groups).map((g) => (
-                        <option key={g} value={g}>
-                          {g}
-                        </option>
-                      ))}
-                    </select>
+            {selectedNames.size > 0 && (
+              <>
+                <span className="text-[10px] text-blue-400 ml-1">
+                  {selectedNames.size} selected →
+                </span>
+                <div className="flex items-center gap-1">
+                  <select
+                    value={bulkTargetGroup}
+                    onChange={(e) => setBulkTargetGroup(e.target.value)}
+                    className="rounded bg-slate-800 px-1 py-0.5 text-[11px] text-slate-300 outline-none focus:ring-1 focus:ring-blue-500"
+                  >
+                    <option value="">Move to group…</option>
+                    {Object.keys(groups).map((g) => (
+                      <option key={g} value={g}>
+                        {g}
+                      </option>
+                    ))}
+                  </select>
+                  <button
+                    onClick={() => moveSelectedToGroup(bulkTargetGroup)}
+                    disabled={!bulkTargetGroup}
+                    className={`${BTN_PRIMARY} py-0.5 text-[10px]`}
+                  >
+                    Move
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        )}
+
+        {/* Column table */}
+        {fields.length > 0 && (
+          <div className="overflow-hidden rounded border border-slate-800">
+            <div className={`grid ${ROW_GRID} items-center gap-1 bg-slate-800/50 px-2 py-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-400`}>
+              <span></span>
+              <span></span>
+              <span>Field</span>
+              <span>Type</span>
+              <span>Source</span>
+              <span></span>
+            </div>
+
+            {/* Top-level fields — also a drop target for group→top-level */}
+            <div
+              className="divide-y divide-slate-800/60"
+              role="rowgroup"
+              aria-label="Top-level fields"
+            >
+              {topLevelFields.map((f, i) =>
+                renderFieldRow(f, topLevelIndices[i] ?? i),
+              )}
+            </div>
+
+            {/* Groups */}
+            {Object.entries(groups).map(([groupKey, groupLabel]) => {
+              const members = fields.filter((f) => f.group === groupKey);
+              const isCollapsed = collapsedGroups.has(groupKey);
+
+              return (
+                <div key={groupKey}>
+                  {/* Group header — drop target for top-level→group */}
+                  <div
+                    role="row"
+                    onDragOver={(e) => handleDragOverGroup(e, groupKey)}
+                    onDrop={handleDrop}
+                    className="flex items-center gap-2 border-t border-slate-700 bg-slate-800/40 px-2 py-1.5 cursor-pointer hover:bg-slate-700/40"
+                    data-group-key={groupKey}
+                    onClick={() => toggleCollapse(groupKey)}
+                  >
                     <button
-                      onClick={() => moveSelectedToGroup(bulkTargetGroup)}
-                      disabled={!bulkTargetGroup}
-                      className={`${BTN_PRIMARY} py-0.5 text-[10px]`}
+                      type="button"
+                      className="text-slate-400"
+                      aria-label={
+                        isCollapsed
+                          ? `Expand group ${groupLabel}`
+                          : `Collapse group ${groupLabel}`
+                      }
                     >
-                      Move
+                      {isCollapsed ? (
+                        <ChevronRight size={12} />
+                      ) : (
+                        <ChevronDown size={12} />
+                      )}
+                    </button>
+                    <span className="font-mono text-xs font-medium text-slate-300">
+                      {groupLabel}
+                    </span>
+                    <span className="text-[10px] text-slate-600">
+                      struct · {members.length} fields
+                    </span>
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        removeGroup(groupKey);
+                      }}
+                      className="ml-auto text-[10px] text-slate-700 hover:text-red-400"
+                      title={`Remove group ${groupLabel}`}
+                    >
+                      remove group
                     </button>
                   </div>
-                </>
-              )}
-            </div>
-          )}
 
-          {/* Column table header */}
-          {fields.length > 0 && (
-            <div className="overflow-hidden rounded border border-slate-800">
-              <div className="grid grid-cols-[20px_20px_1fr_90px_110px_80px_24px] items-center gap-1 bg-slate-800/50 px-2 py-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                <span></span>
-                <span></span>
-                <span>Field</span>
-                <span>Type</span>
-                <span>Role</span>
-                <span>Source</span>
-                <span></span>
-              </div>
-
-              {/* Top-level fields */}
-              <div
-                className="divide-y divide-slate-800/60"
-                role="rowgroup"
-                aria-label="Top-level fields"
-              >
-                {topLevelFields.map((f, i) =>
-                  renderFieldRow(f, topLevelIndices[i] ?? i),
-                )}
-              </div>
-
-              {/* Groups */}
-              {Object.entries(groups).map(([groupKey, groupLabel]) => {
-                const members = fields.filter((f) => f.group === groupKey);
-                const isCollapsed = collapsedGroups.has(groupKey);
-
-                return (
-                  <div key={groupKey}>
-                    {/* Group header — also a drop target */}
+                  {/* Group members */}
+                  {!isCollapsed && (
                     <div
-                      role="row"
-                      onDragOver={(e) => handleDragOverGroup(e, groupKey)}
-                      onDrop={handleDrop}
-                      className="flex items-center gap-2 border-t border-slate-700 bg-slate-800/40 px-2 py-1.5 cursor-pointer hover:bg-slate-700/40"
-                      data-group-key={groupKey}
-                      onClick={() => toggleCollapse(groupKey)}
+                      className="divide-y divide-slate-800/40 bg-slate-900/30"
+                      role="rowgroup"
+                      aria-label={`Fields in group ${groupLabel}`}
                     >
-                      <button
-                        type="button"
-                        className="text-slate-400"
-                        aria-label={
-                          isCollapsed
-                            ? `Expand group ${groupLabel}`
-                            : `Collapse group ${groupLabel}`
-                        }
-                      >
-                        {isCollapsed ? (
-                          <ChevronRight size={12} />
-                        ) : (
-                          <ChevronDown size={12} />
-                        )}
-                      </button>
-                      <span className="font-mono text-xs font-medium text-slate-300">
-                        {groupLabel}
-                      </span>
-                      <span className="text-[10px] text-slate-600">
-                        struct · {members.length} fields
-                      </span>
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          removeGroup(groupKey);
-                        }}
-                        className="ml-auto text-[10px] text-slate-700 hover:text-red-400"
-                        title={`Remove group ${groupLabel}`}
-                      >
-                        remove group
-                      </button>
+                      {members.map((f) => renderFieldRow(f, fields.indexOf(f)))}
+                      {members.length === 0 && (
+                        <p className="pl-8 py-1.5 text-[11px] text-slate-700 italic">
+                          Drop fields here to add to group
+                        </p>
+                      )}
                     </div>
-
-                    {/* Group members */}
-                    {!isCollapsed && (
-                      <div
-                        className="divide-y divide-slate-800/40 bg-slate-900/30"
-                        role="rowgroup"
-                        aria-label={`Fields in group ${groupLabel}`}
-                      >
-                        {members.map((f) => renderFieldRow(f, fields.indexOf(f)))}
-                        {members.length === 0 && (
-                          <p className="pl-8 py-1.5 text-[11px] text-slate-700 italic">
-                            Drop fields here to add to group
-                          </p>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          )}
-
-          {fields.length === 0 && (
-            <p className="text-xs text-slate-600">
-              No fields. Load from Iceberg or add custom columns below.
-            </p>
-          )}
-
-          {/* Add group */}
-          <div className="space-y-1 pt-1">
-            <p className={SUB_HEADING}>Add Group</p>
-            <div className="flex items-center gap-2">
-              <input
-                value={newGroupName}
-                onChange={(e) => setNewGroupName(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') {
-                    if (selectedNames.size > 0) createGroupAndMoveSelected();
-                    else addGroup();
-                  }
-                }}
-                placeholder="group_name"
-                className={`${INPUT_CLS} max-w-[160px]`}
-              />
-              <button
-                type="button"
-                onClick={selectedNames.size > 0 ? createGroupAndMoveSelected : addGroup}
-                disabled={!newGroupName.trim()}
-                className={BTN_NEUTRAL}
-              >
-                <Plus size={11} className="mr-1 inline" />
-                {selectedNames.size > 0
-                  ? `Create & move ${selectedNames.size} selected`
-                  : 'Create group'}
-              </button>
-            </div>
+                  )}
+                </div>
+              );
+            })}
           </div>
+        )}
 
-          {/* Add custom column */}
-          <div className="space-y-1">
-            <p className={SUB_HEADING}>Add Custom Column</p>
-            <div className="flex flex-wrap items-center gap-2">
-              <input
-                value={newColName}
-                onChange={(e) => setNewColName(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') addCustomColumn();
-                }}
-                placeholder="column_name"
-                className={`${INPUT_CLS} max-w-[160px]`}
-              />
-              <select
-                value={newColType}
-                onChange={(e) => setNewColType(e.target.value as SparkDataType)}
-                className={`${SELECT_CLS} max-w-[100px]`}
-              >
-                {SPARK_TYPES.map((t) => (
-                  <option key={t} value={t}>
-                    {t}
-                  </option>
-                ))}
-              </select>
-              {Object.keys(groups).length > 0 && (
-                <select
-                  value={newColGroup}
-                  onChange={(e) => setNewColGroup(e.target.value)}
-                  className={`${SELECT_CLS} max-w-[120px]`}
-                >
-                  <option value="">top-level</option>
-                  {Object.keys(groups).map((g) => (
-                    <option key={g} value={g}>
-                      {g}
-                    </option>
-                  ))}
-                </select>
-              )}
-              <button
-                type="button"
-                onClick={addCustomColumn}
-                disabled={!newColName.trim()}
-                className={BTN_PRIMARY}
-              >
-                <Plus size={11} className="mr-1 inline" />
-                Add
-              </button>
-            </div>
+        {fields.length === 0 && (
+          <p className="text-xs text-slate-600">
+            No fields. Load from Iceberg or add custom columns below.
+          </p>
+        )}
+
+        {/* Add group */}
+        <div className="space-y-1 pt-1">
+          <p className={SUB_HEADING}>Add Group</p>
+          <div className="flex items-center gap-2">
+            <input
+              value={newGroupName}
+              onChange={(e) => setNewGroupName(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  if (selectedNames.size > 0) createGroupAndMoveSelected();
+                  else addGroup();
+                }
+              }}
+              placeholder="group_name"
+              className={`${INPUT_CLS} max-w-[160px]`}
+            />
+            <button
+              type="button"
+              onClick={selectedNames.size > 0 ? createGroupAndMoveSelected : addGroup}
+              disabled={!newGroupName.trim()}
+              className={BTN_NEUTRAL}
+            >
+              <Plus size={11} className="mr-1 inline" />
+              {selectedNames.size > 0
+                ? `Create & move ${selectedNames.size} selected`
+                : 'Create group'}
+            </button>
           </div>
         </div>
 
-        {/* ── Right: live YAML preview ── */}
-        {fields.length > 0 && (
-          <div className="sticky top-0">
-            <p className="mb-1 text-[10px] font-medium uppercase tracking-wider text-slate-500">
-              YAML Preview
-            </p>
-            <pre className="max-h-[500px] overflow-auto rounded border border-slate-700 bg-slate-950 p-2 font-mono text-[10px] leading-relaxed text-green-300 whitespace-pre">
-              {yamlPreview}
-            </pre>
+        {/* Add custom column */}
+        <div className="space-y-1">
+          <p className={SUB_HEADING}>Add Custom Column</p>
+          <div className="flex flex-wrap items-center gap-2">
+            <input
+              value={newColName}
+              onChange={(e) => setNewColName(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') addCustomColumn();
+              }}
+              placeholder="column_name"
+              className={`${INPUT_CLS} max-w-[160px]`}
+            />
+            <select
+              value={newColType}
+              onChange={(e) => setNewColType(e.target.value as SparkDataType)}
+              className={`${SELECT_CLS} max-w-[100px]`}
+            >
+              {SPARK_TYPES.map((t) => (
+                <option key={t} value={t}>
+                  {t}
+                </option>
+              ))}
+            </select>
+            {Object.keys(groups).length > 0 && (
+              <select
+                value={newColGroup}
+                onChange={(e) => setNewColGroup(e.target.value)}
+                className={`${SELECT_CLS} max-w-[120px]`}
+              >
+                <option value="">top-level</option>
+                {Object.keys(groups).map((g) => (
+                  <option key={g} value={g}>
+                    {g}
+                  </option>
+                ))}
+              </select>
+            )}
+            <button
+              type="button"
+              onClick={addCustomColumn}
+              disabled={!newColName.trim()}
+              className={BTN_PRIMARY}
+            >
+              <Plus size={11} className="mr-1 inline" />
+              Add
+            </button>
           </div>
-        )}
+        </div>
       </div>
     </div>
   );

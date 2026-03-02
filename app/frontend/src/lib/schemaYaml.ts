@@ -461,8 +461,14 @@ export function validateSchemaBuilder(state: SchemaBuilderState): string[] {
     rawTopLevel,
   } = state;
 
-  // Only run V1 checks when V2 fields are NOT populated (avoid double-reporting)
-  if (state.fullFields.length === 0) {
+  // Only run V1 checks when NO V2 fields are populated (avoid double-reporting
+  // across tabs — e.g. rawFields loaded but fullFields not yet touched).
+  const usingV2 =
+    state.rawFields.length > 0 ||
+    state.fullFields.length > 0 ||
+    state.preprocessedFields.length > 0;
+
+  if (!usingV2) {
     if (!targetColumn) {
       errors.push('Schema: target column must be selected');
     }

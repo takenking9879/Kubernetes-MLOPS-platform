@@ -143,7 +143,6 @@ export function SchemaBuilderSection({
             idField={state.idField}
             onChange={handleRawChange}
             dataset={state.dataset || inferredDataset}
-            yamlPreview={rawYaml}
           />
         )}
 
@@ -181,24 +180,21 @@ export function SchemaBuilderSection({
       <div className="flex flex-wrap items-center gap-2 pt-1 border-t border-slate-800">
         <button
           onClick={() => onDownload(rawYaml, 'raw.yaml')}
-          disabled={state.rawFields.length === 0 && state.rawTopLevel.length === 0}
+          disabled={state.rawFields.length === 0}
           className={BTN_NEUTRAL}
         >
           ↓ raw.yaml
         </button>
         <button
           onClick={() => onDownload(fullYaml, 'full.yaml')}
-          disabled={state.fullFields.length === 0 && state.fullColumns.length === 0}
+          disabled={state.fullFields.length === 0}
           className={BTN_NEUTRAL}
         >
           ↓ full.yaml
         </button>
         <button
           onClick={() => onDownload(preprocessedYaml, 'preprocessed.yaml')}
-          disabled={
-            state.preprocessedFields.length === 0 &&
-            state.preprocessedColumns.length === 0
-          }
+          disabled={state.preprocessedFields.length === 0}
           className={BTN_NEUTRAL}
         >
           ↓ preprocessed.yaml
