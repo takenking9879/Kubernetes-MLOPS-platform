@@ -76,7 +76,8 @@ def _submit_ray_job(**context):
     with open(base_yaml_path) as fh:
         manifest = copy.deepcopy(_yaml.safe_load(fh))
 
-    ray_job_name = k8s_name(train_run_id, "ray-train")
+    # RayJob names must be ≤ 47 characters (KubeRay operator constraint)
+    ray_job_name = k8s_name(train_run_id, "ray-train", max_len=47)
     manifest["metadata"]["name"] = ray_job_name
 
     extra_env = {
