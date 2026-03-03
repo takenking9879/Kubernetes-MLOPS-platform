@@ -9,45 +9,6 @@ spec:
   shutdownAfterJobFinishes: true
   ttlSecondsAfterFinished: 60  # 1 minutes - allow Prometheus to scrape metrics
 
-  # Submitter pod: the KubeRay operator creates this pod to call `ray job submit`
-  # and then `ray job logs`.
-  #
-  # Root cause of past DNS failures:
-  #   1. CoreDNS had `disable denial cluster.local` — NXDOMAIN responses for
-  #      search-domain-expanded names were never cached.  With ndots:5 (default),
-  #      the resolver tried 4 expanded variants of the 4-dot head-svc FQDN before
-  #      the absolute lookup; each uncached NXDOMAIN hit the k8s API, taking ~5 s
-  #      per attempt → ~20 s total before the absolute lookup finally succeeded.
-  #      Fixed in CoreDNS ConfigMap: `disable denial cluster.local` removed.
-  #   2. Belt-and-suspenders: dnsPolicy:None + explicit CoreDNS IP (10.96.0.10)
-  #      bypasses the node resolver entirely.  ndots:1 guarantees any name with
-  #      ≥ 1 dot (all k8s FQDNs) is tried as absolute first — no search domains
-  #      are prepended, so `ray job logs` resolves the head-svc in < 1 ms.
-  #
-  # containers is required by the CRD; KubeRay patches `ray job submit` into the
-  # first container — only name+image are needed here.
-  # Retry up to 2 times so a transient CoreDNS blip doesn't fail the whole job.
-  submitterConfig:
-    backoffLimit: 2
-
-  submitterPodTemplate:
-    spec:
-      restartPolicy: Never
-      dnsPolicy: None
-      dnsConfig:
-        nameservers:
-          - 10.96.0.10   # CoreDNS ClusterIP (kube-dns service)
-        searches:
-          - ray.svc.cluster.local
-          - svc.cluster.local
-          - cluster.local
-        options:
-          - name: ndots
-            value: "1"
-      containers:
-        - name: ray-job-submitter
-          image: ray-cluster:2.53.0
-
   runtimeEnvYAML: |
     env_vars:
       # Final training (single run): fewer workers, more CPU per worker.
@@ -98,13 +59,6 @@ spec:
           labels:
             app: kuberay-training
         spec:
-          # ndots:2 → 4-dot FQDNs (*.ray.svc.cluster.local) are resolved as
-          # absolute names first, avoiding cascading search-domain timeouts.
-          dnsPolicy: ClusterFirst
-          dnsConfig:
-            options:
-              - name: ndots
-                value: "2"
           containers:
             - name: ray-head
               image: ray-cluster:2.53.0
@@ -186,13 +140,6 @@ spec:
             labels:
               app: kuberay-training
           spec:
-            # Same ndots:2 fix as head pod — workers also make FQDN connections
-            # to the head service (GCS, dashboard) during Ray Tune trials.
-            dnsPolicy: ClusterFirst
-            dnsConfig:
-              options:
-                - name: ndots
-                  value: "2"
             affinity:
               podAntiAffinity:
                 preferredDuringSchedulingIgnoredDuringExecution:
