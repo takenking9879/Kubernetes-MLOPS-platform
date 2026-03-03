@@ -56,6 +56,18 @@ class KubeRayTraining(BaseUtils):
         self.schema = self._load_schema_features()
         self.output_dir = output_dir
 
+        # Airflow injects TRAIN_RUN_ID as an env var per RayJob submission so
+        # that multiple concurrent/sequential runs each carry their own ID.
+        # We surface it into params_full so every method reads from one place.
+        # Fallback chain: env var → execution.train_run_id (set by backend) → run_metadata.run_id
+        env_train_run_id = (
+            os.getenv("TRAIN_RUN_ID")
+            or self.params_full.get("execution", {}).get("train_run_id", "")
+            or self.params_full.get("run_metadata", {}).get("run_id", "")
+        )
+        if env_train_run_id:
+            self.params_full.setdefault("run_metadata", {})["train_run_id"] = env_train_run_id
+
         # Iceberg setup
         self.catalog_kwargs = self._get_iceberg_catalog()
 
