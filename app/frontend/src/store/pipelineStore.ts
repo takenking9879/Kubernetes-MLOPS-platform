@@ -6,7 +6,7 @@
  */
 
 import { create } from 'zustand';
-import { devtools } from 'zustand/middleware';
+import { devtools, persist } from 'zustand/middleware';
 import type { Node } from 'reactflow';
 import type { NodeData } from '../types/nodes';
 import { isStageNode } from '../types/nodes';
@@ -131,12 +131,16 @@ interface PipelineState {
   selectEdge: (id: string | null) => void;
   log: (message: string, type: ConsoleMessage['type']) => void;
   clearConsole: () => void;
+
+  // Reset
+  reset: () => void;
 }
 
 // ─── Store implementation ───────────────────────────────────────────
 
 export const usePipelineStore = create<PipelineState>()(
   devtools(
+    persist(
     (set, get) => ({
       // Initial state
       nodes: [],
@@ -609,7 +613,44 @@ export const usePipelineStore = create<PipelineState>()(
       },
 
       clearConsole: () => set({ consoleMessages: [] }),
+
+      reset: () =>
+        set({
+          nodes: [],
+          edges: [],
+          dirtyNodeIds: new Set(),
+          datasetSchema: null,
+          validationResult: null,
+          isValidating: false,
+          dryRunResult: null,
+          isDryRunning: false,
+          selectedNodeId: null,
+          selectedEdgeId: null,
+          consoleMessages: [],
+          pipelineName: 'visual_pipeline',
+          pipelineVersion: '1.0',
+        }),
     }),
+    {
+      name: 'mlops-pipeline-store',
+      version: 1,
+      partialize: (state) => ({
+        nodes: state.nodes,
+        edges: state.edges,
+        pipelineName: state.pipelineName,
+        pipelineVersion: state.pipelineVersion,
+      }),
+      // dirtyNodeIds is a Set — it is intentionally excluded from persistence.
+      // On rehydration Zustand merges persisted fields over the initial state,
+      // so dirtyNodeIds will be initialized to `new Set()` from the initial state.
+      merge: (persisted, current) => ({
+        ...current,
+        ...(persisted as Partial<PipelineState>),
+        // Always restore non-serializable fields from initial state
+        dirtyNodeIds: new Set<string>(),
+      }),
+    },
+    ),
     { name: 'PipelineStore' },
   ),
 );

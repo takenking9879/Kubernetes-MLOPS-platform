@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useRef } from 'react';
 import { ReactFlowProvider } from 'reactflow';
 import { MainLayout } from './components/Layout/MainLayout';
 import { DatasetPage } from './pages/DatasetPage';
@@ -7,8 +7,7 @@ import { RunPage } from './pages/RunPage';
 import { ServingPage } from './pages/ServingPage';
 import { useDatasetStore } from './store/datasetStore';
 import { usePipelineStore } from './store/pipelineStore';
-
-type Page = 'datasets' | 'dsl-builder' | 'processing' | 'run-pipeline' | 'serving';
+import { useUIStore, type Page } from './store/uiStore';
 
 const TAB_LABELS: Record<Page, string> = {
   'datasets':    'Datasets',
@@ -19,7 +18,7 @@ const TAB_LABELS: Record<Page, string> = {
 };
 
 export default function App() {
-  const [page, setPage] = useState<Page>('datasets');
+  const { page, setPage } = useUIStore();
   const { activeDataset } = useDatasetStore();
   
   // YAML Actions (lifting logic for visibility)
