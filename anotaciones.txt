@@ -34,4 +34,8 @@ https://repo1.maven.org/maven2/org/apache/iceberg/iceberg-spark-extensions-4.0_2
 
 #Voy a cambiar a spark 4.1.1 entonces necesito cambiar:
 
-k3s/spark/Dockerfile
+k3s/spark/
+
+
+Checar que el rayjob se elimina al completarse (Complete) porque no lo hizo
+

@@ -1,22 +1,26 @@
 /**
- * ServingPage — Kafka inference serving configuration.
+ * ServingPage — Model serving configuration and deployment.
  *
- * 4-step workflow:
- *   1. Training Run — select train_run_id (auto-resolves dataset)
- *   2. Kafka Schema (raw.yaml) — build & save raw.yaml to S3
- *   3. Serving Config — alias, canary, webhook settings
- *   4. Review & Submit — generates params_serving.yaml via backend
+ * Supports two modes:
+ *   ray_only — 3 steps: Training Run → Serving Config → Review & Deploy
+ *   kafka    — 4 steps: Training Run → Kafka Schema → Serving Config → Review & Deploy
+ *
+ * After saving the config (params_serving.yaml), a "Deploy Now" button triggers
+ * the serving_pipeline Airflow DAG (promotion + RayService patch + optional Spark connector).
  */
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Check, Copy, RefreshCw } from 'lucide-react';
 import {
   listTrainingRunIds,
   uploadRawSchema,
   submitServingConfig,
+  triggerServingDeploy,
+  getServingDeployStatus,
   type TrainingRunId,
   type SchemaUploadSingleResult,
   type ServingConfigResult,
+  type ServingDeployResult,
 } from '../api/platformClient';
 import {
   generateRawYamlV2,
@@ -36,9 +40,27 @@ const BTN_PRIMARY =
   'rounded bg-blue-600 px-4 py-1.5 text-xs font-medium text-white hover:bg-blue-500 disabled:opacity-40';
 const SUB_HEADING = 'text-xs font-semibold text-slate-400 uppercase tracking-wider';
 
-// ─── Constants ────────────────────────────────────────────────────────────────
+// ─── Stepper types ────────────────────────────────────────────────────────────
 
-const STEP_LABELS = ['Training Run', 'Kafka Schema', 'Serving Config', 'Review'];
+interface StepDef {
+  label: string;
+  logicalStep: number;
+}
+
+const STEPS_RAY_ONLY: StepDef[] = [
+  { label: 'Training Run', logicalStep: 1 },
+  { label: 'Serving Config', logicalStep: 3 },
+  { label: 'Review', logicalStep: 4 },
+];
+
+const STEPS_KAFKA: StepDef[] = [
+  { label: 'Training Run', logicalStep: 1 },
+  { label: 'Kafka Schema', logicalStep: 2 },
+  { label: 'Serving Config', logicalStep: 3 },
+  { label: 'Review', logicalStep: 4 },
+];
+
+const TERMINAL_STATES = new Set(['success', 'failed', 'upstream_failed']);
 
 // ─── Primitive UI components ──────────────────────────────────────────────────
 
@@ -96,20 +118,21 @@ function ToggleButton({
 // ─── StepperHeader ────────────────────────────────────────────────────────────
 
 function StepperHeader({
+  steps,
   currentStep,
   stepStatus,
   onStepClick,
 }: {
+  steps: StepDef[];
   currentStep: number;
-  stepStatus: (n: number) => 'active' | 'completed' | 'error' | 'pending';
-  onStepClick: (n: number) => void;
+  stepStatus: (logicalStep: number) => 'active' | 'completed' | 'error' | 'pending';
+  onStepClick: (logicalStep: number) => void;
 }) {
   return (
     <div className="flex w-full select-none items-start gap-0">
-      {STEP_LABELS.map((label, i) => {
-        const n = i + 1;
-        const st = stepStatus(n);
-        const clickable = n <= currentStep;
+      {steps.map(({ label, logicalStep }, i) => {
+        const st = stepStatus(logicalStep);
+        const clickable = logicalStep <= currentStep;
 
         const nodeStyle =
           st === 'active'
@@ -128,10 +151,10 @@ function StepperHeader({
               : 'text-slate-600';
 
         return (
-          <div key={n} className="flex flex-1 items-start">
+          <div key={logicalStep} className="flex flex-1 items-start">
             <div
               className={`flex flex-col items-center ${clickable ? 'cursor-pointer' : 'cursor-default'}`}
-              onClick={() => clickable && onStepClick(n)}
+              onClick={() => clickable && onStepClick(logicalStep)}
             >
               <div
                 className={`flex h-7 w-7 items-center justify-center rounded-full text-xs font-bold transition-colors ${nodeStyle}`}
@@ -141,14 +164,14 @@ function StepperHeader({
                 ) : st === 'error' ? (
                   '!'
                 ) : (
-                  n
+                  i + 1
                 )}
               </div>
               <span className={`mt-1 text-[10px] transition-colors ${labelStyle}`}>
                 {label}
               </span>
             </div>
-            {i < STEP_LABELS.length - 1 && (
+            {i < steps.length - 1 && (
               <div
                 className={`mx-2 mt-3.5 h-px flex-1 transition-colors ${
                   st === 'completed' ? 'bg-green-700' : 'bg-slate-700'
@@ -231,14 +254,14 @@ export function ServingPage() {
   const [currentStep, setCurrentStep] = useState(1);
   const [navErrors, setNavErrors] = useState<string[]>([]);
 
-  // ── Step 1: Training Run ──────────────────────────────────────────────────
+  // ── Step 1: Training Run + Mode ───────────────────────────────────────────
   const [trainingRunIds, setTrainingRunIds] = useState<TrainingRunId[]>([]);
   const [trainingIdsLoading, setTrainingIdsLoading] = useState(false);
   const [selectedTrainRunId, setSelectedTrainRunId] = useState('');
-  // dataset resolved from the selected TrainingRunId entry (parsed in /ids endpoint)
   const [resolvedDataset, setResolvedDataset] = useState('');
+  const [servingMode, setServingMode] = useState<'ray_only' | 'kafka'>('ray_only');
 
-  // ── Step 2: Kafka Schema (raw.yaml) ───────────────────────────────────────
+  // ── Step 2: Kafka Schema (raw.yaml) — only used when serving_mode=kafka ──
   const [rawFields, setRawFields] = useState<RawFieldEntry[]>([]);
   const [rawGroups, setRawGroups] = useState<Record<string, string>>({
     properties: 'properties',
@@ -247,7 +270,6 @@ export function ServingPage() {
   const [isSavingSchema, setIsSavingSchema] = useState(false);
   const [schemaSaveResult, setSchemaSaveResult] = useState<SchemaUploadSingleResult | null>(null);
   const [schemaSaveError, setSchemaSaveError] = useState('');
-  // raw_schema_s3_path required before submitting
   const [rawSchemaS3Path, setRawSchemaS3Path] = useState('');
 
   // ── Step 3: Serving Config ────────────────────────────────────────────────
@@ -263,6 +285,15 @@ export function ServingPage() {
   // ── Step 4 / Submission ───────────────────────────────────────────────────
   const [submitResult, setSubmitResult] = useState<ServingConfigResult | null>(null);
   const [submitError, setSubmitError] = useState('');
+
+  // ── Deploy state ──────────────────────────────────────────────────────────
+  const [deployResult, setDeployResult] = useState<ServingDeployResult | null>(null);
+  const [deployState, setDeployState] = useState('');
+  const [deployError, setDeployError] = useState('');
+  const deployPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  // ── Dynamic step list based on serving mode ───────────────────────────────
+  const steps = servingMode === 'kafka' ? STEPS_KAFKA : STEPS_RAY_ONLY;
 
   // ── Effects ───────────────────────────────────────────────────────────────
 
@@ -289,7 +320,6 @@ export function ServingPage() {
       setResolvedDataset(entry.dataset);
       return;
     }
-    // Fallback: parse from run_id format train-{dataset}-{6hex}-{ts}Z-{6hex}
     const m = selectedTrainRunId.match(/^train-(.+)-[0-9a-f]{6}-\d{8}T\d{6}Z-[0-9a-f]{6}$/);
     setResolvedDataset(m ? m[1] : '');
   }, [selectedTrainRunId, trainingRunIds]);
@@ -300,6 +330,28 @@ export function ServingPage() {
     setSchemaSaveError('');
     setRawSchemaS3Path('');
   }, [resolvedDataset, rawFields, rawGroups, idField]);
+
+  // When mode switches, reset submission state and jump back to step 1
+  useEffect(() => {
+    setSubmitResult(null);
+    setSubmitError('');
+    setDeployResult(null);
+    setDeployState('');
+    setDeployError('');
+    if (deployPollRef.current) clearInterval(deployPollRef.current);
+    // If currently on step 2 and switching to ray_only, jump to step 1
+    if (currentStep === 2 && servingMode === 'ray_only') {
+      setCurrentStep(1);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [servingMode]);
+
+  // Cleanup poll on unmount
+  useEffect(() => {
+    return () => {
+      if (deployPollRef.current) clearInterval(deployPollRef.current);
+    };
+  }, []);
 
   // ── Derived: raw.yaml content ─────────────────────────────────────────────
 
@@ -317,7 +369,6 @@ export function ServingPage() {
           idField,
           fullFields: [],
           preprocessedFields: [],
-          // V1 compat (unused)
           rawTopLevel: [],
           propertiesFields: [],
           fullColumns: [],
@@ -338,9 +389,10 @@ export function ServingPage() {
         return e;
       }
       case 2: {
+        // Schema step is only validated in kafka mode
+        if (servingMode !== 'kafka') return [];
         const e: string[] = [];
-        if (!rawSchemaS3Path)
-          e.push('Save raw.yaml to S3 before continuing');
+        if (!rawSchemaS3Path) e.push('Save raw.yaml to S3 before continuing');
         if (rawFields.length === 0) e.push('Add at least one field to the schema');
         if (!idField) e.push('Select an id_field');
         return e;
@@ -365,26 +417,32 @@ export function ServingPage() {
 
   // ── Step navigation ────────────────────────────────────────────────────────
 
-  const stepStatus = (n: number): 'active' | 'completed' | 'error' | 'pending' => {
-    if (n === currentStep) return 'active';
-    if (n > currentStep) return 'pending';
-    return getStepErrors(n).length === 0 ? 'completed' : 'error';
+  const stepStatus = (logicalStep: number): 'active' | 'completed' | 'error' | 'pending' => {
+    if (logicalStep === currentStep) return 'active';
+    if (logicalStep > currentStep) return 'pending';
+    return getStepErrors(logicalStep).length === 0 ? 'completed' : 'error';
   };
 
   const goForward = () => {
     const errs = getStepErrors(currentStep);
     if (errs.length > 0) { setNavErrors(errs); return; }
     setNavErrors([]);
-    setCurrentStep((s) => Math.min(s + 1, 4));
+    let next = currentStep + 1;
+    // Skip step 2 (Kafka Schema) when in ray_only mode
+    if (servingMode === 'ray_only' && next === 2) next = 3;
+    setCurrentStep(Math.min(next, 4));
   };
 
   const goBack = () => {
     setNavErrors([]);
-    setCurrentStep((s) => Math.max(s - 1, 1));
+    let prev = currentStep - 1;
+    // Skip step 2 (Kafka Schema) when in ray_only mode
+    if (servingMode === 'ray_only' && prev === 2) prev = 1;
+    setCurrentStep(Math.max(prev, 1));
   };
 
-  const goToStep = (n: number) => {
-    if (n <= currentStep) { setNavErrors([]); setCurrentStep(n); }
+  const goToStep = (logicalStep: number) => {
+    if (logicalStep <= currentStep) { setNavErrors([]); setCurrentStep(logicalStep); }
   };
 
   // ── Handlers ──────────────────────────────────────────────────────────────
@@ -424,7 +482,9 @@ export function ServingPage() {
     try {
       const result = await submitServingConfig({
         train_run_id: selectedTrainRunId,
-        raw_schema_s3_path: rawSchemaS3Path,
+        serving_mode: servingMode,
+        // raw_schema_s3_path is only sent in kafka mode
+        ...(servingMode === 'kafka' ? { raw_schema_s3_path: rawSchemaS3Path } : {}),
         alias,
         canary,
         canary_alias: canaryAlias,
@@ -440,6 +500,32 @@ export function ServingPage() {
     }
   };
 
+  const handleDeploy = async () => {
+    if (!submitResult) return;
+    setDeployError('');
+    setDeployResult(null);
+    setDeployState('queued');
+    if (deployPollRef.current) clearInterval(deployPollRef.current);
+    try {
+      const result = await triggerServingDeploy(submitResult.serve_run_id);
+      setDeployResult(result);
+      // Poll every 15s until terminal state
+      deployPollRef.current = setInterval(() => {
+        void getServingDeployStatus(submitResult.serve_run_id, result.dag_run_id)
+          .then((s) => {
+            setDeployState(s.state);
+            if (TERMINAL_STATES.has(s.state.toLowerCase())) {
+              if (deployPollRef.current) clearInterval(deployPollRef.current);
+            }
+          })
+          .catch(() => { /* keep polling on transient error */ });
+      }, 15_000);
+    } catch (e) {
+      setDeployError(e instanceof Error ? e.message : String(e));
+      setDeployState('');
+    }
+  };
+
   const fullValidationErrors = validateForm();
 
   // ─────────────────────────────────────────────────────────────────────────────
@@ -452,6 +538,7 @@ export function ServingPage() {
       <div className="min-w-0 flex-1 space-y-3 overflow-y-auto p-4">
 
         <StepperHeader
+          steps={steps}
           currentStep={currentStep}
           stepStatus={stepStatus}
           onStepClick={goToStep}
@@ -459,7 +546,7 @@ export function ServingPage() {
 
         <div className="rounded-lg border border-slate-700 bg-slate-900 px-4 py-4">
 
-          {/* ── STEP 1: Training Run ── */}
+          {/* ── STEP 1: Training Run + Mode ── */}
           {currentStep === 1 && (
             <div className="space-y-4">
               <p className={SUB_HEADING}>Select Training Run</p>
@@ -469,7 +556,7 @@ export function ServingPage() {
 
               <Field
                 label="Training Run"
-                tooltip="The train_run_id whose MLflow model will be deployed."
+                tooltip="The train_run_id whose MLflow model will be promoted to champion."
               >
                 <div className="flex gap-1">
                   <select
@@ -499,6 +586,39 @@ export function ServingPage() {
                 </div>
               </Field>
 
+              <Field
+                label="Serving Mode"
+                tooltip="ray_only: deploys Ray Serve only. kafka: also deploys a Spark Kafka streaming connector."
+              >
+                <div className="flex gap-2">
+                  <ToggleButton
+                    active={servingMode === 'ray_only'}
+                    onClick={() => setServingMode('ray_only')}
+                  >
+                    Ray Only
+                  </ToggleButton>
+                  <ToggleButton
+                    active={servingMode === 'kafka'}
+                    onClick={() => setServingMode('kafka')}
+                  >
+                    Kafka
+                  </ToggleButton>
+                </div>
+              </Field>
+
+              {servingMode === 'ray_only' && (
+                <p className="text-xs text-slate-500">
+                  Promotes the model to <code className="rounded bg-slate-800 px-1">@champion</code>,
+                  patches Ray Serve config. No Kafka connector deployed. raw.yaml not required.
+                </p>
+              )}
+              {servingMode === 'kafka' && (
+                <p className="text-xs text-slate-500">
+                  Promotes the model, patches Ray Serve, and deploys a Spark Kafka streaming connector.
+                  You will define a <code className="rounded bg-slate-800 px-1">raw.yaml</code> schema in the next step.
+                </p>
+              )}
+
               {selectedTrainRunId && (
                 <div className="rounded border border-slate-700 bg-slate-800/40 px-3 py-2.5">
                   <div className="grid grid-cols-[100px_1fr] gap-x-3 gap-y-1">
@@ -510,13 +630,15 @@ export function ServingPage() {
                     <span className="font-mono text-[11px] text-slate-200">
                       {resolvedDataset || '—'}
                     </span>
+                    <span className="text-[11px] text-slate-500">Mode</span>
+                    <span className="font-mono text-[11px] text-slate-200">{servingMode}</span>
                   </div>
                 </div>
               )}
             </div>
           )}
 
-          {/* ── STEP 2: Kafka Schema ── */}
+          {/* ── STEP 2: Kafka Schema (only in kafka mode) ── */}
           {currentStep === 2 && (
             <div className="space-y-4">
               <p className={SUB_HEADING}>Kafka Input Schema (raw.yaml)</p>
@@ -586,7 +708,7 @@ export function ServingPage() {
               <div className="space-y-2">
                 <p className={SUB_HEADING}>Model Alias</p>
                 <div className="grid grid-cols-2 gap-3">
-                  <Field label="Alias" tooltip="MLflow model alias for the champion model.">
+                  <Field label="Alias" tooltip="MLflow model alias to promote. Typically 'champion'.">
                     <input
                       value={alias}
                       onChange={(e) => setAlias(e.target.value)}
@@ -659,7 +781,7 @@ export function ServingPage() {
               <div className="space-y-2">
                 <p className={SUB_HEADING}>Webhook</p>
                 <p className="text-xs text-slate-500">
-                  External HTTP endpoint that Kafka inference will POST predictions to.
+                  MLflow alias-change webhook endpoint for hot model reloads.
                 </p>
                 <div className="grid grid-cols-2 gap-3">
                   <Field label="Public Base URL" tooltip="External base URL of the inference service.">
@@ -680,7 +802,7 @@ export function ServingPage() {
                   </Field>
                   <Field
                     label="Max Timestamp Age (s)"
-                    tooltip="Reject Kafka messages older than this many seconds."
+                    tooltip="Reject webhook requests older than this many seconds."
                   >
                     <input
                       type="number"
@@ -697,7 +819,7 @@ export function ServingPage() {
             </div>
           )}
 
-          {/* ── STEP 4: Review & Submit ── */}
+          {/* ── STEP 4: Review & Submit & Deploy ── */}
           {currentStep === 4 && (
             <div className="space-y-3">
               <p className={SUB_HEADING}>Review Configuration</p>
@@ -708,22 +830,22 @@ export function ServingPage() {
                 items={[
                   ['Train run ID', selectedTrainRunId],
                   ['Dataset', resolvedDataset],
+                  ['Mode', servingMode],
                 ]}
               />
 
-              <SummaryCard
-                title="Kafka Schema"
-                onEdit={() => goToStep(2)}
-                items={[
-                  ['Fields', String(rawFields.length)],
-                  ['id_field', idField],
-                  [
-                    'Schema version',
-                    schemaSaveResult ? `v${schemaSaveResult.version}` : '—',
-                  ],
-                  ['S3 path', rawSchemaS3Path],
-                ]}
-              />
+              {servingMode === 'kafka' && (
+                <SummaryCard
+                  title="Kafka Schema"
+                  onEdit={() => goToStep(2)}
+                  items={[
+                    ['Fields', String(rawFields.length)],
+                    ['id_field', idField],
+                    ['Schema version', schemaSaveResult ? `v${schemaSaveResult.version}` : '—'],
+                    ['S3 path', rawSchemaS3Path],
+                  ]}
+                />
+              )}
 
               <SummaryCard
                 title="Serving Config"
@@ -732,10 +854,7 @@ export function ServingPage() {
                   ['Alias', alias],
                   ['Canary', canary ? `Yes (${canaryAlias}, p=${canaryProbability})` : 'No'],
                   ['Webhook path', webhookPath || '—'],
-                  [
-                    'Max timestamp age',
-                    `${webhookMaxTimestampAgeSeconds}s`,
-                  ],
+                  ['Max timestamp age', `${webhookMaxTimestampAgeSeconds}s`],
                 ]}
               />
 
@@ -759,29 +878,69 @@ export function ServingPage() {
 
               {/* Submit / Result */}
               {submitResult ? (
-                <div className="space-y-2 rounded-lg border border-slate-700 bg-slate-800/40 p-4">
-                  <p className="text-sm font-medium text-green-400">
-                    ✓ Serving config saved
-                  </p>
+                <div className="space-y-3 rounded-lg border border-slate-700 bg-slate-800/40 p-4">
+                  <p className="text-sm font-medium text-green-400">✓ Serving config saved</p>
                   <div className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1.5 text-xs">
                     <span className="text-slate-400">Serve run ID</span>
-                    <span className="break-all text-slate-200">
-                      {submitResult.serve_run_id}
-                    </span>
+                    <span className="break-all text-slate-200">{submitResult.serve_run_id}</span>
+                    <span className="text-slate-400">Mode</span>
+                    <span className="text-slate-200">{submitResult.serving_mode}</span>
                     <span className="text-slate-400">Dataset</span>
                     <span className="text-slate-200">{submitResult.dataset}</span>
-                    <span className="text-slate-400">Train run ID</span>
-                    <span className="break-all text-slate-200">
-                      {submitResult.train_run_id}
-                    </span>
-                    <span className="text-slate-400">params S3 path</span>
-                    <span className="break-all text-slate-200">
-                      {submitResult.params_s3_path}
-                    </span>
+                    <span className="text-slate-400">Registry model</span>
+                    <span className="break-all text-slate-200">{submitResult.registry_model_name || '—'}</span>
+                    <span className="text-slate-400">Params S3 path</span>
+                    <span className="break-all text-slate-200">{submitResult.params_s3_path}</span>
                   </div>
+
+                  {/* Deploy section */}
+                  {!deployResult ? (
+                    <div className="space-y-2 border-t border-slate-700 pt-3">
+                      {deployError && (
+                        <p className="text-xs text-red-400">{deployError}</p>
+                      )}
+                      <button
+                        onClick={() => void handleDeploy()}
+                        className="w-full rounded bg-green-700 py-2 text-sm font-semibold text-white hover:bg-green-600"
+                      >
+                        Deploy Now
+                      </button>
+                      <p className="text-center text-[10px] text-slate-500">
+                        Triggers: MLflow promotion → Ray Serve patch
+                        {submitResult.serving_mode === 'kafka' ? ' → Spark Kafka connector' : ''}
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="space-y-1 rounded border border-slate-700 bg-slate-800/40 px-3 py-2">
+                      <p className="text-xs font-medium text-slate-300">Deployment triggered</p>
+                      <div className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-xs">
+                        <span className="text-slate-500">DAG run ID</span>
+                        <span className="break-all font-mono text-slate-200">
+                          {deployResult.dag_run_id}
+                        </span>
+                        <span className="text-slate-500">State</span>
+                        <span
+                          className={`font-mono ${
+                            deployState === 'success'
+                              ? 'text-green-400'
+                              : deployState === 'failed' || deployState === 'upstream_failed'
+                                ? 'text-red-400'
+                                : 'text-amber-400'
+                          }`}
+                        >
+                          {deployState || 'queued'}
+                        </span>
+                      </div>
+                    </div>
+                  )}
+
                   <button
                     onClick={() => {
                       setSubmitResult(null);
+                      setDeployResult(null);
+                      setDeployState('');
+                      setDeployError('');
+                      if (deployPollRef.current) clearInterval(deployPollRef.current);
                       setCurrentStep(1);
                       setNavErrors([]);
                     }}
@@ -844,10 +1003,10 @@ export function ServingPage() {
         )}
       </div>
 
-      {/* ── RIGHT: raw.yaml preview ── */}
+      {/* ── RIGHT: raw.yaml preview (only meaningful in kafka mode) ── */}
       <div className="w-[420px] shrink-0 min-h-0 p-4">
         <YamlPreviewPanel
-          content={rawYamlContent}
+          content={servingMode === 'kafka' ? rawYamlContent : '# raw.yaml not used in ray_only mode'}
           label="raw.yaml preview"
         />
       </div>

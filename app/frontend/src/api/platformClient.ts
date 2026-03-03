@@ -181,7 +181,8 @@ export interface SchemaUploadSingleResult {
 
 export interface ServingConfigRequest {
   train_run_id: string;
-  raw_schema_s3_path: string;
+  serving_mode: 'ray_only' | 'kafka';
+  raw_schema_s3_path?: string;   // required when serving_mode === 'kafka'
   alias?: string;
   canary?: boolean;
   canary_alias?: string;
@@ -197,6 +198,21 @@ export interface ServingConfigResult {
   params_s3_path: string;
   dataset: string;
   train_run_id: string;
+  serving_mode: 'ray_only' | 'kafka';
+  registry_model_name: string;
+}
+
+export interface ServingDeployResult {
+  dag_run_id: string;
+  serve_run_id: string;
+}
+
+export interface ServingDeployStatus {
+  dag_run_id: string;
+  serve_run_id: string;
+  state: string;
+  start_date: string | null;
+  end_date: string | null;
 }
 
 // ─── Processing run types ─────────────────────────────────────────────────────
@@ -475,4 +491,22 @@ export async function submitServingConfig(
     method: 'POST',
     body: JSON.stringify(request),
   });
+}
+
+export async function triggerServingDeploy(
+  serve_run_id: string,
+): Promise<ServingDeployResult> {
+  return _fetch<ServingDeployResult>(
+    `/api/v2/serving-configs/${encodeURIComponent(serve_run_id)}/deploy`,
+    { method: 'POST' },
+  );
+}
+
+export async function getServingDeployStatus(
+  serve_run_id: string,
+  dag_run_id: string,
+): Promise<ServingDeployStatus> {
+  return _fetch<ServingDeployStatus>(
+    `/api/v2/serving-configs/${encodeURIComponent(serve_run_id)}/deploy/${encodeURIComponent(dag_run_id)}/status`,
+  );
 }

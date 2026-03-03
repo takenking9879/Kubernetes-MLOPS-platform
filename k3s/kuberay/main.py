@@ -306,6 +306,7 @@ class KubeRayTraining(BaseUtils):
             params.get("mlflow_artifact_location", "s3://k8s-mlops-platform-bucket/mlflow-artifacts/")
         )
         registry_model_name = params.get("mlflow_registry_model_name")
+        train_run_id = self.params_full.get("run_metadata", {}).get("train_run_id", "")
 
         try:
             result_info = log_training_run(
@@ -315,6 +316,7 @@ class KubeRayTraining(BaseUtils):
                 artifact_location=artifact_location,
                 artifact_set_id=artifact_set_id,
                 table_identifier=table_identifier,
+                train_run_id=train_run_id or None,
                 model=model,
                 registry_model_name=registry_model_name,
             )

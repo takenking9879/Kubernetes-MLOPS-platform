@@ -94,6 +94,7 @@ def _log_and_register_model(
     registered_model_name: str,
     artifact_set_id: Optional[str] = None,
     table_identifier: Optional[str] = None,
+    train_run_id: Optional[str] = None,
     run_id: str,
 ) -> Optional[str]:
     """Log model using native MLflow flavor and register in the Model Registry.
@@ -126,6 +127,8 @@ def _log_and_register_model(
             version_tags["artifact_set_id"] = artifact_set_id
         if table_identifier:
             version_tags["iceberg_table"] = table_identifier
+        if train_run_id:
+            version_tags["train_run_id"] = train_run_id
 
         for tag_key, tag_value in version_tags.items():
             client.set_model_version_tag(
@@ -187,6 +190,7 @@ def log_training_run(
     # ── Traceability (data lineage) ──
     artifact_set_id: Optional[str] = None,
     table_identifier: Optional[str] = None,
+    train_run_id: Optional[str] = None,
     # ── Model Registry ──
     model: Any = None,
     registry_model_name: Optional[str] = None,
@@ -237,6 +241,8 @@ def log_training_run(
             mlflow.set_tag("artifact_set_id", artifact_set_id)
         if table_identifier:
             mlflow.set_tag("iceberg_table", table_identifier)
+        if train_run_id:
+            mlflow.set_tag("train_run_id", train_run_id)
 
         # 3. Log Numeric Metrics
         for k, v in (metrics or {}).items():
@@ -257,6 +263,7 @@ def log_training_run(
                 registered_model_name=effective_registry_name,
                 artifact_set_id=artifact_set_id,
                 table_identifier=table_identifier,
+                train_run_id=train_run_id,
                 run_id=run.info.run_id,
             )
 

@@ -50,6 +50,63 @@ def delete_ray_job(client, namespace: str, name: str) -> None:
         raise
 
 
+def patch_ray_service_config(
+    client,
+    namespace: str,
+    ray_service_name: str,
+    params_s3_path: str,
+) -> None:
+    """Patch a RayService's serveConfigV2 to inject PARAMS_SERVING_S3_PATH.
+
+    Strategy: GET the current RayService, parse the serveConfigV2 YAML string,
+    inject PARAMS_SERVING_S3_PATH into every application's runtime_env.env_vars,
+    re-serialize, and MERGE-patch spec.serveConfigV2. This triggers KubeRay to
+    perform a rolling reload of Ray Serve deployments.
+
+    Idempotent: patching the same value twice leaves the resource unchanged.
+
+    Args:
+        client:           kubernetes.client.CustomObjectsApi instance
+        namespace:        K8s namespace where the RayService lives (e.g. "ray")
+        ray_service_name: Name of the RayService resource (e.g. "model-serving")
+        params_s3_path:   Full S3 URI of params_serving.yaml to inject
+    """
+    import copy
+    import yaml as _yaml
+
+    obj = client.get_namespaced_custom_object(
+        group="ray.io",
+        version="v1",
+        namespace=namespace,
+        plural="rayservices",
+        name=ray_service_name,
+    )
+
+    serve_config_str = obj.get("spec", {}).get("serveConfigV2", "")
+    serve_config = _yaml.safe_load(serve_config_str) or {}
+    updated = copy.deepcopy(serve_config)
+
+    for app in updated.get("applications", []):
+        runtime_env = app.setdefault("runtime_env", {})
+        env_vars = runtime_env.setdefault("env_vars", {})
+        env_vars["PARAMS_SERVING_S3_PATH"] = params_s3_path
+
+    patch_body = {"spec": {"serveConfigV2": _yaml.dump(updated, default_flow_style=False)}}
+
+    client.patch_namespaced_custom_object(
+        group="ray.io",
+        version="v1",
+        namespace=namespace,
+        plural="rayservices",
+        name=ray_service_name,
+        body=patch_body,
+    )
+    logger.info(
+        "Patched RayService %s/%s: PARAMS_SERVING_S3_PATH=%s",
+        namespace, ray_service_name, params_s3_path,
+    )
+
+
 def k8s_name(run_id: str, prefix: str, max_len: int = 63) -> str:
     """Generate an RFC-1123 compliant Kubernetes resource name from a run ID.
 
