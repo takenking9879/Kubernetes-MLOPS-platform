@@ -445,7 +445,42 @@ async def list_processing_runs(dataset: str | None = Query(None, description="Fi
 
 @router.get("/ids")
 async def list_preprocess_run_ids(dataset: str | None = Query(default=None)):
-    """List preprocessing run IDs from S3 (new-style runs in runs/preprocessing/)."""
+    """List preprocessing run IDs from S3 (new-style runs in runs/preprocessing/).
+
+    When `dataset` is provided, the Iceberg metadata table is queried to obtain
+    the artifact_set_ids linked to that raw_dataset_name.  Only run IDs whose
+    last-6-char suffix matches one of those artifact_set_ids are returned — this
+    works for both new-style IDs (pre-{dataset}-{ts}-{6hex}) and legacy IDs
+    ({YYYYMMDD}_{HHMMSS} where the last 6 chars are still the artifact_set_id).
+    """
+    # ── 1. Optionally collect valid artifact_set_ids from Iceberg ─────────────
+    allowed_artifact_ids: set[str] | None = None
+    if dataset:
+        try:
+            from pyiceberg.catalog import load_catalog
+
+            catalog = load_catalog(
+                "glue",
+                **{
+                    "type": "glue",
+                    "client.region": AWS_REGION,
+                    "client.access-key-id": os.getenv("AWS_ACCESS_KEY_ID", ""),
+                    "client.secret-access-key": os.getenv("AWS_SECRET_ACCESS_KEY", ""),
+                },
+            )
+            table = catalog.load_table("metadata.preprocessing_artifacts")
+            df = table.scan(
+                row_filter=f"raw_dataset_name = '{dataset}'",
+                selected_fields=("artifact_set_id",),
+            ).to_pandas()
+            allowed_artifact_ids = set(str(v) for v in df["artifact_set_id"] if v)
+        except Exception as exc:
+            raise HTTPException(
+                status_code=500,
+                detail=f"Failed to query Iceberg metadata table for dataset filter: {exc}",
+            ) from exc
+
+    # ── 2. List all run prefixes from S3 ──────────────────────────────────────
     s3 = _s3_client()
     resp = s3.list_objects_v2(
         Bucket=S3_BUCKET,
@@ -455,11 +490,19 @@ async def list_preprocess_run_ids(dataset: str | None = Query(default=None)):
     runs = []
     for prefix_obj in resp.get("CommonPrefixes", []):
         run_id = prefix_obj["Prefix"].rstrip("/").rsplit("/", 1)[-1]
-        m = re.match(r"^pre-(.+)-(\d{8}T\d{6}Z)-([0-9a-f]{6})$", run_id)
-        run_dataset = m.group(1) if m else ""
+        # artifact_set_id = last 6 chars of the run_id (convention used on write)
+        artifact_set_id = run_id[-6:]
+
+        # If filtering by dataset, skip run IDs whose artifact_set_id is not
+        # in the set returned by the Iceberg metadata table.
+        if allowed_artifact_ids is not None and artifact_set_id not in allowed_artifact_ids:
+            continue
+
+        # Best-effort: extract dataset name from new-style run ID pattern.
+        m = re.match(r"^pre-(.+)-\d{8}T\d{6}Z-[0-9a-f]{6}$", run_id)
+        run_dataset = m.group(1) if m else dataset or ""
         runs.append({"preprocess_run_id": run_id, "dataset": run_dataset})
-    if dataset:
-        runs = [r for r in runs if r["dataset"] == dataset]
+
     # Newest first (run IDs contain timestamps)
     runs.sort(key=lambda r: r["preprocess_run_id"], reverse=True)
     return {"runs": runs}
