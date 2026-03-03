@@ -18,6 +18,7 @@ spec:
   # first container — only name+image are needed here.
   submitterPodTemplate:
     spec:
+      restartPolicy: Never
       dnsPolicy: ClusterFirst
       dnsConfig:
         options:
