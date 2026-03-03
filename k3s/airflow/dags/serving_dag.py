@@ -114,13 +114,13 @@ def _promote_to_champion(**context):
 
 
 def _patch_ray_service_config(**context):
-    """Patch the RayService serveConfigV2 to inject PARAMS_SERVING_S3_PATH.
+    """Create or patch the RayService to inject PARAMS_SERVING_S3_PATH.
 
     Strategy:
-      1. GET the current RayService to read serveConfigV2.
-      2. Parse as YAML.
-      3. Inject PARAMS_SERVING_S3_PATH into every application's runtime_env.env_vars.
-      4. Re-serialize and MERGE-patch spec.serveConfigV2.
+      - If the RayService exists: read serveConfigV2, inject PARAMS_SERVING_S3_PATH
+        into every application's runtime_env.env_vars, and MERGE-patch.
+      - If the RayService does NOT exist (first deploy): load the base manifest from
+        the repo, inject PARAMS_SERVING_S3_PATH, and CREATE the resource.
 
     KubeRay detects the spec change and triggers a rolling reload of Ray Serve
     deployments. ConfigLoader.load() picks up the new PARAMS_SERVING_S3_PATH at
@@ -132,6 +132,7 @@ def _patch_ray_service_config(**context):
     import copy
     import yaml as _yaml
     from kubernetes import client as _k8s_api
+    from kubernetes.client.exceptions import ApiException
     from airflow.providers.cncf.kubernetes.hooks.kubernetes import KubernetesHook
 
     conf = context["dag_run"].conf or {}
@@ -142,45 +143,87 @@ def _patch_ray_service_config(**context):
     hook = KubernetesHook(conn_id="kubernetes_default")
     k8s_client = _k8s_api.CustomObjectsApi(hook.get_conn())
 
-    obj = k8s_client.get_namespaced_custom_object(
-        group="ray.io",
-        version="v1",
-        namespace=ray_service_namespace,
-        plural="rayservices",
-        name=ray_service_name,
-    )
+    def _inject_env(serve_config: dict) -> dict:
+        updated = copy.deepcopy(serve_config)
+        for app in updated.get("applications", []):
+            runtime_env = app.setdefault("runtime_env", {})
+            env_vars = runtime_env.setdefault("env_vars", {})
+            env_vars["PARAMS_SERVING_S3_PATH"] = params_serving_s3_path
+            print(
+                f"Injecting PARAMS_SERVING_S3_PATH into app '{app.get('name', '?')}': "
+                f"{params_serving_s3_path}"
+            )
+        return updated
 
-    serve_config_str = obj.get("spec", {}).get("serveConfigV2", "")
-    serve_config = _yaml.safe_load(serve_config_str) or {}
-    updated = copy.deepcopy(serve_config)
-
-    for app in updated.get("applications", []):
-        runtime_env = app.setdefault("runtime_env", {})
-        env_vars = runtime_env.setdefault("env_vars", {})
-        env_vars["PARAMS_SERVING_S3_PATH"] = params_serving_s3_path
+    try:
+        obj = k8s_client.get_namespaced_custom_object(
+            group="ray.io",
+            version="v1",
+            namespace=ray_service_namespace,
+            plural="rayservices",
+            name=ray_service_name,
+        )
+        # ── Existing resource: patch serveConfigV2 ──────────────────────────
+        serve_config_str = obj.get("spec", {}).get("serveConfigV2", "")
+        serve_config = _yaml.safe_load(serve_config_str) or {}
+        updated = _inject_env(serve_config)
+        patch_body = {
+            "spec": {
+                "serveConfigV2": _yaml.dump(updated, default_flow_style=False),
+            }
+        }
+        k8s_client.patch_namespaced_custom_object(
+            group="ray.io",
+            version="v1",
+            namespace=ray_service_namespace,
+            plural="rayservices",
+            name=ray_service_name,
+            body=patch_body,
+        )
         print(
-            f"Patching app '{app.get('name', '?')}' with "
+            f"RayService '{ray_service_name}' patched: "
             f"PARAMS_SERVING_S3_PATH={params_serving_s3_path}"
         )
 
-    patch_body = {
-        "spec": {
-            "serveConfigV2": _yaml.dump(updated, default_flow_style=False),
-        }
-    }
+    except ApiException as exc:
+        if exc.status != 404:
+            raise
+        # ── First deploy: create from base manifest ─────────────────────────
+        import os as _os
+        from pathlib import Path as _Path
 
-    k8s_client.patch_namespaced_custom_object(
-        group="ray.io",
-        version="v1",
-        namespace=ray_service_namespace,
-        plural="rayservices",
-        name=ray_service_name,
-        body=patch_body,
-    )
-    print(
-        f"RayService '{ray_service_name}' in '{ray_service_namespace}' patched: "
-        f"PARAMS_SERVING_S3_PATH={params_serving_s3_path}"
-    )
+        base_yaml_path = _Path(
+            _os.getenv(
+                "RAYSERVICE_YAML",
+                "/opt/airflow/dags/repo/k3s/kuberay/serving/rayservice-model-serving.yaml",
+            )
+        )
+        if not base_yaml_path.exists():
+            raise FileNotFoundError(
+                f"RayService '{ray_service_name}' not found in cluster and base manifest "
+                f"not found at {base_yaml_path}. Deploy the RayService manually first or "
+                "set RAYSERVICE_YAML to the correct path."
+            ) from exc
+
+        with open(base_yaml_path) as fh:
+            manifest = _yaml.safe_load(fh)
+
+        serve_config_str = manifest.get("spec", {}).get("serveConfigV2", "")
+        serve_config = _yaml.safe_load(serve_config_str) or {}
+        updated = _inject_env(serve_config)
+        manifest["spec"]["serveConfigV2"] = _yaml.dump(updated, default_flow_style=False)
+
+        k8s_client.create_namespaced_custom_object(
+            group="ray.io",
+            version="v1",
+            namespace=ray_service_namespace,
+            plural="rayservices",
+            body=manifest,
+        )
+        print(
+            f"RayService '{ray_service_name}' created (first deploy): "
+            f"PARAMS_SERVING_S3_PATH={params_serving_s3_path}"
+        )
 
 
 def _branch_on_serving_mode(**context):
