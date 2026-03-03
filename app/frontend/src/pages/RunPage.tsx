@@ -15,8 +15,10 @@ import { Check, ChevronDown, ChevronUp, Copy, RefreshCw } from 'lucide-react';
 import {
   getPreprocessParams,
   getRunStatus,
+  listDatasets,
   listPreprocessRunIds,
   submitRun,
+  type DatasetInfo,
   type PreprocessRunId,
   type TrainingRunResult,
 } from '../api/platformClient';
@@ -431,6 +433,8 @@ export function RunPage() {
   const [navErrors, setNavErrors] = useState<string[]>([]);
 
   // ── Step 1: Preprocessing Run ─────────────────────────────────────────────
+  const [availableDatasets, setAvailableDatasets] = useState<DatasetInfo[]>([]);
+  const [selectedDatasetFilter, setSelectedDatasetFilter] = useState('');
   const [preprocessRunIds, setPreprocessRunIds] = useState<PreprocessRunId[]>([]);
   const [preprocessIdsLoading, setPreprocessIdsLoading] = useState(false);
   const [selectedPreprocessRunId, setSelectedPreprocessRunId] = useState('');
@@ -484,13 +488,22 @@ export function RunPage() {
 
   const loadPreprocessIds = useCallback(() => {
     setPreprocessIdsLoading(true);
-    listPreprocessRunIds()
+    listPreprocessRunIds(selectedDatasetFilter || undefined)
       .then((r) => setPreprocessRunIds(r.runs))
       .catch(() => setPreprocessRunIds([]))
       .finally(() => setPreprocessIdsLoading(false));
+  }, [selectedDatasetFilter]);
+
+  useEffect(() => {
+    listDatasets()
+      .then((datasets) => setAvailableDatasets(datasets))
+      .catch(() => setAvailableDatasets([]));
   }, []);
 
   useEffect(() => {
+    setSelectedPreprocessRunId('');
+    setPreprocessInfo(null);
+    setPreprocessInfoError('');
     loadPreprocessIds();
   }, [loadPreprocessIds]);
 
@@ -507,13 +520,13 @@ export function RunPage() {
       .then(async (r) => {
         const { parse } = await import('yaml');
         const parsed = parse(r.yaml_content) as {
-          execution?: { dsl_s3_path?: string };
+          execution?: { dsl_s3_path?: string; dsl_version?: number; raw_dataset_name?: string };
           schema_ref?: { version?: number };
           run_metadata?: { dataset?: string; dsl_version?: number };
         };
         setPreprocessInfo({
-          dataset: parsed.run_metadata?.dataset ?? '',
-          dsl_version: parsed.run_metadata?.dsl_version ?? null,
+          dataset: parsed.run_metadata?.dataset ?? parsed.execution?.raw_dataset_name ?? '',
+          dsl_version: parsed.run_metadata?.dsl_version ?? parsed.execution?.dsl_version ?? null,
           dsl_s3_path: parsed.execution?.dsl_s3_path ?? '',
           schema_version: parsed.schema_ref?.version ?? null,
         });
@@ -742,6 +755,24 @@ export function RunPage() {
                 Select the preprocessing run whose processed table this training job will use.
                 The dataset, DSL version, and schema version are auto-loaded from the run params.
               </p>
+
+              <Field
+                label="Raw Dataset"
+                tooltip="Filter preprocessing runs by source raw dataset."
+              >
+                <select
+                  value={selectedDatasetFilter}
+                  onChange={(e) => setSelectedDatasetFilter(e.target.value)}
+                  className={SELECT_CLS}
+                >
+                  <option value="">— all datasets —</option>
+                  {availableDatasets.map((d) => (
+                    <option key={d.name} value={d.name}>
+                      {d.name}
+                    </option>
+                  ))}
+                </select>
+              </Field>
 
               <Field
                 label="Preprocessing Run"

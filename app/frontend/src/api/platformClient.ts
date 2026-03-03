@@ -412,8 +412,9 @@ export async function submitProcessingRun(
   });
 }
 
-export async function listPreprocessRunIds(): Promise<{ runs: PreprocessRunId[] }> {
-  return _fetch<{ runs: PreprocessRunId[] }>('/api/v2/processing-runs/ids');
+export async function listPreprocessRunIds(dataset?: string): Promise<{ runs: PreprocessRunId[] }> {
+  const qs = dataset ? `?dataset=${encodeURIComponent(dataset)}` : '';
+  return _fetch<{ runs: PreprocessRunId[] }>(`/api/v2/processing-runs/ids${qs}`);
 }
 
 export async function listProcessingRuns(rawDataset?: string): Promise<ProcessingRunsResult> {

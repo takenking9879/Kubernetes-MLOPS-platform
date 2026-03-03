@@ -444,7 +444,7 @@ async def list_processing_runs(dataset: str | None = Query(None, description="Fi
 
 
 @router.get("/ids")
-async def list_preprocess_run_ids():
+async def list_preprocess_run_ids(dataset: str | None = Query(default=None)):
     """List preprocessing run IDs from S3 (new-style runs in runs/preprocessing/)."""
     s3 = _s3_client()
     resp = s3.list_objects_v2(
@@ -456,8 +456,10 @@ async def list_preprocess_run_ids():
     for prefix_obj in resp.get("CommonPrefixes", []):
         run_id = prefix_obj["Prefix"].rstrip("/").rsplit("/", 1)[-1]
         m = re.match(r"^pre-(.+)-(\d{8}T\d{6}Z)-([0-9a-f]{6})$", run_id)
-        dataset = m.group(1) if m else ""
-        runs.append({"preprocess_run_id": run_id, "dataset": dataset})
+        run_dataset = m.group(1) if m else ""
+        runs.append({"preprocess_run_id": run_id, "dataset": run_dataset})
+    if dataset:
+        runs = [r for r in runs if r["dataset"] == dataset]
     # Newest first (run IDs contain timestamps)
     runs.sort(key=lambda r: r["preprocess_run_id"], reverse=True)
     return {"runs": runs}
