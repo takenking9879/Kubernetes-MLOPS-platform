@@ -9,6 +9,23 @@ spec:
   shutdownAfterJobFinishes: true
   ttlSecondsAfterFinished: 60  # 1 minutes - allow Prometheus to scrape metrics
 
+  # Submitter pod: the KubeRay operator creates this pod to call `ray job submit`
+  # and then `ray job logs`.  Default ndots:5 causes the K8s resolver to first try
+  # appending all search domains to the 4-dot head-service FQDN before attempting
+  # the absolute lookup — each attempt times out, summing to ~7 s of DNS failures.
+  # ndots:2 ensures 4-dot FQDNs are tried as absolute names immediately.
+  submitterPodTemplate:
+    spec:
+      dnsPolicy: ClusterFirst
+      dnsConfig:
+        options:
+          - name: ndots
+            value: "2"
+      restartPolicy: Never
+      containers:
+        - name: ray-job-submitter
+          image: ray-cluster:2.53.0
+
   runtimeEnvYAML: |
     env_vars:
       # Final training (single run): fewer workers, more CPU per worker.
@@ -59,6 +76,13 @@ spec:
           labels:
             app: kuberay-training
         spec:
+          # ndots:2 → 4-dot FQDNs (*.ray.svc.cluster.local) are resolved as
+          # absolute names first, avoiding cascading search-domain timeouts.
+          dnsPolicy: ClusterFirst
+          dnsConfig:
+            options:
+              - name: ndots
+                value: "2"
           containers:
             - name: ray-head
               image: ray-cluster:2.53.0
@@ -140,6 +164,13 @@ spec:
             labels:
               app: kuberay-training
           spec:
+            # Same ndots:2 fix as head pod — workers also make FQDN connections
+            # to the head service (GCS, dashboard) during Ray Tune trials.
+            dnsPolicy: ClusterFirst
+            dnsConfig:
+              options:
+                - name: ndots
+                  value: "2"
             affinity:
               podAntiAffinity:
                 preferredDuringSchedulingIgnoredDuringExecution:
