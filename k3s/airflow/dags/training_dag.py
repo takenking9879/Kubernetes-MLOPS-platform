@@ -145,17 +145,18 @@ def _poll_ray_job(**context):
             obj = client.get_namespaced_custom_object(
                 "ray.io", "v1", RAY_NAMESPACE, "rayjobs", ray_job_name
             )
-            state = (
-                obj.get("status", {})
-                   .get("jobStatus", {})
-                   .get("state", "")
-            ).lower()
+            # KubeRay v1: status.jobStatus is a plain string — "PENDING",
+            # "RUNNING", "SUCCEEDED", "FAILED", "STOPPED".
+            # (The old .get("jobStatus", {}).get("state", "") chain called
+            # .get() on a string once the job was RUNNING, raising AttributeError
+            # which silently fell into finally: and deleted the RayJob mid-run.)
+            state = obj.get("status", {}).get("jobStatus", "").lower()
             print(f"RayJob {ray_job_name} state: {state}")
             if state == "succeeded":
                 print("Ray training completed successfully.")
                 return
-            if state == "failed":
-                raise RuntimeError(f"RayJob {ray_job_name} failed.")
+            if state in ("failed", "stopped"):
+                raise RuntimeError(f"RayJob {ray_job_name} ended with state: {state}.")
         raise RuntimeError(f"RayJob {ray_job_name} timed out after {timeout}s.")
     finally:
         print(f"Cleanup: deleting RayJob {ray_job_name}")
