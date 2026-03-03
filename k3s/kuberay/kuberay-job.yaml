@@ -16,6 +16,12 @@ spec:
   # ndots:2 ensures 4-dot FQDNs are tried as absolute names immediately.
   # containers is required by the CRD; KubeRay patches `ray job submit` into the
   # first container — only name+image are needed here.
+  # Retry the submitter pod up to 2 times so that transient DNS hiccups
+  # (e.g. coredns not yet caching the new head-svc entry) do not immediately
+  # mark the RayJob as FAILED.
+  submitterConfig:
+    backoffLimit: 2
+
   submitterPodTemplate:
     spec:
       restartPolicy: Never
