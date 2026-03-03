@@ -490,7 +490,7 @@ async def list_preprocess_run_ids(dataset: str | None = Query(default=None)):
     runs = []
     for prefix_obj in resp.get("CommonPrefixes", []):
         run_id = prefix_obj["Prefix"].rstrip("/").rsplit("/", 1)[-1]
-        # artifact_set_id = last 6 chars of the run_id (convention used on write)
+        # artifact_set_id = last 6 chars of the run_id (convention fixed at write time)
         artifact_set_id = run_id[-6:]
 
         # If filtering by dataset, skip run IDs whose artifact_set_id is not
@@ -498,9 +498,8 @@ async def list_preprocess_run_ids(dataset: str | None = Query(default=None)):
         if allowed_artifact_ids is not None and artifact_set_id not in allowed_artifact_ids:
             continue
 
-        # Best-effort: extract dataset name from new-style run ID pattern.
-        m = re.match(r"^pre-(.+)-\d{8}T\d{6}Z-[0-9a-f]{6}$", run_id)
-        run_dataset = m.group(1) if m else dataset or ""
+        # dataset name is only known if we queried Iceberg; fall back to empty string.
+        run_dataset = dataset or ""
         runs.append({"preprocess_run_id": run_id, "dataset": run_dataset})
 
     # Newest first (run IDs contain timestamps)
