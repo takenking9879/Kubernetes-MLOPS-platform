@@ -588,6 +588,23 @@ def _resolve_params_path() -> str:
 
 
 def main():
+    # Explicitly initialise Ray before any Ray operation (including Tune).
+    # Without this, ray.Tuner auto-inits at first use and resolves the dashboard
+    # address via the K8s head-service FQDN, which can fail DNS inside trial workers.
+    # Using address="auto" honours the RAY_ADDRESS env var (set to an IP by KubeRay),
+    # so JobSubmissionClient always connects via IP, not the service hostname.
+    if not ray.is_initialized():
+        ray.init(address="auto", ignore_reinit_error=True)
+
+    # Ensure the dashboard address used by JobSubmissionClient (ray jobs logs/status)
+    # is IP-based.  RAY_ADDRESS is set by KubeRay to "head-ip:6379"; the dashboard
+    # lives on the same host at port 8265.  Without this, Ray may resolve the URL from
+    # GCS cluster metadata, which contains the K8s service FQDN and can fail DNS.
+    _ray_addr = os.getenv("RAY_ADDRESS", "")
+    if _ray_addr and "RAY_DASHBOARD_ADDRESS" not in os.environ:
+        _head_ip = _ray_addr.split(":")[0]
+        os.environ["RAY_DASHBOARD_ADDRESS"] = f"{_head_ip}:8265"
+
     ctx = ray.data.DataContext.get_current()
     ctx.enable_rich_progress_bars = True
     ctx.use_ray_tqdm = False
