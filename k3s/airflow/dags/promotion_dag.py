@@ -6,7 +6,7 @@ import os
 # Read tracking URI from env var; fall back to in-cluster default
 MLFLOW_TRACKING_URI = os.getenv(
     "MLFLOW_TRACKING_URI",
-    "http://mlflow-service.mlflow.svc.cluster.local:5000",
+    "http://my-mlflow.ray.svc.cluster.local:80",
 )
 
 def promote_model_to_champion(model_name: str, version: str):

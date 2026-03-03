@@ -50,7 +50,7 @@ RAY_NAMESPACE = "ray"
 
 MLFLOW_TRACKING_URI = os.getenv(
     "MLFLOW_TRACKING_URI",
-    "http://mlflow-service.mlflow.svc.cluster.local:5000",
+    "http://my-mlflow.ray.svc.cluster.local:80",
 )
 
 _DAGS_DIR = Path(__file__).parent.parent  # k3s/airflow/

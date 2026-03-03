@@ -45,7 +45,7 @@ except ImportError:
 # ---------------------------------------------------------------------------
 MLFLOW_TRACKING_URI = os.getenv(
     "MLFLOW_TRACKING_URI",
-    "http://mlflow-service.mlflow.svc.cluster.local:5000",
+    "http://my-mlflow.ray.svc.cluster.local:80",
 )
 S3_BUCKET = os.getenv("S3_BUCKET", "k8s-mlops-platform-bucket")
 SPARK_NAMESPACE = "spark"
