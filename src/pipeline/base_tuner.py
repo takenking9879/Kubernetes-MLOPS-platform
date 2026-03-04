@@ -149,9 +149,27 @@ class BaseTuner(ABC):
         num_workers = int(os.getenv("NUM_WORKERS_TUNE", os.getenv("NUM_WORKERS", 2)))
         cpus_per_worker = int(os.getenv("CPUS_PER_WORKER_TUNE", os.getenv("CPUS_PER_WORKER", 1)))
 
+        # GPU detection: same pattern as BaseTrainer._resolve_gpu()
+        use_gpu_env = os.getenv("USE_GPU", "auto").lower()
+        if use_gpu_env == "auto":
+            try:
+                import torch
+                gpu_available = torch.cuda.is_available()
+            except ImportError:
+                gpu_available = False
+        elif use_gpu_env in ("1", "true", "yes"):
+            gpu_available = True
+        else:
+            gpu_available = False
+
+        resources_per_worker: Dict[str, Any] = {"CPU": cpus_per_worker}
+        if gpu_available:
+            resources_per_worker["GPU"] = 1
+
         scaling_config = ScalingConfig(
             num_workers=num_workers,
-            resources_per_worker={"CPU": cpus_per_worker},
+            resources_per_worker=resources_per_worker,
+            use_gpu=gpu_available,
         )
 
         # --- Hyperparameter search space ---

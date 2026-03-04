@@ -108,12 +108,15 @@ class ModelConfig(BaseModel):
     target: str = "attack"
     num_classes: int = Field(6, ge=2)
     seed: int = 42
+    task_type: Literal["classification", "regression"] = "classification"
+    model_type: str = "mlp"
 
 
 class RunRequest(BaseModel):
     preprocess_run_id: str            # references the preprocessing run; replaces processed_table
     execution_id: str = ""            # auto-generated if empty; becomes train_run_id
     framework: Literal["xgboost", "pytorch"] = "xgboost"
+    use_gpu: bool = False
     tuning: TuningConfig = Field(default_factory=TuningConfig)
     model: ModelConfig = Field(default_factory=ModelConfig)
     sample_fraction_for_tuning: float = Field(0.2, ge=0.01, le=1.0)
@@ -304,6 +307,9 @@ def _generate_training_params_yaml(
                 "dsl_count_dim": True,
                 "input_dim": 14,
                 "framework": req.framework,
+                "task_type": req.model.task_type,
+                "model_type": req.model.model_type,
+                "use_gpu": req.use_gpu,
                 "seed": req.model.seed,
                 "mlflow_tracking_uri": mlflow_cfg.get("tracking_uri", "http://my-mlflow"),
                 "mlflow_experiment_name": req.model.experiment_name,

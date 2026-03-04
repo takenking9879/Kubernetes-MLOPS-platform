@@ -8,9 +8,101 @@ import numpy as np
 import pandas as pd
 import xgboost
 from ray.train.xgboost import RayTrainReportCallback
-from sklearn.metrics import classification_report
+from sklearn.metrics import (
+    classification_report,
+    mean_absolute_error,
+    mean_squared_error,
+    r2_score,
+)
 
 logger_std = logging.getLogger(__name__)
+
+
+# ── Regression metrics ───────────────────────────────────────────────────────
+
+
+def regression_metrics_np(
+    y_true: np.ndarray,
+    y_pred: np.ndarray,
+    *,
+    prefix: str = "val",
+) -> Dict[str, float]:
+    """Compute regression metrics from arrays of true and predicted values."""
+    y_true = np.asarray(y_true, dtype=np.float64).ravel()
+    y_pred = np.asarray(y_pred, dtype=np.float64).ravel()
+
+    mse = float(mean_squared_error(y_true, y_pred))
+    mae = float(mean_absolute_error(y_true, y_pred))
+    r2 = float(r2_score(y_true, y_pred)) if len(y_true) > 1 else 0.0
+    rmse = float(np.sqrt(mse))
+
+    return {
+        f"{prefix}_mse": mse,
+        f"{prefix}_rmse": rmse,
+        f"{prefix}_mae": mae,
+        f"{prefix}_r2": r2,
+    }
+
+
+def xgb_regression_metrics_on_ds(
+    *,
+    ds,
+    split: str,
+    target: str,
+    feature_columns: Optional[List[str]] = None,
+    booster_checkpoint,
+) -> Dict[str, Any]:
+    """Compute regression metrics for XGBoost on a Ray Dataset split.
+
+    Aggregates predictions batch-by-batch and computes final metrics on the driver.
+    """
+    try:
+        booster = RayTrainReportCallback.get_model(booster_checkpoint)
+        model_bytes = booster.save_raw()
+
+        def predict_batch(df: "pd.DataFrame") -> "pd.DataFrame":
+            y_true = df[target].astype("float64").to_numpy()
+            if feature_columns:
+                X = df[feature_columns]
+            else:
+                X = df.drop(columns=[target], errors="ignore").select_dtypes(
+                    include=[np.number, "bool"]
+                )
+
+            tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".ubj")
+            try:
+                tmp.write(model_bytes)
+                tmp.close()
+                b = xgboost.Booster()
+                b.load_model(tmp.name)
+            finally:
+                try:
+                    os.unlink(tmp.name)
+                except Exception:
+                    pass
+
+            dmat = xgboost.DMatrix(X)
+            y_pred = b.predict(dmat).astype("float64")
+
+            return pd.DataFrame({"y_true": y_true, "y_pred": y_pred})
+
+        result_rows = ds.map_batches(predict_batch, batch_format="pandas").take_all()
+
+        all_true = np.concatenate([np.atleast_1d(r["y_true"]) for r in result_rows])
+        all_pred = np.concatenate([np.atleast_1d(r["y_pred"]) for r in result_rows])
+
+        return regression_metrics_np(all_true, all_pred, prefix=split)
+
+    except Exception as e:
+        logger_std.error(
+            "Error computing regression metrics for XGBoost: %s",
+            str(e),
+            exc_info=True,
+        )
+        return {}
+
+
+# ── Classification metrics ───────────────────────────────────────────────────
 
 
 def metrics_from_confusion_np(conf, *, prefix: str = "val") -> Dict[str, float]:

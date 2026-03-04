@@ -358,9 +358,10 @@ class KubeRayTraining(BaseUtils):
 
             if framework == "pytorch":
                 import torch
-                from src.models.pytorch import NeuralNetwork
+                from src.models.registry import get_model
                 num_classes = int(self.params.get("num_classes", 6))
-                model = NeuralNetwork(input_dim=self.input_dim, num_classes=num_classes)
+                model_type = self.params.get("model_type", "mlp")
+                model = get_model(model_type, {"input_dim": self.input_dim, "num_classes": num_classes})
                 with checkpoint.as_directory() as ckpt_dir:
                     state = torch.load(
                         os.path.join(ckpt_dir, "model.pt"),
@@ -502,6 +503,14 @@ class KubeRayTraining(BaseUtils):
                     effective_params["max_epochs"] = base["max_epochs"]
 
             # ── Train ──
+            task_type = self.params.get("task_type", "classification")
+            model_type = self.params.get("model_type", "mlp")
+            # Set USE_GPU env var so _resolve_gpu() in BaseTrainer picks it up.
+            use_gpu_flag = self.params.get("use_gpu", False)
+            os.environ["USE_GPU"] = "true" if use_gpu_flag else "false"
+            self.logger.info(
+                "GPU training: %s (USE_GPU=%s)", "enabled" if use_gpu_flag else "disabled", os.environ["USE_GPU"]
+            )
             trainer = get_trainer(framework)
             result, final_metrics = trainer.train(
                 train_dataset=train_ds,
@@ -514,6 +523,8 @@ class KubeRayTraining(BaseUtils):
                 input_dim=input_dim,
                 num_classes=num_classes,
                 params=effective_params,
+                task_type=task_type,
+                model_type=model_type,
             )
             self.logger.info("Training completed successfully.")
 

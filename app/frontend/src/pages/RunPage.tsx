@@ -15,17 +15,24 @@ import { Check, ChevronDown, ChevronUp, Copy, RefreshCw } from 'lucide-react';
 import {
   getPreprocessParams,
   getRunStatus,
+  getTrainingConfig,
   listDatasets,
   listPreprocessRunIds,
   submitRun,
   type DatasetInfo,
+  type ModelTypeConfig,
   type PreprocessRunId,
+  type TaskTypeConfig,
+  type TrainingConfig,
   type TrainingRunResult,
 } from '../api/platformClient';
 import {
+  TASK_INFO,
   XGBOOST_DEFAULTS,
   XGBOOST_TUNE_SETTINGS_DEFAULTS,
   getDefaults,
+  getDefaultsForTask,
+  getParamMetaForTask,
   getTuneSettingsDefaults,
   getAllowedKeys,
   getSearchSpace,
@@ -34,6 +41,7 @@ import {
   getNonTunableKeys,
   type ParamMeta,
   type SearchSpaceEntry,
+  type TaskType,
 } from '../types/hyperparams';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -380,6 +388,9 @@ function YamlPreviewPanel({ content }: { content: string }) {
 function buildPreviewYaml(opts: {
   preprocess_run_id: string;
   framework: Framework;
+  taskType: TaskType;
+  modelType: string;
+  useGpu: boolean;
   tuningEnabled: boolean;
   numberOfTrials: number;
   sampleFraction: number;
@@ -397,6 +408,9 @@ function buildPreviewYaml(opts: {
     'model:',
     `  target: ${opts.modelConfig.target}`,
     `  num_classes: ${opts.modelConfig.num_classes}`,
+    `  task_type: ${opts.taskType}`,
+    ...(opts.framework === 'pytorch' ? [`  model_type: ${opts.modelType}`] : []),
+    `  use_gpu: ${opts.useGpu}`,
     `  experiment_name: ${opts.modelConfig.experiment_name}`,
     `  registry_model_name: ${opts.modelConfig.registry_model_name}`,
     `  seed: ${opts.modelConfig.seed}`,
@@ -478,6 +492,12 @@ export function RunPage() {
   const [numberOfTrials, setNumberOfTrials] = useState(3);
   const [sampleFraction, setSampleFraction] = useState(0.2);
 
+  // ── Task / model / GPU ────────────────────────────────────────────────────
+  const [taskType, setTaskType] = useState<TaskType>('classification');
+  const [modelType, setModelType] = useState<string>('mlp');
+  const [useGpu, setUseGpu] = useState<boolean>(false);
+  const [trainingConfig, setTrainingConfig] = useState<TrainingConfig | null>(null);
+
   // ── Submission ────────────────────────────────────────────────────────────
   const [submitResult, setSubmitResult] = useState<TrainingRunResult | null>(null);
   const [submitError, setSubmitError] = useState('');
@@ -498,6 +518,10 @@ export function RunPage() {
     listDatasets()
       .then((datasets) => setAvailableDatasets(datasets))
       .catch(() => setAvailableDatasets([]));
+    // Load training config once; silently ignore failures (UI falls back to local constants).
+    getTrainingConfig()
+      .then(setTrainingConfig)
+      .catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -538,10 +562,10 @@ export function RunPage() {
   }, [selectedPreprocessRunId]);
 
   useEffect(() => {
-    setHyperparams({ ...getDefaults(framework) });
+    setHyperparams({ ...getDefaultsForTask(framework, taskType) });
     setTuneSettings({ ...getTuneSettingsDefaults(framework) });
     setSearchSpaceOverrides({});
-  }, [framework]);
+  }, [framework, taskType]);
 
   useEffect(() => {
     if (!submitResult?.dag_run_id) return;
@@ -570,6 +594,9 @@ export function RunPage() {
       buildPreviewYaml({
         preprocess_run_id: selectedPreprocessRunId,
         framework,
+        taskType,
+        modelType,
+        useGpu,
         tuningEnabled,
         numberOfTrials,
         sampleFraction,
@@ -580,6 +607,9 @@ export function RunPage() {
     [
       selectedPreprocessRunId,
       framework,
+      taskType,
+      modelType,
+      useGpu,
       tuningEnabled,
       numberOfTrials,
       sampleFraction,
@@ -682,8 +712,13 @@ export function RunPage() {
       const result = await submitRun({
         preprocess_run_id: selectedPreprocessRunId,
         framework,
+        use_gpu: useGpu,
         tuning: { enabled: tuningEnabled, number_of_trials: numberOfTrials },
-        model: modelConfig,
+        model: {
+          ...modelConfig,
+          task_type: taskType,
+          model_type: framework === 'pytorch' ? modelType : undefined,
+        },
         sample_fraction_for_tuning: sampleFraction,
         hyperparams: tuningEnabled ? {} : hyperparams,
         tune_settings: tuningEnabled ? tuneSettings : {},
@@ -698,7 +733,7 @@ export function RunPage() {
   // ── Derived values ────────────────────────────────────────────────────────
 
   const searchSpace = getSearchSpace(framework);
-  const paramMeta = getParamMeta(framework);
+  const paramMeta = getParamMetaForTask(framework, taskType);
   const tuneSettingsMeta = getTuneSettingsMeta(framework);
   const nonTunableKeys = getNonTunableKeys(framework);
 
@@ -873,6 +908,79 @@ export function RunPage() {
                     PyTorch
                   </ToggleButton>
                 </div>
+              </div>
+
+              {/* Task Type / Model Type / GPU */}
+              <div className="space-y-2">
+                <p className={SUB_HEADING}>Task Configuration</p>
+                <div className="grid grid-cols-2 gap-3">
+                  <Field label="Task Type">
+                    <select
+                      value={taskType}
+                      onChange={(e) => setTaskType(e.target.value as TaskType)}
+                      className={SELECT_CLS}
+                    >
+                      {(trainingConfig?.task_types ?? [
+                        { id: 'classification', label: 'Classification', description: 'Predict a discrete class label.' } as TaskTypeConfig,
+                        { id: 'regression',     label: 'Regression',     description: 'Predict a continuous numeric value.' } as TaskTypeConfig,
+                      ]).map((t) => (
+                        <option key={t.id} value={t.id}>{t.label}</option>
+                      ))}
+                    </select>
+                    <p className="mt-0.5 text-[10px] text-slate-500">
+                      {(trainingConfig?.task_types ?? []).find((t) => t.id === taskType)?.description}
+                    </p>
+                  </Field>
+
+                  {framework === 'pytorch' ? (
+                    <Field label="Model Architecture">
+                      <select
+                        value={modelType}
+                        onChange={(e) => setModelType(e.target.value)}
+                        className={SELECT_CLS}
+                      >
+                        {(trainingConfig?.model_types ?? [
+                          { id: 'mlp', label: 'MLP', framework: 'pytorch', description: 'Multi-layer perceptron.' } as ModelTypeConfig,
+                        ])
+                          .filter((m) => m.framework === 'pytorch')
+                          .map((m) => (
+                            <option key={m.id} value={m.id}>{m.label} — {m.description}</option>
+                          ))}
+                      </select>
+                    </Field>
+                  ) : (
+                    <Field label="GPU Acceleration">
+                      <label className="flex cursor-pointer items-center gap-2 pt-1">
+                        <input
+                          type="checkbox"
+                          checked={useGpu}
+                          onChange={(e) => setUseGpu(e.target.checked)}
+                          className="accent-blue-500"
+                        />
+                        <span className="text-xs text-slate-300">
+                          {useGpu ? 'Enabled — workers request GPU' : 'Disabled — CPU only'}
+                        </span>
+                      </label>
+                    </Field>
+                  )}
+                </div>
+
+                {/* GPU toggle on its own row for PyTorch (model type already fills the grid) */}
+                {framework === 'pytorch' && (
+                  <Field label="GPU Acceleration">
+                    <label className="flex cursor-pointer items-center gap-2 pt-1">
+                      <input
+                        type="checkbox"
+                        checked={useGpu}
+                        onChange={(e) => setUseGpu(e.target.checked)}
+                        className="accent-blue-500"
+                      />
+                      <span className="text-xs text-slate-300">
+                        {useGpu ? 'Enabled — workers request GPU' : 'Disabled — CPU only'}
+                      </span>
+                    </label>
+                  </Field>
+                )}
               </div>
 
               {/* Experiment */}
@@ -1181,11 +1289,50 @@ export function RunPage() {
                 onEdit={() => goToStep(2)}
                 items={[
                   ['Framework', framework],
+                  ['Task type', taskType],
+                  ...(framework === 'pytorch' ? [['Model type', modelType] as [string, string]] : []),
+                  ['GPU', useGpu ? 'enabled' : 'disabled (CPU only)'],
                   ['Target', `${modelConfig.target} (${modelConfig.num_classes} classes)`],
                   ['Experiment', modelConfig.experiment_name],
                   ['Registry', modelConfig.registry_model_name],
                 ]}
               />
+
+              {/* Metric Reference — task-aware, collapsible */}
+              <details className="rounded border border-slate-700 bg-slate-900 px-3 py-2">
+                <summary className="cursor-pointer select-none text-xs font-semibold text-slate-300">
+                  Metric Reference — {taskType === 'classification' ? 'Classification' : 'Regression'}
+                </summary>
+                <div className="mt-3 space-y-3">
+                  <p className="text-xs text-slate-400">
+                    <span className="font-medium text-slate-200">Loss function: </span>
+                    <span className="font-mono text-amber-400">{TASK_INFO[taskType].loss[framework].name}</span>
+                    {' — '}{TASK_INFO[taskType].loss[framework].description}
+                  </p>
+                  <div className="overflow-x-auto">
+                    <table className="w-full min-w-[480px] text-xs">
+                      <thead>
+                        <tr className="border-b border-slate-700 text-left text-slate-500">
+                          <th className="py-1 pr-4 font-medium">Metric</th>
+                          <th className="pr-4 font-medium">Range</th>
+                          <th className="pr-4 font-medium">Perfect</th>
+                          <th className="font-medium">Interpretation</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {TASK_INFO[taskType].metrics.map((m) => (
+                          <tr key={m.key} className="border-b border-slate-800 text-slate-300">
+                            <td className="py-1 pr-4 font-mono text-blue-400">{m.label}</td>
+                            <td className="pr-4 text-slate-400">{m.range}</td>
+                            <td className="pr-4 font-semibold text-green-400">{String(m.perfect)}</td>
+                            <td className="text-slate-400">{m.note}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </details>
 
               <SummaryCard
                 title="Tuning"

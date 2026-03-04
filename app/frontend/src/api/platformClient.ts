@@ -149,17 +149,62 @@ export interface ModelConfig {
   target?: string;
   num_classes?: number;
   seed?: number;
+  task_type?: 'classification' | 'regression';
+  model_type?: string;
 }
 
 export interface RunRequest {
   preprocess_run_id: string;   // replaces processed_table
   execution_id?: string;
   framework: 'xgboost' | 'pytorch';
+  use_gpu?: boolean;
   tuning?: TuningConfig;
   model?: ModelConfig;
   sample_fraction_for_tuning?: number;
   hyperparams?: Record<string, unknown>;
   tune_settings?: Record<string, unknown>;
+}
+
+// ─── Training config types (GET /api/v2/config) ───────────────────────────────
+
+export interface TrainingMetricInfo {
+  key: string;
+  label: string;
+  range: string;
+  perfect: number | string;
+  note: string;
+}
+
+export interface TrainingLossInfo {
+  name: string;
+  description: string;
+}
+
+export interface TaskTypeConfig {
+  id: string;
+  label: string;
+  description: string;
+  loss: Record<string, TrainingLossInfo>;
+  metrics: TrainingMetricInfo[];
+}
+
+export interface ModelTypeConfig {
+  id: string;
+  label: string;
+  framework: string;
+  description: string;
+}
+
+export interface FrameworkConfig {
+  id: string;
+  label: string;
+  description: string;
+}
+
+export interface TrainingConfig {
+  frameworks: FrameworkConfig[];
+  task_types: TaskTypeConfig[];
+  model_types: ModelTypeConfig[];
 }
 
 /** Entry from GET /api/v2/processing-runs/ids */
@@ -400,6 +445,10 @@ export async function checkArtifact(
   return _fetch<ArtifactCheckResult>(
     `/api/v2/runs/check?execution_id=${encodeURIComponent(executionId)}&dataset=${encodeURIComponent(dataset)}`,
   );
+}
+
+export async function getTrainingConfig(): Promise<TrainingConfig> {
+  return _fetch<TrainingConfig>('/api/v2/config');
 }
 
 export async function submitRun(request: RunRequest): Promise<TrainingRunResult> {

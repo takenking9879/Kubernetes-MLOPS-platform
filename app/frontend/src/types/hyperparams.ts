@@ -169,3 +169,156 @@ export function getNonTunableKeys(framework: 'xgboost' | 'pytorch'): string[] {
     (k) => !(k in searchSpace) && !(k in tuneSettings)
   );
 }
+
+// ─── Task-aware helpers ────────────────────────────────────────────────────────
+
+export type TaskType = 'classification' | 'regression';
+
+/**
+ * Returns defaults reset for the given task type.
+ * XGBoost regression uses a different objective and eval_metric than classification.
+ */
+export function getDefaultsForTask(
+  framework: 'xgboost' | 'pytorch',
+  taskType: TaskType,
+): Record<string, number | string | string[]> {
+  const base = getDefaults(framework);
+  if (framework === 'xgboost' && taskType === 'regression') {
+    return { ...base, objective: 'reg:squarederror', eval_metric: ['rmse', 'mae'] };
+  }
+  return base;
+}
+
+/**
+ * Returns ParamMeta with task-aware options for XGBoost objective.
+ * For regression, replaces the classification-only objective dropdown options.
+ */
+export function getParamMetaForTask(
+  framework: 'xgboost' | 'pytorch',
+  taskType: TaskType,
+): Record<string, ParamMeta> {
+  const base = getParamMeta(framework);
+  if (framework === 'xgboost' && taskType === 'regression') {
+    return {
+      ...base,
+      objective: { ...base.objective, options: ['reg:squarederror', 'reg:pseudohubererror'] },
+      eval_metric: { ...base.eval_metric, defaultValue: ['rmse', 'mae'] },
+    };
+  }
+  return base;
+}
+
+// ─── Task metadata — metric + loss reference ───────────────────────────────────
+
+export interface MetricInfo {
+  key: string;
+  label: string;
+  /** Human-readable value range, e.g. "[0, 1]" or "[0, ∞)" */
+  range: string;
+  /** The value that indicates a perfect model */
+  perfect: number | string;
+  /** Plain-language explanation shown in the UI */
+  note: string;
+}
+
+export interface LossInfo {
+  name: string;
+  description: string;
+}
+
+export const TASK_INFO: Record<TaskType, {
+  loss: Record<'xgboost' | 'pytorch', LossInfo>;
+  metrics: MetricInfo[];
+}> = {
+  classification: {
+    loss: {
+      pytorch: {
+        name: 'CrossEntropyLoss',
+        description: 'Log-loss over class probabilities. Lower is better. No upper bound.',
+      },
+      xgboost: {
+        name: 'mlogloss',
+        description: 'Multi-class log-loss. Lower is better. 0 = perfect (unachievable in practice).',
+      },
+    },
+    metrics: [
+      {
+        key: 'accuracy',
+        label: 'Accuracy',
+        range: '[0, 1]',
+        perfect: 1,
+        note: 'Fraction of predictions that were correct. Misleading on class-imbalanced data.',
+      },
+      {
+        key: 'f1_macro',
+        label: 'F1 Macro',
+        range: '[0, 1]',
+        perfect: 1,
+        note: 'Harmonic mean of precision & recall averaged equally across classes. Best for imbalanced data.',
+      },
+      {
+        key: 'f1_weighted',
+        label: 'F1 Weighted',
+        range: '[0, 1]',
+        perfect: 1,
+        note: 'F1 weighted by support per class. Penalises errors on larger classes.',
+      },
+      {
+        key: 'precision_macro',
+        label: 'Precision Macro',
+        range: '[0, 1]',
+        perfect: 1,
+        note: 'Of all positive predictions, the fraction that were actually positive. High = few false alarms.',
+      },
+      {
+        key: 'recall_macro',
+        label: 'Recall Macro',
+        range: '[0, 1]',
+        perfect: 1,
+        note: 'Of all actual positives, the fraction the model detected. High = few missed detections.',
+      },
+    ],
+  },
+  regression: {
+    loss: {
+      pytorch: {
+        name: 'MSELoss',
+        description: 'Mean squared error. Penalises large errors heavily — sensitive to outliers. Lower is better.',
+      },
+      xgboost: {
+        name: 'RMSE (reg:squarederror)',
+        description: 'Root mean squared error. In the same units as the target. Lower is better.',
+      },
+    },
+    metrics: [
+      {
+        key: 'mse',
+        label: 'MSE',
+        range: '[0, ∞)',
+        perfect: 0,
+        note: 'Mean squared error. Penalises large errors quadratically — very sensitive to outliers.',
+      },
+      {
+        key: 'rmse',
+        label: 'RMSE',
+        range: '[0, ∞)',
+        perfect: 0,
+        note: 'Square root of MSE. Same units as the target — easier to interpret than MSE.',
+      },
+      {
+        key: 'mae',
+        label: 'MAE',
+        range: '[0, ∞)',
+        perfect: 0,
+        note: 'Mean absolute error. Robust to outliers. Average deviation in target units.',
+      },
+      {
+        key: 'r2',
+        label: 'R²',
+        range: '(-∞, 1]',
+        perfect: 1,
+        note: 'Fraction of variance explained. 1 = perfect, 0 = predicts the mean, <0 = worse than mean.',
+      },
+    ],
+  },
+};

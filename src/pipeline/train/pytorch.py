@@ -50,29 +50,46 @@ def _evaluate_on_dataset(
     input_dim: int,
     batch_size: int,
     prefix: str = "test",
+    task_type: str = "classification",
+    model_type: str = "mlp",
 ) -> Dict[str, Any]:
-    """Compute multiclass metrics from the final checkpoint on a full split."""
+    """Compute metrics from the final checkpoint on a full split."""
     import numpy as np
     from torch import nn
     from sklearn.metrics import classification_report
-    from models.pytorch import NeuralNetwork
+    from models.registry import get_model
+    from pipeline.tasks import get_task_config
+    from pipeline.utils.metrics_utils import regression_metrics_np
 
-    model = NeuralNetwork(input_dim=input_dim, num_classes=num_classes)
+    task_config = get_task_config(task_type)
+
+    model = get_model(model_type, {"input_dim": input_dim, "num_classes": num_classes})
     model.eval()
 
     with checkpoint.as_directory() as ckpt_dir:
         state = torch.load(os.path.join(ckpt_dir, "model.pt"), map_location="cpu")
         model.load_state_dict(state["model_state_dict"])
 
-    loss_fn = nn.CrossEntropyLoss()
-    conf = torch.zeros((num_classes, num_classes), dtype=torch.int64)
+    loss_cls = getattr(nn, task_config.torch_loss_cls)
+    loss_fn = loss_cls(**task_config.torch_loss_kwargs)
+
     total_loss, total_batches = 0.0, 0
 
     ds_eval = _select_model_columns(ds, target=target, feature_columns=feature_columns)
     feature_cols = feature_columns
 
+    if task_type == "classification":
+        conf = torch.zeros((num_classes, num_classes), dtype=torch.int64)
+        all_preds_list, all_targets_list = None, None
+    else:
+        conf = None
+        all_preds_list, all_targets_list = [], []
+
     for batch in ds_eval.iter_torch_batches(batch_size=batch_size, dtypes=torch.float32):
-        y = batch.pop(target).long()
+        if task_type == "classification":
+            y = batch.pop(target).long()
+        else:
+            y = batch.pop(target).float()
         if feature_cols is None:
             feature_cols = sorted(batch.keys())
         X = torch.stack([batch[c] for c in feature_cols], dim=1)
@@ -80,39 +97,49 @@ def _evaluate_on_dataset(
             logits = model(X)
             total_loss += float(loss_fn(logits, y).item())
             total_batches += 1
-            y_pred = logits.argmax(dim=1)
-            idx = y * num_classes + y_pred
-            counts = torch.bincount(idx, minlength=num_classes * num_classes)
-            conf += counts.reshape(num_classes, num_classes)
 
-    # Metrics from confusion matrix
-    from pipeline.utils.pytorch_utils import _metrics_from_confusion
+            if task_type == "classification":
+                y_pred = logits.argmax(dim=1)
+                idx = y * num_classes + y_pred
+                counts = torch.bincount(idx, minlength=num_classes * num_classes)
+                conf += counts.reshape(num_classes, num_classes)
+            else:
+                all_preds_list.append(logits.squeeze(-1).cpu())
+                all_targets_list.append(y.cpu())
 
     metrics: Dict[str, Any] = {}
     metrics[f"{prefix}_loss"] = total_loss / max(total_batches, 1)
-    metrics.update(_metrics_from_confusion(conf, prefix=prefix))
 
-    conf_np = conf.detach().cpu().numpy().astype(np.int64)
-    metrics[f"{prefix}_confusion_matrix"] = conf_np.tolist()
+    if task_type == "classification":
+        from pipeline.utils.pytorch_utils import _metrics_from_confusion
 
-    # Classification report
-    total = int(conf_np.sum())
-    if total > 0:
-        max_rows = int(os.getenv("MLFLOW_CLASSIFICATION_REPORT_MAX_ROWS", "200000"))
-        seed = int(os.getenv("SEED", "42"))
-        flat = conf_np.ravel()
-        if max_rows > 0 and total > max_rows:
-            rng = np.random.default_rng(seed)
-            p = flat / max(float(total), 1.0)
-            sampled = rng.multinomial(max_rows, p)
-            idx_arr = np.repeat(np.arange(flat.size, dtype=np.int64), sampled)
-        else:
-            idx_arr = np.repeat(np.arange(flat.size, dtype=np.int64), flat)
-        y_true = (idx_arr // num_classes).astype(np.int64)
-        y_pred_arr = (idx_arr % num_classes).astype(np.int64)
-        metrics[f"{prefix}_classification_report"] = classification_report(
-            y_true, y_pred_arr, labels=list(range(num_classes)), digits=4, zero_division=0,
-        )
+        metrics.update(_metrics_from_confusion(conf, prefix=prefix))
+
+        conf_np = conf.detach().cpu().numpy().astype(np.int64)
+        metrics[f"{prefix}_confusion_matrix"] = conf_np.tolist()
+
+        # Classification report
+        total = int(conf_np.sum())
+        if total > 0:
+            max_rows = int(os.getenv("MLFLOW_CLASSIFICATION_REPORT_MAX_ROWS", "200000"))
+            seed = int(os.getenv("SEED", "42"))
+            flat = conf_np.ravel()
+            if max_rows > 0 and total > max_rows:
+                rng = np.random.default_rng(seed)
+                p = flat / max(float(total), 1.0)
+                sampled = rng.multinomial(max_rows, p)
+                idx_arr = np.repeat(np.arange(flat.size, dtype=np.int64), sampled)
+            else:
+                idx_arr = np.repeat(np.arange(flat.size, dtype=np.int64), flat)
+            y_true = (idx_arr // num_classes).astype(np.int64)
+            y_pred_arr = (idx_arr % num_classes).astype(np.int64)
+            metrics[f"{prefix}_classification_report"] = classification_report(
+                y_true, y_pred_arr, labels=list(range(num_classes)), digits=4, zero_division=0,
+            )
+    else:
+        all_p = torch.cat(all_preds_list).numpy()
+        all_t = torch.cat(all_targets_list).numpy()
+        metrics.update(regression_metrics_np(all_t, all_p, prefix=prefix))
 
     return metrics
 
@@ -151,6 +178,8 @@ class PyTorchModelTrainer(BaseTrainer):
         input_dim: int,
         num_classes: int,
         cpus_per_worker: int,
+        task_type: str = "classification",
+        model_type: str = "mlp",
     ) -> Dict[str, Any]:
         return {
             "target": target,
@@ -160,6 +189,8 @@ class PyTorchModelTrainer(BaseTrainer):
             "num_classes": int(num_classes),
             "cpus_per_worker": cpus_per_worker,
             "is_tuning": False,
+            "task_type": task_type,
+            "model_type": model_type,
         }
 
     def _preprocess_datasets(
@@ -188,6 +219,7 @@ class PyTorchModelTrainer(BaseTrainer):
         input_dim: int,
         params: Dict[str, Any],
         prefix: str,
+        task_type: str = "classification",
     ) -> Dict[str, Any]:
         return _evaluate_on_dataset(
             checkpoint=result.checkpoint,
@@ -198,14 +230,8 @@ class PyTorchModelTrainer(BaseTrainer):
             input_dim=int(input_dim),
             batch_size=int(params.get("batch_size", 256)),
             prefix=prefix,
-        )
-
-    def _build_scaling_config(self) -> ray.train.ScalingConfig:
-        """PyTorch adds GPU detection to the base scaling config."""
-        return ray.train.ScalingConfig(
-            num_workers=int(os.getenv("NUM_WORKERS", 2)),
-            resources_per_worker={"CPU": int(os.getenv("CPUS_PER_WORKER", 2))},
-            use_gpu=torch.cuda.is_available(),
+            task_type=task_type,
+            model_type=getattr(self, "_model_type", "mlp"),
         )
 
 

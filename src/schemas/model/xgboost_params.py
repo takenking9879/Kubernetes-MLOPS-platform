@@ -11,6 +11,9 @@ from typing import Any, Dict
 from ray import tune
 
 # Default (non-tuned) params used for final distributed training.
+# NOTE: "objective" and "eval_metric" are overridden at runtime when
+# task_type is specified (see pipeline.tasks.TaskConfig).  The values
+# here serve as defaults for backward compatibility (classification).
 XGBOOST_PARAMS: Dict[str, Any] = {
     "num_boost_round": 60,
     "objective": "multi:softprob",

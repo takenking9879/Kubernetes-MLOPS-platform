@@ -32,6 +32,10 @@ spec:
       TUNE_MAX_VAL_ROWS: "150000"
 
       # Performance knobs (small datasets):
+      # When enabled, datasets are pinned in Ray object store before training.
+      # This accelerates repeated epoch access for small datasets (<500K rows).
+      # For larger datasets, disable to avoid object store pressure and potential
+      # spilling to disk. Monitor ray_object_store_memory when scaling up.
       RAY_MATERIALIZE_DATASETS: "1"
       RAY_MATERIALIZE_DATASETS_TUNE: "1"
 
@@ -161,6 +165,10 @@ spec:
                     # Laptop single-node "simulate 2 nodes": run 2 worker pods on the same host.
                     # Sized so both worker pods can be scheduled together.
                     cpu: "9"
+                    # Worker memory: 3Gi is sized for local development / small datasets.
+                    # For production scaling with datasets >1M rows, increase to 6-8Gi.
+                    # Setting request == limit ensures predictable scheduling but no burst headroom.
+                    # Consider request < limit (e.g., 4Gi/6Gi) for production workloads.
                     memory: "3Gi"
                   requests:
                     cpu: "9"

@@ -34,6 +34,7 @@ from routers import runs as _runs_router
 from routers import processing_runs as _processing_runs_router
 from routers import schemas as _schemas_router
 from routers import serving_configs as _serving_configs_router
+from routers import config as _config_router
 
 app.include_router(_datasets_router.router)
 app.include_router(_dsls_router.router)
@@ -41,6 +42,7 @@ app.include_router(_runs_router.router)
 app.include_router(_processing_runs_router.router)
 app.include_router(_schemas_router.router)
 app.include_router(_serving_configs_router.router)
+app.include_router(_config_router.router)
 # ─────────────────────────────────────────────────────────────────────────────
 
 

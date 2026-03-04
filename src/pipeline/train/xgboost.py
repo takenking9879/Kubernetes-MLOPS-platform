@@ -1,6 +1,6 @@
 """XGBoost trainer — concrete implementation of BaseTrainer.
 
-It only supports RAM-based training (DMatrix-based)."""
+Uses QuantileDMatrix with streaming iterator for memory-efficient training."""
 
 from __future__ import annotations
 
@@ -13,7 +13,7 @@ import ray.train
 from ray.train.xgboost import XGBoostTrainer
 
 from schemas.model.xgboost_params import XGBOOST_PARAMS
-from pipeline.utils.metrics_utils import xgb_multiclass_metrics_on_ds
+from pipeline.utils.metrics_utils import xgb_multiclass_metrics_on_ds, xgb_regression_metrics_on_ds
 from pipeline.utils.xgboost_utils import (
     train_func,
     get_train_val_dmatrix,
@@ -59,6 +59,8 @@ class XGBoostModelTrainer(BaseTrainer):
         input_dim: int,
         num_classes: int,
         cpus_per_worker: int,
+        task_type: str = "classification",
+        model_type: str = "mlp",
     ) -> Dict[str, Any]:
         return {
             "target": target,
@@ -67,6 +69,8 @@ class XGBoostModelTrainer(BaseTrainer):
             "num_classes": int(num_classes),
             "cpus_per_worker": cpus_per_worker,
             "is_tuning": False,
+            "task_type": task_type,
+            "model_type": model_type,
         }
 
     def _preprocess_datasets(
@@ -93,13 +97,22 @@ class XGBoostModelTrainer(BaseTrainer):
         input_dim: int,
         params: Dict[str, Any],
         prefix: str,
+        task_type: str = "classification",
     ) -> Dict[str, Any]:
-        return xgb_multiclass_metrics_on_ds(
+        if task_type == "classification":
+            return xgb_multiclass_metrics_on_ds(
+                ds=ds,
+                split=prefix,
+                target=target,
+                feature_columns=feature_columns,
+                num_classes=int(num_classes),
+                booster_checkpoint=result.checkpoint,
+            )
+        return xgb_regression_metrics_on_ds(
             ds=ds,
             split=prefix,
             target=target,
             feature_columns=feature_columns,
-            num_classes=int(num_classes),
             booster_checkpoint=result.checkpoint,
         )
 

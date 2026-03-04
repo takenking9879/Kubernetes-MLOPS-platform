@@ -38,7 +38,9 @@ except Exception as e:  # pragma: no cover
     TRAIN_RECALL = None
     print(f"[pytorch_utils] Prometheus setup failed: {e}")
 
-from models.pytorch import NeuralNetwork
+from models.registry import get_model
+from pipeline.tasks import get_task_config
+from pipeline.utils.metrics_utils import regression_metrics_np
 
 logger = logging.getLogger(__name__)
 
@@ -116,12 +118,18 @@ def train_func(config: Dict):
     train_shard = ray.train.get_dataset_shard("train")
     val_shard = ray.train.get_dataset_shard("val")
 
-    model = NeuralNetwork(
-        input_dim=config.get("input_dim", 14),
-        num_classes=config.get("num_classes", 6),
-    )
+    task_type = config.get("task_type", "classification")
+    task_config = get_task_config(task_type)
+
+    model_type = config.get("model_type", "mlp")
+    model = get_model(model_type, {
+        "input_dim": config.get("input_dim", 14),
+        "num_classes": config.get("num_classes", 6),
+    })
     model = ray.train.torch.prepare_model(model)
-    loss_fn = nn.CrossEntropyLoss()
+
+    loss_cls = getattr(nn, task_config.torch_loss_cls)
+    loss_fn = loss_cls(**task_config.torch_loss_kwargs)
     optimizer = torch.optim.Adam(model.parameters(), lr=lr, weight_decay=weight_decay)
 
     # Log actual CPU configuration for debugging
@@ -179,9 +187,11 @@ def train_func(config: Dict):
         )
         train_loss, train_batches = 0.0, 0
         for batch in train_loader:
-            # Separar target de features dinámicamente
-            y = batch.pop(target).long()
-            # X son todas las columnas restantes concatenadas
+            # Separate target from features dynamically
+            if task_type == "classification":
+                y = batch.pop(target).long()
+            else:
+                y = batch.pop(target).float()
             if feature_cols is None:
                 feature_cols = sorted(batch.keys())
             X = torch.stack([batch[c] for c in feature_cols], dim=1)
@@ -203,25 +213,40 @@ def train_func(config: Dict):
         )
         val_loss, val_batches = 0.0, 0
         num_classes = int(config.get("num_classes", 2))
-        conf = torch.zeros((num_classes, num_classes), dtype=torch.int64)
+
+        # Classification: accumulate confusion matrix.  Regression: accumulate preds/targets.
+        if task_type == "classification":
+            conf = torch.zeros((num_classes, num_classes), dtype=torch.int64)
+            all_preds_list, all_targets_list = None, None
+        else:
+            conf = None
+            all_preds_list, all_targets_list = [], []
+
         with torch.no_grad():
             for batch in val_loader:
-                y = batch.pop(target).long()
+                if task_type == "classification":
+                    y = batch.pop(target).long()
+                else:
+                    y = batch.pop(target).float()
                 if feature_cols is None:
                     feature_cols = sorted(batch.keys())
                 X = torch.stack([batch[c] for c in feature_cols], dim=1)
-                
+
                 preds = model(X)
                 loss = loss_fn(preds, y)
                 val_loss += loss.item()
                 val_batches += 1
-                y_pred = preds.argmax(dim=1)
-                
-                # Vectorización senior: usamos bincount para evitar el loop de Python
-                # Desplazamos y para que cada par (y, y_pred) sea un índice único [0, n^2-1]
-                indices = y * num_classes + y_pred
-                counts = torch.bincount(indices, minlength=num_classes * num_classes)
-                conf += counts.reshape(num_classes, num_classes)
+
+                if task_type == "classification":
+                    y_pred = preds.argmax(dim=1)
+                    # Vectorized confusion matrix via bincount
+                    indices = y * num_classes + y_pred
+                    counts = torch.bincount(indices, minlength=num_classes * num_classes)
+                    conf += counts.reshape(num_classes, num_classes)
+                else:
+                    y_pred = preds.squeeze(-1)
+                    all_preds_list.append(y_pred.cpu())
+                    all_targets_list.append(y.cpu())
 
         train_time_sec = time.perf_counter() - start_time
         logger.info(f"[pytorch] Worker train_time_sec={train_time_sec:.2f}")
@@ -229,10 +254,14 @@ def train_func(config: Dict):
         avg_val_loss = val_loss / max(val_batches, 1)
 
         epoch_time_sec = time.perf_counter() - epoch_start
-        
-        # Medimos el tiempo que tarda en derivar precisión, recall, etc. de la matriz
+
         metrics_start = time.perf_counter()
-        metrics = _metrics_from_confusion(conf, prefix="val")
+        if task_type == "classification":
+            metrics = _metrics_from_confusion(conf, prefix="val")
+        else:
+            all_p = torch.cat(all_preds_list).numpy()
+            all_t = torch.cat(all_targets_list).numpy()
+            metrics = regression_metrics_np(all_t, all_p, prefix="val")
         metrics["multiclass_metrics_time_sec"] = time.perf_counter() - metrics_start
 
         report = {
@@ -268,7 +297,7 @@ def train_func(config: Dict):
                 TRAIN_LOSS.labels(framework="pytorch", split="val").set(float(avg_val_loss))
             except Exception:
                 pass
-            # Export validation performance metrics
+            # Export validation performance metrics (classification only)
             if "val_accuracy" in metrics:
                 try:
                     TRAIN_ACCURACY.labels(framework="pytorch", split="val").set(float(metrics["val_accuracy"]))

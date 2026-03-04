@@ -67,6 +67,8 @@ class BaseTrainer(ABC):
         input_dim: int,
         num_classes: int,
         cpus_per_worker: int,
+        task_type: str = "classification",
+        model_type: str = "mlp",
     ) -> Dict[str, Any]:
         """Build the full ``train_loop_config`` dict (framework-specific keys included)."""
 
@@ -97,6 +99,7 @@ class BaseTrainer(ABC):
         input_dim: int,
         params: Dict[str, Any],
         prefix: str,
+        task_type: str = "classification",
     ) -> Dict[str, Any]:
         """Compute final metrics on a full dataset split (driver-side)."""
 
@@ -104,10 +107,33 @@ class BaseTrainer(ABC):
     # Concrete lifecycle – shared across frameworks
     # ──────────────────────────────────────────────
 
+    def _resolve_gpu(self) -> bool:
+        """Determine whether to request GPU resources.
+
+        Respects ``USE_GPU`` env var:
+          - ``"auto"`` (default): auto-detect via ``torch.cuda.is_available()``
+          - ``"true"`` / ``"1"``: force GPU
+          - ``"false"`` / ``"0"``: force CPU
+        """
+        use_gpu_env = os.getenv("USE_GPU", "auto").lower()
+        if use_gpu_env == "auto":
+            try:
+                import torch
+                return torch.cuda.is_available()
+            except ImportError:
+                return False
+        return use_gpu_env in ("1", "true", "yes")
+
     def _build_scaling_config(self) -> ray.train.ScalingConfig:
+        gpu = self._resolve_gpu()
+        cpus = int(os.getenv("CPUS_PER_WORKER", 2))
+        resources: Dict[str, Any] = {"CPU": cpus}
+        if gpu:
+            resources["GPU"] = 1
         return ray.train.ScalingConfig(
             num_workers=int(os.getenv("NUM_WORKERS", 2)),
-            resources_per_worker={"CPU": int(os.getenv("CPUS_PER_WORKER", 2))},
+            resources_per_worker=resources,
+            use_gpu=gpu,
         )
 
     def _extract_result_metrics(self, result: ray.train.Result) -> Dict[str, Any]:
@@ -134,6 +160,8 @@ class BaseTrainer(ABC):
         num_classes: int = 6,
         params: Optional[Dict[str, Any]] = None,
         callbacks: Optional[List[object]] = None,
+        task_type: str = "classification",
+        model_type: str = "mlp",
     ) -> Tuple[ray.train.Result, Dict[str, Any]]:
         """Execute the full training lifecycle.
 
@@ -157,6 +185,8 @@ class BaseTrainer(ABC):
             input_dim=input_dim,
             num_classes=num_classes,
             cpus_per_worker=cpus_per_worker,
+            task_type=task_type,
+            model_type=model_type,
         )
 
         # 3 — Construct Ray Trainer
@@ -195,6 +225,7 @@ class BaseTrainer(ABC):
                 input_dim=input_dim,
                 params=effective_params,
                 prefix="val",
+                task_type=task_type,
             )
         )
 
@@ -209,6 +240,7 @@ class BaseTrainer(ABC):
                     input_dim=input_dim,
                     params=effective_params,
                     prefix="test",
+                    task_type=task_type,
                 )
             )
 

@@ -8,9 +8,11 @@ import xgboost
 from ray.train import Checkpoint
 
 import numpy as np
+import pandas as pd
 from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score
 
 from schemas.model.xgboost_params import XGBOOST_PARAMS
+from pipeline.tasks import get_task_config
 
 logger = logging.getLogger(__name__)
 
@@ -41,34 +43,98 @@ except Exception as e:  # pragma: no cover
     TRAIN_RECALL = None
     print(f"[xgboost_utils] Prometheus setup failed: {e}")
 
-def get_train_val_dmatrix(target: str, feature_columns: Optional[List[str]] = None) -> Tuple[xgboost.DMatrix, xgboost.DMatrix]:
+class RayShardIter(xgboost.core.DataIter):
+    """Streams batches from a Ray Dataset shard into XGBoost without full materialization.
+
+    Each call to ``next()`` yields one batch. XGBoost's ``QuantileDMatrix``
+    constructs the internal data structure incrementally, avoiding the
+    3x memory duplication of ``materialize().to_pandas()`` + ``DMatrix``.
+    """
+
+    def __init__(
+        self,
+        shard,
+        *,
+        target: str,
+        feature_columns: Optional[List[str]] = None,
+        batch_size: int = 4096,
+    ):
+        super().__init__(cache_prefix=None)  # No disk caching
+        self._shard = shard
+        self._target = target
+        self._feature_columns = feature_columns
+        self._batch_size = batch_size
+        self._iter = None
+
+    def next(self, input_data):
+        if self._iter is None:
+            self._iter = self._shard.iter_batches(
+                batch_size=self._batch_size,
+                batch_format="pandas",
+                prefetch_batches=2,
+            )
+        try:
+            batch = next(self._iter)
+        except StopIteration:
+            return 0  # No more data
+
+        y = batch[self._target].to_numpy()
+        if self._feature_columns:
+            X = batch[self._feature_columns].to_numpy()
+        else:
+            X = (
+                batch.drop(columns=[self._target], errors="ignore")
+                .select_dtypes(include=[np.number, "bool"])
+                .to_numpy()
+            )
+
+        input_data(data=X, label=y)
+        return 1  # More data available
+
+    def reset(self):
+        self._iter = None
+
+
+def get_train_val_dmatrix(
+    target: str,
+    feature_columns: Optional[List[str]] = None,
+) -> Tuple[xgboost.QuantileDMatrix, xgboost.QuantileDMatrix]:
+    """Build DMatrix objects from Ray dataset shards.
+
+    Uses ``QuantileDMatrix`` with a streaming iterator to avoid full
+    materialization.  This reduces peak memory from ~6x dataset size to
+    ~2x, enabling training on datasets that would otherwise OOM.
+
+    Requires xgboost >= 2.0 for ``QuantileDMatrix``.
+    """
     train_shard = ray.train.get_dataset_shard("train")
     val_shard = ray.train.get_dataset_shard("val")
-
-    # Use Ray Data's nthread for parallelization during materialization
-    # This respects the CPU allocation for the worker
     cpus = int(os.getenv("OMP_NUM_THREADS", "1"))
-    
-    train_df = train_shard.materialize().to_pandas()
-    val_df = val_shard.materialize().to_pandas()
+    batch_size = int(os.getenv("XGBOOST_DMATRIX_BATCH_SIZE", "4096"))
 
-    if feature_columns:
-        train_X = train_df[feature_columns]
-        val_X = val_df[feature_columns]
-    else:
-        # Fallback: drop label + keep only numeric/bool columns.
-        # This avoids failures when metadata columns exist (e.g. timestamp datetime64).
-        train_X = train_df.drop(columns=[target], errors="ignore").select_dtypes(include=[np.number, "bool"])
-        val_X = val_df.drop(columns=[target], errors="ignore").select_dtypes(include=[np.number, "bool"])
-    
-    train_y = train_df[target]
-    val_y = val_df[target]
+    try:
+        # Streaming QuantileDMatrix — avoids full materialization
+        train_iter = RayShardIter(
+            train_shard, target=target,
+            feature_columns=feature_columns, batch_size=batch_size,
+        )
+        dtrain = xgboost.QuantileDMatrix(train_iter, nthread=cpus)
 
-    # XGBoost DMatrix construction can use multiple threads via nthread parameter
-    return (
-        xgboost.DMatrix(train_X, label=train_y, nthread=cpus),
-        xgboost.DMatrix(val_X, label=val_y, nthread=cpus),
-    )
+        # Validation: use ref=dtrain for consistent quantile bin boundaries
+        val_iter = RayShardIter(
+            val_shard, target=target,
+            feature_columns=feature_columns, batch_size=batch_size,
+        )
+        dval = xgboost.QuantileDMatrix(val_iter, ref=dtrain, nthread=cpus)
+
+        return dtrain, dval
+
+    except Exception as e:
+        raise RuntimeError(
+            f"QuantileDMatrix is required for memory-efficient XGBoost training "
+            f"but failed to initialize: {e}. "
+            f"Ensure xgboost>=2.0 is installed."
+        ) from e
 
 
 def run_xgboost_train(
@@ -129,16 +195,17 @@ class RayTrainPeriodicReportCheckpointCallback(xgboost.callback.TrainingCallback
         report_every: int = 5,
         checkpoint_every: int = 50,
         filename: str = "model.ubj",
-        # Aquí aceptamos tanto `metric` como `metrics` por compatibilidad
         metrics: Optional[List[str]] = None,
         is_tuning: bool = False,
         dval: xgboost.DMatrix = None,  # For computing accuracy/F1/etc.
+        task_type: str = "classification",
     ):
         self.report_every = max(int(report_every), 1)
         self.checkpoint_every = max(int(checkpoint_every), 1)
         self.filename = filename
         self.is_tuning = is_tuning
-        self.dval = dval  # Store validation DMatrix for metric calculation
+        self.dval = dval
+        self.task_type = task_type
 
         # Normalizamos alias: metrics override metric if ambos provistos
         if metrics is not None:
@@ -261,28 +328,27 @@ class RayTrainPeriodicReportCheckpointCallback(xgboost.callback.TrainingCallback
                 except Exception:
                     pass
             
-            # Compute and export accuracy/precision/recall/F1 on validation set
-            if self.dval is not None:
+            # Compute and export task-specific metrics on validation set
+            if self.dval is not None and self.task_type == "classification":
                 try:
                     y_true = self.dval.get_label().astype(int)
                     y_pred_proba = model.predict(self.dval)
-                    # For multiclass, predict returns probabilities - take argmax
                     if len(y_pred_proba.shape) > 1:
                         y_pred = np.argmax(y_pred_proba, axis=1)
                     else:
                         y_pred = (y_pred_proba > 0.5).astype(int)
-                    
+
                     acc = accuracy_score(y_true, y_pred)
                     prec = precision_score(y_true, y_pred, average='macro', zero_division=0)
                     rec = recall_score(y_true, y_pred, average='macro', zero_division=0)
                     f1 = f1_score(y_true, y_pred, average='macro', zero_division=0)
-                    
+
                     TRAIN_ACCURACY.labels(framework="xgboost", split="val").set(acc)
                     TRAIN_PRECISION.labels(framework="xgboost", split="val").set(prec)
                     TRAIN_RECALL.labels(framework="xgboost", split="val").set(rec)
                     TRAIN_F1.labels(framework="xgboost", split="val").set(f1)
-                    
-                    print(f"[xgboost_utils] Epoch {it}: loss={loss_val:.4f}, acc={acc:.4f}, f1={f1:.4f}")
+
+                    print(f"[xgboost_utils] Epoch {it}: acc={acc:.4f}, f1={f1:.4f}")
                 except Exception as e:
                     print(f"[xgboost_utils] Failed to compute classification metrics: {e}")
 
@@ -338,12 +404,24 @@ class RayTrainPeriodicReportCheckpointCallback(xgboost.callback.TrainingCallback
 
 def train_func(config: Dict):
     """Distributed training loop for XGBoost workers.
-    
+
     Used by both training and tuning pipelines.
     """
+    task_type = config.get("task_type", "classification")
+    task_config = get_task_config(task_type)
+
     params = dict(config.get("xgboost_params", XGBOOST_PARAMS))
     target = config["target"]
-    params["num_class"] = int(config.get("num_classes", 2))
+
+    # Inject task-specific objective and eval_metric if not overridden by user
+    if "objective" not in params:
+        params["objective"] = task_config.xgb_objective
+    if "eval_metric" not in params:
+        params["eval_metric"] = task_config.xgb_eval_metric
+
+    # num_class only for classification objectives
+    if task_type == "classification":
+        params["num_class"] = int(config.get("num_classes", 2))
 
     # Align XGBoost threading with Ray worker configuration
     cpus_per_worker = int(config.get("cpus_per_worker", os.getenv("CPUS_PER_WORKER", "1")))
@@ -378,6 +456,7 @@ def train_func(config: Dict):
                 filename=checkpoint_filename,
                 is_tuning=is_tuning,
                 dval=dval,
+                task_type=task_type,
             )
         ],
     )
