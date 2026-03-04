@@ -68,11 +68,11 @@ class RayShardIter(xgboost.core.DataIter):
 
     def next(self, input_data):
         if self._iter is None:
-            self._iter = self._shard.iter_batches(
+            self._iter = iter(self._shard.iter_batches(
                 batch_size=self._batch_size,
                 batch_format="pandas",
                 prefetch_batches=2,
-            )
+            ))
         try:
             batch = next(self._iter)
         except StopIteration:
