@@ -354,7 +354,17 @@ class KubeRayTraining(BaseUtils):
 
         try:
             if framework == "xgboost":
-                return RayTrainReportCallback.get_model(checkpoint)
+                booster = RayTrainReportCallback.get_model(checkpoint)
+                # Embed feature names so mlflow.xgboost.log_model serialises them
+                # into the artifact.  At serving time the adapter reads them back via
+                # booster.feature_names — without this they are None and the
+                # dimension-validation in adapters.py raises TypeError.
+                if booster is not None and self.schema:
+                    booster.feature_names = [str(f) for f in self.schema]
+                    self.logger.info(
+                        "Set feature_names on booster (%d features)", len(self.schema)
+                    )
+                return booster
 
             if framework == "pytorch":
                 import torch

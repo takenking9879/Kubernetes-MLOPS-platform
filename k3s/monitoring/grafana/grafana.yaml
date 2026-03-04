@@ -129,6 +129,8 @@ spec:
                   name: grafana-dashboard-mlops-inference
               - configMap:
                   name: grafana-dashboard-mlops-training
+              - configMap:
+                  name: grafana-dashboard-mlops-resources
 
 ---
 # ----------------------------
