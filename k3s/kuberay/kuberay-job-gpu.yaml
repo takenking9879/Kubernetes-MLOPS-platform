@@ -1,102 +1,31 @@
-# ============================================================
-# RayJob — External GPU worker variant
-# ============================================================
-#
-# Designed for two scenarios:
-#
-#   Phase 0 — Local Docker Desktop PoC
-#     GPU runs in a Docker container outside Kubernetes.
-#     No Tailscale needed; Docker --network=host can reach pod IPs directly.
-#
-#     Usage:
-#       1. kubectl apply -f k3s/kuberay/kuberay-job-gpu-runpod.yaml
-#       2. HEAD_IP=$(kubectl get pod -n ray -l ray.io/node-type=head \
-#                    -o jsonpath='{.items[0].status.podIP}')
-#          HOST_IP=$(docker run --rm --network=host alpine \
-#                    ip route get 8.8.8.8 | awk '{print $7; exit}')
-#          docker run --rm --gpus all --network=host \
-#            -e PYTHONPATH=/home/ray/app/repo:/home/ray/app/repo/src \
-#            ray-cluster-gpu:2.53.0 \
-#            ray start \
-#              --address="${HEAD_IP}:6379" \
-#              --num-gpus=1 \
-#              --node-ip-address="${HOST_IP}" \
-#              --min-worker-port=20000 \
-#              --max-worker-port=20020 \
-#              --block
-#       3. kubectl apply -f (trigger via Airflow training_dag_gpu)
-#
-#   Phase 1 — RunPod remote GPU via Tailscale
-#     See k3s/runpod/ for Dockerfile, startup script, and helpers.
-#     Tailscale Operator must be installed in the cluster (see plan docs).
-#     The training_dag_gpu.py DAG handles RunPod provisioning automatically.
-#
-# TOPOLOGY:
-#
-#   ┌─────────────────────────────────────────────────────┐
-#   │  [head pod]   num-cpus:0, num-gpus:0                │
-#   │  [no K8s GPU workers — GPU provided externally]     │
-#   │  External worker joins:                             │
-#   │    ray start --address=<head-ip>:6379               │
-#   │              --num-gpus=1 --block                   │
-#   └─────────────────────────────────────────────────────┘
-#
-# ============================================================
 apiVersion: ray.io/v1
 kind: RayJob
 metadata:
-  name: kuberay-job-gpu
+  name: ray-gpu-test-job
   namespace: ray
 spec:
-  entrypoint: python3 /home/ray/app/repo/k3s/kuberay/main.py
-
-  shutdownAfterJobFinishes: true
-  ttlSecondsAfterFinished: 60
-
-  runtimeEnvYAML: |
-    env_vars:
-      # ── 1 GPU worker (external Docker container or RunPod pod) ────────────
-      NUM_WORKERS: "1"
-      CPUS_PER_WORKER: "10"
-
-      NUM_WORKERS_TUNE: "1"
-      CPUS_PER_WORKER_TUNE: "6"
-
-      # Single GPU: keep concurrent trials at 1 to avoid VRAM contention.
-      MAX_CONCURRENT_TRIALS: "1"
-
-      TUNE_MAX_TRAIN_ROWS: "250000"
-      TUNE_MAX_VAL_ROWS: "150000"
-
-      RAY_MATERIALIZE_DATASETS: "1"
-      RAY_MATERIALIZE_DATASETS_TUNE: "1"
-
-      PROMETHEUS_GRACE_SECONDS: "10"
-      REPORT_FREQUENCY: "4"
-
+  entrypoint: "python3 /home/ray/gpu_test_main.py"
   rayClusterSpec:
-    rayVersion: "2.53.0"
-    enableInTreeAutoscaling: false
-    autoscalerOptions:
-      version: v2
-      upscalingMode: Default
-      idleTimeoutSeconds: 60
-
-    ########################
-    # HEAD — no GPU, no CPU tasks
-    ########################
+    rayVersion: '2.9.0'
     headGroupSpec:
       rayStartParams:
-        num-cpus: "0"
-        num-gpus: "0"
+        dashboard-host: '0.0.0.0'
+        num-cpus: '1'
+        num-gpus: '0'
       template:
-        metadata:
-          labels:
-            app: kuberay-training-gpu
         spec:
           containers:
             - name: ray-head
               image: ray-cluster-gpu:2.53.0
+              env:
+                - name: RAY_gcs_rpc_server_reconnect_timeout_s
+                  value: "300"
+                - name: RAY_raylet_death_check_interval_ms
+                  value: "1000"
+                - name: RAY_num_gcs_missed_heartbeat_limit
+                  value: "30"
+                - name: RAY_enable_infeasible_task_early_exit
+                  value: "true"
               ports:
                 - containerPort: 6379
                   name: gcs-server
@@ -104,65 +33,103 @@ spec:
                   name: dashboard
                 - containerPort: 10001
                   name: client
-                - containerPort: 8002
-                  name: metrics
-              resources:
-                limits:
-                  cpu: "2"
-                  memory: "3Gi"
-                requests:
-                  cpu: "1"
-                  memory: "3Gi"
               volumeMounts:
-                - name: job-files
-                  mountPath: /home/ray/app
-              envFrom:
-                - secretRef:
-                    name: env-secret
-              env:
-                - name: RAY_enable_infeasible_task_early_exit
-                  value: "true"
-                - name: RAY_DEFAULT_OBJECT_STORE_MEMORY_PROPORTION
-                  value: "0.7"
-                - name: RAY_ACCEL_ENV_VAR_OVERRIDE_ON_ZERO
-                  value: "0"
-                - name: PYTHONPATH
-                  value: /home/ray/app/repo:/home/ray/app/repo/src
-
-          initContainers:
-            - name: git-sync
-              image: registry.k8s.io/git-sync/git-sync:v4.1.0
-              resources:
-                requests:
-                  cpu: 100m
-                  memory: 128Mi
-                limits:
-                  cpu: 200m
-                  memory: 256Mi
-              env:
-                - name: GITSYNC_REPO
-                  value: "https://github.com/takenking9879/Kubernetes-MLOPS-platform"
-                - name: GIT_SYNC_BRANCH
-                  value: "main"
-                - name: GIT_SYNC_ROOT
-                  value: "/git"
-                - name: GIT_SYNC_DEST
-                  value: "repo"
-                - name: GIT_SYNC_WAIT
-                  value: "30"
-                - name: GITSYNC_ONE_TIME
-                  value: "true"
-              volumeMounts:
-                - name: job-files
-                  mountPath: /git
-
+                - mountPath: /home/ray/gpu_test_main.py
+                  name: python-script
+                  subPath: gpu_test_main.py
           volumes:
-            - name: job-files
-              emptyDir: {}
-
-    ########################
-    # NO K8s GPU workers
-    # External GPU worker joins via:
-    #   ray start --address=<head-pod-ip>:6379 --num-gpus=1 --block
-    ########################
+            - name: python-script
+              configMap:
+                name: gpu-test-script
     workerGroupSpecs: []
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: gpu-test-script
+  namespace: ray
+data:
+  gpu_test_main.py: |
+    import ray
+    import torch
+    import torch.nn as nn
+    import torch.optim as optim
+    import time
+    import sys
+
+    # Set CPU to 0 to avoid the "Infeasible Task" error if worker doesn't report CPUs
+    @ray.remote(num_gpus=1, num_cpus=0)
+    def train_gpu_task():
+        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        print(f"Device being used: {device}")
+        
+        if not torch.cuda.is_available():
+            raise RuntimeError("Error: CUDA not available on this worker")
+
+        print(f"CUDA Available: {torch.cuda.is_available()}")
+        print(f"GPU Count: {torch.cuda.device_count()}")
+        print(f"GPU Name: {torch.cuda.get_device_name(0)}")
+
+        # Minimal Neural Network
+        model = nn.Linear(10, 1).to(device)
+        criterion = nn.MSELoss()
+        optimizer = optim.SGD(model.parameters(), lr=0.01)
+
+        # Synthetic Data
+        torch.manual_seed(42)
+        inputs = torch.randn(64, 10).to(device)
+        targets = torch.randn(64, 1).to(device)
+
+        # Minimal Training Loop
+        for epoch in range(5):
+            optimizer.zero_grad()
+            outputs = model(inputs)
+            loss = criterion(outputs, targets)
+            loss.backward()
+            optimizer.step()
+            print(f"Epoch {epoch+1}, Loss: {loss.item():.4f}")
+        
+        return f"Training finished on GPU: {torch.cuda.get_device_name(0)}"
+
+    if __name__ == "__main__":
+        print("Initialising Ray...")
+        ray.init(address="auto")
+        
+        print("Waiting for GPU worker to join... (max 120s)")
+        for i in range(12):
+            resources = ray.cluster_resources()
+            if "GPU" in resources and resources["GPU"] > 0:
+                print(f"GPU resources detected: {resources['GPU']}")
+                break
+            time.sleep(10)
+            print(f"Still waiting for GPU worker... step {i+1}")
+        else:
+            print("Timeout: No GPU resources found.")
+            sys.exit(1)
+
+        print("Submitting GPU task...")
+        result_ref = train_gpu_task.remote()
+        
+        try:
+            result = ray.get(result_ref, timeout=300)
+            print(f"Success: {result}")
+        except Exception as e:
+            print(f"Task failed: {e}")
+            sys.exit(1)
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ray-gpu-test-head
+  namespace: ray
+spec:
+  ports:
+    - name: gcs
+      port: 6379
+      targetPort: 6379
+    - name: dashboard
+      port: 8265
+      targetPort: 8265
+  selector:
+    ray.io/node-type: head
+    ray.io/cluster: ray-gpu-test-job # Usually matches metadata.name of RayCluster or job
