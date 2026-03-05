@@ -1,0 +1,6 @@
+helm repo add nvidia-device-plugin https://la-cc.github.io/nvidia-device-plugin-helm-chart
+
+helm install my-nvidia-device-plugin nvidia-device-plugin/nvidia-device-plugin --version 0.3.9
+
+#Crear imagen GPU
+docker build -t ray-cluster-gpu:2.53.0 ./k3s/kuberay/gpu/

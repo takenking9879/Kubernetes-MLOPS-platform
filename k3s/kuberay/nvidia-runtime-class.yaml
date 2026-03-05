@@ -1,0 +1,15 @@
+# RuntimeClass para GPUs NVIDIA.
+# Necesario cuando el nvidia-container-runtime NO está configurado como runtime
+# por defecto en containerd (opción recomendada para no afectar pods sin GPU).
+#
+# Aplicar con:
+#   kubectl apply -f k3s/kuberay/nvidia-runtime-class.yaml
+#
+# Prerequisito en el nodo host:
+#   sudo nvidia-ctk runtime configure --runtime=containerd
+#   sudo systemctl restart containerd && sudo systemctl restart k3s
+apiVersion: node.k8s.io/v1
+kind: RuntimeClass
+metadata:
+  name: nvidia
+handler: nvidia

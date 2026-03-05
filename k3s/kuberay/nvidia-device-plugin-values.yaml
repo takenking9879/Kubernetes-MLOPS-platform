@@ -1,0 +1,98 @@
+# Helm values para nvidia-device-plugin v0.18.2
+#
+# Repo: https://github.com/NVIDIA/k8s-device-plugin
+#
+# Instalar / actualizar con:
+#   helm repo add nvdp https://nvidia.github.io/k8s-device-plugin
+#   helm repo update
+#   helm upgrade -i nvdp nvdp/nvidia-device-plugin \
+#     --version=0.18.2 \
+#     --namespace nvidia-device-plugin \
+#     --create-namespace \
+#     -f k3s/kuberay/nvidia-device-plugin-values.yaml
+
+# -----------------------------------------------------------------
+# Plugin config
+#
+# TWO profiles are provided:
+#   "default"      → 1 physical GPU = 1 nvidia.com/gpu resource.
+#                    Use with kuberay-job-gpu.yaml (replicas: 1).
+#
+#   "time-slicing" → 1 physical GPU = 2 nvidia.com/gpu resources via
+#                    CUDA time-slicing (no VRAM isolation).
+#                    Use with kuberay-job-gpu.yaml when replicas: 2.
+#                    To activate per-node:
+#                      kubectl label node <node> \
+#                        nvidia.com/device-plugin.config=time-slicing
+#
+# config.default points to the profile applied cluster-wide by default.
+# Change to "time-slicing" to enable sharing globally.
+# -----------------------------------------------------------------
+config:
+  default: "default"
+  map:
+    default: |
+      version: v1
+      flags:
+        migStrategy: "none"
+        failOnInitError: true
+        nvidiaDriverRoot: "/"
+        plugin:
+          passDeviceSpecs: false
+          deviceListStrategy: envvar
+          deviceIDStrategy: uuid
+
+    time-slicing: |
+      version: v1
+      flags:
+        migStrategy: "none"
+        failOnInitError: true
+        nvidiaDriverRoot: "/"
+        plugin:
+          passDeviceSpecs: false
+          deviceListStrategy: envvar
+          deviceIDStrategy: uuid
+      sharing:
+        timeSlicing:
+          # failRequestsGreaterThanOne: true enforces that each pod
+          # requests exactly 1 slice (recommended).
+          failRequestsGreaterThanOne: true
+          resources:
+            - name: nvidia.com/gpu
+              # 2 replicas on a single RTX 4070 → 2 virtual GPUs.
+              # Each worker sees 1 nvidia.com/gpu but shares the
+              # physical GPU 50/50 via CUDA time-slicing.
+              # Increase if you have more RAM / smaller workloads.
+              replicas: 2
+
+# -----------------------------------------------------------------
+# RuntimeClass
+# Debe coincidir con el handler definido en nvidia-runtime-class.yaml
+# -----------------------------------------------------------------
+runtimeClassName: "nvidia"
+
+# -----------------------------------------------------------------
+# GPU Feature Discovery: genera labels automáticos en los nodos
+# (nvidia.com/gpu.product, nvidia.com/gpu.memory, etc.)
+# Requiere Node Feature Discovery (nfd) que se despliega junto.
+# -----------------------------------------------------------------
+gfd:
+  enabled: true
+
+nfd:
+  enabled: true
+
+# -----------------------------------------------------------------
+# Tolerations: permite que el daemonset se schedule en nodos
+# con taint nvidia.com/gpu=NoSchedule (común en clusters mixtos)
+# -----------------------------------------------------------------
+tolerations:
+  - key: nvidia.com/gpu
+    operator: Exists
+    effect: NoSchedule
+
+# -----------------------------------------------------------------
+# Evitar que el plugin falle en nodos sin GPU (útil en clusters
+# mixtos donde el DaemonSet corre en todos los nodos).
+# -----------------------------------------------------------------
+failOnInitError: false

@@ -447,6 +447,18 @@ class KubeRayTraining(BaseUtils):
             mlflow_tracking_uri = self.params.get("mlflow_tracking_uri")
             mlflow_experiment_name = self.params.get("mlflow_experiment_name")
 
+            # ── Resolve GPU flag early so both tuning and training honour it ──
+            # base_tuner.py reads USE_GPU with default "auto"; setting it here
+            # before the tuning phase ensures the user's app setting is respected
+            # in both phases instead of only in training.
+            use_gpu_flag = self.params.get("use_gpu", False)
+            os.environ["USE_GPU"] = "true" if use_gpu_flag else "false"
+            self.logger.info(
+                "GPU mode: %s (USE_GPU=%s, applies to tuning + training)",
+                "enabled" if use_gpu_flag else "disabled",
+                os.environ["USE_GPU"],
+            )
+
             # ── Tuning phase (optional) ──
             best_params = None
             if self.params.get('tune', False):
@@ -515,12 +527,6 @@ class KubeRayTraining(BaseUtils):
             # ── Train ──
             task_type = self.params.get("task_type", "classification")
             model_type = self.params.get("model_type", "mlp")
-            # Set USE_GPU env var so _resolve_gpu() in BaseTrainer picks it up.
-            use_gpu_flag = self.params.get("use_gpu", False)
-            os.environ["USE_GPU"] = "true" if use_gpu_flag else "false"
-            self.logger.info(
-                "GPU training: %s (USE_GPU=%s)", "enabled" if use_gpu_flag else "disabled", os.environ["USE_GPU"]
-            )
             trainer = get_trainer(framework)
             result, final_metrics = trainer.train(
                 train_dataset=train_ds,

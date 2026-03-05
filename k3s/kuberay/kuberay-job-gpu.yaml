@@ -1,0 +1,267 @@
+# ============================================================
+# RayJob — GPU variant (single RTX 4070, single-node k3s)
+# ============================================================
+#
+# PREREQUISITES (run once per node):
+#   1. sudo nvidia-ctk runtime configure --runtime=containerd
+#   2. sudo systemctl restart containerd && sudo systemctl restart k3s
+#   3. kubectl apply -f k3s/kuberay/nvidia-runtime-class.yaml
+#   4. helm upgrade -i nvdp nvdp/nvidia-device-plugin \
+#        --version=0.18.2 \
+#        --namespace nvidia-device-plugin \
+#        --create-namespace \
+#        -f k3s/kuberay/nvidia-device-plugin-values.yaml
+#
+# TOPOLOGY (1x RTX 4070 - 12 GB VRAM):
+#
+#   ┌───────────────────── Single Node ─────────────────────┐
+#   │  [head pod]  num-cpus:0, no GPU                       │
+#   │  [worker pod] num-gpus:1 → nvidia.com/gpu: 1          │
+#   │               runtimeClassName: nvidia                 │
+#   └──────────────────────────────────────────────────────-─┘
+#
+# TIME-SLICING (optional — 2 workers sharing 1 GPU):
+#   If you want 2 workers each seeing "1 GPU" via CUDA time-slicing:
+#     1. Enable time-slicing in nvidia-device-plugin-values.yaml
+#        (see the `sharing.timeSlicing` block — already included).
+#     2. Change workerGroupSpecs[0].replicas to 2.
+#     3. Change NUM_WORKERS env var to "2".
+#   Note: time-slicing shares compute interleaving but NOT VRAM isolation.
+#   Both workers compete for the same 12 GB of VRAM on the RTX 4070.
+#
+# VERIFY GPU IS EXPOSED:
+#   kubectl get nodes -o custom-columns=\
+#   "NODE:.metadata.name,GPU:.status.allocatable.nvidia\.com/gpu"
+#
+# ============================================================
+apiVersion: ray.io/v1
+kind: RayJob
+metadata:
+  name: kuberay-job-gpu
+  namespace: ray
+spec:
+  entrypoint: python3 /home/ray/app/repo/k3s/kuberay/main.py
+
+  shutdownAfterJobFinishes: true
+  ttlSecondsAfterFinished: 60
+
+  runtimeEnvYAML: |
+    env_vars:
+      # ── GPU training: 1 worker owns the full RTX 4070 ─────────────────
+      # If time-slicing is enabled and replicas: 2, set NUM_WORKERS: "2"
+      NUM_WORKERS: "1"
+      # RTX 4070 node typically has 12+ CPU cores; leave 2 for head/system.
+      CPUS_PER_WORKER: "10"
+
+      # Tune: each trial uses 1 worker with some CPUs
+      NUM_WORKERS_TUNE: "1"
+      CPUS_PER_WORKER_TUNE: "6"
+
+      # Max concurrent tune trials. Keep at 1 with a single GPU to avoid
+      # VRAM contention between trials.
+      MAX_CONCURRENT_TRIALS: "1"
+
+      # Cap dataset size so the GPU worker doesn't OOM during tune.
+      TUNE_MAX_TRAIN_ROWS: "250000"
+      TUNE_MAX_VAL_ROWS: "150000"
+
+      RAY_MATERIALIZE_DATASETS: "1"
+      RAY_MATERIALIZE_DATASETS_TUNE: "1"
+
+      PROMETHEUS_GRACE_SECONDS: "10"
+      REPORT_FREQUENCY: "4"
+
+  rayClusterSpec:
+    rayVersion: "2.53.0"
+    enableInTreeAutoscaling: false
+    autoscalerOptions:
+      version: v2
+      upscalingMode: Default
+      idleTimeoutSeconds: 60
+
+    ########################
+    # HEAD — no GPU
+    ########################
+    headGroupSpec:
+      rayStartParams:
+        # Head never runs GPU tasks; leave the GPU fully for the worker.
+        num-cpus: "0"
+        num-gpus: "0"
+      template:
+        metadata:
+          labels:
+            app: kuberay-training-gpu
+        spec:
+          # Head does NOT need the nvidia runtimeClass.
+          containers:
+            - name: ray-head
+              image: ray-cluster-gpu:2.53.0
+              ports:
+                - containerPort: 6379
+                  name: gcs-server
+                - containerPort: 8265
+                  name: dashboard
+                - containerPort: 10001
+                  name: client
+                - containerPort: 8002
+                  name: metrics
+              resources:
+                limits:
+                  cpu: "2"
+                  memory: "3Gi"
+                requests:
+                  cpu: "1"
+                  memory: "3Gi"
+              volumeMounts:
+                - name: job-files
+                  mountPath: /home/ray/app
+              envFrom:
+                - secretRef:
+                    name: env-secret
+              env:
+                - name: RAY_enable_infeasible_task_early_exit
+                  value: "true"
+                - name: RAY_DEFAULT_OBJECT_STORE_MEMORY_PROPORTION
+                  value: "0.7"
+                - name: RAY_ACCEL_ENV_VAR_OVERRIDE_ON_ZERO
+                  value: "0"
+                - name: PYTHONPATH
+                  value: /home/ray/app/repo:/home/ray/app/repo/src
+
+          initContainers:
+            - name: git-sync
+              image: registry.k8s.io/git-sync/git-sync:v4.1.0
+              resources:
+                requests:
+                  cpu: 100m
+                  memory: 128Mi
+                limits:
+                  cpu: 200m
+                  memory: 256Mi
+              env:
+                - name: GITSYNC_REPO
+                  value: "https://github.com/takenking9879/Kubernetes-MLOPS-platform"
+                - name: GIT_SYNC_BRANCH
+                  value: "main"
+                - name: GIT_SYNC_ROOT
+                  value: "/git"
+                - name: GIT_SYNC_DEST
+                  value: "repo"
+                - name: GIT_SYNC_WAIT
+                  value: "30"
+                - name: GITSYNC_ONE_TIME
+                  value: "true"
+              volumeMounts:
+                - name: job-files
+                  mountPath: /git
+
+          volumes:
+            - name: job-files
+              emptyDir: {}
+
+    ########################
+    # WORKERS — GPU
+    ########################
+    workerGroupSpecs:
+      # ── Default: 1 worker, full RTX 4070 ─────────────────────────────
+      # To use time-slicing (2 workers × 0.5 GPU):
+      #   1. Enable sharing.timeSlicing in nvidia-device-plugin-values.yaml
+      #      and redeploy the helm chart (replicas: 2 exposes 2 virtual GPUs).
+      #   2. Change replicas / minReplicas / maxReplicas to 2.
+      #   3. Change NUM_WORKERS env var above to "2".
+      #   Each worker still requests nvidia.com/gpu: 1 (virtual slice).
+      - replicas: 1
+        minReplicas: 1
+        maxReplicas: 1
+        groupName: gpu-workers
+        rayStartParams:
+          # Advertise 1 GPU to the Ray scheduler so tasks can request GPU.
+          num-gpus: "1"
+
+        template:
+          metadata:
+            labels:
+              app: kuberay-training-gpu
+          spec:
+            # ── RuntimeClass: use nvidia container runtime ─────────────
+            # Required when nvidia is NOT the default containerd runtime.
+            # Matches the handler in nvidia-runtime-class.yaml.
+            runtimeClassName: nvidia
+
+            # ── Toleration: needed if the GPU node has the GPU taint ───
+            tolerations:
+              - key: nvidia.com/gpu
+                operator: Exists
+                effect: NoSchedule
+
+            # No podAntiAffinity: single-node cluster, both pods land here.
+
+            containers:
+              - name: ray-worker
+                image: ray-cluster-gpu:2.53.0
+                resources:
+                  limits:
+                    cpu: "10"
+                    # RTX 4070 node memory budget.
+                    # Total node RAM - head (3Gi) - system (~2Gi) = ~19Gi free
+                    # on a 24Gi node. Adjust to your actual node RAM.
+                    memory: "16Gi"
+                    # Claims the full physical GPU.
+                    # With time-slicing enabled (replicas: 2), this still
+                    # says "1" — k8s maps it to 1 virtual time-slice.
+                    nvidia.com/gpu: "1"
+                  requests:
+                    cpu: "8"
+                    memory: "12Gi"
+                    nvidia.com/gpu: "1"
+
+                volumeMounts:
+                  - name: job-files
+                    mountPath: /home/ray/app
+
+                envFrom:
+                  - secretRef:
+                      name: env-secret
+                env:
+                  - name: RAY_enable_infeasible_task_early_exit
+                    value: "true"
+                  - name: RAY_DEFAULT_OBJECT_STORE_MEMORY_PROPORTION
+                    value: "0.7"
+                  - name: RAY_ACCEL_ENV_VAR_OVERRIDE_ON_ZERO
+                    value: "0"
+                  - name: PYTHONPATH
+                    value: /home/ray/app/repo:/home/ray/app/repo/src
+                  # Optionally limit PyTorch to 1 GPU inside the container.
+                  - name: CUDA_VISIBLE_DEVICES
+                    value: "0"
+
+            initContainers:
+              - name: git-sync
+                image: registry.k8s.io/git-sync/git-sync:v4.1.0
+                resources:
+                  requests:
+                    cpu: 100m
+                    memory: 128Mi
+                  limits:
+                    cpu: 200m
+                    memory: 256Mi
+                env:
+                  - name: GITSYNC_REPO
+                    value: "https://github.com/takenking9879/Kubernetes-MLOPS-platform"
+                  - name: GIT_SYNC_BRANCH
+                    value: "main"
+                  - name: GIT_SYNC_ROOT
+                    value: "/git"
+                  - name: GIT_SYNC_DEST
+                    value: "repo"
+                  - name: GIT_SYNC_WAIT
+                    value: "30"
+                  - name: GITSYNC_ONE_TIME
+                    value: "true"
+                volumeMounts:
+                  - name: job-files
+                    mountPath: /git
+
+            volumes:
+              - name: job-files
+                emptyDir: {}
