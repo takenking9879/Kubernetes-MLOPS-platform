@@ -1,0 +1,184 @@
+---
+# ServiceAccount — identity used by the pod to authenticate to the K8s API.
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: vk-ml
+  namespace: kube-system
+---
+# ClusterRole — permissions needed to manage the virtual node and watch pods.
+# Scope is intentionally minimal: only what the provider actually uses.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: vk-ml
+rules:
+  # Pod management: create/update/delete worker pods, read pod specs.
+  - apiGroups: [""]
+    resources: ["pods", "pods/status"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  # Node management: register and update the virtual node object and its status.
+  - apiGroups: [""]
+    resources: ["nodes", "nodes/status"]
+    verbs: ["get", "list", "watch", "create", "update", "patch"]
+  # Supporting resources needed by the PodController to resolve pod specs.
+  - apiGroups: [""]
+    resources: ["secrets", "configmaps", "services", "namespaces"]
+    verbs: ["get", "list", "watch"]
+  # Events: emitted by the PodController for lifecycle transitions.
+  - apiGroups: [""]
+    resources: ["events"]
+    verbs: ["create", "patch"]
+  # Coordination lease: used by the NodeController for HA heartbeating.
+  - apiGroups: ["coordination.k8s.io"]
+    resources: ["leases"]
+    verbs: ["get", "create", "update"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: vk-ml
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: vk-ml
+subjects:
+  - kind: ServiceAccount
+    name: vk-ml
+    namespace: kube-system
+---
+# Secret — holds RunPod API and Tailscale credentials.
+# Create this manually before deploying:
+#   kubectl create secret generic vk-ml-secrets \
+#     --from-literal=RUNPOD_API_KEY=your_runpod_key \
+#     --from-literal=TAILSCALE_AUTH_KEY=tskey-auth-... \
+#     --from-literal=TAILSCALE_API_KEY=tskey-api-... \
+#     -n kube-system
+#
+# TAILSCALE_AUTH_KEY  — static fallback auth key; required if TAILSCALE_API_KEY is absent.
+# TAILSCALE_API_KEY   — management API key (read/write scope); enables automatic DNS sync
+#                       (creates/updates the MagicDNS A record at startup) and per-worker
+#                       ephemeral key generation (each container gets a fresh single-use key).
+#                       Generate at: https://login.tailscale.com/admin/settings/keys
+apiVersion: v1
+kind: Secret
+metadata:
+  name: vk-ml-secrets
+  namespace: kube-system
+type: Opaque
+# Data is intentionally empty — fill it in before deployment.
+# stringData:
+#   RUNPOD_API_KEY: "your-runpod-api-key"
+---
+# Deployment — runs the virtual kubelet process.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: vk-ml
+  namespace: kube-system
+  labels:
+    app: vk-ml
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: vk-ml
+  template:
+    metadata:
+      labels:
+        app: vk-ml
+    spec:
+      serviceAccountName: vk-ml
+      # Run on a real node, not on the virtual node itself.
+      nodeSelector:
+        kubernetes.io/os: linux
+      # Tolerate control-plane taints so the process can run on k3s master.
+      tolerations:
+        - key: node-role.kubernetes.io/control-plane
+          operator: Exists
+          effect: NoSchedule
+      containers:
+        - name: vk-ml
+          image: vk-ml:latest
+          imagePullPolicy: IfNotPresent
+          args:
+            - --compute-provider=runpod
+            - --node-name=vk-ml-runpod
+            - --namespace=ray
+            - --reconcile-interval=15s
+            - --node-cpu=1000
+            - --node-memory=10Ti
+            - --node-gpu=100
+            - --tailscale-enabled=true
+            # --tailnet-name: use "-" for the default tailnet of TAILSCALE_API_KEY,
+            # or specify the org name explicitly (e.g. "example@github").
+            - --tailnet-name=-
+            # --ray-head-dns-record: vk-ml creates/updates this MagicDNS A record at startup,
+            # pointing it to the ClusterIP of --ray-head-service.
+            # Replace <tailnet> with your actual tailnet name (visible in admin.tailscale.com → DNS).
+            - --ray-head-dns-record=ray-head.tail9789aa.ts.net
+            # --ray-head-service: K8s service whose ClusterIP the DNS record targets.
+            - --ray-head-service=ray-gpu-test-head
+            # --ray-head-tailscale-addr is auto-derived from --ray-head-dns-record + ":6379"
+            # when omitted. Set it explicitly only if the Ray GCS port differs from 6379.
+            # ── RunPod pod parameters ────────────────────────────────────────
+            # GPU model to request. Override to pin a different card.
+            # Set to "" (--runpod-gpu-type=) to let RunPod auto-select by cost/availability.
+            - --runpod-gpu-type=NVIDIA RTX 2000 Ada Generation
+            # GPU priority: "availability" (default) or "price"
+            - --runpod-gpu-priority=availability
+            # Cloud type: "SECURE" (default) or "COMMUNITY"
+            - --runpod-cloud-type=SECURE
+            # Container disk size in GB
+            - --runpod-disk-gb=50
+            # Interruptible/spot instances — false = on-demand (default)
+            - --runpod-interruptible=false
+            # Optional: restrict to specific data centers (comma-separated IDs).
+            # Comment out or omit to allow all data centers.
+            # - --runpod-datacenter-ids=US-TX-3,EU-RO-1
+            # Optional: minimum disk bandwidth MB/s and download Mbps (0 = no constraint)
+            # - --runpod-min-disk-mbps=200
+            # - --runpod-min-download-mbps=500
+          env:
+            - name: RUNPOD_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: vk-ml-secrets
+                  key: RUNPOD_API_KEY
+            - name: TAILSCALE_AUTH_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: vk-ml-secrets
+                  key: TAILSCALE_AUTH_KEY
+                  optional: true  # not required when TAILSCALE_API_KEY generates per-worker keys
+            - name: TAILSCALE_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: vk-ml-secrets
+                  key: TAILSCALE_API_KEY
+                  optional: true  # enables auto-DNS and ephemeral keys; omit to use static auth key only
+          ports:
+            - name: health
+              containerPort: 8080
+              protocol: TCP
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 200m
+              memory: 256Mi
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: 8080
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            timeoutSeconds: 5
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: 8080
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            timeoutSeconds: 3

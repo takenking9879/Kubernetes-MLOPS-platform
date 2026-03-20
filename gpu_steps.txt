@@ -4,3 +4,31 @@ helm install my-nvidia-device-plugin nvidia-device-plugin/nvidia-device-plugin -
 
 #Crear imagen GPU
 docker build -t ray-cluster-gpu:2.53.0 ./k3s/kuberay/gpu/
+
+kubectl apply -f k3s/kuberay/kuberay-job-gpu.yaml
+
+kubectl delete rayjob ray-gpu-test-job -n ray
+
+
+cd virtual-kubelet-ml-platform
+# 1. Run the virtual kubelet locally against your k3s cluster
+KUBECONFIG=~/.kube/config go run ./cmd/vk-ml \
+  --compute-provider=local \
+  --node-name=vk-ml-runpod \
+  --namespace=ray
+
+kubectl delete node vk-ml-runpod
+
+# 2. Verify virtual node appears in cluster
+kubectl get nodes
+
+# 3. Apply the RayCluster with workers targeted at vk-ml-runpod
+kubectl apply -f k3s/kuberay/kuberay-job-gpu.yaml
+
+# 4. Watch pods get scheduled to virtual node → Docker containers launched locally
+kubectl get pods -n ray -w
+docker ps  # see running ray worker containers
+
+# 5. Verify Ray worker joined head
+kubectl logs -n ray <head-pod>
+# Should see: "Added 1 nodes" in Ray logs

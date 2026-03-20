@@ -1,441 +1,1264 @@
-2026-03-04 12:58:58.370 | 2026-03-04 10:58:58,369	INFO cli.py:41 -- Job submission server address: http://ray-train-network-traffic-235537-2026030-66062f-h5s9p-head-svc.ray.svc.cluster.local:8265
-2026-03-04 12:58:58.703 | 2026-03-04 10:58:58,703	SUCC cli.py:65 -- ----------------------------------------------------------------------------------
-2026-03-04 12:58:58.703 | 2026-03-04 10:58:58,703	SUCC cli.py:66 -- Job 'ray-train-network-traffic-235537-2026030-66062f-mqkq6' submitted successfully
-2026-03-04 12:58:58.703 | 2026-03-04 10:58:58,703	SUCC cli.py:67 -- ----------------------------------------------------------------------------------
-2026-03-04 12:58:58.703 | 2026-03-04 10:58:58,703	INFO cli.py:291 -- Next steps
-2026-03-04 12:58:58.703 | 2026-03-04 10:58:58,703	INFO cli.py:292 -- Query the logs of the job:
-2026-03-04 12:58:58.703 | 2026-03-04 10:58:58,703	INFO cli.py:294 -- ray job logs ray-train-network-traffic-235537-2026030-66062f-mqkq6
-2026-03-04 12:58:58.703 | 2026-03-04 10:58:58,703	INFO cli.py:296 -- Query the status of the job:
-2026-03-04 12:58:58.703 | 2026-03-04 10:58:58,703	INFO cli.py:298 -- ray job status ray-train-network-traffic-235537-2026030-66062f-mqkq6
-2026-03-04 12:58:58.703 | 2026-03-04 10:58:58,703	INFO cli.py:300 -- Request the job to be stopped:
-2026-03-04 12:58:58.703 | 2026-03-04 10:58:58,703	INFO cli.py:302 -- ray job stop ray-train-network-traffic-235537-2026030-66062f-mqkq6
-2026-03-04 12:59:00.326 | 2026-03-04 10:59:00,325	INFO cli.py:41 -- Job submission server address: http://ray-train-network-traffic-235537-2026030-66062f-h5s9p-head-svc.ray.svc.cluster.local:8265
-2026-03-04 12:59:02.345 | 2026-03-04 10:58:58,446	INFO job_manager.py:579 -- Runtime env is setting up.
-2026-03-04 12:59:02.345 | Running entrypoint for job ray-train-network-traffic-235537-2026030-66062f-mqkq6: python3 /home/ray/app/repo/k3s/kuberay/main.py
-2026-03-04 12:59:06.351 | 2026-03-04 10:59:05,755	INFO worker.py:1680 -- Using address 10.1.15.62:6379 set in the environment variable RAY_ADDRESS
-2026-03-04 12:59:06.351 | 2026-03-04 10:59:05,757	INFO worker.py:1821 -- Connecting to existing Ray cluster at address: 10.1.15.62:6379...
-2026-03-04 12:59:06.351 | 2026-03-04 10:59:05,775	INFO worker.py:1998 -- Connected to Ray cluster. View the dashboard at http://10.1.15.62:8265 
-2026-03-04 12:59:06.351 | Downloaded params from s3://k8s-mlops-platform-bucket/runs/training/train-network_traffic-235537-20260304T185813Z-66062f/params_training.yaml → /tmp/tmp2alkrhdh.yaml
-2026-03-04 12:59:06.351 | 2026-03-04 10:59:06,249 - KubeRayTraining - DEBUG - Parameters retrieved and sanitized from /tmp/tmp2alkrhdh.yaml
-2026-03-04 12:59:06.351 | 2026-03-04 10:59:06,253 - KubeRayTraining - DEBUG - Parameters retrieved and sanitized from /tmp/tmp2alkrhdh.yaml
-2026-03-04 12:59:06.351 | 2026-03-04 10:59:06,260 - KubeRayTraining - INFO - Target column from DSL: attack
-2026-03-04 12:59:06.351 | 2026-03-04 10:59:06,261 - KubeRayTraining - INFO - Input dimension calculated from DSL: 14 features.
-2026-03-04 12:59:06.351 | 2026-03-04 10:59:06,261 - KubeRayTraining - INFO - Using Iceberg warehouse: s3://k8s-mlops-platform-bucket/warehouse
-2026-03-04 12:59:06.351 | 2026-03-04 10:59:06,262 - KubeRayTraining - INFO - Prometheus metrics server started on port 8002
-2026-03-04 12:59:09.355 | 2026-03-04 10:59:07,666 - KubeRayTraining - INFO - [RAY CLUSTER RESOURCES]
-2026-03-04 12:59:09.355 |             ────────────────────────────────
-2026-03-04 12:59:09.355 |             CPU           : 0.0 / 18.0
-2026-03-04 12:59:09.355 |             Memory        : 0B / 9.00GiB
-2026-03-04 12:59:09.355 |             Object Store  : 0B / 5.43GiB
-2026-03-04 12:59:09.355 |             ────────────────────────────────
-2026-03-04 12:59:09.355 | 2026-03-04 10:59:07,928 - KubeRayTraining - INFO - Minio connection verified. Buckets: ['frontend-crm-bucket', 'k8s-mlops-platform-bucket']
-2026-03-04 12:59:12.361 | 2026-03-04 10:59:09,534 - KubeRayTraining - INFO - Latest artifact found — id=235537, table=iceberg.processed.network_traffic_235537
-2026-03-04 12:59:12.361 | 2026-03-04 10:59:09,535 - KubeRayTraining - INFO - Using processed table from metadata: iceberg.processed.network_traffic_235537
-2026-03-04 12:59:12.361 | 2026-03-04 10:59:09,536 - KubeRayTraining - INFO - Starting training pipeline with Iceberg table: processed.network_traffic_235537
-2026-03-04 12:59:12.361 | 2026-03-04 10:59:09,536 - KubeRayTraining - INFO - Starting training using framework: xgboost
-2026-03-04 12:59:12.361 | 2026-03-04 10:59:09,536 - KubeRayTraining - INFO - Starting hyperparameter tuning with Iceberg row filtering...
-2026-03-04 12:59:16.368 | /home/ray/anaconda3/lib/python3.11/site-packages/google/rpc/__init__.py:18: UserWarning: pkg_resources is deprecated as an API. See https://setuptools.pypa.io/en/latest/pkg_resources.html. The pkg_resources package is slated for removal as early as 2025-11-30. Refrain from using this package or pin to Setuptools<81.
-2026-03-04 12:59:16.368 |   import pkg_resources
-2026-03-04 12:59:16.368 | ╭──────────────────────────────────────────────────────────╮
-2026-03-04 12:59:16.368 | │ Configuration for experiment     xgboost_tune            │
-2026-03-04 12:59:16.368 | ├──────────────────────────────────────────────────────────┤
-2026-03-04 12:59:16.368 | │ Search algorithm                 BasicVariantGenerator   │
-2026-03-04 12:59:16.369 | │ Scheduler                        AsyncHyperBandScheduler │
-2026-03-04 12:59:16.369 | │ Number of trials                 3                       │
-2026-03-04 12:59:16.369 | ╰──────────────────────────────────────────────────────────╯
-2026-03-04 12:59:16.369 | 
-2026-03-04 12:59:16.369 | View detailed results here: k8s-mlops-platform-bucket/v1/models/xgboost_tune
-2026-03-04 12:59:16.369 | To visualize your results with TensorBoard, run: `tensorboard --logdir /tmp/ray/session_2026-03-04_10-58-25_363918_1/artifacts/2026-03-04_10-59-15/xgboost_tune/driver_artifacts`
-2026-03-04 12:59:16.369 | 
-2026-03-04 12:59:16.369 | Trial status: 2 PENDING
-2026-03-04 12:59:16.369 | Current time: 2026-03-04 10:59:16. Total running time: 0s
-2026-03-04 12:59:16.369 | Logical resource usage: 0/18 CPUs, 0/0 GPUs
-2026-03-04 12:59:16.369 | ╭───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
-2026-03-04 12:59:16.369 | │ Trial name               status       ..._params/max_depth     .../min_child_weight     ..._params/subsample     xgboost_params/eta     ...ost_params/lambda     xgboost_params/alpha │
-2026-03-04 12:59:16.369 | ├───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
-2026-03-04 12:59:16.369 | │ _trainable_3d834_00000   PENDING                        10                        1                 0.85584             0.0227124                   0.551378                0.0675578 │
-2026-03-04 12:59:17.369 | │ _trainable_3d834_00001   PENDING                         3                        3                 0.755496            0.000877963                 0.187709                0.214452  │
-2026-03-04 12:59:17.369 | ╰───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
-2026-03-04 12:59:21.375 | 
-2026-03-04 12:59:21.375 | Trial _trainable_3d834_00000 started with configuration:
-2026-03-04 12:59:21.375 | ╭──────────────────────────────────────────────────────────────╮
-2026-03-04 12:59:21.375 | │ Trial _trainable_3d834_00000 config                          │
-2026-03-04 12:59:21.375 | ├──────────────────────────────────────────────────────────────┤
-2026-03-04 12:59:21.375 | │ xgboost_params/alpha                     0.06755783389483333 │
-2026-03-04 12:59:21.375 | │ xgboost_params/eta                      0.022712353891979675 │
-2026-03-04 12:59:21.375 | │ xgboost_params/eval_metric              ...gloss', 'merror'] │
-2026-03-04 12:59:21.375 | │ xgboost_params/lambda                     0.5513775028839663 │
-2026-03-04 12:59:21.375 | │ xgboost_params/max_depth                                  10 │
-2026-03-04 12:59:21.375 | │ xgboost_params/min_child_weight                            1 │
-2026-03-04 12:59:21.375 | │ xgboost_params/objective                      multi:softprob │
-2026-03-04 12:59:21.375 | │ xgboost_params/subsample                  0.8558402410953434 │
-2026-03-04 12:59:21.375 | ╰──────────────────────────────────────────────────────────────╯
-2026-03-04 12:59:21.375 | 
-2026-03-04 12:59:21.375 | Trial _trainable_3d834_00001 started with configuration:
-2026-03-04 12:59:21.375 | ╭───────────────────────────────────────────────────────────────╮
-2026-03-04 12:59:21.375 | │ Trial _trainable_3d834_00001 config                           │
-2026-03-04 12:59:21.375 | ├───────────────────────────────────────────────────────────────┤
-2026-03-04 12:59:21.375 | │ xgboost_params/alpha                      0.21445179459663105 │
-2026-03-04 12:59:22.377 | │ xgboost_params/eta                      0.0008779627690966223 │
-2026-03-04 12:59:22.377 | │ xgboost_params/eval_metric               ...gloss', 'merror'] │
-2026-03-04 12:59:22.377 | │ xgboost_params/lambda                     0.18770946151777737 │
-2026-03-04 12:59:22.377 | │ xgboost_params/max_depth                                    3 │
-2026-03-04 12:59:22.377 | │ xgboost_params/min_child_weight                             3 │
-2026-03-04 12:59:22.377 | │ xgboost_params/objective                       multi:softprob │
-2026-03-04 12:59:22.377 | │ xgboost_params/subsample                   0.7554961451512414 │
-2026-03-04 12:59:22.377 | ╰───────────────────────────────────────────────────────────────╯
-2026-03-04 12:59:25.381 | (_trainable pid=428, ip=10.1.15.64) Reducing the parallelism to 1, as that is thenumber of files
-2026-03-04 12:59:26.382 | (_trainable pid=419, ip=10.1.15.63) Registered dataset logger for dataset dataset_7_0
-2026-03-04 12:59:26.382 | (_trainable pid=419, ip=10.1.15.63) Starting execution of Dataset dataset_7_0. Full logs are in /tmp/ray/session_2026-03-04_10-58-25_363918_1/logs/ray-data
-2026-03-04 12:59:26.382 | (_trainable pid=419, ip=10.1.15.63) Execution plan of Dataset dataset_7_0: InputDataBuffer[Input] -> TaskPoolMapOperator[ReadIceberg] -> LimitOperator[limit=250000] -> TaskPoolMapOperator[MapBatches(random_sample)]
-2026-03-04 12:59:26.382 | (_trainable pid=419, ip=10.1.15.63) [dataset]: A new progress UI is available. To enable, set `ray.data.DataContext.get_current().enable_rich_progress_bars = True` and `ray.data.DataContext.get_current().use_ray_tqdm = False`.
-2026-03-04 12:59:26.382 | (_trainable pid=419, ip=10.1.15.63) Progress bar disabled because stdout is a non-interactive terminal.
-2026-03-04 12:59:26.382 | (_trainable pid=428, ip=10.1.15.64) === Ray Data Progress {Running Dataset} ===
-2026-03-04 12:59:26.382 | (_trainable pid=428, ip=10.1.15.64) Running Dataset: dataset_11_0. Active & requested resources: 0/18 CPU, 0.0B/2.7GiB object store: Progress Completed 0 / ?
-2026-03-04 12:59:29.386 | (_trainable pid=419, ip=10.1.15.63) ✔️  Dataset dataset_7_0 execution finished in 2.29 seconds
-2026-03-04 12:59:29.386 | (_trainable pid=419, ip=10.1.15.63) Execution plan of Dataset dataset_13_0: InputDataBuffer[Input] -> TaskPoolMapOperator[ReadIceberg] -> LimitOperator[limit=150000]
-2026-03-04 12:59:30.401 | (_trainable pid=428, ip=10.1.15.64) Reducing the parallelism to 1, as that is thenumber of files [repeated 11x across cluster] (Ray deduplicates logs by default. Set RAY_DEDUP_LOGS=0 to disable log deduplication, or see https://docs.ray.io/en/master/ray-observability/user-guides/configure-logging.html#log-deduplication for more options.)
-2026-03-04 12:59:34.408 | (TrainController pid=936, ip=10.1.15.63) Attempting to start training worker group of size 1 with the following resources: [{'CPU': 6}] * 1
-2026-03-04 12:59:34.408 | (_trainable pid=428, ip=10.1.15.64) Registered dataset logger for dataset dataset_15_0 [repeated 3x across cluster]
-2026-03-04 12:59:34.408 | (_trainable pid=428, ip=10.1.15.64) Starting execution of Dataset dataset_15_0. Full logs are in /tmp/ray/session_2026-03-04_10-58-25_363918_1/logs/ray-data [repeated 3x across cluster]
-2026-03-04 12:59:34.408 | (_trainable pid=428, ip=10.1.15.64) Execution plan of Dataset dataset_11_0: InputDataBuffer[Input] -> TaskPoolMapOperator[ReadIceberg] -> LimitOperator[limit=250000] -> TaskPoolMapOperator[MapBatches(random_sample)]
-2026-03-04 12:59:34.408 | (_trainable pid=428, ip=10.1.15.64) [dataset]: A new progress UI is available. To enable, set `ray.data.DataContext.get_current().enable_rich_progress_bars = True` and `ray.data.DataContext.get_current().use_ray_tqdm = False`.
-2026-03-04 12:59:34.408 | (_trainable pid=428, ip=10.1.15.64) Progress bar disabled because stdout is a non-interactive terminal.
-2026-03-04 12:59:34.408 | (_trainable pid=428, ip=10.1.15.64) === Ray Data Progress {Running Dataset} === [repeated 3x across cluster]
-2026-03-04 12:59:34.408 | (_trainable pid=428, ip=10.1.15.64) Running Dataset: dataset_15_0. Active & requested resources: 0/18 CPU, 0.0B/2.7GiB object store: Progress Completed 0 / ? [repeated 3x across cluster]
-2026-03-04 12:59:34.408 | (_trainable pid=428, ip=10.1.15.64) ✔️  Dataset dataset_15_0 execution finished in 2.07 seconds [repeated 3x across cluster]
-2026-03-04 12:59:34.408 | (_trainable pid=428, ip=10.1.15.64) Execution plan of Dataset dataset_15_0: InputDataBuffer[Input] -> TaskPoolMapOperator[ReadIceberg] -> LimitOperator[limit=150000]
-2026-03-04 12:59:39.419 | (TrainController pid=936, ip=10.1.15.63) Started training worker group of size 1: 
-2026-03-04 12:59:39.419 | (TrainController pid=936, ip=10.1.15.63) - (ip=10.1.15.64, pid=1204) world_rank=0, local_rank=0, node_rank=0
-2026-03-04 12:59:39.419 | (RayTrainWorker pid=1204, ip=10.1.15.64) [10:59:36] Task [xgboost.ray-rank=00000000]:651dd7c00b75588622d2472702000000 got rank 0
-2026-03-04 12:59:39.419 | (SplitCoordinator pid=1336, ip=10.1.15.64) Execution plan of Dataset train_22_0: InputDataBuffer[Input] -> OutputSplitter[split(1, equal=True)]
-2026-03-04 12:59:39.419 | (SplitCoordinator pid=1336, ip=10.1.15.64) [dataset]: A new progress UI is available. To enable, set `ray.data.DataContext.get_current().enable_rich_progress_bars = True` and `ray.data.DataContext.get_current().use_ray_tqdm = False`.
-2026-03-04 12:59:39.419 | (SplitCoordinator pid=1336, ip=10.1.15.64) Progress bar disabled because stdout is a non-interactive terminal.
-2026-03-04 12:59:39.419 | (RayTrainWorker pid=1204, ip=10.1.15.64) [xgboost_utils] Skipping Prometheus server (tuning mode)
-2026-03-04 12:59:39.419 | (RayTrainWorker pid=1204, ip=10.1.15.64) Reporting training result 1: TrainingReport(checkpoint=None, metrics={'validation-mlogloss': 1.129610945135355, 'validation-merror': 0.05425, 'train-mlogloss': 1.1260055185140927, 'training_iteration': 4}, validation_spec=None)
-2026-03-04 12:59:39.419 | (RayTrainWorker pid=1204, ip=10.1.15.64) Reporting training result 2: TrainingReport(checkpoint=None, metrics={'validation-mlogloss': 1.1250836785435676, 'validation-merror': 0.05425, 'train-mlogloss': 1.1214252129828115, 'training_iteration': 8}, validation_spec=None)
-2026-03-04 12:59:42.426 | (RayTrainWorker pid=1146, ip=10.1.15.63) Checkpoint successfully created at: Checkpoint(filesystem=s3, path=k8s-mlops-platform-bucket/v1/models/xgboost_tune_train_3d834_00000/checkpoint_2026-03-04_10-59-38.976604)
-2026-03-04 12:59:42.426 | (RayTrainWorker pid=1146, ip=10.1.15.63) Reporting training result 3: TrainingReport(checkpoint=Checkpoint(filesystem=s3, path=k8s-mlops-platform-bucket/v1/models/xgboost_tune_train_3d834_00000/checkpoint_2026-03-04_10-59-38.976604), metrics={'validation-mlogloss': 0.9141533133238554, 'validation-merror': 0.05425, 'train-mlogloss': 0.9089756888558888, 'training_iteration': 8}, validation_spec=None)
-2026-03-04 12:59:42.426 | (TrainController pid=988, ip=10.1.15.64) Attempting to start training worker group of size 1 with the following resources: [{'CPU': 6}] * 1
-2026-03-04 12:59:42.426 | (SplitCoordinator pid=1337, ip=10.1.15.64) Registered dataset logger for dataset val_24_2 [repeated 14x across cluster]
-2026-03-04 12:59:42.426 | (SplitCoordinator pid=1337, ip=10.1.15.64) Starting execution of Dataset val_24_2. Full logs are in /tmp/ray/session_2026-03-04_10-58-25_363918_1/logs/ray-data [repeated 14x across cluster]
-2026-03-04 12:59:42.426 | (SplitCoordinator pid=1337, ip=10.1.15.64) === Ray Data Progress {Running Dataset} === [repeated 14x across cluster]
-2026-03-04 12:59:42.426 | (SplitCoordinator pid=1337, ip=10.1.15.64) Running Dataset: val_24_2. Active & requested resources: 0/12 CPU, 0.0B/2.7GiB object store: Progress Completed 0 / ? [repeated 14x across cluster]
-2026-03-04 12:59:42.426 | (SplitCoordinator pid=1337, ip=10.1.15.64) ✔️  Dataset val_24_2 execution finished in 0.03 seconds [repeated 14x across cluster]
-2026-03-04 12:59:42.426 | (RayTrainWorker pid=1204, ip=10.1.15.64) [xgboost-worker] World rank 0 finished in 3.48s
-2026-03-04 12:59:46.433 | 
-2026-03-04 12:59:46.433 | Trial status: 2 RUNNING
-2026-03-04 12:59:46.433 | Current time: 2026-03-04 10:59:46. Total running time: 30s
-2026-03-04 12:59:46.433 | Logical resource usage: 2.0/18 CPUs, 0/0 GPUs
-2026-03-04 12:59:46.433 | ╭────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
-2026-03-04 12:59:46.433 | │ Trial name               status       ..._params/max_depth     .../min_child_weight     ..._params/subsample     xgboost_params/eta     ...ost_params/lambda     xgboost_params/alpha     iter     total time (s)     validation-mlogloss     validation-merror     train-mlogloss │
-2026-03-04 12:59:46.433 | ├────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
-2026-03-04 12:59:46.433 | │ _trainable_3d834_00000   RUNNING                        10                        1                 0.85584             0.0227124                   0.551378                0.0675578                                                                                              │
-2026-03-04 12:59:46.433 | │ _trainable_3d834_00001   RUNNING                         3                        3                 0.755496            0.000877963                 0.187709                0.214452         8             25.551                 1.12508               0.05425            1.12143 │
-2026-03-04 12:59:46.433 | ╰────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
-2026-03-04 12:59:48.435 | 🏃 View run _trainable_3d834_00000 at: http://my-mlflow/#/experiments/1/runs/44299a522cd04a15965234a17ed9a337
-2026-03-04 12:59:48.435 | 🧪 View experiment at: http://my-mlflow/#/experiments/1
-2026-03-04 12:59:48.435 | 
-2026-03-04 12:59:48.435 | Trial _trainable_3d834_00000 completed after 8 iterations at 2026-03-04 10:59:46. Total running time: 30s
-2026-03-04 12:59:48.435 | ╭─────────────────────────────────────────────────╮
-2026-03-04 12:59:48.435 | │ Trial _trainable_3d834_00000 result             │
-2026-03-04 12:59:48.435 | ├─────────────────────────────────────────────────┤
-2026-03-04 12:59:48.435 | │ checkpoint_dir_name                             │
-2026-03-04 12:59:48.435 | │ time_this_iter_s                        25.6074 │
-2026-03-04 12:59:48.435 | │ time_total_s                            25.6074 │
-2026-03-04 12:59:48.435 | │ training_iteration                            8 │
-2026-03-04 12:59:48.435 | │ train-mlogloss                          0.90898 │
-2026-03-04 12:59:48.435 | │ validation-merror                       0.05425 │
-2026-03-04 12:59:48.435 | │ validation-mlogloss                     0.91415 │
-2026-03-04 12:59:48.435 | ╰─────────────────────────────────────────────────╯
-2026-03-04 12:59:48.435 | 🏃 View run _trainable_3d834_00001 at: http://my-mlflow/#/experiments/1/runs/eb5cd9b260d34c05b35c595fc9d03417
-2026-03-04 12:59:48.435 | 🧪 View experiment at: http://my-mlflow/#/experiments/1
-2026-03-04 12:59:48.435 | 
-2026-03-04 12:59:48.435 | Trial _trainable_3d834_00001 completed after 8 iterations at 2026-03-04 10:59:46. Total running time: 30s
-2026-03-04 12:59:48.435 | ╭─────────────────────────────────────────────────╮
-2026-03-04 12:59:48.435 | │ Trial _trainable_3d834_00001 result             │
-2026-03-04 12:59:48.435 | ├─────────────────────────────────────────────────┤
-2026-03-04 12:59:48.435 | │ checkpoint_dir_name                             │
-2026-03-04 12:59:48.435 | │ time_this_iter_s                         25.551 │
-2026-03-04 12:59:48.435 | │ time_total_s                             25.551 │
-2026-03-04 12:59:48.435 | │ training_iteration                            8 │
-2026-03-04 12:59:48.435 | │ train-mlogloss                          1.12143 │
-2026-03-04 12:59:48.435 | │ validation-merror                       0.05425 │
-2026-03-04 12:59:48.435 | │ validation-mlogloss                     1.12508 │
-2026-03-04 12:59:48.435 | ╰─────────────────────────────────────────────────╯
-2026-03-04 12:59:50.439 | 
-2026-03-04 12:59:50.439 | Trial _trainable_3d834_00002 started with configuration:
-2026-03-04 12:59:50.439 | ╭──────────────────────────────────────────────────────────────╮
-2026-03-04 12:59:50.439 | │ Trial _trainable_3d834_00002 config                          │
-2026-03-04 12:59:50.439 | ├──────────────────────────────────────────────────────────────┤
-2026-03-04 12:59:50.439 | │ xgboost_params/alpha                      1.1361147868732953 │
-2026-03-04 12:59:50.439 | │ xgboost_params/eta                       0.09131998340753009 │
-2026-03-04 12:59:50.439 | │ xgboost_params/eval_metric              ...gloss', 'merror'] │
-2026-03-04 12:59:50.439 | │ xgboost_params/lambda                    0.21971773310923365 │
-2026-03-04 12:59:50.439 | │ xgboost_params/max_depth                                   5 │
-2026-03-04 12:59:51.440 | │ xgboost_params/min_child_weight                            2 │
-2026-03-04 12:59:51.440 | │ xgboost_params/objective                      multi:softprob │
-2026-03-04 12:59:51.440 | │ xgboost_params/subsample                  0.5145978640127624 │
-2026-03-04 12:59:51.440 | ╰──────────────────────────────────────────────────────────────╯
-2026-03-04 12:59:53.443 | (_trainable pid=1673, ip=10.1.15.64) Reducing the parallelism to 1, as that is thenumber of files
-2026-03-04 12:59:53.443 | (TrainController pid=988, ip=10.1.15.64) Started training worker group of size 1: 
-2026-03-04 12:59:53.443 | (TrainController pid=988, ip=10.1.15.64) - (ip=10.1.15.63, pid=1146) world_rank=0, local_rank=0, node_rank=0
-2026-03-04 12:59:53.443 | (RayTrainWorker pid=1146, ip=10.1.15.63) [10:59:36] Task [xgboost.ray-rank=00000000]:189f94b8ff1f1d82ccd7a6bf02000000 got rank 0
-2026-03-04 12:59:53.443 | (SplitCoordinator pid=1337, ip=10.1.15.64) Execution plan of Dataset val_24_2: InputDataBuffer[Input] -> OutputSplitter[split(1, equal=True)] [repeated 13x across cluster]
-2026-03-04 12:59:53.443 | (SplitCoordinator pid=1272, ip=10.1.15.63) [dataset]: A new progress UI is available. To enable, set `ray.data.DataContext.get_current().enable_rich_progress_bars = True` and `ray.data.DataContext.get_current().use_ray_tqdm = False`. [repeated 3x across cluster]
-2026-03-04 12:59:53.443 | (SplitCoordinator pid=1272, ip=10.1.15.63) Progress bar disabled because stdout is a non-interactive terminal. [repeated 3x across cluster]
-2026-03-04 12:59:53.443 | (RayTrainWorker pid=1146, ip=10.1.15.63) [xgboost_utils] Skipping Prometheus server (tuning mode)
-2026-03-04 12:59:53.443 | (RayTrainWorker pid=1146, ip=10.1.15.63) Reporting training result 2: TrainingReport(checkpoint=None, metrics={'validation-mlogloss': 0.9141533133238554, 'validation-merror': 0.05425, 'train-mlogloss': 0.9089756888558888, 'training_iteration': 8}, validation_spec=None) [repeated 2x across cluster]
-2026-03-04 12:59:53.443 | (RayTrainWorker pid=1204, ip=10.1.15.64) Checkpoint successfully created at: Checkpoint(filesystem=s3, path=k8s-mlops-platform-bucket/v1/models/xgboost_tune_train_3d834_00001/checkpoint_2026-03-04_10-59-38.920451)
-2026-03-04 12:59:53.443 | (RayTrainWorker pid=1204, ip=10.1.15.64) Reporting training result 3: TrainingReport(checkpoint=Checkpoint(filesystem=s3, path=k8s-mlops-platform-bucket/v1/models/xgboost_tune_train_3d834_00001/checkpoint_2026-03-04_10-59-38.920451), metrics={'validation-mlogloss': 1.1250836785435676, 'validation-merror': 0.05425, 'train-mlogloss': 1.1214252129828115, 'training_iteration': 8}, validation_spec=None)
-2026-03-04 12:59:53.443 | (RayTrainWorker pid=1146, ip=10.1.15.63) [xgboost-worker] World rank 0 finished in 3.49s
-2026-03-04 12:59:53.443 | (_trainable pid=1673, ip=10.1.15.64) Reducing the parallelism to 1, as that is thenumber of files
-2026-03-04 12:59:53.443 | (_trainable pid=1673, ip=10.1.15.64) Registered dataset logger for dataset dataset_31_0
-2026-03-04 12:59:53.443 | (_trainable pid=1673, ip=10.1.15.64) Reducing the parallelism to 1, as that is thenumber of files
-2026-03-04 12:59:53.443 | (_trainable pid=1673, ip=10.1.15.64) Starting execution of Dataset dataset_31_0. Full logs are in /tmp/ray/session_2026-03-04_10-58-25_363918_1/logs/ray-data
-2026-03-04 12:59:53.443 | (_trainable pid=1673, ip=10.1.15.64) Execution plan of Dataset dataset_31_0: InputDataBuffer[Input] -> TaskPoolMapOperator[ReadIceberg] -> LimitOperator[limit=250000] -> TaskPoolMapOperator[MapBatches(random_sample)]
-2026-03-04 12:59:53.443 | (_trainable pid=1673, ip=10.1.15.64) Reducing the parallelism to 1, as that is thenumber of files
-2026-03-04 12:59:53.443 | (_trainable pid=1673, ip=10.1.15.64) === Ray Data Progress {Running Dataset} ===
-2026-03-04 12:59:53.443 | (_trainable pid=1673, ip=10.1.15.64) Running Dataset: dataset_31_0. Active & requested resources: 0/18 CPU, 0.0B/2.7GiB object store: Progress Completed 0 / ?
-2026-03-04 12:59:54.444 | (_trainable pid=1673, ip=10.1.15.64) ✔️  Dataset dataset_31_0 execution finished in 0.70 seconds
-2026-03-04 12:59:54.444 | (_trainable pid=1673, ip=10.1.15.64) Registered dataset logger for dataset dataset_33_0
-2026-03-04 12:59:54.444 | (_trainable pid=1673, ip=10.1.15.64) Reducing the parallelism to 1, as that is thenumber of files
-2026-03-04 12:59:54.444 | (_trainable pid=1673, ip=10.1.15.64) Starting execution of Dataset dataset_33_0. Full logs are in /tmp/ray/session_2026-03-04_10-58-25_363918_1/logs/ray-data
-2026-03-04 12:59:54.444 | (_trainable pid=1673, ip=10.1.15.64) Execution plan of Dataset dataset_33_0: InputDataBuffer[Input] -> TaskPoolMapOperator[ReadIceberg] -> LimitOperator[limit=150000]
-2026-03-04 12:59:54.444 | (_trainable pid=1673, ip=10.1.15.64) Reducing the parallelism to 1, as that is thenumber of files
-2026-03-04 12:59:54.444 | (_trainable pid=1673, ip=10.1.15.64) === Ray Data Progress {Running Dataset} ===
-2026-03-04 12:59:54.444 | (_trainable pid=1673, ip=10.1.15.64) Running Dataset: dataset_33_0. Active & requested resources: 0/18 CPU, 0.0B/2.7GiB object store: Progress Completed 0 / ?
-2026-03-04 12:59:55.445 | (_trainable pid=1673, ip=10.1.15.64) ✔️  Dataset dataset_33_0 execution finished in 0.62 seconds
-2026-03-04 13:00:00.469 | (TrainController pid=1860, ip=10.1.15.64) Attempting to start training worker group of size 1 with the following resources: [{'CPU': 6}] * 1
-2026-03-04 13:00:00.469 | (_trainable pid=1673, ip=10.1.15.64) [dataset]: A new progress UI is available. To enable, set `ray.data.DataContext.get_current().enable_rich_progress_bars = True` and `ray.data.DataContext.get_current().use_ray_tqdm = False`.
-2026-03-04 13:00:00.469 | (_trainable pid=1673, ip=10.1.15.64) Progress bar disabled because stdout is a non-interactive terminal.
-2026-03-04 13:00:00.469 | (RayTrainWorker pid=1615, ip=10.1.15.63) [11:00:00] Task [xgboost.ray-rank=00000000]:6f6a53a7707ff47d80cb894a02000000 got rank 0
-2026-03-04 13:00:00.469 | (TrainController pid=1860, ip=10.1.15.64) Started training worker group of size 1: 
-2026-03-04 13:00:00.469 | (TrainController pid=1860, ip=10.1.15.64) - (ip=10.1.15.63, pid=1615) world_rank=0, local_rank=0, node_rank=0
-2026-03-04 13:00:00.469 | (SplitCoordinator pid=2008, ip=10.1.15.64) Registered dataset logger for dataset train_35_0
-2026-03-04 13:00:00.469 | (SplitCoordinator pid=2008, ip=10.1.15.64) Starting execution of Dataset train_35_0. Full logs are in /tmp/ray/session_2026-03-04_10-58-25_363918_1/logs/ray-data
-2026-03-04 13:00:00.469 | (SplitCoordinator pid=2008, ip=10.1.15.64) Execution plan of Dataset train_35_0: InputDataBuffer[Input] -> OutputSplitter[split(1, equal=True)]
-2026-03-04 13:00:00.469 | (SplitCoordinator pid=2008, ip=10.1.15.64) [dataset]: A new progress UI is available. To enable, set `ray.data.DataContext.get_current().enable_rich_progress_bars = True` and `ray.data.DataContext.get_current().use_ray_tqdm = False`.
-2026-03-04 13:00:00.469 | (SplitCoordinator pid=2008, ip=10.1.15.64) Progress bar disabled because stdout is a non-interactive terminal.
-2026-03-04 13:00:00.469 | (SplitCoordinator pid=2008, ip=10.1.15.64) === Ray Data Progress {Running Dataset} ===
-2026-03-04 13:00:00.469 | (SplitCoordinator pid=2008, ip=10.1.15.64) Running Dataset: train_35_0. Active & requested resources: 0/12 CPU, 0.0B/2.7GiB object store: Progress Completed 0 / ?
-2026-03-04 13:00:00.469 | (SplitCoordinator pid=2008, ip=10.1.15.64) ✔️  Dataset train_35_0 execution finished in 0.03 seconds
-2026-03-04 13:00:00.469 | (SplitCoordinator pid=2008, ip=10.1.15.64) Registered dataset logger for dataset train_35_1
-2026-03-04 13:00:00.469 | (SplitCoordinator pid=2008, ip=10.1.15.64) Starting execution of Dataset train_35_1. Full logs are in /tmp/ray/session_2026-03-04_10-58-25_363918_1/logs/ray-data
-2026-03-04 13:00:00.469 | (SplitCoordinator pid=2008, ip=10.1.15.64) Execution plan of Dataset train_35_1: InputDataBuffer[Input] -> OutputSplitter[split(1, equal=True)]
-2026-03-04 13:00:00.469 | (SplitCoordinator pid=2008, ip=10.1.15.64) === Ray Data Progress {Running Dataset} ===
-2026-03-04 13:00:00.469 | (SplitCoordinator pid=2008, ip=10.1.15.64) Running Dataset: train_35_1. Active & requested resources: 0/12 CPU, 0.0B/2.7GiB object store: Progress Completed 0 / ?
-2026-03-04 13:00:00.469 | (SplitCoordinator pid=2008, ip=10.1.15.64) ✔️  Dataset train_35_1 execution finished in 0.02 seconds
-2026-03-04 13:00:00.469 | (SplitCoordinator pid=2008, ip=10.1.15.64) Registered dataset logger for dataset train_35_2
-2026-03-04 13:00:00.469 | (SplitCoordinator pid=2008, ip=10.1.15.64) Starting execution of Dataset train_35_2. Full logs are in /tmp/ray/session_2026-03-04_10-58-25_363918_1/logs/ray-data
-2026-03-04 13:00:00.469 | (SplitCoordinator pid=2008, ip=10.1.15.64) Execution plan of Dataset train_35_2: InputDataBuffer[Input] -> OutputSplitter[split(1, equal=True)]
-2026-03-04 13:00:01.470 | (SplitCoordinator pid=2008, ip=10.1.15.64) === Ray Data Progress {Running Dataset} ===
-2026-03-04 13:00:01.470 | (SplitCoordinator pid=2008, ip=10.1.15.64) Running Dataset: train_35_2. Active & requested resources: 0/12 CPU, 0.0B/2.7GiB object store: Progress Completed 0 / ?
-2026-03-04 13:00:01.470 | (SplitCoordinator pid=2008, ip=10.1.15.64) ✔️  Dataset train_35_2 execution finished in 0.03 seconds
-2026-03-04 13:00:01.470 | (SplitCoordinator pid=2008, ip=10.1.15.64) Registered dataset logger for dataset train_35_3
-2026-03-04 13:00:01.470 | (SplitCoordinator pid=2008, ip=10.1.15.64) Starting execution of Dataset train_35_3. Full logs are in /tmp/ray/session_2026-03-04_10-58-25_363918_1/logs/ray-data
-2026-03-04 13:00:01.470 | (SplitCoordinator pid=2008, ip=10.1.15.64) Execution plan of Dataset train_35_3: InputDataBuffer[Input] -> OutputSplitter[split(1, equal=True)]
-2026-03-04 13:00:01.470 | (SplitCoordinator pid=2008, ip=10.1.15.64) === Ray Data Progress {Running Dataset} ===
-2026-03-04 13:00:01.470 | (SplitCoordinator pid=2008, ip=10.1.15.64) Running Dataset: train_35_3. Active & requested resources: 0/12 CPU, 0.0B/2.7GiB object store: Progress Completed 0 / ?
-2026-03-04 13:00:01.470 | (SplitCoordinator pid=2008, ip=10.1.15.64) ✔️  Dataset train_35_3 execution finished in 0.03 seconds
-2026-03-04 13:00:01.470 | (RayTrainWorker pid=1615, ip=10.1.15.63) [xgboost_utils] Skipping Prometheus server (tuning mode)
-2026-03-04 13:00:01.470 | (RayTrainWorker pid=1615, ip=10.1.15.63) Reporting training result 1: TrainingReport(checkpoint=None, metrics={'validation-mlogloss': 0.7673416390568017, 'validation-merror': 0.05425, 'train-mlogloss': 0.7601698447710528, 'training_iteration': 4}, validation_spec=None)
-2026-03-04 13:00:01.470 | (RayTrainWorker pid=1615, ip=10.1.15.63) Reporting training result 2: TrainingReport(checkpoint=None, metrics={'validation-mlogloss': 0.5399243189767003, 'validation-merror': 0.05425, 'train-mlogloss': 0.5299155638835329, 'training_iteration': 8}, validation_spec=None)
-2026-03-04 13:00:06.480 | (RayTrainWorker pid=1615, ip=10.1.15.63) Checkpoint successfully created at: Checkpoint(filesystem=s3, path=k8s-mlops-platform-bucket/v1/models/xgboost_tune_train_3d834_00002/checkpoint_2026-03-04_11-00-02.196959)
-2026-03-04 13:00:06.480 | (RayTrainWorker pid=1615, ip=10.1.15.63) Reporting training result 3: TrainingReport(checkpoint=Checkpoint(filesystem=s3, path=k8s-mlops-platform-bucket/v1/models/xgboost_tune_train_3d834_00002/checkpoint_2026-03-04_11-00-02.196959), metrics={'validation-mlogloss': 0.5399243189767003, 'validation-merror': 0.05425, 'train-mlogloss': 0.5299155638835329, 'training_iteration': 8}, validation_spec=None)
-2026-03-04 13:00:06.480 | (RayTrainWorker pid=1615, ip=10.1.15.63) [xgboost-worker] World rank 0 finished in 3.44s
-2026-03-04 13:00:10.486 | 🏃 View run _trainable_3d834_00002 at: http://my-mlflow/#/experiments/1/runs/b9fdc2fbbf5a48bfa5a157443036044d
-2026-03-04 13:00:10.486 | 🧪 View experiment at: http://my-mlflow/#/experiments/1
-2026-03-04 13:00:10.486 | 
-2026-03-04 13:00:10.486 | Trial _trainable_3d834_00002 completed after 8 iterations at 2026-03-04 11:00:09. Total running time: 53s
-2026-03-04 13:00:10.486 | ╭─────────────────────────────────────────────────╮
-2026-03-04 13:00:10.486 | │ Trial _trainable_3d834_00002 result             │
-2026-03-04 13:00:10.486 | ├─────────────────────────────────────────────────┤
-2026-03-04 13:00:10.486 | │ checkpoint_dir_name                             │
-2026-03-04 13:00:10.486 | │ time_this_iter_s                        19.2889 │
-2026-03-04 13:00:10.486 | │ time_total_s                            19.2889 │
-2026-03-04 13:00:11.487 | │ training_iteration                            8 │
-2026-03-04 13:00:11.487 | │ train-mlogloss                          0.52992 │
-2026-03-04 13:00:11.487 | │ validation-merror                       0.05425 │
-2026-03-04 13:00:11.487 | │ validation-mlogloss                     0.53992 │
-2026-03-04 13:00:11.487 | ╰─────────────────────────────────────────────────╯
-2026-03-04 13:00:13.489 | 2026-03-04 11:00:13,294	INFO tune.py:1009 -- Wrote the latest version of all result files and experiment state to 'k8s-mlops-platform-bucket/v1/models/xgboost_tune' in 3.6804s.
-2026-03-04 13:00:13.489 | 
-2026-03-04 13:00:13.489 | Trial status: 3 TERMINATED
-2026-03-04 13:00:13.489 | Current time: 2026-03-04 11:00:13. Total running time: 57s
-2026-03-04 13:00:13.489 | Logical resource usage: 1.0/18 CPUs, 0/0 GPUs
-2026-03-04 13:00:13.489 | ╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
-2026-03-04 13:00:13.489 | │ Trial name               status         ..._params/max_depth     .../min_child_weight     ..._params/subsample     xgboost_params/eta     ...ost_params/lambda     xgboost_params/alpha     iter     total time (s)     validation-mlogloss     validation-merror     train-mlogloss │
-2026-03-04 13:00:13.489 | ├──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
-2026-03-04 13:00:13.489 | │ _trainable_3d834_00000   TERMINATED                       10                        1                 0.85584             0.0227124                   0.551378                0.0675578        8            25.6074                0.914153               0.05425           0.908976 │
-2026-03-04 13:00:13.489 | │ _trainable_3d834_00001   TERMINATED                        3                        3                 0.755496            0.000877963                 0.187709                0.214452         8            25.551                 1.12508                0.05425           1.12143  │
-2026-03-04 13:00:14.491 | │ _trainable_3d834_00002   TERMINATED                        5                        2                 0.514598            0.09132                     0.219718                1.13611          8            19.2889                0.539924               0.05425           0.529916 │
-2026-03-04 13:00:14.491 | ╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
-2026-03-04 13:00:14.491 | 
-2026-03-04 13:00:16.493 | 2026-03-04 11:00:14,506 - KubeRayTraining - INFO - Best hyperparameters found: {'objective': 'multi:softprob', 'eval_metric': ['mlogloss', 'merror'], 'max_depth': 5, 'min_child_weight': 2, 'subsample': 0.5145978640127624, 'eta': 0.09131998340753009, 'lambda': 0.21971773310923365, 'alpha': 1.1361147868732953}
-2026-03-04 13:00:16.493 | 2026-03-04 11:00:14,507 - KubeRayTraining - INFO - Loading final datasets from Iceberg...
-2026-03-04 13:00:16.493 | 2026-03-04 11:00:14,507 - KubeRayTraining - INFO - Loading train split from processed.network_traffic_235537 (2026-01-01T00:30:00+00:00 to 2026-01-01T13:00:00+00:00)
-2026-03-04 13:00:16.493 | /home/ray/app/repo/k3s/kuberay/main.py:171: DeprecationWarning: The 'row_filter' parameter is deprecated and will be removed in a future release. Use the .filter() method on the dataset instead. For example: ds = ray.data.read_iceberg(...).filter(col('column') > 5)
-2026-03-04 13:00:16.493 |   ds = ray.data.read_iceberg(table_identifier=table_name, catalog_kwargs=self.catalog_kwargs, row_filter=row_filter)
-2026-03-04 13:00:16.493 | 2026-03-04 11:00:15,683	WARNING iceberg_datasource.py:431 -- Reducing the parallelism to 1, as that is thenumber of files
-2026-03-04 13:00:16.493 | 2026-03-04 11:00:15,692 - KubeRayTraining - INFO - Schema validation passed. Total columns: 16
-2026-03-04 13:00:16.493 | 2026-03-04 11:00:15,692 - KubeRayTraining - INFO - Materializing train dataset in Ray Object Store for performance.
-2026-03-04 13:00:16.493 | 2026-03-04 11:00:15,705	INFO logging.py:397 -- Registered dataset logger for dataset dataset_40_0
-2026-03-04 13:00:16.493 | 2026-03-04 11:00:15,714	WARNING iceberg_datasource.py:431 -- Reducing the parallelism to 1, as that is thenumber of files
-2026-03-04 13:00:17.495 | 2026-03-04 11:00:15,716	INFO streaming_executor.py:178 -- Starting execution of Dataset dataset_40_0. Full logs are in /tmp/ray/session_2026-03-04_10-58-25_363918_1/logs/ray-data
-2026-03-04 13:00:17.495 | 2026-03-04 11:00:15,716	INFO streaming_executor.py:179 -- Execution plan of Dataset dataset_40_0: InputDataBuffer[Input] -> TaskPoolMapOperator[ReadIceberg]
-2026-03-04 13:00:17.495 | 2026-03-04 11:00:15,716	WARNING iceberg_datasource.py:431 -- Reducing the parallelism to 1, as that is thenumber of files
-2026-03-04 13:00:19.498 |  ✔️  Dataset dataset_40_0 execution finished in 2.18 seconds 1… 3k/…  1.39 k ro… 
-2026-03-04 13:00:19.498 |   │ Active/total resources: Active & requested resources: 0/18 CPU, 9.6KiB/2.7G…
-2026-03-04 13:00:19.498 |   │                                                                             
-2026-03-04 13:00:19.498 |   ├─   ReadIceberg->SplitBlocks(36) 100% ━━━━━━━ 3k/3k [ 0:00:… , 1.39 k row/s ]
-2026-03-04 13:00:19.498 |   │    0.0 CPU, 9.6KiB object store; Tasks: 0; Queued blocks: 0;                
-2026-03-04 13:00:19.498 |                                                                                 2026-03-04 11:00:17,921	INFO progress_manager.py:347 -- ✔️  Dataset dataset_40_0 execution finished in 2.18 seconds
-2026-03-04 13:00:19.498 | 2026-03-04 11:00:17,950 - KubeRayTraining - INFO - Data for split 'train' loaded.
-2026-03-04 13:00:19.498 | 2026-03-04 11:00:17,951 - KubeRayTraining - INFO - Loading val split from processed.network_traffic_235537 (2026-01-01T13:00:00+00:00 to 2026-01-02T05:40:00+00:00)
-2026-03-04 13:00:19.498 | 2026-03-04 11:00:18,884	WARNING iceberg_datasource.py:431 -- Reducing the parallelism to 1, as that is thenumber of files
-2026-03-04 13:00:19.498 | 2026-03-04 11:00:18,887 - KubeRayTraining - INFO - Schema validation passed. Total columns: 16
-2026-03-04 13:00:20.499 | 2026-03-04 11:00:18,887 - KubeRayTraining - INFO - Materializing val dataset in Ray Object Store for performance.
-2026-03-04 13:00:20.499 | 2026-03-04 11:00:18,891	INFO logging.py:397 -- Registered dataset logger for dataset dataset_43_0
-2026-03-04 13:00:20.499 | 2026-03-04 11:00:18,895	WARNING iceberg_datasource.py:431 -- Reducing the parallelism to 1, as that is thenumber of files
-2026-03-04 13:00:20.499 | 2026-03-04 11:00:18,896	INFO streaming_executor.py:178 -- Starting execution of Dataset dataset_43_0. Full logs are in /tmp/ray/session_2026-03-04_10-58-25_363918_1/logs/ray-data
-2026-03-04 13:00:20.499 | 2026-03-04 11:00:18,896	INFO streaming_executor.py:179 -- Execution plan of Dataset dataset_43_0: InputDataBuffer[Input] -> TaskPoolMapOperator[ReadIceberg]
-2026-03-04 13:00:20.499 | 2026-03-04 11:00:18,897	WARNING iceberg_datasource.py:431 -- Reducing the parallelism to 1, as that is thenumber of files
-2026-03-04 13:00:21.501 |  ✔️  Dataset dataset_43_0 execution finished in 1.46 seconds 1… 4k/…  2.76 k ro… 
-2026-03-04 13:00:21.501 |   │ Active/total resources: Active & requested resources: 0/18 CPU, 51.2KiB/2.7…
-2026-03-04 13:00:21.501 |   │                                                                             
-2026-03-04 13:00:21.501 |   ├─   ReadIceberg->SplitBlocks(36) 100% ━━━━━━━ 4k/4k [ 0:00:… , 2.77 k row/s ]
-2026-03-04 13:00:21.501 |   │    0.0 CPU, 51.2KiB object store; Tasks: 0; Queued blocks: 0;               
-2026-03-04 13:00:21.501 |                                                                                 2026-03-04 11:00:20,389	INFO progress_manager.py:347 -- ✔️  Dataset dataset_43_0 execution finished in 1.46 seconds
-2026-03-04 13:00:21.501 | 2026-03-04 11:00:20,420 - KubeRayTraining - INFO - Data for split 'val' loaded.
-2026-03-04 13:00:21.501 | 2026-03-04 11:00:20,420 - KubeRayTraining - INFO - Loading test split from processed.network_traffic_235537 (2026-01-02T07:00:00+00:00 to 2026-01-03T03:50:00+00:00)
-2026-03-04 13:00:23.504 | 2026-03-04 11:00:21,582	WARNING iceberg_datasource.py:431 -- Reducing the parallelism to 1, as that is thenumber of files
-2026-03-04 13:00:23.504 | 2026-03-04 11:00:21,584 - KubeRayTraining - INFO - Schema validation passed. Total columns: 16
-2026-03-04 13:00:23.504 | 2026-03-04 11:00:21,584 - KubeRayTraining - INFO - Materializing test dataset in Ray Object Store for performance.
-2026-03-04 13:00:23.504 | 2026-03-04 11:00:21,588	INFO logging.py:397 -- Registered dataset logger for dataset dataset_46_0
-2026-03-04 13:00:23.504 | 2026-03-04 11:00:21,591	WARNING iceberg_datasource.py:431 -- Reducing the parallelism to 1, as that is thenumber of files
-2026-03-04 13:00:23.504 | 2026-03-04 11:00:21,592	INFO streaming_executor.py:178 -- Starting execution of Dataset dataset_46_0. Full logs are in /tmp/ray/session_2026-03-04_10-58-25_363918_1/logs/ray-data
-2026-03-04 13:00:23.504 | 2026-03-04 11:00:21,592	INFO streaming_executor.py:179 -- Execution plan of Dataset dataset_46_0: InputDataBuffer[Input] -> TaskPoolMapOperator[ReadIceberg]
-2026-03-04 13:00:23.504 | 2026-03-04 11:00:21,592	WARNING iceberg_datasource.py:431 -- Reducing the parallelism to 1, as that is thenumber of files
-2026-03-04 13:00:23.504 |  ✔️  Dataset dataset_46_0 execution finished in 0.72 seconds 10… 5k/…   0.00 ro… 
-2026-03-04 13:00:23.504 |   │ Active/total resources: Active & requested resources: 0/18 CPU, 47.7KiB/2.7…
-2026-03-04 13:00:24.505 |   │                                                                             
-2026-03-04 13:00:24.505 |   ├─   ReadIceberg->SplitBlocks(36) 100% ━━━━━━━━ 5k/5k [ 0:00:00 , 0.00 row/s ]
-2026-03-04 13:00:24.505 |   │    0.0 CPU, 47.7KiB object store; Tasks: 0; Queued blocks: 0;               
-2026-03-04 13:00:24.505 |                                                                                 2026-03-04 11:00:22,340	INFO progress_manager.py:347 -- ✔️  Dataset dataset_46_0 execution finished in 0.72 seconds
-2026-03-04 13:00:24.505 | 2026-03-04 11:00:22,360 - KubeRayTraining - INFO - Data for split 'test' loaded.
-2026-03-04 13:00:24.505 | 2026-03-04 11:00:22,360 - KubeRayTraining - INFO - GPU training: disabled (USE_GPU=false)
-2026-03-04 13:00:27.509 | (TrainController pid=1981) Attempting to start training worker group of size 2 with the following resources: [{'CPU': 8}] * 2
-2026-03-04 13:00:27.509 | (SplitCoordinator pid=2009, ip=10.1.15.64) Registered dataset logger for dataset val_37_2 [repeated 3x across cluster]
-2026-03-04 13:00:27.509 | (SplitCoordinator pid=2009, ip=10.1.15.64) Starting execution of Dataset val_37_2. Full logs are in /tmp/ray/session_2026-03-04_10-58-25_363918_1/logs/ray-data [repeated 3x across cluster]
-2026-03-04 13:00:27.509 | (SplitCoordinator pid=2009, ip=10.1.15.64) Execution plan of Dataset val_37_2: InputDataBuffer[Input] -> OutputSplitter[split(1, equal=True)] [repeated 3x across cluster]
-2026-03-04 13:00:27.509 | (SplitCoordinator pid=2009, ip=10.1.15.64) [dataset]: A new progress UI is available. To enable, set `ray.data.DataContext.get_current().enable_rich_progress_bars = True` and `ray.data.DataContext.get_current().use_ray_tqdm = False`.
-2026-03-04 13:00:27.509 | (SplitCoordinator pid=2009, ip=10.1.15.64) Progress bar disabled because stdout is a non-interactive terminal.
-2026-03-04 13:00:27.509 | (SplitCoordinator pid=2009, ip=10.1.15.64) === Ray Data Progress {Running Dataset} === [repeated 3x across cluster]
-2026-03-04 13:00:27.509 | (SplitCoordinator pid=2009, ip=10.1.15.64) Running Dataset: val_37_2. Active & requested resources: 0/12 CPU, 0.0B/2.7GiB object store: Progress Completed 0 / ? [repeated 3x across cluster]
-2026-03-04 13:00:27.509 | (SplitCoordinator pid=2009, ip=10.1.15.64) ✔️  Dataset val_37_2 execution finished in 0.04 seconds [repeated 3x across cluster]
-2026-03-04 13:00:31.532 | (TrainController pid=1981) Started training worker group of size 2: 
-2026-03-04 13:00:31.532 | (TrainController pid=1981) - (ip=10.1.15.64, pid=2325) world_rank=0, local_rank=0, node_rank=0
-2026-03-04 13:00:31.532 | (TrainController pid=1981) - (ip=10.1.15.63, pid=1999) world_rank=1, local_rank=0, node_rank=1
-2026-03-04 13:00:31.532 | (RayTrainWorker pid=2325, ip=10.1.15.64) [11:00:29] Task [xgboost.ray-rank=00000000]:6e04fae532883e136ede487a02000000 got rank 0
-2026-03-04 13:00:31.532 | (SplitCoordinator pid=2151)  ✔️  Dataset train_48_0 execution finished in 0.06 seconds 100% 3k/… [  ? rows/s 
-2026-03-04 13:00:31.532 | (SplitCoordinator pid=2151)   │ Active/total resources: Active & requested resources: 0/2 CPU, 346.1KiB/2.7…
-2026-03-04 13:00:31.532 | (SplitCoordinator pid=2151)   │                                                                             
-2026-03-04 13:00:31.532 | (SplitCoordinator pid=2151)   ├─ ⠋ split(2, equal=True)   0%            0/0 [ 0:00:00 , ? rows/s ]          
-2026-03-04 13:00:31.532 | (SplitCoordinator pid=2151)   │    0.0 CPU, 346.1KiB object store; Tasks: 0: [0/33 objects local]; Queued b…
-2026-03-04 13:00:31.532 | (SplitCoordinator pid=2151)  ✔️  Dataset train_48_1 execution finished in 0.07 seconds 10… 1.50k/…   ? rows… 
-2026-03-04 13:00:31.532 | (SplitCoordinator pid=2151)   │ Active/total resources: Active & requested resources: 0/2 CPU, 346.1KiB/2.7…
-2026-03-04 13:00:31.532 | (SplitCoordinator pid=2151)   │                                                                             
-2026-03-04 13:00:31.532 | (SplitCoordinator pid=2151)   ├─ ⠋ split(2, equal=True)   0%            0/0 [ 0:00:00 , ? rows/s ]          
-2026-03-04 13:00:31.532 | (SplitCoordinator pid=2151)   │    0.0 CPU, 346.1KiB object store; Tasks: 0: [0/33 objects local]; Queued b…
-2026-03-04 13:00:31.532 | (SplitCoordinator pid=2151)  ✔️  Dataset train_48_2 execution finished in 0.07 seconds 10… 1.50k/…   ? rows… 
-2026-03-04 13:00:31.532 | (SplitCoordinator pid=2151)   │ Active/total resources: Active & requested resources: 0/2 CPU, 346.1KiB/2.7…
-2026-03-04 13:00:31.532 | (SplitCoordinator pid=2151)   │                                                                             
-2026-03-04 13:00:31.532 | (SplitCoordinator pid=2151)   ├─ ⠋ split(2, equal=True)   0%            0/0 [ 0:00:00 , ? rows/s ]          
-2026-03-04 13:00:31.532 | (SplitCoordinator pid=2151)   │    0.0 CPU, 346.1KiB object store; Tasks: 0: [0/33 objects local]; Queued b…
-2026-03-04 13:00:31.532 | (SplitCoordinator pid=2151)   ✔️  Dataset train_48_3 execution finished in 0.08 seconds   0% 3k/… [  ? row/s 
-2026-03-04 13:00:31.532 | (SplitCoordinator pid=2151)   │ Active/total resources: Active & requested resources: 0/2 CPU, 346.1KiB/2.7…
-2026-03-04 13:00:31.532 | (SplitCoordinator pid=2151)   │                                                                             
-2026-03-04 13:00:31.532 | (SplitCoordinator pid=2151)   ├─ ⠋ split(2, equal=True)   0%            0/0 [ 0:00:00 , ? rows/s ]          
-2026-03-04 13:00:31.532 | (SplitCoordinator pid=2151)   │    0.0 CPU, 346.1KiB object store; Tasks: 0: [0/33 objects local]; Queued b…
-2026-03-04 13:00:31.532 | (SplitCoordinator pid=2212)   ✔️  Dataset val_50_0 execution finished in 0.08 seconds   0% 4k/?k [ , ? row/s 
-2026-03-04 13:00:31.532 | (SplitCoordinator pid=2212)   ✔️  Dataset val_50_2 execution finished in 0.07 seconds   0% 4k/?k [ , ? row/s 
-2026-03-04 13:00:31.532 | (RayTrainWorker pid=1999, ip=10.1.15.63) [xgboost_utils] ✓ Prometheus HTTP server started on port 8002 (worker registry)
-2026-03-04 13:00:31.532 | (RayTrainWorker pid=1999, ip=10.1.15.63) Reporting training result 1: TrainingReport(checkpoint=None, metrics={'validation-mlogloss': 0.7304661079496145, 'validation-merror': 0.02125, 'train-mlogloss': 0.7282198601166407, 'training_iteration': 4}, validation_spec=None)
-2026-03-04 13:00:31.532 | (RayTrainWorker pid=2325, ip=10.1.15.64) [xgboost_utils] Epoch 4: acc=0.9755, f1=0.6392
-2026-03-04 13:00:31.532 | (SplitCoordinator pid=2212) Registered dataset logger for dataset val_50_2 [repeated 7x across cluster]
-2026-03-04 13:00:32.532 | (SplitCoordinator pid=2212) Starting execution of Dataset val_50_2. Full logs are in /tmp/ray/session_2026-03-04_10-58-25_363918_1/logs/ray-data [repeated 7x across cluster]
-2026-03-04 13:00:32.532 | (SplitCoordinator pid=2212) Execution plan of Dataset val_50_2: InputDataBuffer[Input] -> OutputSplitter[split(2, equal=True)] [repeated 7x across cluster]
-2026-03-04 13:00:32.532 | (SplitCoordinator pid=2212)                                                                                 ✔️  Dataset val_50_2 execution finished in 0.07 seconds [repeated 7x across cluster]
-2026-03-04 13:00:33.533 | (RayTrainWorker pid=2325, ip=10.1.15.64) [xgboost_utils] Epoch 8: acc=0.9865, f1=0.7440
-2026-03-04 13:00:33.533 | (RayTrainWorker pid=2325, ip=10.1.15.64) [xgboost_utils] Epoch 12: acc=0.9925, f1=0.9106
-2026-03-04 13:00:36.539 | (RayTrainWorker pid=2325, ip=10.1.15.64) [xgboost_utils] Epoch 16: acc=0.9945, f1=0.9449
-2026-03-04 13:00:37.539 | (RayTrainWorker pid=2325, ip=10.1.15.64) [xgboost_utils] Epoch 20: acc=0.9945, f1=0.9449
-2026-03-04 13:00:37.539 | (RayTrainWorker pid=1999, ip=10.1.15.63) [11:00:29] Task [xgboost.ray-rank=00000001]:e0431ad374acaee9e5dcbd5d02000000 got rank 1
-2026-03-04 13:00:37.539 | (SplitCoordinator pid=2212)   ✔️  Dataset val_50_1 execution finished in 0.07 seconds 100% 2k/?k [  ? rows/s 
-2026-03-04 13:00:37.539 | (SplitCoordinator pid=2212)   │ Active/total resources: Active & requested resources: 0/2 CPU, 461.4KiB/2.7… [repeated 3x across cluster]
-2026-03-04 13:00:37.539 | (SplitCoordinator pid=2212)   │                                                                              [repeated 3x across cluster]
-2026-03-04 13:00:37.539 | (SplitCoordinator pid=2212)   ├─ ⠋ split(2, equal=True)   0%            0/0 [ 0:00:00 , ? rows/s ]           [repeated 3x across cluster]
-2026-03-04 13:00:37.540 | (SplitCoordinator pid=2212)   │    0.0 CPU, 461.4KiB object store; Tasks: 0: [0/33 objects local]; Queued b… [repeated 3x across cluster]
-2026-03-04 13:00:40.545 | (RayTrainWorker pid=2325, ip=10.1.15.64) [xgboost_utils] Epoch 24: acc=0.9945, f1=0.9449
-2026-03-04 13:00:40.545 | (RayTrainWorker pid=2325, ip=10.1.15.64) [xgboost_utils] ✓ Prometheus HTTP server started on port 8002 (worker registry)
-2026-03-04 13:00:40.545 | (RayTrainWorker pid=2325, ip=10.1.15.64) Reporting training result 6: TrainingReport(checkpoint=None, metrics={'validation-mlogloss': 0.12480568325147033, 'validation-merror': 0.0055, 'train-mlogloss': 0.12029273219406605, 'training_iteration': 24}, validation_spec=None) [repeated 10x across cluster]
-2026-03-04 13:00:41.545 | (RayTrainWorker pid=2325, ip=10.1.15.64) [xgboost_utils] Epoch 28: acc=0.9945, f1=0.9449
-2026-03-04 13:00:44.553 | (RayTrainWorker pid=2325, ip=10.1.15.64) [xgboost_utils] Epoch 32: acc=0.9955, f1=0.9552
-2026-03-04 13:00:45.555 | (RayTrainWorker pid=2325, ip=10.1.15.64) [xgboost_utils] Epoch 36: acc=0.9955, f1=0.9552
-2026-03-04 13:00:45.555 | (RayTrainWorker pid=2325, ip=10.1.15.64) Reporting training result 9: TrainingReport(checkpoint=None, metrics={'validation-mlogloss': 0.05464981139265001, 'validation-merror': 0.0055, 'train-mlogloss': 0.04956501170744498, 'training_iteration': 36}, validation_spec=None) [repeated 6x across cluster]
-2026-03-04 13:00:48.563 | (RayTrainWorker pid=2325, ip=10.1.15.64) [xgboost_utils] Epoch 40: acc=0.9955, f1=0.9552
-2026-03-04 13:00:49.564 | (RayTrainWorker pid=2325, ip=10.1.15.64) [xgboost_utils] Epoch 44: acc=0.9955, f1=0.9552
-2026-03-04 13:00:52.567 | (RayTrainWorker pid=1999, ip=10.1.15.63) Reporting training result 12: TrainingReport(checkpoint=None, metrics={'validation-mlogloss': 0.03119800351490267, 'validation-merror': 0.0055, 'train-mlogloss': 0.02547613014932722, 'training_iteration': 48}, validation_spec=None) [repeated 6x across cluster]
-2026-03-04 13:00:52.567 | (RayTrainWorker pid=2325, ip=10.1.15.64) [xgboost_utils] Epoch 48: acc=0.9955, f1=0.9552
-2026-03-04 13:00:53.570 | (RayTrainWorker pid=2325, ip=10.1.15.64) [xgboost_utils] Epoch 52: acc=0.9955, f1=0.9552
-2026-03-04 13:00:56.574 | (RayTrainWorker pid=2325, ip=10.1.15.64) [xgboost_utils] Epoch 56: acc=0.9955, f1=0.9552
-2026-03-04 13:00:57.575 | (RayTrainWorker pid=1999, ip=10.1.15.63) Reporting training result 15: TrainingReport(checkpoint=None, metrics={'validation-mlogloss': 0.02275339636870194, 'validation-merror': 0.0055, 'train-mlogloss': 0.01678606304448719, 'training_iteration': 60}, validation_spec=None) [repeated 6x across cluster]
-2026-03-04 13:00:57.575 | (RayTrainWorker pid=2325, ip=10.1.15.64) [xgboost_utils] Epoch 60: acc=0.9955, f1=0.9552
-2026-03-04 13:01:02.595 | (RayTrainWorker pid=2325, ip=10.1.15.64) Checkpoint successfully created at: Checkpoint(filesystem=s3, path=k8s-mlops-platform-bucket/v1/models/xgboost/checkpoint_2026-03-04_11-00-58.113641)
-2026-03-04 13:01:02.595 | (RayTrainWorker pid=2325, ip=10.1.15.64) Reporting training result 16: TrainingReport(checkpoint=Checkpoint(filesystem=s3, path=k8s-mlops-platform-bucket/v1/models/xgboost/checkpoint_2026-03-04_11-00-58.113641), metrics={'validation-mlogloss': 0.02275339636870194, 'validation-merror': 0.0055, 'train-mlogloss': 0.01678606304448719, 'training_iteration': 60}, validation_spec=None)
-2026-03-04 13:01:02.595 | (RayTrainWorker pid=1999, ip=10.1.15.63) [xgboost-worker] World rank 1 finished in 28.91s
-2026-03-04 13:01:02.595 | (RayTrainWorker pid=2325, ip=10.1.15.64) [xgboost_utils] Cleared Prometheus metrics after training
-2026-03-04 13:01:07.603 | [xgboost] distributed train_time_sec=42.90
-2026-03-04 13:01:07.603 | 2026-03-04 11:01:06,276	INFO logging.py:397 -- Registered dataset logger for dataset dataset_52_0
-2026-03-04 13:01:07.603 | 2026-03-04 11:01:06,282	INFO streaming_executor.py:178 -- Starting execution of Dataset dataset_52_0. Full logs are in /tmp/ray/session_2026-03-04_10-58-25_363918_1/logs/ray-data
-2026-03-04 13:01:07.603 | 2026-03-04 11:01:06,282	INFO streaming_executor.py:179 -- Execution plan of Dataset dataset_52_0: InputDataBuffer[Input] -> TaskPoolMapOperator[MapBatches(predict_and_cm_batch)]
-2026-03-04 13:01:08.603 | (autoscaler +2m6s) Tip: use `ray status` to view detailed cluster status. To disable these messages, set RAY_SCHEDULER_EVENTS=0.
-2026-03-04 13:01:08.603 | (autoscaler +2m6s) No available node types can fulfill cluster constraint: {'CPU': 1.0}*22. Add suitable node types to this cluster to resolve this issue.
-2026-03-04 13:01:12.613 |  ✔️  Dataset dataset_52_0 execution finished in 4.62 seconds 10… 36/…   7.84 ro… 
-2026-03-04 13:01:12.613 |   │ Active/total resources: Active & requested resources: 0/18 CPU, 1.5KiB/2.7G…
-2026-03-04 13:01:12.613 |   │                                                                             
-2026-03-04 13:01:12.613 |   ├─   MapBatches(predict_and_cm_batch) 100% ━━━━━ 36/36 [ 0:00:… , 7.85 row/s ]
-2026-03-04 13:01:12.613 |   │    0.0 CPU, 1.5KiB object store; Tasks: 0; Queued blocks: 0;                
-2026-03-04 13:01:12.613 |                                                                                 2026-03-04 11:01:10,929	INFO progress_manager.py:347 -- ✔️  Dataset dataset_52_0 execution finished in 4.62 seconds
-2026-03-04 13:01:12.613 | 2026-03-04 11:01:11,558	INFO logging.py:397 -- Registered dataset logger for dataset dataset_53_0
-2026-03-04 13:01:12.613 | 2026-03-04 11:01:11,562	INFO streaming_executor.py:178 -- Starting execution of Dataset dataset_53_0. Full logs are in /tmp/ray/session_2026-03-04_10-58-25_363918_1/logs/ray-data
-2026-03-04 13:01:12.613 | 2026-03-04 11:01:11,562	INFO streaming_executor.py:179 -- Execution plan of Dataset dataset_53_0: InputDataBuffer[Input] -> TaskPoolMapOperator[MapBatches(predict_and_cm_batch)]
-2026-03-04 13:01:12.613 |  ✔️  Dataset dataset_53_0 execution finished in 0.21 seconds 10… 36/…   0.00 ro… 
-2026-03-04 13:01:12.613 |   │ Active/total resources: Active & requested resources: 0/18 CPU, 20.4KiB/2.7…
-2026-03-04 13:01:12.613 |   │                                                                             
-2026-03-04 13:01:12.613 |   ├─   MapBatches(predict_and_cm_batch) 100% ━━━━━ 36/36 [ 0:00:… , 0.00 row/s ]
-2026-03-04 13:01:12.613 |   │    0.0 CPU, 20.4KiB object store; Tasks: 0; Queued blocks: 0;               
-2026-03-04 13:01:12.613 |                                                                                 2026-03-04 11:01:11,799	INFO progress_manager.py:347 -- ✔️  Dataset dataset_53_0 execution finished in 0.21 seconds
-2026-03-04 13:01:12.613 | 2026-03-04 11:01:11,811 - KubeRayTraining - INFO - Training completed successfully.
-2026-03-04 13:01:12.613 | 2026-03-04 11:01:11,811 - KubeRayTraining - INFO - Final metrics exported to Prometheus
-2026-03-04 13:01:12.613 | 2026-03-04 11:01:11,811 - KubeRayTraining - INFO - Exportando modelo final de xgboost a S3...
-2026-03-04 13:01:12.613 | 2026-03-04 11:01:11,811 - KubeRayTraining - INFO - Descargando model.ubj desde s3://k8s-mlops-platform-bucket/v1/models/xgboost/checkpoint_2026-03-04_11-00-58.113641/model.ubj
-2026-03-04 13:01:12.613 | /home/ray/app/repo/k3s/kuberay/main.py:233: UserWarning: [11:01:12] WARNING: /workspace/src/c_api/c_api.cc:1511: Unknown file format: ``. Using UBJSON (`ubj`) as a guess.
-2026-03-04 13:01:13.614 |   bst.load_model(tmp.name)
-2026-03-04 13:01:14.616 | 2026-03-04 11:01:12,636 - KubeRayTraining - INFO - Modelo exportado correctamente a s3://k8s-mlops-platform-bucket/v1/models/model_xgboost.pkl
-2026-03-04 13:01:14.616 | 2026-03-04 11:01:13,189 - KubeRayTraining - INFO - xgboost multiclass metrics time = 6.52 s
-2026-03-04 13:01:17.621 | 2026/03/04 11:01:15 WARNING mlflow.models.model: `artifact_path` is deprecated. Please use `name` instead.
-2026-03-04 13:01:22.629 | Successfully registered model 'attack-detection'.
-2026-03-04 13:01:22.629 | 2026/03/04 11:01:20 WARNING mlflow.tracking._model_registry.fluent: Run with id ec0575d0df9b4e60af9306defe3c259f has no artifacts at artifact path 'model', registering model based on models:/m-7f5225306c4748f4868df27fc72cf076 instead
-2026-03-04 13:01:22.629 | 2026/03/04 11:01:21 INFO mlflow.store.model_registry.abstract_store: Waiting up to 300 seconds for model version to finish creation. Model name: attack-detection, version 1
-2026-03-04 13:01:22.629 | Created version '1' of model 'attack-detection'.
-2026-03-04 13:01:22.629 | 🏃 View run xgboost_final_xgboost at: http://my-mlflow/#/experiments/1/runs/ec0575d0df9b4e60af9306defe3c259f
-2026-03-04 13:01:22.629 | 🧪 View experiment at: http://my-mlflow/#/experiments/1
-2026-03-04 13:01:22.629 | 2026-03-04 11:01:21,460 - KubeRayTraining - INFO - MLflow run completed: run_id=ec0575d0df9b4e60af9306defe3c259f, model_version=1, registry=attack-detection
-2026-03-04 13:01:22.629 | 2026-03-04 11:01:21,461 - KubeRayTraining - INFO - Sleeping 10s for Prometheus scrape grace period...
-2026-03-04 13:01:33.669 | (RayTrainWorker pid=1999, ip=10.1.15.63) Reporting training result 16: TrainingReport(checkpoint=None, metrics={'validation-mlogloss': 0.02275339636870194, 'validation-merror': 0.0055, 'train-mlogloss': 0.01678606304448719, 'training_iteration': 60}, validation_spec=None) [repeated 2x across cluster]
-2026-03-04 13:01:33.669 | (RayTrainWorker pid=2325, ip=10.1.15.64) [xgboost-worker] World rank 0 finished in 28.91s
-2026-03-04 13:01:36.685 | 2026-03-04 11:01:36,684	SUCC cli.py:65 -- ---------------------------------------------------------------------
-2026-03-04 13:01:36.685 | 2026-03-04 11:01:36,684	SUCC cli.py:66 -- Job 'ray-train-network-traffic-235537-2026030-66062f-mqkq6' succeeded
-2026-03-04 13:01:36.685 | 2026-03-04 11:01:36,685	SUCC cli.py:67 -- ---------------------------------------------------------------------
+# Updated Full Prompt / Context (Including Multi-Model & LLM Pipeline Considerations)
+
+## Context
+
+I am building a GPU orchestration product on top of **SkyPilot**. SkyPilot is the infra/orchestration base. My product adds:
+
+- Real-time availability  
+- Provider filtering  
+- Region-aware selection  
+- Fallback logic  
+- Better UX  
+
+I already have a **Ray pipeline** for tabular workloads located at:
+
+- `k3s/kuberay/main.py`
+- `k3s/kuberay/gpu_test_main.py`
+
+### Multi-Model & LLM Considerations
+
+- **Current Ray pipeline is mostly for PyTorch ANN models**.  
+- Goal: **extend to support other model types**:
+  - SSMs (State Space Models)  
+  - BAE (Bayesian Autoencoders)  
+  - Other non-LLM models  
+- **LLMs** are fundamentally different; may require a **separate pipeline**:
+  - Could still use Ray for distributed execution  
+  - Or use **vLLM** / other specialized serving frameworks depending on complexity  
+  - Example: kimi uses Ray because it’s multi-node  
+- Pipeline(s) should remain **scalable**, follow **best practices** and **user-friendly**
+
+I want a **modular design** where the current Ray tabular pipeline is preserved/extended for ANN/SSM/BAE, and a **new LLM-specific pipeline** is built for training and serving.
+
+### Core Goals (repeated / integrated)
+
+1. Improve UX for launching LLM/multi-model training or serving without manual provider/region filtering.  
+2. Use **SkyPilot** for infra provisioning and orchestration.  
+3. Use **Ray** for execution and distributed logic.  
+4. Use **DeepSpeed** for training optimization of Torch/LLMs.  
+5. Use **vLLM** for serving and possibly LLM workflows.  
+6. Add **real-time availability layer** using provider APIs.  
+7. Build two pipelines:
+   - Single-node: Vast, RunPod, AWS, GCP, Azure 
+   - Multi-node: same provider + same region, InfiniBand/RDMA capable where possible  
+8. Optimize for **price, availability, region latency, user preferences, spot suitability**  
+9. Minimize egress and make checkpointing robust.  
+10. Extend **Ray tabular pipeline** to multi-model modular workflow (ANN, SSM, BAE, etc.), plus LLMs via a **separate pipeline if needed**.  
+11. Airflow orchestration (SequentialExecutor preferred by docs but it might not be a problem having LocalExecutor)  
+12. Validate pipelines: Multi-node AWS, Single-node RunPod  
+13. Leverage `notebooks/costs.ipynb` for real-time cost and availability  
+14. AWS Spot support  
+15. Prometheus + Grafana integration for metrics  
+16. SkyPilot fallback logic across regions/providers  
+17. Lazy loading / streaming datasets  
+18. UI/UX integration: resource selection + launch via simple UI  
+19. Dropdown to select LLM models (LLaMA, Qwen, GPT-OSS, Kimi) with **centralized resource recommendations**  and precision of them
+
+### Architecture Rules
+
+- SkyPilot: infra provisioning  
+- Ray: job execution (multi-model and possibly LLM)  
+- DeepSpeed: inside Ray training  
+- vLLM: serving / optional LLM workflow  
+- Multi-node: same provider + same region  
+- Checkpoints: SkyPilot cached mount (`MOUNT_CACHED`) where helpful  
+- Storage: cheapest robust option, avoid egress  
+- Users can:
+  - Choose/exclude providers  
+  - Request cheapest option  
+  - Request specific GPU  
+  - See available regions for GPU/provider  
+  - See real-time availability  
+  - Select spot/on-demand  
+- Fallback logic:
+  - Region fallback within cloud  
+  - Cloud-provider fallback if unavailable  
+  - Preserve user constraints  
+
+### MVP-Focused Additions
+
+- **Priority:** validate SkyPilot + scaling in **single-node** RunPod  
+- Initial goal: **migrate `main.py` → GPU**, referencing `gpu_test_main.py`  
+- Validate **scheduler + scaling** on RunPod single-node  
+- Next phase: **multi-node AWS** with **LLaMA 3.1 8B**  
+- Ray configuration:
+  - `ScalingConfig` with `use_gpu=True`  
+  - `resources_per_worker` supporting **fractional GPUs** for MVP cost optimization  
+  - `workerGroupSpecs` in YAML must allow Ray to **detect GPUs correctly** for distributed execution  
+
+### References
+
+- SkyPilot docs/examples:
+  - Kimi-K2: https://docs.skypilot.co/en/latest/examples/models/kimi-k2.html
+  - AWS EFA: https://docs.skypilot.co/en/stable/examples/performance/aws_efa.html
+  - Airflow: https://docs.skypilot.co/en/stable/examples/orchestrators/airflow.html
+  - Checkpointing: https://docs.skypilot.co/en/stable/examples/managed-jobs.html#checkpointing
+  - DeepSeek-R1: https://docs.skypilot.co/en/stable/examples/models/deepseek-r1.html
+  - LLaMA 3.1: https://docs.skypilot.co/en/latest/examples/models/llama-3_1.html
+  - https://docs.skypilot.co/en/latest/examples/managed-jobs.html#running-on-spot-instances
+- GitHub SkyPilot Ray cluster template: https://github.com/skypilot-org/skypilot/blob/master/sky_templates/ray/start_cluster
+
+### Deliverables / Task Requirements
+
+1. Decide **number of steps/phases** covering all tasks in order (dependencies + validation checkpoints)  
+2. Propose **system architecture** integrating SkyPilot + Ray + DeepSpeed + vLLM + Airflow + Prometheus/Grafana  
+3. Design **user-facing UX flow**:
+   - Select providers, GPUs, regions, job types, spot/on-demand, fallbacks  
+   - Dropdown for LLM models with accelerator recommendations  
+4. Develop **provider-selection algorithm** ranking by:
+   - Availability, price, region latency, user preferences  
+   - Single-node vs multi-node compatibility  
+   - Spot suitability  
+   - LLM size / recommended accelerators  
+5. Define **checkpointing strategy** using SkyPilot + Ray + object storage, leveraging `MOUNT_CACHED`  
+6. Provide **concrete implementation plan**, in **strict order**, broken into phases for incremental execution  
+7. Detail plan for:
+   - Real-time availability layer (`notebooks/costs.ipynb`)  
+   - Single-node pipeline on RunPod  
+   - Multi-node pipeline on AWS  
+   - AWS Spot support & validation  
+   - LLM serving pipeline (modular, Ray or vLLM)  
+   - Extend tabular Ray pipeline to multi-model + LLMs  
+   - Airflow orchestration with SequentialExecutor  
+   - Prometheus/Grafana integration  
+   - Lazy loading / dataset streaming  
+   - UI/UX integration for resource selection + launch  
+   - Fallback logic across region/cloud  
+8. Concise list of **risks and trade-offs**  
+9. Recommended **MVP scope**: AWS + RunPod first 
+
+### Important Notes
+
+- Output must be **practical, explicit, engineering-focused**  
+- Avoid generic advice  
+- Prefer **concrete components, data flow, decision rules**  
+- Break large tasks into **ordered implementation plan** with dependencies & validation  
+- **Do not assume** SkyPilot provides live availability, ideal fallback logic, or perfect LLM-accelerator mapping  
+- Separate what **must be built** from what SkyPilot already supports  
+- For RunPod MVP use RTX2000-Ada (skypilot id) and NVIDIA RTX 2000 Ada Generation (runpod id)
+- Please note that this prompt requests a very large and complex plan and implementation. 
+  Make sure the plan is fully broken down, with no steps missing.
+  The idea is that, using this plan, you can progress gradually, tackling each step sequentially over time until everything is completed.
+  Divide the plan into phases or stages if necessary, so that it is more manageable and easy to follow for you.
+
+
+
+  GPU Orchestration Platform — Full Implementation Plan
+Context
+Building a GPU orchestration product on top of SkyPilot. SkyPilot handles infra provisioning; this product adds real-time availability, intelligent provider/region selection, fallback logic, multi-model support, LLM pipelines, and a UX layer.
+
+Current state: SkyPilot is partially integrated. k3s/sky/ray-gpu-training.yaml exists for RTX4090/A40/A100/RTX3090, training_dag_skypilot.py routes pytorch→GPU/xgboost→CPU. The tabular pipeline (main.py) has a USE_GPU path but has not been validated end-to-end on RunPod via SkyPilot.
+
+Target state: Full GPU orchestration with spot-first provisioning, provider selection, multi-model tabular (ANN/SSM/BAE), LLM training (LLaMA 3.1 8B), vLLM serving, multi-node AWS, real-time cost/availability UI, and Prometheus/Grafana GPU metrics.
+
+Spot-First Strategy (Applies to All Phases)
+Default behavior: Every job uses spot instances first, on-demand only as last-resort fallback.
+
+SkyPilot any_of pattern (spot-first):
+
+resources:
+  any_of:
+    - accelerators: A100:1
+      use_spot: true      # cheapest, almost always wins
+    - accelerators: A100:1
+      use_spot: false     # fallback if no spot available
+SkyPilot selects the cheapest option — spot will win if available (70–90% savings).
+
+SkyPilot spot recovery vs Ray FailureConfig — they operate at different levels:
+
+SkyPilot (retry_until_up=True or managed jobs): handles infrastructure failures — spot preemption → re-provision node → restart job. This is the primary recovery mechanism.
+Ray FailureConfig: handles application-level worker failures within a running cluster (OOM crashes, driver timeouts). Complementary, not redundant.
+For spot recovery specifically: use sky jobs launch (managed jobs) instead of sky launch for automatic preemption handling and cross-region retry. sky launch --retry-until-up handles provisioning retries but not mid-job preemptions.
+Decision rule for DAG: Use sky.jobs.launch() for training jobs (handles spot preemption) vs sky.launch() for serving (persistent cluster, no preemption tolerance needed).
+
+Cross-region failover: SkyPilot auto-failover activates automatically — if a region has no capacity, it retries other regions in the same cloud, then other clouds. No extra config needed beyond the any_of list ordering.
+
+Phase 1 — MVP: Validate GPU Training on RunPod RTX2000-Ada (Spot-First)
+Goal: main.py runs end-to-end on RunPod via SkyPilot with GPU on a spot RTX2000-Ada instance. Validate Ray scheduler + ScalingConfig GPU detection. Use sky jobs launch for managed spot recovery.
+
+Dependencies: None.
+
+Tasks
+1.1 — Update k3s/sky/ray-gpu-training.yaml: spot-first, RTX2000-Ada
+
+resources:
+  any_of:
+    # Spot-first: cheapest options first
+    - cloud: runpod
+      accelerators: RTX2000-Ada:1
+      use_spot: true
+    - cloud: runpod
+      accelerators: RTX4090:1
+      use_spot: true
+    - cloud: runpod
+      accelerators: A40:1
+      use_spot: true
+    # On-demand fallbacks
+    - cloud: runpod
+      accelerators: RTX2000-Ada:1
+      use_spot: false
+    - cloud: runpod
+      accelerators: RTX4090:1
+      use_spot: false
+Force USE_GPU: "true" in envs: block. Do not rely on params.yaml for this.
+
+1.2 — Switch to sky jobs launch in training_dag_skypilot.py
+
+File: k3s/airflow/dags/training_dag_skypilot.py
+
+Replace sky.launch(detach_run=True) with sky.jobs.launch() for managed spot jobs:
+
+# Instead of:
+# sky.launch(task, cluster_name=cluster, detach_run=True, retry_until_up=True)
+# Use:
+sky.jobs.launch(task, name=job_name, retry_until_up=True, detach_run=True)
+And change polling: sky.jobs.queue() (not sky.queue()) to get job status.
+
+Note: sky jobs is SkyPilot's managed jobs API. The cluster is ephemeral and auto-cleaned; no sky down needed in finally. Spot preemptions are automatically handled — new resources provisioned without manual intervention.
+
+1.3 — Verify USE_GPU propagation in main.py / base_trainer.py
+
+Trace: USE_GPU env var → BaseTrainer._resolve_gpu() → ScalingConfig(use_gpu=True, resources_per_worker={"GPU": 1}).
+
+Fix if needed: _resolve_gpu() should read os.getenv("USE_GPU", "false").lower() == "true" as override before params.yaml.
+
+Files: k3s/kuberay/main.py, src/pipeline/train/base_trainer.py
+
+1.4 — Validate: gpu_test_main.py first, then full main.py
+
+Run with entrypoint overridden to gpu_test_main.py. Confirm GPU name returned. Then trigger full training_pipeline_skypilot DAG.
+
+Validation:
+
+sky jobs launch k3s/sky/ray-gpu-training.yaml --name rtx2000-test --yes
+sky jobs logs rtx2000-test --follow
+# Expected: spot RTX2000-Ada provisioned, "GPU: NVIDIA RTX 2000 Ada Generation", training completes
+Rollback: RTX2000-Ada spot is first entry; if unavailable, RTX4090 spot is next. All fallbacks preserved.
+
+Phase 2 — Real-Time Availability Layer + Provider-Selection Algorithm
+Goal: Service querying RunPod, Vast.ai, and SkyPilot catalogs in real time. Scores by price/availability/region with spot-first bias. REST API exposed. Spot availability used to rank offers.
+
+Dependencies: Phase 1 complete.
+
+Tasks
+2.1 — src/services/gpu_catalog.py — Unified catalog from RunPod + Vast + SkyPilot
+
+New file: src/services/gpu_catalog.py
+
+@dataclass
+class GPUOffer:
+    provider: str           # "runpod" | "vast" | "aws" | "gcp" | "azure"
+    gpu_type: str           # SkyPilot ID: "RTX2000-Ada", "A100", "H100"
+    gpu_count: int
+    vram_gb: float
+    vcpus: int
+    ram_gb: float
+    price_on_demand: float
+    price_spot: float | None      # None = no spot option
+    spot_available: bool          # True = spot stock > 0 right now
+    available_count: int          # total units available (spot + on-demand)
+    region: str
+    infiniband: bool
+    skypilot_accelerator: str     # exact string for YAML any_of
+    skypilot_cloud: str
+
+class GPUCatalogService:
+    TTL_SECONDS = 60
+
+    def query_availability(self, providers=None, **filters) -> list[GPUOffer]:
+        # RunPod API (from costs.ipynb cell 2-3)
+        # Vast SDK (from costs.ipynb cell 6-7)
+        # sky.list_accelerators() for AWS/GCP/Azure offline catalog
+        # Cache with TTL; return [] per provider on failure (never raise)
+2.2 — src/services/gpu_selector.py — Scoring algorithm (spot-first)
+
+New file: src/services/gpu_selector.py
+
+@dataclass
+class ResourceConstraints:
+    providers: list[str]
+    gpu_types: list[str] | None   # None = cheapest available
+    min_vram_gb: int = 0
+    max_price_per_hour: float = 9999
+    prefer_spot: bool = True      # DEFAULT True (spot-first)
+    require_infiniband: bool = False
+    preferred_regions: list[str] = field(default_factory=list)
+    num_nodes: int = 1
+    num_gpus_per_node: int = 1
+    job_type: str = "tabular"     # "tabular" | "llm"
+Scoring algorithm (produces ordered any_of list — spot entries first):
+
+Filter: wrong provider, below min_vram, infiniband required but unavailable
+Generate two entries per valid offer: spot variant + on-demand variant
+Score spot: price_spot * 1.0 (if spot_available=True); deprioritize if unavailable
+Score on-demand: price_on_demand * 2.5 (price premium to always prefer spot)
+Region bonus: score *= 0.95 for preferred regions
+InfiniBand bonus: score *= 0.85 if required and available
+Sort ascending by score → spot entries naturally bubble up
+Deduplicate: same cloud+gpu can appear once (spot) before its on-demand fallback
+Append final "any cloud, any GPU matching VRAM" spot+ondemand entries as last resort
+Output order example for RTX2000-Ada on RunPod:
+
+1. {cloud: runpod, accelerators: RTX2000-Ada:1, use_spot: true}   # cheapest
+2. {cloud: runpod, accelerators: RTX4090:1, use_spot: true}       # next cheapest spot
+3. {cloud: vast, accelerators: RTX3090:1, use_spot: true}         # alternative spot
+4. {cloud: runpod, accelerators: RTX2000-Ada:1, use_spot: false}  # on-demand fallback
+5. {cloud: runpod, accelerators: RTX4090:1, use_spot: false}      # on-demand fallback
+2.3 — app/backend/routers/gpu_resources.py — REST endpoints
+
+New file:
+
+GET  /api/v2/gpu-resources/catalog
+     ?providers=runpod,vast&min_vram=8
+     → list[GPUOffer] (spot-available entries first)
+
+POST /api/v2/gpu-resources/select
+     Body: ResourceConstraints JSON
+     → {any_of: [...], spot_entries: int, ondemand_entries: int,
+        estimated_cost_spot: float, estimated_cost_ondemand: float}
+
+GET  /api/v2/gpu-resources/llm-catalog
+     → static list of LLMs with GPU recommendations
+Static LLM catalog:
+
+LLM_CATALOG = [
+    {"model_id": "meta-llama/Llama-3.1-8B",  "vram_gb": 16,  "min_gpus": 1, "recommended_gpu": "A100"},
+    {"model_id": "Qwen/Qwen2.5-7B",           "vram_gb": 14,  "min_gpus": 1, "recommended_gpu": "A40"},
+    {"model_id": "meta-llama/Llama-3.1-70B",  "vram_gb": 140, "min_gpus": 4, "recommended_gpu": "A100-80GB"},
+    {"model_id": "deepseek-ai/DeepSeek-R1-8B","vram_gb": 16,  "min_gpus": 1, "recommended_gpu": "A100"},
+]
+2.4 — Register router in app/backend/main.py.
+
+2.5 — Unit tests: tests/test_gpu_selector.py
+
+Spot entries always before on-demand in output
+Unavailable spot still included (as lower priority) unless spot_available=False hard excludes
+InfiniBand hard-exclude works
+Validation:
+
+curl 'http://localhost:8000/api/v2/gpu-resources/catalog?providers=runpod'
+# spot_available=true entries appear first in response
+
+curl -X POST http://localhost:8000/api/v2/gpu-resources/select \
+  -d '{"providers":["runpod"],"prefer_spot":true}'
+# First any_of entry has use_spot: true
+Rollback: Entirely additive. No existing code modified.
+
+Phase 3 — Multi-Provider UI + Dynamic YAML Generation + Vast.ai
+Goal: UI resource selector with cost comparison (spot vs on-demand prices shown side by side). DAG generates any_of dynamically. Vast.ai validated.
+
+Dependencies: Phase 2 complete.
+
+Tasks
+3.1 — Dynamic YAML generation in training_dag_skypilot.py
+
+In _submit_sky_job(), if resource_constraints present:
+
+catalog = GPUCatalogService().query_availability()
+any_of = GPUSelectorService().select_providers(constraints, catalog)
+# Load static YAML as base, replace resources.any_of
+# Write to /tmp/sky_job_{run_id}.yaml, load with sky.Task.from_yaml()
+If absent → static YAML fallback (backward compatible).
+
+3.2 — resource_constraints in RunRequest + DAG routing
+
+File: app/backend/routers/runs.py
+
+Add resource_constraints: ResourceConstraints | None = None to RunRequest
+prefer_spot=True is the default in ResourceConstraints
+DAG routing: use_gpu=True OR resource_constraints is not None → training_pipeline_skypilot
+Pass resource_constraints in dag_conf
+3.3 — Frontend: GPUResourceSelector.tsx
+
+New file: app/frontend/src/components/GPUResourceSelector.tsx
+
+UI elements:
+
+Provider checkboxes: RunPod / Vast.ai / AWS / GCP / Azure
+GPU type dropdown: "Auto (cheapest)" or specific type
+Min VRAM slider
+Spot preference toggle (default: ON) — when ON, spot entries ranked first
+Cost comparison table: for each top candidate, shows spot price + on-demand price side-by-side
+Savings estimate: "Est. ~X% savings with spot"
+Integration: RunPage.tsx step 2 — collapsible "Resource Selection" section.
+
+New API clients in app/frontend/src/api/platformClient.ts:
+
+queryGPUCatalog(params): Promise<GPUOffer[]>
+selectGPUResources(constraints): Promise<GPUSelectResult>
+getLLMCatalog(): Promise<LLMModelInfo[]>
+3.4 — Vast.ai validation
+
+New file: k3s/sky/vast-test.yaml with cloud: vast + cloud: runpod in any_of (both spot variants first). Verify sky show-gpus --cloud vast for exact accelerator IDs.
+
+3.5 — Fallback ordering (spot-first, cross-region)
+
+SkyPilot handles cross-region failover automatically. The any_of list should encode:
+
+Spot, preferred provider, preferred region
+Spot, preferred provider, any region (SkyPilot auto-retries regions)
+Spot, alternative provider
+On-demand, preferred provider (last resort)
+Validation:
+
+UI: select RunPod + Vast, spot ON → cost table shows spot price (highlighted as recommended)
+sky jobs logs confirms spot instance provisioned
+Rollback: resource_constraints optional. Static YAML fallback preserved. Frontend additive.
+
+Phase 4 — Extended Tabular Pipeline: SSM + BAE + DeepSpeed + Checkpointing
+Goal: SSM and BAE model types in main.py. DeepSpeed ZeRO integrated (opt-in). Checkpoint recovery via S3 storage_path (Ray) + SkyPilot managed jobs restart.
+
+Dependencies: Phase 1 complete. Parallel to Phase 3.
+
+Spot Recovery Architecture (clarified)
+Two-level recovery:
+
+SkyPilot managed jobs (sky jobs launch): node preempted → SkyPilot auto-provisions new node in another region, restarts the entire job from scratch (or from last checkpoint if S3 storage_path set)
+Ray FailureConfig: within a running cluster, handles worker-level failures (OOM, crash) by restarting from last Ray Train checkpoint saved to storage_path
+Both are complementary. For cost-optimized spot training, add FailureConfig so transient worker crashes don't restart from epoch 0.
+
+Tasks
+4.1 — SSM model: src/models/ssm.py
+
+State Space Model for tabular data. Features as 1D sequence → S4-style SSM block → classification head.
+
+class SSMTabular(nn.Module):
+    def __init__(self, input_dim, num_classes, d_state=16): ...
+Register: register_model("ssm", lambda cfg: SSMTabular(...)) Files: src/models/ssm.py, src/models/registry.py
+
+4.2 — BAE model: src/models/bae.py
+
+Bootstrap Aggregating Ensemble of autoencoders.
+
+class BAETabular(nn.Module):
+    def __init__(self, input_dim, num_classes, n_estimators=5, latent_dim=32): ...
+Register: register_model("bae", lambda cfg: BAETabular(...)) Files: src/models/bae.py, src/models/registry.py
+
+4.3 — Route SSM/BAE through existing PyTorchTrainer
+
+File: src/pipeline/train/__init__.py
+
+if framework in ("ssm", "bae"):
+    from pipeline.train.pytorch import PyTorchModelTrainer
+    return PyTorchModelTrainer()
+4.4 — SSM/BAE hyperparams in RunRequest
+
+File: app/backend/routers/runs.py
+
+_SSM_ALLOWED_KEYS = frozenset({"batch_size", "max_epochs", "lr", "weight_decay", "d_state"})
+_BAE_ALLOWED_KEYS = frozenset({"batch_size", "max_epochs", "lr", "weight_decay", "n_estimators", "latent_dim"})
+4.5 — DeepSpeed integration (opt-in): src/pipeline/utils/pytorch_utils.py
+
+Ray Train uses TorchTrainer + deepspeed.initialize() directly in train_func. Do NOT use prepare_model() or prepare_data_loader() — DeepSpeed manages distributed state.
+
+In train_func, replace the standard model/optimizer setup when DeepSpeed is enabled:
+
+if os.getenv("USE_DEEPSPEED", "false").lower() == "true":
+    import deepspeed
+    from deepspeed.accelerator import get_accelerator
+    ds_config = json.loads(os.getenv("DEEPSPEED_CONFIG_JSON", "{}")) or {
+        "train_micro_batch_size_per_gpu": batch_size,
+        "bf16": {"enabled": True},            # bf16 for Ampere/Ada/Hopper GPUs
+        "zero_optimization": {"stage": 1},    # tabular: stage 1 is sufficient
+        "gradient_clipping": True,
+        "steps_per_print": 50,
+    }
+    model, optimizer, _, lr_scheduler = deepspeed.initialize(
+        model=model,
+        model_parameters=model.parameters(),
+        config=ds_config,
+    )
+    device = get_accelerator().device_name(model.local_rank)
+    # Use model.backward(loss) instead of loss.backward()
+    # Use model.save_checkpoint(tmpdir) instead of torch.save()
+Critical changes in the training loop when DeepSpeed is active:
+
+model.backward(loss) instead of loss.backward()
+model.save_checkpoint(tmpdir) + torch.distributed.barrier() before ray.train.report(checkpoint=...)
+Add USE_DEEPSPEED: "false" to all SkyPilot GPU YAMLs (off by default for tabular; enabled for LLM). Add deepspeed==0.15.4 to k3s/kuberay/gpu/requirements_e1.txt. Rebuild image tag 2.53.1.
+
+4.6 — Ray FailureConfig for worker-level recovery
+
+File: src/pipeline/train/base_trainer.py
+
+Add FailureConfig when on spot (USE_SPOT env set) to survive transient OOM crashes without full restart:
+
+failure_config = ray.train.FailureConfig(max_failures=3) \
+    if os.getenv("USE_SPOT", "false").lower() == "true" else None
+run_config = ray.train.RunConfig(
+    storage_path=output_dir,  # S3 URI — checkpoints persist across restarts
+    failure_config=failure_config,
+)
+Set USE_SPOT: "true" in SkyPilot YAMLs when spot instance is used (injected by DAG based on whether the provisioned instance is spot).
+
+4.7 — MOUNT_CACHED for dev/debug warm clusters
+
+file_mounts:
+  /tmp/ray_checkpoints:
+    source: s3://k8s-mlops-platform-bucket/sky-cache/${TRAIN_RUN_ID}/checkpoints
+    mode: MOUNT_CACHED
+Only for repeated sky exec development. Ephemeral managed jobs use storage_path=S3. File: k3s/sky/ray-gpu-training.yaml
+
+Validation:
+
+# SSM + BAE: submit with model_type="ssm" / "bae", verify MLflow logged
+# DeepSpeed: set USE_DEEPSPEED=true, verify "ZeRO stage 1 enabled" in logs
+# FailureConfig: kill a Ray worker mid-training, verify resumes from checkpoint
+Rollback: SSM/BAE new registry entries. XGBoost/MLP unaffected. DeepSpeed opt-in env var.
+
+Phase 5 — Multi-Node AWS Pipeline + InfiniBand + Spot-First
+Goal: Multi-node GPU training on AWS. Spot p4d.24xlarge (EFA) first, on-demand as fallback. InfiniBand awareness in selector.
+
+Dependencies: Phase 2 (catalog with infiniband), Phase 4 (DeepSpeed + FailureConfig).
+
+Tasks
+5.1 — New SkyPilot YAML: k3s/sky/ray-gpu-multinode-aws.yaml (spot-first)
+
+name: ray-gpu-multinode
+num_nodes: 2
+
+resources:
+  any_of:
+    # Spot-first (EFA-capable)
+    - cloud: aws
+      instance_type: p4d.24xlarge   # 8×A100-40GB, EFA
+      use_spot: true
+    - cloud: aws
+      instance_type: p3dn.24xlarge  # 8×V100-32GB, EFA
+      use_spot: true
+    # Non-EFA spot fallback
+    - cloud: aws
+      accelerators: A10G:1
+      use_spot: true
+    # On-demand fallbacks
+    - cloud: aws
+      instance_type: p4d.24xlarge
+      use_spot: false
+    - cloud: aws
+      instance_type: p3dn.24xlarge
+      use_spot: false
+  disk_size: 100
+
+envs:
+  USE_DEEPSPEED: "true"
+  USE_SPOT: "true"    # enables Ray FailureConfig for worker crashes
+  NCCL_DEBUG: "INFO"
+  NCCL_IB_DISABLE: "0"   # Enable InfiniBand/EFA
+
+run: |
+  HEAD_IP=$(echo "$SKYPILOT_NODE_IPS" | head -1)
+  if [ "$SKYPILOT_NODE_RANK" == "0" ]; then
+    ray start --head --port=6379 --num-gpus=0 --num-cpus=0 --dashboard-host=0.0.0.0
+    python3 -c "
+import ray, time, sys
+expected = (int('$SKYPILOT_NUM_NODES') - 1) * 8
+ray.init(address='auto', ignore_reinit_error=True)
+for _ in range(30):
+    if ray.cluster_resources().get('GPU', 0) >= expected:
+        sys.exit(0)
+    time.sleep(10)
+sys.exit(1)
+"
+    python3 /home/ray/app/repo/k3s/kuberay/main.py
+  else
+    sleep 20
+    ray start --address="${HEAD_IP}:6379" \
+              --num-gpus=8 --num-cpus=48 \
+              --node-ip-address="$(hostname -I | awk '{print $1}')" --block
+  fi
+5.2 — InfiniBand awareness in GPUSelectorService
+
+infiniband=True for: AWS p3dn/p4d/p4de/p5 families. RunPod NVLink cluster pods. Vast.ai high-bandwidth offers. Scoring: hard-exclude if required but unavailable; score *= 0.85 if required and available.
+
+5.3 — DAG routing: multi-node path
+
+File: k3s/airflow/dags/training_dag_skypilot.py
+
+num_nodes = int(conf.get("num_nodes", 1))
+if model_type == "pytorch" and num_nodes > 1:
+    yaml_path = SKY_YAML_GPU_MULTINODE
+elif model_type == "pytorch":
+    yaml_path = SKY_YAML_GPU
+else:
+    yaml_path = SKY_YAML_CPU
+All paths use sky.jobs.launch() (managed jobs) for spot recovery.
+
+5.4 — AWS IAM instance profile
+
+Document in docs/AWS_SETUP.md: IAM role skypilot-training-role with S3 permissions. Add to ~/.sky/config.yaml. No AWS_ACCESS_KEY_ID in YAML.
+
+Validation:
+
+sky jobs launch k3s/sky/ray-gpu-multinode-aws.yaml --name test-multinode --yes
+sky jobs logs test-multinode --follow
+# Expected: p4d.24xlarge spot provisioned, NCCL EFA init, 16 GPUs registered
+# Spot interruption: SkyPilot auto-retries in another region
+Rollback: New YAML file + new num_nodes > 1 routing branch. Existing paths unchanged.
+
+Risk: p4d.24xlarge spot availability is low. Test with p3.8xlarge first (4×V100, no EFA but validates multi-node Ray). Move to EFA-capable instances after multi-node Ray is confirmed working.
+
+Phase 6 — LLM Training Pipeline + vLLM Serving
+Goal: LLaMA 3.1 8B fine-tuning (spot-first, LoRA) on RunPod/AWS. vLLM serving as persistent SkyPilot cluster (on-demand, since serving needs uptime). LLM model dropdown in UI.
+
+Dependencies: Phase 4 (DeepSpeed). Phase 3 helpful but not blocking.
+
+Spot Strategy for LLM
+LLM training: spot-first (A100-80GB spot first, fallback to on-demand). Long job → checkpoint to S3 every N steps so SkyPilot restart doesn't lose progress.
+vLLM serving: on-demand only (persistent endpoint; spot preemption unacceptable for serving).
+Tasks
+6.1 — New SkyPilot YAML: k3s/sky/ray-llm-training.yaml (spot-first)
+
+name: ray-llm-training
+num_nodes: 1
+
+resources:
+  any_of:
+    # Spot-first
+    - cloud: runpod
+      accelerators: A100-80GB:1
+      use_spot: true
+    - cloud: runpod
+      accelerators: A100:2        # 2×40GB with NVLink
+      use_spot: true
+    - cloud: aws
+      instance_type: p4d.24xlarge
+      use_spot: true
+    - cloud: vast
+      accelerators: A100-80GB:1
+      use_spot: true
+    # On-demand fallbacks
+    - cloud: runpod
+      accelerators: A100-80GB:1
+      use_spot: false
+    - cloud: aws
+      instance_type: p4d.24xlarge
+      use_spot: false
+  disk_size: 200
+
+envs:
+  LLM_MODEL_ID: "meta-llama/Llama-3.1-8B"
+  HF_TOKEN: ""
+  TRAIN_DATASET_S3: ""
+  MAX_SEQ_LEN: "2048"
+  USE_DEEPSPEED: "true"
+  DEEPSPEED_STAGE: "3"
+  LORA_ENABLED: "true"
+  LORA_RANK: "8"
+  MAX_STEPS: "500"
+  SAVE_STEPS: "100"   # checkpoint every 100 steps to S3 for spot recovery
+
+setup: |
+  nvidia-smi || exit 1
+  pip install transformers==4.46.0 peft==0.13.2 datasets==3.1.0 \
+              trl==0.12.2 deepspeed==0.15.4 --quiet
+  git clone --depth=1 --branch main \
+    https://github.com/takenking9879/Kubernetes-MLOPS-platform.git \
+    /home/ray/app/repo
+
+run: |
+  python3 /home/ray/app/repo/k3s/kuberay/llm_main.py
+6.2 — New LLM training entrypoint: k3s/kuberay/llm_main.py
+
+Separate from main.py. Uses HuggingFace + TRL + DeepSpeed directly (not Ray Train).
+
+Key implementation:
+
+# 1. Load model from HuggingFace (HF_TOKEN) + LoRA config via PEFT
+# 2. Load dataset: load_dataset("json", data_files=s3_uri, streaming=True)
+#    → streaming=True: no full JSONL loaded into memory (lazy)
+# 3. DeepSpeed ZeRO stage 3 config from DEEPSPEED_STAGE env
+# 4. TRL SFTTrainer with:
+#    - output_dir: /tmp/checkpoints/ (sync to S3 at SAVE_STEPS intervals)
+#    - save_steps: int(os.getenv("SAVE_STEPS", "100"))
+#    - resume_from_checkpoint: auto-detect latest S3 checkpoint on restart
+# 5. Save final adapter to: s3://bucket/llm-adapters/{LLM_MODEL_ID}/{TRAIN_RUN_ID}/
+# 6. Log to MLflow: adapter S3 path, training loss, perplexity
+Why not Ray Train for LLMs: HuggingFace Trainer + DeepSpeed is more battle-tested for LLM fine-tuning (gradient checkpointing, LoRA merging, tokenizer handling). SkyPilot manages the cluster.
+
+6.3 — New Airflow DAG: k3s/airflow/dags/llm_training_dag.py
+
+dag_id = "llm_training_pipeline"
+# dag_run.conf: llm_model_id, train_dataset_s3, hf_token_secret_key,
+#              lora_enabled, lora_rank, max_steps, deepspeed_stage,
+#              resource_constraints (optional)
+Tasks:
+
+select_gpu_resources — GPUSelectorService with prefer_spot=True, job_type="llm"
+submit_sky_job — sky.jobs.launch() (managed job, auto spot recovery)
+poll_sky_job — sky.jobs.queue() polling; timeout 28800s (8h)
+6.4 — New SkyPilot YAML: k3s/sky/vllm-serving.yaml (on-demand only)
+
+name: vllm-serving
+resources:
+  any_of:
+    - cloud: runpod
+      accelerators: A100:1
+      use_spot: false    # on-demand: serving needs uptime
+    - cloud: runpod
+      accelerators: RTX4090:1
+      use_spot: false
+    - cloud: vast
+      accelerators: A100:1
+      use_spot: false
+  disk_size: 100
+
+envs:
+  HF_MODEL_ID: "meta-llama/Llama-3.1-8B"
+  LLM_ADAPTER_S3: ""
+  HF_TOKEN: ""
+  VLLM_PORT: "8000"
+  MAX_MODEL_LEN: "4096"
+  GPU_MEMORY_UTILIZATION: "0.90"
+  TENSOR_PARALLEL_SIZE: "1"
+
+setup: |
+  pip install vllm==0.6.4 --quiet
+  if [ -n "$LLM_ADAPTER_S3" ]; then
+    aws s3 sync $LLM_ADAPTER_S3 /tmp/lora_adapter/
+  fi
+
+run: |
+  vllm serve $HF_MODEL_ID \
+    --port $VLLM_PORT \
+    --gpu-memory-utilization $GPU_MEMORY_UTILIZATION \
+    --max-model-len $MAX_MODEL_LEN \
+    --tensor-parallel-size $TENSOR_PARALLEL_SIZE \
+    ${LLM_ADAPTER_S3:+--lora-modules local=/tmp/lora_adapter/} \
+    --host 0.0.0.0
+Serving uses sky.launch() (not managed jobs — we want persistent cluster).
+
+6.5 — New Airflow DAG: k3s/airflow/dags/vllm_serving_dag.py
+
+Tasks:
+
+submit_sky_job — sky.launch() (persistent cluster, no sky down)
+wait_for_endpoint_ready — polls http://{cluster_ip}:8000/health
+register_endpoint — writes URL to runs/serving/{serve_run_id}/endpoint.json on S3
+Add GET /api/v2/serving-configs/{serve_run_id}/endpoint in app/backend/routers/serving_configs.py.
+
+6.6 — LLM model dropdown in ServingPage.tsx
+
+New LLM section showing:
+
+Model dropdown (from GET /api/v2/gpu-resources/llm-catalog)
+Recommended GPU/VRAM for selected model
+Fine-tuned adapter selector (optional S3 path)
+Estimated $/hr (on-demand, since serving = on-demand)
+"Deploy" → triggers vllm_serving_pipeline
+Endpoint URL when ready
+6.7 — Streaming dataset support (lazy loading)
+
+File: k3s/kuberay/llm_main.py: load_dataset(..., streaming=True) (no full JSONL in memory). File: k3s/sky/ray-gpu-training.yaml envs: RAY_MATERIALIZE_DATASETS: "0" for large tabular sets.
+
+S3 paths:
+
+llm-data/                               ← JSONL training files
+llm-adapters/{model-id}/{run-id}/       ← LoRA adapter weights
+runs/llm-training/{llm-train-id}/       ← params + MLflow link
+Validation:
+
+# Use Qwen 2.5 7B first (no HF gating):
+sky jobs launch k3s/sky/ray-llm-training.yaml --name qwen-test \
+  --env LLM_MODEL_ID=Qwen/Qwen2.5-7B \
+  --env TRAIN_DATASET_S3=s3://bucket/llm-data/train.jsonl \
+  --env MAX_STEPS=50 --yes
+sky jobs logs qwen-test --follow
+# Spot A100 provisioned, training loss logged, adapter saved to S3, MLflow run created
+
+# vLLM serving:
+sky launch k3s/sky/vllm-serving.yaml --env HF_MODEL_ID=Qwen/Qwen2.5-7B --yes
+curl http://{cluster_ip}:8000/v1/completions \
+  -d '{"model":"Qwen/Qwen2.5-7B","prompt":"Hello","max_tokens":20}'
+Rollback: All new files. Tabular pipeline completely unaffected.
+
+Risk: LLaMA 3.1 requires HF_TOKEN with accepted terms. Test with Qwen 2.5 7B first. vLLM 0.6.x breaking changes vs 0.5.x — pin and test before merge.
+
+Phase 7 — GPU Metrics + Cost Tracking + LocalExecutor
+Goal: GPU utilization visible in Grafana. Per-run cost (spot vs on-demand) in MLflow. Airflow LocalExecutor for concurrent DAG execution.
+
+Dependencies: Phase 1. Parallel to all other phases.
+
+Grafana/Prometheus Architecture Change
+The existing K8s Grafana + Prometheus works for KubeRay jobs (pods running inside the cluster on Docker Desktop kubeadm). When training moves to SkyPilot external VMs (RunPod, AWS), those VMs are not reachable from inside the Docker Desktop cluster — there's no network path from in-cluster Prometheus to external cloud VMs.
+
+Solution: Grafana Cloud remote_write (recommended)
+
+Use Grafana Cloud free tier as the unified metrics sink:
+
+SkyPilot VMs push metrics → Grafana Cloud Prometheus endpoint (remote_write over HTTPS — works from anywhere)
+In-cluster Prometheus also remote_writes existing Ray/K8s metrics → Grafana Cloud
+Single Grafana Cloud dashboard shows both sources
+Setup:
+
+Create free Grafana Cloud account → get remote_write URL + API key
+Add to K8s Prometheus config: remote_write: [{url: ..., basic_auth: ...}]
+On SkyPilot VMs: use grafana-agent or simple prometheus_client push
+Fallback: MLflow GPU metric logging (zero infrastructure)
+
+If Grafana Cloud is not desired, log GPU metrics directly to MLflow as metrics in the training run. This requires no networking changes — MLflow is already accessible from all compute:
+
+# Background thread in main.py / llm_main.py
+while training:
+    util = nvidia_smi_query()
+    mlflow.log_metric("gpu_utilization", util, step=current_step)
+    time.sleep(15)
+Tasks
+7.1 — GPU metrics: Grafana Agent on SkyPilot VMs
+
+In all GPU SkyPilot YAML setup: blocks:
+
+# Install Grafana Agent (lightweight, push-based)
+ARCH=amd64
+curl -sL https://github.com/grafana/agent/releases/latest/download/grafana-agent-linux-$ARCH.zip \
+  -o /tmp/agent.zip && unzip /tmp/agent.zip -d /usr/local/bin/
+chmod +x /usr/local/bin/grafana-agent-linux-$ARCH
+In run: blocks, before main entrypoint:
+
+cat > /tmp/agent-config.yaml << EOF
+metrics:
+  global:
+    scrape_interval: 15s
+    remote_write:
+      - url: "${GRAFANA_REMOTE_WRITE_URL}"
+        basic_auth:
+          username: "${GRAFANA_INSTANCE_ID}"
+          password: "${GRAFANA_API_KEY}"
+  configs:
+    - name: gpu
+      scrape_configs:
+        - job_name: skypilot-gpu
+          static_configs:
+            - targets: ['localhost:9400']
+              labels:
+                cluster: "${SKY_CLUSTER_NAME}"
+                is_spot: "${USE_SPOT}"
+EOF
+
+# DCGM GPU exporter (NVIDIA, publishes to :9400)
+# Alternative: simple prometheus_client script
+cat > /tmp/gpu_exporter.py << 'PYEOF'
+from prometheus_client import start_http_server, Gauge
+import subprocess, time, os
+
+gpu_util = Gauge('gpu_utilization_percent', 'GPU utilization', ['gpu', 'cluster', 'is_spot'])
+gpu_mem  = Gauge('gpu_memory_used_mb', 'GPU memory used MB', ['gpu', 'cluster'])
+CLUSTER = os.getenv("SKY_CLUSTER_NAME", "unknown")
+IS_SPOT = os.getenv("USE_SPOT", "false")
+
+start_http_server(9400)
+while True:
+    r = subprocess.run(
+        ["nvidia-smi","--query-gpu=utilization.gpu,memory.used",
+         "--format=csv,noheader,nounits"], capture_output=True, text=True)
+    for i, line in enumerate(r.stdout.strip().split("\n")):
+        util, mem = line.split(", ")
+        gpu_util.labels(gpu=str(i), cluster=CLUSTER, is_spot=IS_SPOT).set(float(util))
+        gpu_mem.labels(gpu=str(i), cluster=CLUSTER).set(float(mem))
+    time.sleep(15)
+PYEOF
+python3 /tmp/gpu_exporter.py &
+grafana-agent-linux-$ARCH --config.file=/tmp/agent-config.yaml &
+Add envs: GRAFANA_REMOTE_WRITE_URL: "", GRAFANA_INSTANCE_ID: "", GRAFANA_API_KEY: "", SKY_CLUSTER_NAME: "". Airflow injects actual values from Airflow Variables.
+
+If Grafana Cloud not desired: skip agent setup, use MLflow log_metric() fallback instead (see Task 7.3).
+
+7.2 — Update in-cluster Prometheus for remote_write to Grafana Cloud
+
+File: K8s Prometheus ConfigMap (find with kubectl get cm -n monitoring | grep prometheus)
+
+Add to prometheus.yaml:
+
+remote_write:
+  - url: ${GRAFANA_REMOTE_WRITE_URL}
+    basic_auth:
+      username: ${GRAFANA_INSTANCE_ID}
+      password: ${GRAFANA_API_KEY}
+This merges existing Ray/K8s metrics into Grafana Cloud alongside SkyPilot VM metrics.
+
+7.3 — Grafana Cloud dashboard (or in-cluster update)
+
+If using Grafana Cloud: create dashboard in Grafana Cloud UI with panels querying combined data. If staying in-cluster: update existing k3s/grafana/dashboards/ to add SkyPilot GPU panels (they'll only show data when Grafana Cloud ingestion is configured; MLflow-only mode won't show here).
+
+New file: k3s/grafana/dashboards/gpu-training-skypilot.json
+
+Panels:
+
+GPU utilization % (line, per GPU, per cluster, spot/on-demand labeled)
+GPU memory used/total (area chart)
+Training loss vs step (from Ray Prometheus metrics, already scraped)
+Spot vs on-demand usage ratio
+Cost efficiency: $/hr vs GPU utilization % (scatter)
+7.3 — Per-run cost tracking in main.py
+
+At job completion:
+
+gpu_price = float(os.getenv("GPU_PRICE_PER_HOUR", "0"))
+is_spot = os.getenv("USE_SPOT", "false").lower() == "true"
+elapsed_hours = (time.time() - job_start_time) / 3600
+if gpu_price > 0:
+    mlflow.set_tag("estimated_cost_usd", round(gpu_price * elapsed_hours, 4))
+    mlflow.set_tag("instance_type", "spot" if is_spot else "on_demand")
+    mlflow.set_tag("gpu_price_per_hour", gpu_price)
+Airflow injects GPU_PRICE_PER_HOUR from GPUSelectorService selection (uses price_spot if spot was provisioned).
+
+Same logging in llm_main.py.
+
+7.4 — Airflow LocalExecutor migration
+
+# Airflow Helm values or docker-compose.yaml
+executor: LocalExecutor
+# Requires PostgreSQL (verify deployed before switching)
+Allows multiple DAGs to run concurrently (e.g., preprocessing + training simultaneously). Verify: airflow config get-value core executor → should return LocalExecutor.
+
+7.5 — Cost estimate in GPUResourceSelector.tsx
+
+Add to UI:
+
+Expected runtime presets: "Quick 0.5h / Standard 2h / Full 8h"
+Spot cost estimate: price_spot * hours (highlighted, primary)
+On-demand cost estimate: price_on_demand * hours (secondary, shows savings %)
+Post-job: read estimated_cost_usd from MLflow and show actual cost in run history
+Validation:
+
+# Pushgateway:
+curl http://prometheus-pushgateway.monitoring:9091/metrics | grep gpu_utilization
+# Grafana: metrics appear during training, is_spot label visible
+
+# MLflow: after training run → estimated_cost_usd tag present, instance_type="spot"
+
+# Airflow: submit 2 DAGs simultaneously → both run concurrently (proves LocalExecutor)
+Rollback: GPU metrics additive (empty PUSHGATEWAY URL = no-op). Cost tag is enhancement. LocalExecutor revert: change executor back to SequentialExecutor.
+
+Phase 8 — Unified Launch Wizard + Intelligent Orchestration + Model Upload
+Goal: All previous phases are accessible through a unified, user-triggerable UI running as a K8s pod. Users launch training, serving, or both in minutes. The system selects the right orchestration backend automatically (Ray Train / vLLM / Ray+vLLM) based on model type and size. Custom model .py files can be uploaded.
+
+Dependencies: All previous phases conceptually complete, but Phase 8 can be built incrementally alongside Phases 3–7 since it's primarily a frontend + service orchestration layer.
+
+Primary clouds tested: RunPod (single-node), Vast.ai (single-node), AWS (multi-node spot). Designed to extend easily to GCP/Azure/Lambda without code changes — only ~/.sky/config.yaml credentials needed.
+
+Orchestration Decision Logic (Central to Phase 8)
+# app/backend/services/orchestration_selector.py
+
+def select_training_orchestration(model_type: str) -> str:
+    if model_type in ("ann", "ssm", "bae", "xgboost", "user_uploaded"):
+        return "ray_train"          # existing tabular pipeline
+    elif model_type == "llm":
+        return "llm_finetune"       # HF+TRL+DeepSpeed (llm_main.py)
+
+def select_serving_orchestration(
+    model_vram_gb: float,
+    num_gpus_per_node: int,
+    vram_per_gpu_gb: float,
+    num_nodes: int,
+) -> str:
+    fits_single_node = model_vram_gb <= num_gpus_per_node * vram_per_gpu_gb
+    if fits_single_node and num_nodes == 1:
+        return "vllm_single_node"   # vllm-serving.yaml (simpler, cheaper)
+    else:
+        return "ray_vllm_multinode" # Kimi-K2 pattern: Ray+vLLM (tensor+pipeline parallel)
+Kimi-K2 pattern for multi-node LLM serving:
+
+Head node: ray start --head + vllm serve with --tensor-parallel-size=GPUs_per_node --pipeline-parallel-size=num_nodes
+Worker nodes: join Ray cluster, sleep (Ray handles work routing)
+network_tier: best in YAML for InfiniBand/EFA when available
+Use sky status --endpoint 8081 <cluster> to get the endpoint URL
+New YAML: k3s/sky/ray-vllm-multinode-serving.yaml (Kimi-K2 style).
+
+Tasks
+8.1 — app/backend/services/orchestration_selector.py
+
+New file: contains select_training_orchestration() and select_serving_orchestration() (shown above).
+
+Also: generate_recommendations(constraints, model_info) -> list[OrchestratorRecommendation]
+
+@dataclass
+class OrchestratorRecommendation:
+    orchestration: str         # "vllm_single_node" | "ray_vllm_multinode" | "ray_train" | "llm_finetune"
+    reason: str                # Human-readable explanation shown in UI
+    sky_yaml_template: str     # Which base YAML to use
+    estimated_cost_spot: float
+    estimated_cost_ondemand: float
+    warnings: list[str]        # e.g., "p4d.24xlarge spot availability is low"
+8.2 — app/backend/services/job_builder.py — Complete YAML + config generation
+
+New file: generates full SkyPilot YAML from scratch given user config (not just the any_of block).
+
+class JobBuilder:
+    def build_training_job(self, config: TrainingJobConfig) -> dict:
+        """Returns complete SkyPilot YAML dict ready for yaml.dump()"""
+
+    def build_serving_job(self, config: ServingJobConfig) -> dict:
+        """Returns complete SkyPilot YAML dict for vLLM or Ray+vLLM"""
+
+    def build_dag_conf(self, config) -> dict:
+        """Returns Airflow dag_run.conf dict for triggering the right DAG"""
+TrainingJobConfig fields:
+
+model_type (ann/ssm/bae/llm/user_uploaded)
+model_s3_path (for user_uploaded only)
+resource_constraints (from Phase 2/3)
+use_deepspeed, deepspeed_stage
+num_nodes (1 for tabular, 1+ for LLM)
+dataset_s3_path, train_run_id
+hyperparams
+The builder outputs a complete YAML (not a partial patch), writes to /tmp/sky_job_{run_id}.yaml, launches via sky.jobs.launch().
+
+8.3 — app/backend/routers/jobs.py — Unified job launch API
+
+New file:
+
+POST /api/v2/jobs/launch
+     Body: {
+       job_type: "training" | "serving" | "both",
+       model_config: {model_type, model_id, ...},
+       resource_constraints: ResourceConstraints,
+       training_config: {...},    # if job_type includes training
+       serving_config: {...},     # if job_type includes serving
+     }
+     Response: {
+       job_ids: {training?: str, serving?: str},
+       orchestration: str,
+       recommendation: OrchestratorRecommendation,
+       sky_yaml_preview: str,     # generated YAML as string (for advanced users)
+     }
+
+GET  /api/v2/jobs/{job_id}/status
+     Response: {status, logs_url, endpoint_url?, cost_so_far?}
+
+GET  /api/v2/jobs/
+     Response: list of recent jobs with status
+
+DELETE /api/v2/jobs/{job_id}
+     Terminates the SkyPilot cluster (sky down / sky jobs cancel)
+The POST /launch endpoint calls OrchestrationSelector, JobBuilder, then triggers the appropriate Airflow DAG (training_pipeline_skypilot, llm_training_pipeline, vllm_serving_pipeline, or ray_vllm_serving_pipeline).
+
+8.4 — New SkyPilot YAML: k3s/sky/ray-vllm-multinode-serving.yaml (Kimi-K2 pattern)
+
+name: ray-vllm-multinode-serving
+num_nodes: 2   # injected by JobBuilder
+
+resources:
+  accelerators: A100:8   # injected by JobBuilder (from resource_constraints)
+  use_spot: false         # serving = on-demand
+  network_tier: best      # EFA/InfiniBand for multi-node communication
+  disk_size: 200
+
+envs:
+  HF_MODEL_ID: ""
+  HF_TOKEN: ""
+  TENSOR_PARALLEL_SIZE: "8"      # GPUs per node
+  PIPELINE_PARALLEL_SIZE: "2"    # num_nodes
+  MAX_MODEL_LEN: "32768"
+  VLLM_PORT: "8081"
+
+setup: |
+  pip install vllm==0.6.4 --quiet
+  # Download model weights if private/LoRA adapter
+  if [ -n "$LLM_ADAPTER_S3" ]; then
+    aws s3 sync $LLM_ADAPTER_S3 /tmp/lora_adapter/
+  fi
+
+run: |
+  HEAD_IP=$(echo "$SKYPILOT_NODE_IPS" | head -1)
+  export VLLM_HOST_IP=$(echo "$SKYPILOT_NODE_IPS" | awk "NR==$((SKYPILOT_NODE_RANK+1))")
+
+  if [ "$SKYPILOT_NODE_RANK" == "0" ]; then
+    ray start --head --port=6379 --disable-usage-stats
+    sleep 10
+    vllm serve $HF_MODEL_ID \
+      --host 0.0.0.0 --port $VLLM_PORT \
+      --tensor-parallel-size $TENSOR_PARALLEL_SIZE \
+      --pipeline-parallel-size $PIPELINE_PARALLEL_SIZE \
+      --max-model-len $MAX_MODEL_LEN
+  else
+    sleep 5
+    ray start --address="${HEAD_IP}:6379" --disable-usage-stats
+    sleep infinity
+  fi
+8.5 — New Airflow DAG: k3s/airflow/dags/ray_vllm_serving_dag.py
+
+dag_id = "ray_vllm_serving_pipeline"
+Tasks:
+
+submit_sky_job — sky.launch() (persistent cluster)
+wait_for_endpoint_ready — polls http://{head_ip}:8081/health
+register_endpoint — writes to S3 + Airflow XCom
+8.6 — Frontend: LaunchWizardPage.tsx — Unified 4-step wizard
+
+New file: app/frontend/src/pages/LaunchWizardPage.tsx
+
+Step 1 — Model Selection:
+
+Job type toggle: "Training" | "Serving" | "Training + Serving"
+Model category: "Tabular (ANN/SSM/BAE/XGBoost)" | "LLM (fine-tune)" | "Upload custom model (.py)"
+Tabular: dropdown of registered model types + hyperparams form (collapsible)
+LLM: dropdown from GET /api/v2/gpu-resources/llm-catalog with VRAM/GPU recommendations
+Upload: file picker for .py + architecture name + description
+Step 2 — Resource Configuration:
+
+GPUResourceSelector component (reuse from Phase 3)
+Adds: num_nodes toggle (Single / Multi-node)
+Multi-node toggle shows: "EFA/InfiniBand preferred" checkbox
+Spot preference (default: ON)
+Step 3 — Smart Recommendations:
+
+Calls POST /api/v2/gpu-resources/select + POST /api/v2/jobs/launch dry-run
+Shows OrchestratorRecommendation:
+Orchestration: "vLLM (single-node)" or "Ray + vLLM (multi-node, Kimi-K2 pattern)" or "Ray Train"
+Why: short explanation ("Your model fits on 1×A100-80GB, vLLM alone is simpler and cheaper")
+Cost estimate: spot $/hr and $/day for selected config
+Warnings if any (low spot availability, no EFA for multi-node, etc.)
+Preview of generated SkyPilot YAML (expandable <details> block)
+Advanced user override: edit the YAML directly in a code editor
+Step 4 — Launch:
+
+Summary of all selections
+"Launch" button → POST /api/v2/jobs/launch
+Real-time status panel: provisioning → running → completed
+Link to Grafana/MLflow for monitoring
+Add "Launch" tab to App.tsx (TAB_LABELS).
+
+8.7 — Model upload + default architecture browser
+
+New file: app/backend/routers/model_architectures.py
+
+GET  /api/v2/model-architectures
+     → list of available architectures: [
+         {id: "ann", name: "MLP (ANN)", description: "...", builtin: true},
+         {id: "ssm", name: "SSM Tabular", description: "...", builtin: true},
+         {id: "bae", name: "BAE Ensemble", description: "...", builtin: true},
+         {id: "user_mlp_v1", name: "Custom MLP v1", description: "...", builtin: false}
+       ]
+
+POST /api/v2/model-architectures/upload
+     Body: multipart/form-data (name, description, file: .py)
+     → validates Python syntax + that file defines a class inheriting nn.Module
+     → uploads to s3://bucket/model-architectures/{name}.py
+     → registers in metadata (Iceberg table or DynamoDB)
+     Returns: {id, s3_path, status: "validated"}
+Validation: parse AST to check class XYZ(nn.Module) exists + forward() method present. Reject obviously malformed files.
+
+Storage: s3://k8s-mlops-platform-bucket/model-architectures/{upload-id}/{name}.py
+
+When training a user-uploaded model:
+
+JobBuilder injects MODEL_ARCHITECTURE_S3: {s3_path} env var
+main.py downloads + importlib.import_module() loads the architecture at runtime
+Falls back to built-in registry if MODEL_ARCHITECTURE_S3 not set
+8.8 — Intelligent recommendation summary component
+
+New file: app/frontend/src/components/OrchestrationRecommendation.tsx
+
+Shows in Step 3 of the wizard:
+
+Selected orchestration with badge color (green = simple, orange = complex but needed)
+Generated YAML preview (read-only monaco editor or textarea)
+Cost breakdown: spot hourly | on-demand hourly | est. monthly at 100h/month
+Warnings list (yellow chips)
+"Why this config?" expandable explainer
+Validation:
+
+# UI flow: open Launch Wizard → LLM → Llama-3.1-8B → RunPod + spot → 1 node
+# → Step 3 shows: "vLLM single-node recommended, est. $0.18/hr spot"
+# → Launch → vllm_serving_pipeline DAG triggered → endpoint URL appears
+
+# Multi-node test: select 2 nodes → Step 3 shows "Ray+vLLM recommended (Kimi-K2 pattern)"
+# → Launch → ray_vllm_serving_pipeline DAG triggered
+
+# Custom model upload: upload a .py file with nn.Module class
+# → "validated" status, appears in model dropdown
+# → Launch training → model loaded at runtime via importlib
+
+# Provider test: select AWS + multi-node → recommendations include p4d.24xlarge spot
+# → On RunPod/Vast single-node → different recommendation
+Rollback: Phase 8 is entirely additive — new pages, new routes, new services. Every previous phase works independently. The wizard is an enhancement, not a replacement.
+
+Implementation Order
+Phase 1: MVP RTX2000-Ada, spot-first, sky jobs            [1-2 days]  REQUIRED FIRST
+  ↓
+Phase 2: Real-time catalog + spot-biased selector API     [3-5 days]
+  ↓
+Phase 3: UI resource selector + dynamic YAML + Vast.ai    [4-6 days]  (needs Phase 2)
+Phase 4: SSM + BAE + DeepSpeed + FailureConfig            [5-8 days]  (needs Phase 1 only, parallel)
+Phase 7: GPU metrics + cost tracking + LocalExecutor      [3-5 days]  (needs Phase 1, parallel)
+  ↓ (Phase 4 + Phase 2 needed)
+Phase 5: Multi-node AWS + InfiniBand + spot               [5-7 days]
+  ↓ (Phase 4 needed)
+Phase 6: LLM training (spot) + vLLM serving (on-demand)   [7-10 days]
+  ↓ (all previous phases)
+Phase 8: Unified Launch Wizard + intelligent orchestration [6-10 days]
+Total: 34–53 working days.
+
+Parallel opportunities:
+
+Phases 3, 4, 7 are independent after Phase 2/1 respectively
+Within Phase 4: SSM and BAE are independent implementations
+Phase 8 tasks 8.1–8.3 (backend) can start after Phase 2; 8.4–8.8 (frontend/LLM) need Phase 6
+Critical Files Reference
+Phase	File(s)	Action
+1	k3s/sky/ray-gpu-training.yaml	Spot-first any_of, add RTX2000-Ada, force USE_GPU=true
+1	k3s/airflow/dags/training_dag_skypilot.py	Switch to sky.jobs.launch()
+1	src/pipeline/train/base_trainer.py	Fix USE_GPU env propagation
+2	src/services/gpu_catalog.py	NEW: unified catalog with spot availability
+2	src/services/gpu_selector.py	NEW: spot-first scoring algorithm
+2	app/backend/routers/gpu_resources.py	NEW: REST API
+3	k3s/airflow/dags/training_dag_skypilot.py	Dynamic YAML generation
+3	app/backend/routers/runs.py	resource_constraints + DAG routing
+3	app/frontend/src/components/GPUResourceSelector.tsx	NEW: UI with spot/on-demand cost table
+4	src/models/ssm.py, src/models/bae.py	NEW: model architectures
+4	src/models/registry.py	Register ssm, bae
+4	src/pipeline/utils/pytorch_utils.py	DeepSpeed opt-in
+4	src/pipeline/train/base_trainer.py	FailureConfig for spot
+4	k3s/kuberay/gpu/requirements_e1.txt	Add deepspeed; rebuild image tag 2.53.1
+5	k3s/sky/ray-gpu-multinode-aws.yaml	NEW: multi-node, spot-first, EFA
+5	k3s/airflow/dags/training_dag_skypilot.py	num_nodes routing
+6	k3s/sky/ray-llm-training.yaml	NEW: LLM training, spot-first
+6	k3s/kuberay/llm_main.py	NEW: HF+TRL+DeepSpeed+LoRA, streaming dataset
+6	k3s/sky/vllm-serving.yaml	NEW: vLLM serving, on-demand
+6	k3s/airflow/dags/llm_training_dag.py	NEW: LLM DAG (sky.jobs.launch)
+6	k3s/airflow/dags/vllm_serving_dag.py	NEW: vLLM DAG (sky.launch persistent)
+7	k3s/sky/ray-gpu-training.yaml	Add Pushgateway GPU metrics push
+7	k3s/grafana/dashboards/gpu-training-skypilot.json	NEW: spot/on-demand labeled dashboard
+7	k3s/kuberay/main.py	Cost tracking with is_spot tag
+8	app/backend/services/orchestration_selector.py	NEW: vLLM vs Ray+vLLM decision logic
+8	app/backend/services/job_builder.py	NEW: complete YAML + DAG config generation
+8	app/backend/routers/jobs.py	NEW: unified job launch/status/cancel API
+8	app/backend/routers/model_architectures.py	NEW: model upload + validation
+8	k3s/sky/ray-vllm-multinode-serving.yaml	NEW: Kimi-K2 pattern multi-node vLLM
+8	k3s/airflow/dags/ray_vllm_serving_dag.py	NEW: Ray+vLLM serving DAG
+8	app/frontend/src/pages/LaunchWizardPage.tsx	NEW: 4-step unified launch wizard
+8	app/frontend/src/components/OrchestrationRecommendation.tsx	NEW: recommendation panel
+8	app/frontend/src/App.tsx	Add "Launch" tab
+Risks and Trade-offs
+Risk	Mitigation
+RTX2000-Ada spot on RunPod may be unavailable	Fallback to RTX4090 spot in any_of
+Spot preemptions interrupt LLM training mid-run	Checkpoint every 100 steps to S3; SkyPilot managed jobs auto-restarts from S3
+DeepSpeed cu128 + torch 2.10 incompatibility	Test in fresh container before image rebuild
+Dynamic any_of via Python API vs YAML	Write temp YAML to /tmp/, use from_yaml()
+RunPod/Vast API rate limits	60s TTL cache; return stale data on 429
+p4d.24xlarge spot unavailability	Test multi-node with p3.8xlarge first
+LLaMA 3.1 HF gating	Test with Qwen 2.5 7B (ungated) first
+vLLM 0.6.x breaking changes	Pin to 0.6.4; test before merge
+Vast.ai GPU IDs vs SkyPilot IDs	Verify with sky show-gpus --cloud vast
+LocalExecutor requires PostgreSQL	Verify PostgreSQL deployed before migration
+SkyPilot Provides vs What We Build
+SkyPilot provides:
+
+Infra provisioning + spot-first via any_of with use_spot ordering
+Cross-region failover (automatic, no config needed)
+Managed jobs (sky jobs launch): auto-restart on spot preemption
+retry_until_up=True for provisioning retries
+idle_minutes_to_autostop for cost safety
+sky.list_accelerators() for offline GPU catalog
+SKYPILOT_NODE_RANK, SKYPILOT_NODE_IPS, SKYPILOT_NUM_NODES env vars
+MOUNT_CACHED for persistent overlays
+We build:
+
+Real-time spot availability from RunPod + Vast APIs (SkyPilot catalog is cached/static)
+Spot-first scoring algorithm with price comparison (spot vs on-demand)
+Dynamic any_of YAML generation from user constraints
+GPU metrics push to Prometheus (SkyPilot has no built-in metrics)
+Per-run cost tracking with is_spot label in MLflow
+LLM model catalog with GPU/VRAM recommendations
+vLLM serving lifecycle management (persistent cluster, endpoint registration)
+UI cost comparison table (spot price vs on-demand side-by-side)

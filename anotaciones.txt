@@ -39,3 +39,14 @@ k3s/spark/
 
 Checar que el rayjob se elimina al completarse (Complete) porque no lo hizo
 
+Checar regiones y gpusid:
+Scrappear: https://docs.runpod.io/api-reference/endpoints/GET/endpoints
+
+Checar donde sin codigo:
+https://docs.runpod.io/pods/networking
+
+base de datos en tiempo real
+https://github.com/skypilot-org/skypilot-catalog/tree/master/.github/workflows
+
+Para infinband:
+https://docs.skypilot.co/en/latest/examples/performance/index.html

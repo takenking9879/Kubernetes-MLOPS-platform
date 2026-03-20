@@ -1,21 +1,24 @@
 FROM rayproject/ray:2.53.0-py311
 
-# 1️⃣ Instalar uv (binario precompilado, súper rápido)
+USER root
+
+# Install minimal tools required
+RUN apt-get update -qq \
+    && apt-get install -y --no-install-recommends \
+        curl \
+        ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install uv (fast Python installer)
 RUN pip install --no-cache-dir uv
 
-# 2️⃣ Copiar requirements primero (mejor cache de Docker)
+# Install Tailscale using official script
+RUN curl -fsSL https://tailscale.com/install.sh | sh
+
+# Python dependencies
 COPY requirements_gpu.txt /tmp/requirements.txt
+RUN uv pip install --system --no-cache -r /tmp/requirements.txt \
+    && rm -rf /tmp/*
 
-# 3️⃣ Instalar deps con uv (mucho más rápido que pip)
-RUN uv pip install \
-    --system \
-    --no-cache \
-    -r /tmp/requirements.txt
-
-RUN --mount=type=cache,target=/root/.cache/uv \
-    uv pip install \
-    --system \
-    --no-cache \
-    -r /tmp/requirements.txt && \
-    # Limpieza agresiva de archivos que no necesitas en el runtime
-    sudo rm -rf /tmp/* /var/tmp/*
+# Return to default ray user
+USER ray

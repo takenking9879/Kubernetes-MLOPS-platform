@@ -448,15 +448,22 @@ class KubeRayTraining(BaseUtils):
             mlflow_experiment_name = self.params.get("mlflow_experiment_name")
 
             # ── Resolve GPU flag early so both tuning and training honour it ──
-            # base_tuner.py reads USE_GPU with default "auto"; setting it here
-            # before the tuning phase ensures the user's app setting is respected
-            # in both phases instead of only in training.
-            use_gpu_flag = self.params.get("use_gpu", False)
+            # Priority: USE_GPU env var (set by SkyPilot YAML) > params.yaml use_gpu.
+            # This prevents params.yaml "use_gpu: false" from clobbering the
+            # "USE_GPU: true" injected by ray-gpu-training.yaml at VM launch time.
+            _env_gpu = os.getenv("USE_GPU", "auto").lower()
+            if _env_gpu in ("true", "1", "yes"):
+                use_gpu_flag = True
+            elif _env_gpu in ("false", "0", "no"):
+                use_gpu_flag = False
+            else:  # "auto" — fall back to params.yaml
+                use_gpu_flag = self.params.get("use_gpu", False)
             os.environ["USE_GPU"] = "true" if use_gpu_flag else "false"
             self.logger.info(
-                "GPU mode: %s (USE_GPU=%s, applies to tuning + training)",
+                "GPU mode: %s (USE_GPU=%s, source=%s)",
                 "enabled" if use_gpu_flag else "disabled",
                 os.environ["USE_GPU"],
+                "env" if _env_gpu != "auto" else "params.yaml",
             )
 
             # ── Tuning phase (optional) ──

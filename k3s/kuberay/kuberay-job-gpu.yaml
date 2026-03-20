@@ -6,8 +6,10 @@ metadata:
 spec:
   entrypoint: "python3 /home/ray/gpu_test_main.py"
   rayClusterSpec:
-    rayVersion: '2.9.0'
+    rayVersion: '2.53.0'
+    enableInTreeAutoscaling: true
     headGroupSpec:
+      serviceType: NodePort # Use this for local nodes
       rayStartParams:
         dashboard-host: '0.0.0.0'
         num-cpus: '1'
@@ -41,7 +43,42 @@ spec:
             - name: python-script
               configMap:
                 name: gpu-test-script
-    workerGroupSpecs: []
+    workerGroupSpecs:
+    - replicas: 1
+      minReplicas: 1
+      maxReplicas: 2
+      groupName: gpu-group
+      rayStartParams:
+        num-gpus: '1'
+        num-cpus: '2'
+      template:
+        spec:
+          # Target the RunPod virtual kubelet node (--node-name=vk-ml-runpod).
+          nodeSelector:
+            kubernetes.io/hostname: vk-ml-runpod
+          # Required to schedule onto the virtual kubelet node.
+          tolerations:
+          - key: "virtual-kubelet.io/provider"
+            operator: "Exists"
+            effect: "NoSchedule"
+          containers:
+          - name: ray-worker
+            image: ray-cluster-gpu:2.53.0
+            resources:
+              limits:
+                cpu: "2"
+                memory: "8G"
+                nvidia.com/gpu: "1"
+              requests:
+                cpu: "2"
+                memory: "8G"
+                nvidia.com/gpu: "1"
+            volumeMounts:
+              - mountPath: /tmp/ray
+                name: ray-logs
+          volumes:
+          - name: ray-logs
+            emptyDir: {}
 ---
 apiVersion: v1
 kind: ConfigMap
@@ -123,6 +160,12 @@ metadata:
   name: ray-gpu-test-head
   namespace: ray
 spec:
+  # ClusterIP: RunPod workers reach this service via the Tailscale subnet router.
+  # The K3s node must advertise its service CIDR (10.43.0.0/16) so workers that
+  # join the tailnet with --accept-routes can reach ClusterIPs directly.
+  # A Tailscale MagicDNS custom A record (ray-head.<tailnet>.ts.net → ClusterIP)
+  # maps a stable human-readable name to this service's ClusterIP.
+  type: ClusterIP
   ports:
     - name: gcs
       port: 6379
@@ -132,4 +175,6 @@ spec:
       targetPort: 8265
   selector:
     ray.io/node-type: head
-    ray.io/cluster: ray-gpu-test-job # Usually matches metadata.name of RayCluster or job
+    # Do NOT add ray.io/cluster here — KubeRay generates a random suffix on each
+    # RayJob run (e.g. ray-gpu-test-job-wm9mw), so a hardcoded cluster name will
+    # never match and the service will have no endpoints.

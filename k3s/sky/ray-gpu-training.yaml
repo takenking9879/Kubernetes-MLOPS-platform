@@ -1,0 +1,145 @@
+# k3s/sky/ray-gpu-training.yaml
+#
+# SkyPilot equivalent of kuberay-job-gpu.yaml (GPU training on RunPod).
+#
+# Architecture mapping:
+#   kuberay headGroupSpec  (num-gpus: 0, in-cluster)      → Single-node head on GPU VM, ray --num-gpus=0
+#   kuberay workerGroupSpec (1 × GPU, Virtual Kubelet)    → Same VM (single-node), ray --num-gpus=1
+#   Virtual Kubelet + RunPod API + Tailscale               → SkyPilot → RunPod API directly
+#   Tailscale MagicDNS (ray-head.<tailnet>.ts.net)        → SkyPilot SSH inter-node (not needed single-node)
+#   ConfigMap (gpu_test_main.py or main.py)                → git clone in setup: block
+#
+# Why single-node for GPU:
+#   The original kuberay-job-gpu.yaml used 1 GPU worker. Running head+worker on the same VM
+#   is simpler and avoids paying for 2 RunPod pods. The GPU is allocated to Ray tasks only
+#   (head uses --num-gpus=0 so coordination overhead stays off the GPU).
+#
+# To restore multi-node (head on separate VM), see docs/SKYPILOT_GPU_MIGRATION.md section 2.
+#
+# GPU fallback order (any_of): SkyPilot tries each in listed order.
+# Adjust based on current RunPod availability: `sky show-gpus --cloud runpod`
+#
+# Usage (manual test, from repo root):
+#   sky launch k3s/sky/ray-gpu-training.yaml \
+#     --cluster-name ray-gpu-test \
+#     --idle-minutes-to-autostop 10 \
+#     --env TRAIN_RUN_ID=train-test-001 \
+#     --env MODEL_TYPE=pytorch \
+#     --env PARAMS_S3_PATH=s3://bucket/... \
+#     --env AWS_ACCESS_KEY_ID=$(aws configure get aws_access_key_id) \
+#     --env AWS_SECRET_ACCESS_KEY=$(aws configure get aws_secret_access_key) \
+#     --yes
+#
+# Triggered automatically by training_dag_skypilot.py when model_type == "pytorch".
+
+name: ray-gpu-training
+
+# Single-node: head coordinator + GPU worker on same VM
+num_nodes: 1
+
+resources:
+  # SkyPilot tries each option in order; first available GPU wins
+  any_of:
+    - cloud: runpod
+      accelerators: RTX4090:1    # Cheapest high-performance option on RunPod
+    - cloud: runpod
+      accelerators: A40:1
+    - cloud: runpod
+      accelerators: A100:1
+    - cloud: runpod
+      accelerators: RTX3090:1    # Fallback: lower VRAM, still CUDA 12.x compatible
+  disk_size: 50
+  use_spot: false  # Set true + cloud: COMMUNITY for interruptible (cheaper, can be evicted)
+
+# Image already pushed: takenking9879/ray-cluster-gpu:2.53.0
+# Contains: Ray 2.53.0, PyTorch (cu128), XGBoost, MLflow, boto3, scikit-learn
+# Tailscale is still in the image (harmless) — not invoked here
+image_id: docker:takenking9879/ray-cluster-gpu:2.53.0
+
+envs:
+  # ── Per-run parameters (overridden at launch time by training_dag_skypilot.py) ──
+  TRAIN_RUN_ID: ""
+  PREPROCESS_RUN_ID: ""
+  MODEL_TYPE: "pytorch"
+  PARAMS_S3_PATH: ""
+  PROCESSED_TABLE: ""
+
+  # ── Infrastructure ──
+  MLFLOW_TRACKING_URI: "http://my-mlflow.ray.svc.cluster.local:80"
+  AWS_ACCESS_KEY_ID: ""
+  AWS_SECRET_ACCESS_KEY: ""
+  AWS_DEFAULT_REGION: "us-east-1"
+  AWS_S3_ENDPOINT_URL: ""
+
+  # ── Ray training parameters ──
+  NUM_WORKERS: "1"           # 1 GPU worker on single node
+  CPUS_PER_WORKER: "4"
+  NUM_WORKERS_TUNE: "1"
+  CPUS_PER_WORKER_TUNE: "4"
+  MAX_CONCURRENT_TRIALS: "1"
+  TUNE_MAX_TRAIN_ROWS: "250000"
+  TUNE_MAX_VAL_ROWS: "150000"
+  RAY_MATERIALIZE_DATASETS: "1"
+  RAY_MATERIALIZE_DATASETS_TUNE: "1"
+  PROMETHEUS_GRACE_SECONDS: "10"
+  REPORT_FREQUENCY: "4"
+
+  # ── Ray internals ──
+  RAY_enable_infeasible_task_early_exit: "true"
+  RAY_DEFAULT_OBJECT_STORE_MEMORY_PROPORTION: "0.7"
+  RAY_ACCEL_ENV_VAR_OVERRIDE_ON_ZERO: "0"
+
+setup: |
+  # Verify GPU is attached before starting (fail fast on misconfiguration)
+  nvidia-smi || { echo "ERROR: nvidia-smi failed — GPU not attached"; exit 1; }
+
+  # Clone the training repo — replaces git-sync init container + ConfigMap from kuberay-job-gpu.yaml
+  mkdir -p /home/ray/app
+  git clone --depth=1 --branch main \
+    https://github.com/takenking9879/Kubernetes-MLOPS-platform.git \
+    /home/ray/app/repo
+  echo "Repo cloned: $(ls /home/ray/app/repo/k3s/kuberay/)"
+
+run: |
+  export PYTHONPATH=/home/ray/app/repo:/home/ray/app/repo/src
+
+  # ── Single-node: head + GPU worker on same VM ────────────────────────────────
+  # Head coordinator: --num-gpus=0 reserves GPU only for Ray tasks, not the coordinator
+  # This mirrors headGroupSpec.rayStartParams.num-gpus: "0" in kuberay-job-gpu.yaml
+  ray start --head \
+            --port=6379 \
+            --num-gpus=0 \
+            --num-cpus=0 \
+            --dashboard-host=0.0.0.0
+
+  # GPU worker on same node: connect to head, expose 1 GPU
+  # Mirrors workerGroupSpec: num-gpus: 1, num-cpus: 2
+  ray start --address="127.0.0.1:6379" \
+            --num-gpus=1 \
+            --num-cpus=4 \
+            --node-ip-address="127.0.0.1"
+
+  # Wait for Ray GCS to be ready and GPU worker to register
+  python3 - <<'PYTHON_BLOCK'
+  import ray
+  import time
+  import sys
+
+  for attempt in range(12):
+      try:
+          ray.init(address="auto", ignore_reinit_error=True)
+          gpus = ray.cluster_resources().get("GPU", 0)
+          if gpus >= 1:
+              print(f"Ray ready — {gpus} GPU(s) registered")
+              sys.exit(0)
+          print(f"Attempt {attempt+1}/12: GPU not registered yet, retrying...")
+      except Exception as e:
+          print(f"Attempt {attempt+1}/12: {e}")
+      time.sleep(5)
+
+  print("ERROR: GPU worker never registered")
+  sys.exit(1)
+  PYTHON_BLOCK
+
+  # Execute training entrypoint (same as kuberay-job.yaml entrypoint)
+  python3 /home/ray/app/repo/k3s/kuberay/main.py
