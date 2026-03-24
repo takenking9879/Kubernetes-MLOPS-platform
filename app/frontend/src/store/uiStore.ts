@@ -8,7 +8,7 @@
 import { create } from 'zustand';
 import { devtools, persist } from 'zustand/middleware';
 
-export type Page = 'datasets' | 'dsl-builder' | 'processing' | 'run-pipeline' | 'serving';
+export type Page = 'datasets' | 'dsl-builder' | 'processing' | 'run-pipeline' | 'serving' | 'launch';
 
 interface UIState {
   page: Page;

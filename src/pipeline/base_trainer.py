@@ -190,6 +190,12 @@ class BaseTrainer(ABC):
         )
 
         # 3 — Construct Ray Trainer
+        # FailureConfig: on spot instances, survive up to 3 transient worker
+        # crashes (OOM, SIGKILL) without restarting from epoch 0.
+        # Ray Train resumes from the last checkpoint written to storage_path (S3).
+        on_spot = os.getenv("USE_SPOT", "false").lower() == "true"
+        failure_config = ray.train.FailureConfig(max_failures=3) if on_spot else None
+
         trainer_cls = self._get_ray_trainer_cls()
         trainer = trainer_cls(
             train_loop_per_worker=self._get_train_func(),
@@ -199,6 +205,7 @@ class BaseTrainer(ABC):
             run_config=ray.train.RunConfig(
                 storage_path=storage_path,
                 name=name,
+                failure_config=failure_config,
                 callbacks=callbacks or None,
             ),
         )

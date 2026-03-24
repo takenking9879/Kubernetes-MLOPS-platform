@@ -125,12 +125,37 @@ def train_func(config: Dict):
     model = get_model(model_type, {
         "input_dim": config.get("input_dim", 14),
         "num_classes": config.get("num_classes", 6),
+        "d_state": params.get("d_state", 16),
+        "n_estimators": params.get("n_estimators", 5),
+        "latent_dim": params.get("latent_dim", 32),
     })
-    model = ray.train.torch.prepare_model(model)
 
     loss_cls = getattr(nn, task_config.torch_loss_cls)
     loss_fn = loss_cls(**task_config.torch_loss_kwargs)
-    optimizer = torch.optim.Adam(model.parameters(), lr=lr, weight_decay=weight_decay)
+
+    # ── DeepSpeed (opt-in via USE_DEEPSPEED=true) ──────────────────────────────
+    use_deepspeed = os.getenv("USE_DEEPSPEED", "false").lower() == "true"
+    if use_deepspeed:
+        import deepspeed
+        from deepspeed.accelerator import get_accelerator
+        ds_config = json.loads(os.getenv("DEEPSPEED_CONFIG_JSON", "{}")) or {
+            "train_micro_batch_size_per_gpu": batch_size,
+            "bf16": {"enabled": True},
+            "zero_optimization": {"stage": 1},
+            "gradient_clipping": True,
+            "steps_per_print": 50,
+        }
+        model, optimizer, _, _ = deepspeed.initialize(
+            model=model,
+            model_parameters=model.parameters(),
+            config=ds_config,
+        )
+        device = get_accelerator().device_name(model.local_rank)
+        print(f"[pytorch_utils] DeepSpeed ZeRO stage 1 enabled, device={device}")
+    else:
+        model = ray.train.torch.prepare_model(model)
+        optimizer = torch.optim.Adam(model.parameters(), lr=lr, weight_decay=weight_decay)
+    # ─────────────────────────────────────────────────────────────────────────────
 
     # Log actual CPU configuration for debugging
     world_rank = ray.train.get_context().get_world_rank()
@@ -196,11 +221,15 @@ def train_func(config: Dict):
                 feature_cols = sorted(batch.keys())
             X = torch.stack([batch[c] for c in feature_cols], dim=1)
             
-            optimizer.zero_grad()
             preds = model(X)
             loss = loss_fn(preds, y)
-            loss.backward()
-            optimizer.step()
+            if use_deepspeed:
+                model.backward(loss)
+                model.step()
+            else:
+                optimizer.zero_grad()
+                loss.backward()
+                optimizer.step()
             train_loss += loss.item()
             train_batches += 1
         avg_train_loss = train_loss / max(train_batches, 1)
@@ -323,16 +352,23 @@ def train_func(config: Dict):
 
         # Checkpoint: only rank 0 uploads to avoid duplicates
         if should_checkpoint and world_rank in (0, None):
-            base_model = model.module if hasattr(model, "module") else model
             with tempfile.TemporaryDirectory() as tmpdir:
-                torch.save(
-                    {"model_state_dict": base_model.state_dict()},
-                    os.path.join(tmpdir, "model.pt"),
-                )
-                torch.save(
-                    {"optimizer_state_dict": optimizer.state_dict()},
-                    os.path.join(tmpdir, "optimizer.pt"),
-                )
+                if use_deepspeed:
+                    # DeepSpeed manages optimizer state internally
+                    model.save_checkpoint(tmpdir)
+                    import torch.distributed as dist
+                    if dist.is_available() and dist.is_initialized():
+                        dist.barrier()
+                else:
+                    base_model = model.module if hasattr(model, "module") else model
+                    torch.save(
+                        {"model_state_dict": base_model.state_dict()},
+                        os.path.join(tmpdir, "model.pt"),
+                    )
+                    torch.save(
+                        {"optimizer_state_dict": optimizer.state_dict()},
+                        os.path.join(tmpdir, "optimizer.pt"),
+                    )
                 with open(os.path.join(tmpdir, "meta.json"), "w", encoding="utf-8") as f:
                     json.dump(
                         {

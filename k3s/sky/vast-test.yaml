@@ -1,0 +1,104 @@
+# k3s/sky/vast-test.yaml
+#
+# Validates GPU training on Vast.ai alongside RunPod with spot-first ordering.
+#
+# Before launching, verify exact Vast.ai accelerator IDs:
+#   sky show-gpus --cloud vast
+#
+# Usage:
+#   sky launch k3s/sky/vast-test.yaml \
+#     --name vast-test \
+#     --env TRAIN_RUN_ID=train-test-vast-001 \
+#     --env MODEL_TYPE=pytorch \
+#     --env PARAMS_S3_PATH=s3://bucket/... \
+#     --env AWS_ACCESS_KEY_ID=$(aws configure get aws_access_key_id) \
+#     --env AWS_SECRET_ACCESS_KEY=$(aws configure get aws_secret_access_key) \
+#     --yes
+
+name: vast-gpu-test
+
+num_nodes: 1
+
+resources:
+  image_id: docker:takenking9879/ray-cluster-gpu:e1
+  any_of:
+    # Spot-first: Vast.ai spot tends to be cheapest
+    - cloud: vast
+      accelerators: RTX4090:1
+      use_spot: true
+    - cloud: runpod
+      accelerators: RTX4090:1
+      use_spot: true
+    - cloud: vast
+      accelerators: A40:1
+      use_spot: true
+    - cloud: runpod
+      accelerators: A40:1
+      use_spot: true
+    # On-demand fallbacks
+    - cloud: vast
+      accelerators: RTX4090:1
+      use_spot: false
+    - cloud: runpod
+      accelerators: RTX4090:1
+      use_spot: false
+  disk_size: 30
+
+envs:
+  TRAIN_RUN_ID: ""
+  PREPROCESS_RUN_ID: ""
+  MODEL_TYPE: "pytorch"
+  PARAMS_S3_PATH: ""
+  PROCESSED_TABLE: ""
+
+  USE_GPU: "true"
+  USE_SPOT: "true"
+  USE_DEEPSPEED: "false"
+
+  MLFLOW_TRACKING_URI: ""         # injected by Airflow DAG via task.update_envs()
+  AWS_ACCESS_KEY_ID: ""
+  AWS_SECRET_ACCESS_KEY: ""
+  AWS_DEFAULT_REGION: "us-east-1"
+  AWS_S3_ENDPOINT_URL: ""
+
+  NUM_WORKERS: "1"
+  CPUS_PER_WORKER: "4"
+  RAY_enable_infeasible_task_early_exit: "true"
+
+setup: |
+  nvidia-smi || { echo "ERROR: nvidia-smi failed — GPU not attached"; exit 1; }
+  mkdir -p /home/ray/app
+  git clone --depth=1 --branch main \
+    https://github.com/takenking9879/Kubernetes-MLOPS-platform.git \
+    /home/ray/app/repo
+  echo "Repo cloned: $(ls /home/ray/app/repo/k3s/kuberay/)"
+  pip install ray[train,tune,data]==2.53.0
+
+run: |
+  set -e
+  export PYTHONPATH=/home/ray/app/repo:/home/ray/app/repo/src
+
+  RAY_START_CMD="ray start --head \
+    --port=6379 \
+    --dashboard-port=8265 \
+    --dashboard-host=0.0.0.0 \
+    --disable-usage-stats \
+    --include-dashboard=True"
+
+  if [ "${SKYPILOT_NUM_GPUS_PER_NODE:-0}" -gt 0 ]; then
+    RAY_START_CMD="${RAY_START_CMD} --num-gpus=${SKYPILOT_NUM_GPUS_PER_NODE}"
+  fi
+
+  eval "${RAY_START_CMD}"
+
+  for i in $(seq 1 60); do
+    ray health-check --address=127.0.0.1:6379 &>/dev/null && break
+    echo "Waiting for Ray head ($i/60)"
+    sleep 1
+  done
+  ray health-check --address=127.0.0.1:6379 \
+    || { echo "ERROR: Ray head did not become healthy"; exit 1; }
+
+  sleep 5
+
+  python3 /home/ray/app/repo/k3s/kuberay/main.py

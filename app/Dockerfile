@@ -27,7 +27,8 @@ WORKDIR /deps
 COPY backend/requirements.txt .
 
 RUN pip install --upgrade pip \
-    && pip install --prefix=/usr/local -r requirements.txt
+    && pip install --prefix=/usr/local -r requirements.txt \
+    && pip install --prefix=/usr/local vastai-sdk==0.5.1 --no-deps
 
 ############################
 # Stage 2: Spark + Node.js + frontend + Python runtime

@@ -1,0 +1,329 @@
+{
+  "__inputs": [],
+  "__requires": [
+    { "type": "grafana", "id": "grafana", "name": "Grafana", "version": "10.0.0" },
+    { "type": "panel", "id": "timeseries", "name": "Time series", "version": "" },
+    { "type": "panel", "id": "stat", "name": "Stat", "version": "" },
+    { "type": "panel", "id": "gauge", "name": "Gauge", "version": "" },
+    { "type": "datasource", "id": "prometheus", "name": "Prometheus", "version": "1.0.0" }
+  ],
+  "annotations": { "list": [] },
+  "description": "GPU utilisation, memory, training cost and spot/on-demand breakdown for SkyPilot training runs.",
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 1,
+  "id": null,
+  "links": [],
+  "panels": [
+    {
+      "id": 1,
+      "type": "timeseries",
+      "title": "GPU Utilisation %",
+      "description": "Per-GPU utilisation across all SkyPilot clusters. Label `is_spot` distinguishes spot vs on-demand instances.",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": { "lineWidth": 2, "fillOpacity": 10 },
+          "unit": "percent",
+          "min": 0,
+          "max": 100,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "red", "value": null },
+              { "color": "yellow", "value": 40 },
+              { "color": "green", "value": 70 }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": { "calcs": ["mean", "max"], "displayMode": "table", "placement": "bottom" },
+        "tooltip": { "mode": "multi" }
+      },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "expr": "skypilot_gpu_utilization_pct{cluster=~\"$cluster\"}",
+          "legendFormat": "{{cluster}} gpu{{gpu}} (spot={{is_spot}})",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "type": "timeseries",
+      "title": "GPU Memory Used (MB)",
+      "description": "GPU memory used vs total. Helps detect OOM risk before it causes preemption.",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": { "lineWidth": 2, "fillOpacity": 10 },
+          "unit": "decmbytes",
+          "min": 0
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": { "calcs": ["mean", "max"], "displayMode": "table", "placement": "bottom" },
+        "tooltip": { "mode": "multi" }
+      },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "expr": "skypilot_gpu_memory_used_mb{cluster=~\"$cluster\"}",
+          "legendFormat": "{{cluster}} gpu{{gpu}} used",
+          "refId": "A"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "expr": "skypilot_gpu_memory_total_mb{cluster=~\"$cluster\"}",
+          "legendFormat": "{{cluster}} gpu{{gpu}} total",
+          "refId": "B"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "type": "stat",
+      "title": "Average GPU Utilisation",
+      "description": "Mean GPU utilisation across all GPUs in selected cluster(s) over the time range.",
+      "gridPos": { "h": 4, "w": 4, "x": 0, "y": 8 },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "unit": "percent",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "red", "value": null },
+              { "color": "yellow", "value": 40 },
+              { "color": "green", "value": 70 }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": { "calcs": ["mean"] },
+        "orientation": "auto",
+        "graphMode": "area",
+        "colorMode": "background"
+      },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "expr": "avg(skypilot_gpu_utilization_pct{cluster=~\"$cluster\"})",
+          "legendFormat": "Avg util",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "type": "stat",
+      "title": "GPU Memory Utilisation %",
+      "description": "Ratio of used / total GPU memory averaged across GPUs.",
+      "gridPos": { "h": 4, "w": 4, "x": 4, "y": 8 },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "unit": "percent",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 80 },
+              { "color": "red", "value": 95 }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": { "calcs": ["mean"] },
+        "orientation": "auto",
+        "graphMode": "area",
+        "colorMode": "background"
+      },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "expr": "100 * avg(skypilot_gpu_memory_used_mb{cluster=~\"$cluster\"}) / avg(skypilot_gpu_memory_total_mb{cluster=~\"$cluster\"})",
+          "legendFormat": "Mem util %",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "type": "stat",
+      "title": "Active Spot Clusters",
+      "description": "Number of distinct clusters with is_spot=true currently sending metrics.",
+      "gridPos": { "h": 4, "w": 4, "x": 8, "y": 8 },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "unit": "short",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [{ "color": "blue", "value": null }]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"] },
+        "orientation": "auto",
+        "colorMode": "background"
+      },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "expr": "count(count by (cluster) (skypilot_gpu_utilization_pct{is_spot=\"true\"}))",
+          "legendFormat": "Spot clusters",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 6,
+      "type": "gauge",
+      "title": "Spot vs On-Demand GPU Ratio",
+      "description": "% of GPU samples that come from spot instances in the selected time window.",
+      "gridPos": { "h": 4, "w": 4, "x": 12, "y": 8 },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "unit": "percent",
+          "min": 0,
+          "max": 100,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "red", "value": null },
+              { "color": "yellow", "value": 50 },
+              { "color": "green", "value": 80 }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": { "reduceOptions": { "calcs": ["mean"] } },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "expr": "100 * sum(skypilot_gpu_utilization_pct{is_spot=\"true\",cluster=~\"$cluster\"}) / sum(skypilot_gpu_utilization_pct{cluster=~\"$cluster\"})",
+          "legendFormat": "Spot %",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 7,
+      "type": "timeseries",
+      "title": "Ray Training Loss (from Ray Prometheus metrics)",
+      "description": "Training loss reported by Ray Train workers via Prometheus. Metric name varies by trainer.",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 12 },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": { "lineWidth": 2 },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": { "calcs": ["lastNotNull"], "displayMode": "table", "placement": "bottom" },
+        "tooltip": { "mode": "multi" }
+      },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "expr": "ray_train_loss",
+          "legendFormat": "{{trial_id}}",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 8,
+      "type": "timeseries",
+      "title": "GPU Utilisation — Spot vs On-Demand (stacked)",
+      "description": "Average GPU utilisation split by instance type. Higher spot utilisation = better cost efficiency.",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 12 },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": { "lineWidth": 2, "fillOpacity": 20, "stacking": { "mode": "none" } },
+          "unit": "percent",
+          "min": 0,
+          "max": 100
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": { "calcs": ["mean"], "displayMode": "table", "placement": "bottom" },
+        "tooltip": { "mode": "multi" }
+      },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "expr": "avg(skypilot_gpu_utilization_pct{is_spot=\"true\",cluster=~\"$cluster\"})",
+          "legendFormat": "Spot",
+          "refId": "A"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "expr": "avg(skypilot_gpu_utilization_pct{is_spot=\"false\",cluster=~\"$cluster\"})",
+          "legendFormat": "On-demand",
+          "refId": "B"
+        }
+      ]
+    }
+  ],
+  "refresh": "30s",
+  "schemaVersion": 38,
+  "tags": ["mlops", "gpu", "skypilot", "training"],
+  "templating": {
+    "list": [
+      {
+        "current": {},
+        "hide": 0,
+        "includeAll": false,
+        "name": "datasource",
+        "options": [],
+        "query": "prometheus",
+        "refresh": 1,
+        "type": "datasource",
+        "label": "Prometheus"
+      },
+      {
+        "current": {},
+        "datasource": { "type": "prometheus", "uid": "${datasource}" },
+        "definition": "label_values(skypilot_gpu_utilization_pct, cluster)",
+        "hide": 0,
+        "includeAll": true,
+        "multi": true,
+        "name": "cluster",
+        "options": [],
+        "query": {
+          "query": "label_values(skypilot_gpu_utilization_pct, cluster)",
+          "refId": "StandardVariableQuery"
+        },
+        "refresh": 2,
+        "type": "query",
+        "label": "Cluster"
+      }
+    ]
+  },
+  "time": { "from": "now-3h", "to": "now" },
+  "timepicker": {},
+  "timezone": "browser",
+  "title": "GPU Training — SkyPilot",
+  "uid": "skypilot-gpu-training",
+  "version": 1
+}

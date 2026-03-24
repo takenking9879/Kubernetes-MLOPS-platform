@@ -56,12 +56,31 @@ def list_models() -> List[str]:
 
 def _register_builtins() -> None:
     from models.pytorch import NeuralNetwork
+    from models.ssm import SSMTabular
+    from models.bae import BAETabular
 
     register_model(
         "mlp",
         lambda cfg: NeuralNetwork(
             input_dim=cfg.get("input_dim", 14),
             num_classes=cfg.get("num_classes", 6),
+        ),
+    )
+    register_model(
+        "ssm",
+        lambda cfg: SSMTabular(
+            input_dim=cfg.get("input_dim", 14),
+            num_classes=cfg.get("num_classes", 6),
+            d_state=cfg.get("d_state", 16),
+        ),
+    )
+    register_model(
+        "bae",
+        lambda cfg: BAETabular(
+            input_dim=cfg.get("input_dim", 14),
+            num_classes=cfg.get("num_classes", 6),
+            n_estimators=cfg.get("n_estimators", 5),
+            latent_dim=cfg.get("latent_dim", 32),
         ),
     )
 

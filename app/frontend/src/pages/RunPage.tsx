@@ -22,10 +22,12 @@ import {
   type DatasetInfo,
   type ModelTypeConfig,
   type PreprocessRunId,
+  type ResourceConstraints,
   type TaskTypeConfig,
   type TrainingConfig,
   type TrainingRunResult,
 } from '../api/platformClient';
+import { GPUResourceSelector } from '../components/GPUResourceSelector';
 import {
   TASK_INFO,
   XGBOOST_DEFAULTS,
@@ -496,6 +498,13 @@ export function RunPage() {
   const [taskType, setTaskType] = useState<TaskType>('classification');
   const [modelType, setModelType] = useState<string>('mlp');
   const [useGpu, setUseGpu] = useState<boolean>(false);
+  const [resourceConstraints, setResourceConstraints] = useState<ResourceConstraints>({
+    providers: ['runpod'],
+    prefer_spot: true,
+    min_vram_gb: 0,
+    max_price_per_hour: 9999,
+  });
+  const [useResourceSelector, setUseResourceSelector] = useState<boolean>(false);
   const [trainingConfig, setTrainingConfig] = useState<TrainingConfig | null>(null);
 
   // ── Submission ────────────────────────────────────────────────────────────
@@ -713,6 +722,7 @@ export function RunPage() {
         preprocess_run_id: selectedPreprocessRunId,
         framework,
         use_gpu: useGpu,
+        resource_constraints: useResourceSelector ? resourceConstraints : null,
         tuning: { enabled: tuningEnabled, number_of_trials: numberOfTrials },
         model: {
           ...modelConfig,
@@ -982,6 +992,33 @@ export function RunPage() {
                   </Field>
                 )}
               </div>
+
+              {/* Dynamic GPU resource selector (pytorch only) */}
+              {framework === 'pytorch' && (
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    <p className={SUB_HEADING}>Resource Selection</p>
+                    <label className="flex cursor-pointer items-center gap-1.5">
+                      <input
+                        type="checkbox"
+                        checked={useResourceSelector}
+                        onChange={(e) => {
+                          setUseResourceSelector(e.target.checked);
+                          if (e.target.checked) setUseGpu(true);
+                        }}
+                        className="accent-blue-500"
+                      />
+                      <span className="text-xs text-slate-400">Dynamic provider selection</span>
+                    </label>
+                  </div>
+                  {useResourceSelector && (
+                    <GPUResourceSelector
+                      value={resourceConstraints}
+                      onChange={setResourceConstraints}
+                    />
+                  )}
+                </div>
+              )}
 
               {/* Experiment */}
               <div className="space-y-2">

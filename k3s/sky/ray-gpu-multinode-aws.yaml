@@ -1,0 +1,177 @@
+# k3s/sky/ray-gpu-multinode-aws.yaml
+#
+# Multi-node GPU training on AWS via SkyPilot managed jobs.
+# Spot-first: p4d.24xlarge (8×A100-40GB, EFA/InfiniBand) → p3dn.24xlarge
+# (8×V100-32GB, EFA) → A100 spot (any region) → on-demand fallbacks.
+#
+# EFA (Elastic Fabric Adapter) is the AWS equivalent of InfiniBand.
+# Enabled automatically on p4d/p3dn via NCCL_IB_DISABLE=0.
+#
+# DeepSpeed ZeRO stage 1 is ON by default for multi-node (USE_DEEPSPEED=true).
+# Ray FailureConfig (max_failures=3) activates automatically via USE_SPOT=true.
+#
+# Usage (manual test):
+#   sky jobs launch k3s/sky/ray-gpu-multinode-aws.yaml \
+#     --name test-multinode \
+#     --env TRAIN_RUN_ID=train-test-mn-001 \
+#     --env MODEL_TYPE=pytorch \
+#     --env PARAMS_S3_PATH=s3://bucket/... \
+#     --yes
+#
+# Risk: p4d.24xlarge spot availability is limited.
+# Validate multi-node Ray with p3.8xlarge (4×V100, no EFA) first:
+#   sky jobs launch ... --env OVERRIDE_INSTANCE=p3.8xlarge
+#
+# Triggered by training_dag_skypilot.py when num_nodes > 1.
+
+name: ray-gpu-multinode
+
+num_nodes: 2
+
+resources:
+  any_of:
+    # Spot-first — EFA-capable (InfiniBand equivalent on AWS)
+    - cloud: aws
+      instance_type: p4d.24xlarge    # 8×A100-40GB, 400 Gbps EFA
+      use_spot: true
+    - cloud: aws
+      instance_type: p3dn.24xlarge   # 8×V100-32GB, 100 Gbps EFA
+      use_spot: true
+    # Non-EFA spot fallback (validates multi-node Ray without EFA cost)
+    - cloud: aws
+      instance_type: p3.8xlarge      # 4×V100-16GB, no EFA
+      use_spot: true
+    # On-demand fallbacks
+    - cloud: aws
+      instance_type: p4d.24xlarge
+      use_spot: false
+    - cloud: aws
+      instance_type: p3dn.24xlarge
+      use_spot: false
+  disk_size: 100
+
+envs:
+  # ── Per-run parameters ──
+  TRAIN_RUN_ID: ""
+  PREPROCESS_RUN_ID: ""
+  MODEL_TYPE: "pytorch"
+  PARAMS_S3_PATH: ""
+  PROCESSED_TABLE: ""
+
+  # ── GPU / training control ──
+  USE_GPU: "true"
+  USE_SPOT: "true"
+  USE_DEEPSPEED: "true"             # ZeRO stage 1 on by default for multi-node
+
+  # ── NCCL / EFA (InfiniBand) ──
+  NCCL_DEBUG: "INFO"
+  NCCL_IB_DISABLE: "0"             # Enable InfiniBand / EFA
+  NCCL_SOCKET_IFNAME: "eth0"
+  FI_EFA_USE_DEVICE_RDMA: "1"      # AWS EFA RDMA for p4d
+  RDMAV_FORK_SAFE: "1"
+
+  # ── Infrastructure ──
+  MLFLOW_TRACKING_URI: ""         # injected by Airflow DAG via task.update_envs()
+  AWS_DEFAULT_REGION: "us-east-1"
+  AWS_S3_ENDPOINT_URL: ""
+
+  # ── GPU metrics (optional Grafana Cloud remote_write) ──
+  GPU_PRICE_PER_HOUR: "0"   # injected by Airflow for cost tracking
+  SKY_CLUSTER_NAME: ""      # injected by Airflow (cluster name for metric labels)
+  GRAFANA_REMOTE_WRITE_URL: ""
+  GRAFANA_INSTANCE_ID: ""
+  GRAFANA_API_KEY: ""
+
+  # ── Ray training parameters ──
+  NUM_WORKERS: "16"                 # 2 nodes × 8 GPUs
+  CPUS_PER_WORKER: "6"
+  NUM_WORKERS_TUNE: "4"
+  CPUS_PER_WORKER_TUNE: "6"
+  MAX_CONCURRENT_TRIALS: "1"
+  TUNE_MAX_TRAIN_ROWS: "500000"
+  TUNE_MAX_VAL_ROWS: "200000"
+  RAY_MATERIALIZE_DATASETS: "1"
+  REPORT_FREQUENCY: "4"
+  RAY_enable_infeasible_task_early_exit: "true"
+  RAY_DEFAULT_OBJECT_STORE_MEMORY_PROPORTION: "0.6"
+
+setup: |
+  set -e
+
+  nvidia-smi || { echo "ERROR: nvidia-smi failed — GPU not attached"; exit 1; }
+
+  # Clone repo on every node
+  mkdir -p /home/ubuntu/app
+  if [ ! -d /home/ubuntu/app/repo ]; then
+    git clone --depth=1 --branch main \
+      https://github.com/takenking9879/Kubernetes-MLOPS-platform.git \
+      /home/ubuntu/app/repo
+  fi
+  echo "Repo ready: $(ls /home/ubuntu/app/repo/k3s/kuberay/)"
+
+  # Install Ray + DeepSpeed (fast path: skip if already present)
+  python3 -c "import ray" 2>/dev/null || pip install ray[train,tune,data]==2.53.0
+  python3 -c "import deepspeed" 2>/dev/null || pip install deepspeed==0.15.4
+  python3 -c "import prometheus_client" 2>/dev/null || pip install prometheus-client==0.24.1
+
+  # Optional: Grafana Agent binary for remote_write to Grafana Cloud
+  if [ -n "${GRAFANA_REMOTE_WRITE_URL:-}" ]; then
+    AGENT_BIN=/usr/local/bin/grafana-agent
+    if [ ! -f "${AGENT_BIN}" ]; then
+      AGENT_VER=v0.43.3 ARCH=amd64
+      curl -sL "https://github.com/grafana/agent/releases/download/${AGENT_VER}/grafana-agent-linux-${ARCH}.zip" \
+        -o /tmp/grafana-agent.zip
+      unzip -q /tmp/grafana-agent.zip -d /tmp/
+      mv /tmp/grafana-agent-linux-${ARCH} "${AGENT_BIN}"
+      chmod +x "${AGENT_BIN}"
+    fi
+  fi
+
+run: |
+  set -e
+  export PYTHONPATH=/home/ubuntu/app/repo:/home/ubuntu/app/repo/src
+
+  HEAD_IP=$(echo "${SKYPILOT_NODE_IPS}" | head -n1)
+  NUM_GPUS=${SKYPILOT_NUM_GPUS_PER_NODE:-8}
+  NUM_CPUS=${SKYPILOT_NUM_CPUS_PER_NODE:-48}
+
+  if [ "${SKYPILOT_NODE_RANK}" -eq 0 ]; then
+    # ── Head node: start Ray head (no GPUs on head — workers own the GPUs) ──
+    ray start --head \
+      --port=6379 \
+      --dashboard-port=8265 \
+      --dashboard-host=0.0.0.0 \
+      --num-gpus=0 \
+      --num-cpus=4 \
+      --disable-usage-stats
+
+    # Wait for all worker nodes to register their GPUs
+    python3 /home/ubuntu/app/repo/k3s/sky/wait_for_workers.py
+
+    # GPU metrics exporter (head node — all GPU labels include cluster/is_spot)
+    python3 /home/ubuntu/app/repo/k3s/sky/gpu_exporter.py &
+    echo "[setup] GPU exporter started (PID=$!)"
+    if [ -n "${GRAFANA_REMOTE_WRITE_URL:-}" ] && command -v grafana-agent >/dev/null 2>&1; then
+      python3 /home/ubuntu/app/repo/k3s/sky/write_grafana_config.py
+      grafana-agent --config.file=/tmp/grafana-agent-config.yaml &
+    fi
+
+    python3 /home/ubuntu/app/repo/k3s/kuberay/main.py
+
+  else
+    # ── Worker nodes: join the Ray cluster ──
+    echo "Worker rank ${SKYPILOT_NODE_RANK}: waiting for head at ${HEAD_IP}:6379"
+    for i in $(seq 1 30); do
+      ray health-check --address="${HEAD_IP}:6379" &>/dev/null && break
+      echo "Head not ready yet ($i/30)..."
+      sleep 10
+    done
+
+    ray start \
+      --address="${HEAD_IP}:6379" \
+      --num-gpus="${NUM_GPUS}" \
+      --num-cpus="${NUM_CPUS}" \
+      --node-ip-address="$(hostname -I | awk '{print $1}')" \
+      --disable-usage-stats \
+      --block
+  fi

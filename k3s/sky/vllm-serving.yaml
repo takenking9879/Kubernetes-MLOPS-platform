@@ -1,0 +1,108 @@
+# k3s/sky/vllm-serving.yaml
+#
+# Persistent vLLM serving cluster via SkyPilot sky.launch() (NOT managed jobs).
+# On-demand only — serving needs uptime, spot preemptions are unacceptable.
+#
+# Usage (manual test):
+#   sky launch k3s/sky/vllm-serving.yaml \
+#     --cluster-name vllm-test \
+#     --env HF_MODEL_ID=Qwen/Qwen2.5-7B \
+#     --yes
+#
+# Check endpoint:
+#   sky status --endpoint 8000 vllm-test
+#
+# Tear down:
+#   sky down vllm-test
+#
+# Triggered by vllm_serving_dag.py (sky.launch, persistent cluster).
+# The DAG polls GET /health until healthy, then registers the endpoint to S3.
+
+name: vllm-serving
+
+num_nodes: 1
+
+resources:
+  any_of:
+    # On-demand only — no spot for serving
+    - cloud: runpod
+      accelerators: A100:1
+      use_spot: false
+    - cloud: runpod
+      accelerators: RTX4090:1
+      use_spot: false
+    - cloud: vast
+      accelerators: A100:1
+      use_spot: false
+    - cloud: runpod
+      accelerators: A40:1
+      use_spot: false
+  disk_size: 100
+
+# Safety net: auto-terminate if idle for 60 min (prevents runaway on-demand costs
+# if the operator forgets to sky down after serving is no longer needed).
+idle_minutes_to_autostop: 60
+
+envs:
+  # ── Per-run parameters ──
+  SERVE_RUN_ID: ""
+  HF_MODEL_ID: "meta-llama/Llama-3.1-8B"
+  HF_TOKEN: ""
+  LLM_ADAPTER_S3: ""         # optional: s3://bucket/path/to/lora-adapter/
+
+  # ── vLLM config ──
+  VLLM_PORT: "8000"
+  MAX_MODEL_LEN: "4096"
+  GPU_MEMORY_UTILIZATION: "0.90"
+  TENSOR_PARALLEL_SIZE: "1"  # set to GPU count for multi-GPU
+
+  # ── Infrastructure ──
+  AWS_ACCESS_KEY_ID: ""
+  AWS_SECRET_ACCESS_KEY: ""
+  AWS_DEFAULT_REGION: "us-east-1"
+  S3_BUCKET: "k8s-mlops-platform-bucket"
+
+setup: |
+  set -euo pipefail
+
+  nvidia-smi || { echo "ERROR: nvidia-smi failed — GPU not attached"; exit 1; }
+
+  if [ "$(id -u)" -eq 0 ]; then SUDO=""; else SUDO="sudo"; fi
+
+  if ! command -v uv >/dev/null 2>&1; then
+    ${SUDO} python3 -m pip install --no-cache-dir uv
+  fi
+
+  # Install vLLM + boto3 for adapter download
+  ${SUDO} uv pip install --system --no-cache \
+    vllm==0.6.4 \
+    boto3==1.42.28
+
+  # Download LoRA adapter from S3 if provided
+  if [ -n "${LLM_ADAPTER_S3:-}" ]; then
+    echo "Downloading LoRA adapter from ${LLM_ADAPTER_S3}"
+    aws s3 sync "${LLM_ADAPTER_S3}" /tmp/lora_adapter/ \
+      --region "${AWS_DEFAULT_REGION}"
+    echo "Adapter downloaded to /tmp/lora_adapter/"
+  fi
+
+  echo "Setup complete — vLLM ready."
+
+run: |
+  set -e
+
+  LORA_ARG=""
+  if [ -d /tmp/lora_adapter ] && [ "$(ls -A /tmp/lora_adapter)" ]; then
+    LORA_ARG="--lora-modules adapter=/tmp/lora_adapter"
+  fi
+
+  echo "Starting vLLM: model=${HF_MODEL_ID}, port=${VLLM_PORT}"
+
+  vllm serve "${HF_MODEL_ID}" \
+    --host 0.0.0.0 \
+    --port "${VLLM_PORT}" \
+    --gpu-memory-utilization "${GPU_MEMORY_UTILIZATION}" \
+    --max-model-len "${MAX_MODEL_LEN}" \
+    --tensor-parallel-size "${TENSOR_PARALLEL_SIZE}" \
+    ${HF_TOKEN:+--hf-token "${HF_TOKEN}"} \
+    ${LORA_ARG}

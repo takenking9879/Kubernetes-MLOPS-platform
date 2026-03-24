@@ -54,3 +54,6 @@ extraEnv: |
       secretKeyRef:
         name: env-secret
         key: AWS_SECRET_ACCESS_KEY
+  
+  - name: MLFLOW_TRACKING_URI
+    value: "http://mlflow:5000"

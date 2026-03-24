@@ -35,6 +35,7 @@ AIRFLOW_PORT = os.getenv("AIRFLOW_PORT", "8080")
 AIRFLOW_USER = os.getenv("AIRFLOW_USER", "admin")
 AIRFLOW_PASSWORD = os.getenv("AIRFLOW_PASSWORD", "admin")
 DAG_ID = "training_pipeline"
+DAG_ID_SKYPILOT = "training_pipeline_skypilot"
 
 # Path to k3s/config.yaml (static infra config)
 _REPO_CONFIG_PATH = os.getenv(
@@ -53,6 +54,12 @@ _XGBOOST_ALLOWED_KEYS: frozenset = frozenset({
 _PYTORCH_ALLOWED_KEYS: frozenset = frozenset({
     "batch_size", "max_epochs", "lr", "weight_decay",
 })
+_SSM_ALLOWED_KEYS: frozenset = frozenset({
+    "batch_size", "max_epochs", "lr", "weight_decay", "d_state",
+})
+_BAE_ALLOWED_KEYS: frozenset = frozenset({
+    "batch_size", "max_epochs", "lr", "weight_decay", "n_estimators", "latent_dim",
+})
 
 _XGBOOST_PARAM_TYPES: dict[str, type] = {
     "num_boost_round": int, "objective": str, "eval_metric": list,
@@ -62,6 +69,14 @@ _XGBOOST_PARAM_TYPES: dict[str, type] = {
 }
 _PYTORCH_PARAM_TYPES: dict[str, type] = {
     "batch_size": int, "max_epochs": int, "lr": float, "weight_decay": float,
+}
+_SSM_PARAM_TYPES: dict[str, type] = {
+    "batch_size": int, "max_epochs": int, "lr": float, "weight_decay": float,
+    "d_state": int,
+}
+_BAE_PARAM_TYPES: dict[str, type] = {
+    "batch_size": int, "max_epochs": int, "lr": float, "weight_decay": float,
+    "n_estimators": int, "latent_dim": int,
 }
 
 _XGBOOST_TUNE_SETTINGS_DEFAULTS: dict[str, int] = {
@@ -112,11 +127,27 @@ class ModelConfig(BaseModel):
     model_type: str = "mlp"
 
 
+class ResourceConstraintsConfig(BaseModel):
+    """GPU resource constraints forwarded to GPUSelectorService in the Airflow DAG."""
+    providers: list[str] = Field(default_factory=lambda: ["runpod"])
+    gpu_types: list[str] | None = None
+    min_vram_gb: float = 0
+    max_price_per_hour: float = 9999
+    prefer_spot: bool = True
+    require_infiniband: bool = False
+    preferred_regions: list[str] = Field(default_factory=list)
+    num_nodes: int = 1
+    num_gpus_per_node: int = 1
+    job_type: str = "tabular"
+
+
 class RunRequest(BaseModel):
     preprocess_run_id: str            # references the preprocessing run; replaces processed_table
     execution_id: str = ""            # auto-generated if empty; becomes train_run_id
-    framework: Literal["xgboost", "pytorch"] = "xgboost"
+    framework: Literal["xgboost", "pytorch", "ssm", "bae"] = "xgboost"
     use_gpu: bool = False
+    num_nodes: int = Field(1, ge=1, le=64)                        # Phase 5: multi-node training
+    resource_constraints: ResourceConstraintsConfig | None = None  # Phase 3: dynamic GPU selection
     tuning: TuningConfig = Field(default_factory=TuningConfig)
     model: ModelConfig = Field(default_factory=ModelConfig)
     sample_fraction_for_tuning: float = Field(0.2, ge=0.01, le=1.0)
@@ -127,8 +158,20 @@ class RunRequest(BaseModel):
     def validate_hyperparams(self) -> "RunRequest":
         """Validate hyperparameter keys and types against the allowed set."""
         fw = self.framework
-        allowed = _XGBOOST_ALLOWED_KEYS if fw == "xgboost" else _PYTORCH_ALLOWED_KEYS
-        expected_types = _XGBOOST_PARAM_TYPES if fw == "xgboost" else _PYTORCH_PARAM_TYPES
+        model_type = self.model.model_type if self.model else "mlp"
+
+        if fw == "xgboost":
+            allowed = _XGBOOST_ALLOWED_KEYS
+            expected_types = _XGBOOST_PARAM_TYPES
+        elif model_type == "ssm":
+            allowed = _SSM_ALLOWED_KEYS
+            expected_types = _SSM_PARAM_TYPES
+        elif model_type == "bae":
+            allowed = _BAE_ALLOWED_KEYS
+            expected_types = _BAE_PARAM_TYPES
+        else:
+            allowed = _PYTORCH_ALLOWED_KEYS
+            expected_types = _PYTORCH_PARAM_TYPES
 
         for key, val in self.hyperparams.items():
             if key not in allowed:
@@ -441,7 +484,11 @@ async def submit_run(request: RunRequest):
     )
     train_params_s3_path = f"s3://{S3_BUCKET}/{training_key}"
 
-    # Trigger Airflow training_pipeline DAG
+    # Route to SkyPilot DAG when GPU or explicit resource_constraints requested
+    use_skypilot = request.use_gpu or request.resource_constraints is not None
+    active_dag_id = DAG_ID_SKYPILOT if use_skypilot else DAG_ID
+
+    # Trigger Airflow training DAG
     dag_conf: dict[str, Any] = {
         "train_run_id": train_run_id,
         "preprocess_run_id": request.preprocess_run_id,
@@ -450,11 +497,15 @@ async def submit_run(request: RunRequest):
         "dsl_s3_path": lineage["dsl_s3_path"],
         "train_params_s3_path": train_params_s3_path,
         "model_type": request.framework,
+        "num_nodes": request.num_nodes,
     }
+    if request.resource_constraints is not None:
+        dag_conf["resource_constraints"] = request.resource_constraints.model_dump()
+
     try:
         status, data = _airflow_request(
             "POST",
-            f"api/v2/dags/{DAG_ID}/dagRuns",
+            f"api/v2/dags/{active_dag_id}/dagRuns",
             body={"logical_date": datetime.now(timezone.utc).isoformat(), "conf": dag_conf},
         )
         if status >= 400:
@@ -470,19 +521,25 @@ async def submit_run(request: RunRequest):
 
     return {
         "dag_run_id": dag_run_id,
+        "dag_id": active_dag_id,
         "train_run_id": train_run_id,
         "preprocess_run_id": request.preprocess_run_id,
         "train_params_s3_path": train_params_s3_path,
         "processed_table": lineage["processed_table"],
+        "skypilot": use_skypilot,
     }
 
 
 @router.get("/{dag_run_id}/status")
-async def run_status(dag_run_id: str):
-    """Poll the state of an Airflow DAG run."""
+async def run_status(dag_run_id: str, skypilot: bool = False):
+    """Poll the state of an Airflow DAG run.
+
+    Pass ?skypilot=true when the run was submitted to training_pipeline_skypilot.
+    """
+    dag_id = DAG_ID_SKYPILOT if skypilot else DAG_ID
     try:
         status, data = _airflow_request(
-            "GET", f"api/v2/dags/{DAG_ID}/dagRuns/{dag_run_id}"
+            "GET", f"api/v2/dags/{dag_id}/dagRuns/{dag_run_id}"
         )
         if status >= 400:
             raise HTTPException(status_code=502, detail=f"Airflow returned {status}: {data}")

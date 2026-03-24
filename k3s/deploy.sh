@@ -8,12 +8,13 @@ set -euo pipefail
 # ============================================================
 ENABLE_REPO_DOWNLOAD=false
 ENABLE_KAFKA=false
-ENABLE_RAY=true
-ENABLE_MLFLOW=true
+ENABLE_RAY=false
+ENABLE_MLFLOW=false
 ENABLE_SPARK=true
 ENABLE_APP=true
 ENABLE_MONITORING=true
 ENABLE_AIRFLOW=true
+ENABLE_INGRESS=true
 
 # ============================================================
 # TIMEOUTS
@@ -352,8 +353,9 @@ ok "Parallel workloads completed"
 if [ "${ENABLE_MONITORING}" = true ]; then
   deploy_monitoring
 fi
-
-deploy_ingress
+if [ "${ENABLE_INGRESS}" = true ]; then
+  deploy_ingress
+fi
 sep
 ok "DEPLOYMENT FINISHED SUCCESSFULLY"
 

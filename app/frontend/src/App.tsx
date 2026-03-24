@@ -5,6 +5,7 @@ import { DatasetPage } from './pages/DatasetPage';
 import { ProcessingPage } from './pages/ProcessingPage';
 import { RunPage } from './pages/RunPage';
 import { ServingPage } from './pages/ServingPage';
+import { LaunchWizardPage } from './pages/LaunchWizardPage';
 import { useDatasetStore } from './store/datasetStore';
 import { usePipelineStore } from './store/pipelineStore';
 import { useUIStore, type Page } from './store/uiStore';
@@ -15,6 +16,7 @@ const TAB_LABELS: Record<Page, string> = {
   'processing':  'Processing',
   'run-pipeline':'Training',
   'serving':     'Serving',
+  'launch':      'Launch',
 };
 
 export default function App() {
@@ -124,6 +126,8 @@ export default function App() {
         {page === 'run-pipeline' && <RunPage />}
 
         {page === 'serving' && <ServingPage />}
+
+        {page === 'launch' && <LaunchWizardPage />}
       </div>
     </div>
   );

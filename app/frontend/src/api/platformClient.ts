@@ -153,11 +153,25 @@ export interface ModelConfig {
   model_type?: string;
 }
 
+export interface ResourceConstraints {
+  providers?: string[];
+  gpu_types?: string[] | null;
+  min_vram_gb?: number;
+  max_price_per_hour?: number;
+  prefer_spot?: boolean;
+  require_infiniband?: boolean;
+  preferred_regions?: string[];
+  num_nodes?: number;
+  num_gpus_per_node?: number;
+  job_type?: string;
+}
+
 export interface RunRequest {
   preprocess_run_id: string;   // replaces processed_table
   execution_id?: string;
   framework: 'xgboost' | 'pytorch';
   use_gpu?: boolean;
+  resource_constraints?: ResourceConstraints | null;
   tuning?: TuningConfig;
   model?: ModelConfig;
   sample_fraction_for_tuning?: number;
@@ -462,8 +476,9 @@ export async function listTrainingRunIds(): Promise<{ runs: TrainingRunId[] }> {
   return _fetch<{ runs: TrainingRunId[] }>('/api/v2/runs/ids');
 }
 
-export async function getRunStatus(dagRunId: string): Promise<RunStatus> {
-  return _fetch<RunStatus>(`/api/v2/runs/${encodeURIComponent(dagRunId)}/status`);
+export async function getRunStatus(dagRunId: string, skypilot = false): Promise<RunStatus> {
+  const q = skypilot ? '?skypilot=true' : '';
+  return _fetch<RunStatus>(`/api/v2/runs/${encodeURIComponent(dagRunId)}/status${q}`);
 }
 
 // ─── Processing Runs API ─────────────────────────────────────────────────────
@@ -558,4 +573,247 @@ export async function getServingDeployStatus(
   return _fetch<ServingDeployStatus>(
     `/api/v2/serving-configs/${encodeURIComponent(serve_run_id)}/deploy/${encodeURIComponent(dag_run_id)}/status`,
   );
+}
+
+// ─── GPU Resources API (Phase 2/3) ────────────────────────────────────────────
+
+export interface GPUOffer {
+  provider: string;
+  gpu_type: string;
+  gpu_count: number;
+  vram_gb: number;
+  vcpus: number;
+  ram_gb: number;
+  price_on_demand: number;
+  price_spot: number | null;
+  spot_available: boolean;
+  available_count: number;
+  region: string;
+  infiniband: boolean;
+  skypilot_accelerator: string;
+  skypilot_cloud: string;
+}
+
+export interface GPUSelectResult {
+  any_of: Array<{ cloud: string; accelerators: string; use_spot: boolean }>;
+  spot_entries: number;
+  ondemand_entries: number;
+  estimated_cost_spot: number | null;
+  estimated_cost_ondemand: number | null;
+}
+
+export interface LLMModelInfo {
+  model_id: string;
+  vram_gb: number;
+  min_gpus: number;
+  recommended_gpu: string;
+}
+
+export async function queryGPUCatalog(params?: {
+  providers?: string;
+  min_vram?: number;
+}): Promise<GPUOffer[]> {
+  const q = new URLSearchParams();
+  if (params?.providers) q.set('providers', params.providers);
+  if (params?.min_vram != null) q.set('min_vram', String(params.min_vram));
+  const qs = q.toString() ? `?${q.toString()}` : '';
+  return _fetch<GPUOffer[]>(`/api/v2/gpu-resources/catalog${qs}`);
+}
+
+export async function selectGPUResources(
+  constraints: ResourceConstraints,
+): Promise<GPUSelectResult> {
+  return _fetch<GPUSelectResult>('/api/v2/gpu-resources/select', {
+    method: 'POST',
+    body: JSON.stringify(constraints),
+  });
+}
+
+export async function getLLMCatalog(): Promise<LLMModelInfo[]> {
+  return _fetch<LLMModelInfo[]>('/api/v2/gpu-resources/llm-catalog');
+}
+
+// ─── vLLM Serving API (Phase 6) ───────────────────────────────────────────────
+
+export interface VllmDeployRequest {
+  serve_run_id?: string;
+  llm_model_id: string;
+  hf_token?: string;
+  llm_adapter_s3?: string;
+  vllm_port?: number;
+  max_model_len?: number;
+  resource_constraints?: ResourceConstraints | null;
+}
+
+export interface VllmDeployResult {
+  serve_run_id: string;
+  dag_run_id: string;
+  sky_cluster_name: string;
+}
+
+export interface VllmEndpointResult {
+  endpoint_url: string;
+  model_id: string;
+  status: 'healthy' | 'pending' | 'not_found';
+}
+
+export async function triggerVllmDeploy(
+  request: VllmDeployRequest,
+): Promise<VllmDeployResult> {
+  return _fetch<VllmDeployResult>('/api/v2/serving-configs/vllm-deploy', {
+    method: 'POST',
+    body: JSON.stringify(request),
+  });
+}
+
+export async function getVllmEndpoint(
+  serveRunId: string,
+): Promise<VllmEndpointResult> {
+  return _fetch<VllmEndpointResult>(
+    `/api/v2/serving-configs/${encodeURIComponent(serveRunId)}/endpoint`,
+  );
+}
+
+// ─── Model Architectures API (Phase 8) ────────────────────────────────────────
+
+export interface ArchitectureInfo {
+  id: string;
+  name: string;
+  description: string;
+  builtin: boolean;
+  s3_path?: string | null;
+  uploaded_at?: string | null;
+}
+
+export interface ArchitectureUploadResult {
+  id: string;
+  name: string;
+  s3_path: string;
+  status: string;
+}
+
+export async function listArchitectures(): Promise<ArchitectureInfo[]> {
+  return _fetch<ArchitectureInfo[]>('/api/v2/model-architectures/');
+}
+
+export async function uploadArchitecture(
+  file: File,
+  name: string,
+  description?: string,
+): Promise<ArchitectureUploadResult> {
+  const form = new FormData();
+  form.append('file', file);
+  form.append('name', name);
+  if (description) form.append('description', description);
+  const res = await fetch(`${API_BASE}/api/v2/model-architectures/upload`, {
+    method: 'POST',
+    body: form,
+  });
+  if (!res.ok) {
+    const body = await res.text();
+    throw new Error(`${res.status} ${res.statusText}: ${body}`);
+  }
+  return res.json() as Promise<ArchitectureUploadResult>;
+}
+
+// ─── Jobs API (Phase 8) ───────────────────────────────────────────────────────
+
+export interface ModelConfigIn {
+  model_type: string;
+  model_id?: string;
+  architecture_s3?: string;
+  vram_gb?: number;
+}
+
+export interface TrainingConfigIn {
+  preprocess_run_id?: string;
+  dataset?: string;
+  processed_table?: string;
+  dataset_s3_path?: string;
+  use_gpu?: boolean;
+  use_deepspeed?: boolean;
+  deepspeed_stage?: number;
+  lora_enabled?: boolean;
+  lora_rank?: number;
+  max_steps?: number;
+  save_steps?: number;
+  hf_token?: string;
+  hyperparams?: Record<string, unknown>;
+  model_cfg?: Record<string, unknown>;
+  num_nodes?: number;
+}
+
+export interface ServingConfigIn {
+  hf_token?: string;
+  llm_adapter_s3?: string;
+  vllm_port?: number;
+  max_model_len?: number;
+  tensor_parallel_size?: number;
+  pipeline_parallel_size?: number;
+  num_nodes?: number;
+}
+
+export interface LaunchRequest {
+  job_type: 'training' | 'serving' | 'both';
+  model: ModelConfigIn;
+  resource_constraints?: ResourceConstraints | null;
+  training?: TrainingConfigIn;
+  serving?: ServingConfigIn;
+  dry_run?: boolean;
+}
+
+export interface OrchestratorRecommendation {
+  orchestration: string;
+  dag_id: string;
+  sky_yaml_template: string;
+  reason: string;
+  estimated_cost_spot: number | null;
+  estimated_cost_ondemand: number | null;
+  warnings: string[];
+}
+
+export interface LaunchResponse {
+  job_ids: Record<string, string>;
+  orchestration: string;
+  recommendation: OrchestratorRecommendation;
+  sky_yaml_preview: string;
+  dry_run: boolean;
+}
+
+export interface JobStatus {
+  job_id: string;
+  dag_run_id: string;
+  dag_id: string;
+  state: string;
+  start_date: string | null;
+  end_date: string | null;
+}
+
+export async function launchJob(request: LaunchRequest): Promise<LaunchResponse> {
+  return _fetch<LaunchResponse>('/api/v2/jobs/launch', {
+    method: 'POST',
+    body: JSON.stringify(request),
+  });
+}
+
+export async function getJobStatus(
+  jobId: string,
+  dagId?: string,
+): Promise<JobStatus> {
+  const q = dagId ? `?dag_id=${encodeURIComponent(dagId)}` : '';
+  return _fetch<JobStatus>(`/api/v2/jobs/${encodeURIComponent(jobId)}/status${q}`);
+}
+
+export async function listJobs(dagId?: string, limit = 20): Promise<JobStatus[]> {
+  const q = new URLSearchParams();
+  if (dagId) q.set('dag_id', dagId);
+  q.set('limit', String(limit));
+  return _fetch<JobStatus[]>(`/api/v2/jobs/?${q.toString()}`);
+}
+
+export async function cancelJob(jobId: string, dagId?: string): Promise<{ job_id: string; state: string }> {
+  const q = dagId ? `?dag_id=${encodeURIComponent(dagId)}` : '';
+  return _fetch(`/api/v2/jobs/${encodeURIComponent(jobId)}${q}`, {
+    method: 'DELETE',
+  });
 }

@@ -1,5 +1,5 @@
 fastapi==0.129.0
-uvicorn[standard]==0.40.0
+uvicorn[standard]==0.42.0
 pydantic==2.12.5
 PyYAML==6.0.3
 boto3==1.42.28
@@ -13,3 +13,4 @@ pyspark==4.0.1
 pyiceberg==0.10.0
 kubernetes==35.0.0
 requests==2.32.5
+runpod==1.8.2

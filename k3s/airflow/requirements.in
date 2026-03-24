@@ -1,0 +1,4 @@
+mlflow==3.7.0
+apache-airflow-providers-cncf-kubernetes==10.12.4
+skypilot[aws,gcp,runpod,vast,cloudflare]==0.12.0
+

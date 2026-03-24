@@ -428,6 +428,10 @@ def train_func(config: Dict):
     cpus_per_worker = max(cpus_per_worker, 1)
     params["nthread"] = cpus_per_worker
 
+    # GPU support — XGBoost >= 2.0 uses device="cuda" (tree_method="hist" stays the same)
+    if os.getenv("USE_GPU", "false").lower() in ("true", "1", "yes"):
+        params["device"] = "cuda"
+
     # num_boost_round is passed to xgb.train, not inside params dict
     num_boost_round = int(params.pop("num_boost_round", 100))
     if "num_boost_round" in config:

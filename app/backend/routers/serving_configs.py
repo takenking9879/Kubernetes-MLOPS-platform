@@ -358,3 +358,108 @@ async def serving_deploy_status(serve_run_id: str, dag_run_id: str):
         "start_date": data.get("start_date"),
         "end_date": data.get("end_date"),
     }
+
+
+# ─── vLLM serving endpoints (Phase 6) ────────────────────────────────────────
+
+VLLM_SERVING_DAG_ID = "vllm_serving_pipeline"
+
+
+class VllmDeployRequest(BaseModel):
+    serve_run_id: str = ""          # auto-generated if empty
+    llm_model_id: str
+    hf_token: str = ""
+    llm_adapter_s3: str = ""        # optional LoRA adapter S3 path
+    vllm_port: int = Field(8000, ge=1, le=65535)
+    max_model_len: int = Field(4096, ge=256)
+    resource_constraints: Optional[dict] = None
+
+
+class VllmDeployResult(BaseModel):
+    serve_run_id: str
+    dag_run_id: str
+    sky_cluster_name: str
+
+
+class VllmEndpointResult(BaseModel):
+    endpoint_url: str
+    model_id: str
+    status: str   # "healthy" | "pending" | "not_found"
+
+
+@router.post("/vllm-deploy", response_model=VllmDeployResult, status_code=202)
+async def trigger_vllm_deploy(request: VllmDeployRequest):
+    """Trigger the vllm_serving_pipeline Airflow DAG to launch a persistent vLLM cluster."""
+    import json as _json
+
+    serve_run_id = request.serve_run_id or (
+        "vllm-"
+        + secrets.token_hex(3)
+        + "-"
+        + datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+    )
+    sky_cluster_name = f"vllm-{serve_run_id[:20]}"
+
+    dag_conf: dict[str, Any] = {
+        "serve_run_id": serve_run_id,
+        "llm_model_id": request.llm_model_id,
+        "hf_token": request.hf_token,
+        "llm_adapter_s3": request.llm_adapter_s3,
+        "vllm_port": request.vllm_port,
+        "max_model_len": request.max_model_len,
+    }
+    if request.resource_constraints:
+        dag_conf["resource_constraints"] = request.resource_constraints
+
+    dag_run_id = (
+        f"vllm_serving__{serve_run_id}__"
+        + datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+    )
+
+    try:
+        status, data = _airflow_request(
+            "POST",
+            f"api/v2/dags/{VLLM_SERVING_DAG_ID}/dagRuns",
+            body={"dag_run_id": dag_run_id, "conf": dag_conf},
+        )
+        if status >= 400:
+            raise HTTPException(
+                status_code=502,
+                detail=f"Airflow returned {status}: {data}",
+            )
+    except HTTPException:
+        raise
+    except Exception as exc:
+        raise HTTPException(
+            status_code=502,
+            detail=f"Failed to trigger vllm_serving_pipeline DAG: {exc}",
+        ) from exc
+
+    return VllmDeployResult(
+        serve_run_id=serve_run_id,
+        dag_run_id=dag_run_id,
+        sky_cluster_name=sky_cluster_name,
+    )
+
+
+@router.get("/{serve_run_id}/endpoint", response_model=VllmEndpointResult)
+async def get_vllm_endpoint(serve_run_id: str):
+    """Fetch the registered vLLM endpoint URL for a serving run from S3."""
+    import json as _json
+
+    s3 = _s3_client()
+    key = f"runs/serving/{serve_run_id}/endpoint.json"
+    try:
+        resp = s3.get_object(Bucket=S3_BUCKET, Key=key)
+        data = _json.loads(resp["Body"].read())
+        return VllmEndpointResult(
+            endpoint_url=data.get("endpoint_url", ""),
+            model_id=data.get("model_id", ""),
+            status="healthy" if data.get("endpoint_url") else "pending",
+        )
+    except ClientError as exc:
+        if exc.response["Error"]["Code"] in ("NoSuchKey", "404"):
+            return VllmEndpointResult(
+                endpoint_url="", model_id="", status="not_found"
+            )
+        raise HTTPException(status_code=500, detail=str(exc)) from exc

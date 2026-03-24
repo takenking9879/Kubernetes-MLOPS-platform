@@ -23,7 +23,7 @@ def get_trainer(framework: str) -> "BaseTrainer":
 
     Raises ``ValueError`` for unsupported frameworks.
     """
-    if framework == "pytorch":
+    if framework in ("pytorch", "ssm", "bae"):
         from pipeline.train.pytorch import PyTorchModelTrainer
         return PyTorchModelTrainer()
 
@@ -33,5 +33,5 @@ def get_trainer(framework: str) -> "BaseTrainer":
 
     raise ValueError(
         f"Unsupported training framework: {framework!r}. "
-        f"Supported: 'pytorch', 'xgboost'."
+        f"Supported: 'pytorch', 'xgboost', 'ssm', 'bae'."
     )

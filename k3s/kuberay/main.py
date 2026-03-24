@@ -341,6 +341,9 @@ class KubeRayTraining(BaseUtils):
                 )
         except Exception as e:
             self.logger.error(f"Error al loggear en MLflow: {str(e)}", exc_info=True)
+            return None
+
+        return result_info
 
     def _extract_model(self, result, framework: str):
         """Extract the trained model object from a Ray Train checkpoint.
@@ -394,6 +397,7 @@ class KubeRayTraining(BaseUtils):
     def train(self):
         # Priority: MODEL_TYPE env var > params.yaml > default
         framework = os.getenv("MODEL_TYPE") or self.params.get("framework", "xgboost")
+        job_start_time = time.time()
 
         try:
             # Log cluster resources
@@ -579,7 +583,7 @@ class KubeRayTraining(BaseUtils):
                     float(mc_time_sec),
                 )
 
-            self._log_final_to_mlflow(
+            mlflow_result = self._log_final_to_mlflow(
                 framework=framework,
                 params=mlflow_payload,
                 metrics=final_metrics,
@@ -587,6 +591,29 @@ class KubeRayTraining(BaseUtils):
                 artifact_set_id=artifact_set_id,
                 table_identifier=table_identifier,
             )
+
+            # ── Cost tracking ────────────────────────────────────────────────
+            gpu_price = float(os.getenv("GPU_PRICE_PER_HOUR", "0") or "0")
+            is_spot = os.getenv("USE_SPOT", "false").lower() == "true"
+            if gpu_price > 0 and mlflow_result and mlflow_result.get("run_id"):
+                elapsed_hours = (time.time() - job_start_time) / 3600
+                estimated_cost = round(gpu_price * elapsed_hours, 4)
+                try:
+                    import mlflow as _mlflow
+                    tracking_uri = self.params.get("mlflow_tracking_uri")
+                    if tracking_uri:
+                        _mlflow.set_tracking_uri(tracking_uri)
+                    with _mlflow.start_run(run_id=mlflow_result["run_id"]):
+                        _mlflow.set_tag("estimated_cost_usd", estimated_cost)
+                        _mlflow.set_tag("instance_type", "spot" if is_spot else "on_demand")
+                        _mlflow.set_tag("gpu_price_per_hour", gpu_price)
+                    self.logger.info(
+                        "Cost tags logged: $%.4f  (%.2fh × $%.3f/h, %s)",
+                        estimated_cost, elapsed_hours, gpu_price,
+                        "spot" if is_spot else "on_demand",
+                    )
+                except Exception as ce:
+                    self.logger.warning(f"Could not log cost tags to MLflow: {ce}")
 
             # Prometheus scrape grace period
             grace = int(os.getenv('PROMETHEUS_GRACE_SECONDS', '5'))
@@ -637,7 +664,9 @@ def _resolve_params_path() -> str:
 
 def main():
     if not ray.is_initialized():
-        ray.init(address="auto", ignore_reinit_error=True)
+        # Port 6379: the Ray cluster started by ~/sky_templates/ray/start_cluster.
+        # "auto" would connect to SkyPilot's internal Ray on port 6380 instead.
+        ray.init(address="localhost:6379", ignore_reinit_error=True)
 
     ctx = ray.data.DataContext.get_current()
     ctx.enable_rich_progress_bars = True

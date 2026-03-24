@@ -17,10 +17,16 @@ import {
   submitServingConfig,
   triggerServingDeploy,
   getServingDeployStatus,
+  getLLMCatalog,
+  triggerVllmDeploy,
+  getVllmEndpoint,
   type TrainingRunId,
   type SchemaUploadSingleResult,
   type ServingConfigResult,
   type ServingDeployResult,
+  type LLMModelInfo,
+  type VllmDeployResult,
+  type VllmEndpointResult,
 } from '../api/platformClient';
 import {
   generateRawYamlV2,
@@ -292,6 +298,23 @@ export function ServingPage() {
   const [deployError, setDeployError] = useState('');
   const deployPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
+  // ── Serving type: tabular (Ray Serve) vs LLM (vLLM) ──────────────────────
+  const [servingType, setServingType] = useState<'tabular' | 'llm'>('tabular');
+
+  // ── LLM serving state ─────────────────────────────────────────────────────
+  const [llmCatalog, setLlmCatalog] = useState<LLMModelInfo[]>([]);
+  const [llmCatalogLoading, setLlmCatalogLoading] = useState(false);
+  const [selectedLlmModel, setSelectedLlmModel] = useState('');
+  const [hfToken, setHfToken] = useState('');
+  const [llmAdapterS3, setLlmAdapterS3] = useState('');
+  const [vllmPort, setVllmPort] = useState(8000);
+  const [maxModelLen, setMaxModelLen] = useState(4096);
+  const [llmDeployResult, setLlmDeployResult] = useState<VllmDeployResult | null>(null);
+  const [llmDeployError, setLlmDeployError] = useState('');
+  const [llmDeploying, setLlmDeploying] = useState(false);
+  const [llmEndpoint, setLlmEndpoint] = useState<VllmEndpointResult | null>(null);
+  const llmPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
   // ── Dynamic step list based on serving mode ───────────────────────────────
   const steps = servingMode === 'kafka' ? STEPS_KAFKA : STEPS_RAY_ONLY;
 
@@ -350,8 +373,19 @@ export function ServingPage() {
   useEffect(() => {
     return () => {
       if (deployPollRef.current) clearInterval(deployPollRef.current);
+      if (llmPollRef.current) clearInterval(llmPollRef.current);
     };
   }, []);
+
+  // Load LLM catalog when switching to LLM mode
+  useEffect(() => {
+    if (servingType !== 'llm' || llmCatalog.length > 0) return;
+    setLlmCatalogLoading(true);
+    getLLMCatalog()
+      .then((c) => { setLlmCatalog(c); if (c.length > 0) setSelectedLlmModel(c[0].model_id); })
+      .catch(() => setLlmCatalog([]))
+      .finally(() => setLlmCatalogLoading(false));
+  }, [servingType, llmCatalog.length]);
 
   // ── Derived: raw.yaml content ─────────────────────────────────────────────
 
@@ -526,6 +560,40 @@ export function ServingPage() {
     }
   };
 
+  const handleLlmDeploy = async () => {
+    if (!selectedLlmModel) return;
+    setLlmDeployError('');
+    setLlmDeployResult(null);
+    setLlmEndpoint(null);
+    setLlmDeploying(true);
+    if (llmPollRef.current) clearInterval(llmPollRef.current);
+    try {
+      const result = await triggerVllmDeploy({
+        llm_model_id: selectedLlmModel,
+        hf_token: hfToken || undefined,
+        llm_adapter_s3: llmAdapterS3 || undefined,
+        vllm_port: vllmPort,
+        max_model_len: maxModelLen,
+      });
+      setLlmDeployResult(result);
+      // Poll endpoint every 20s until healthy
+      llmPollRef.current = setInterval(() => {
+        void getVllmEndpoint(result.serve_run_id)
+          .then((ep) => {
+            setLlmEndpoint(ep);
+            if (ep.status === 'healthy') {
+              if (llmPollRef.current) clearInterval(llmPollRef.current);
+            }
+          })
+          .catch(() => { /* keep polling on transient error */ });
+      }, 20_000);
+    } catch (e) {
+      setLlmDeployError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setLlmDeploying(false);
+    }
+  };
+
   const fullValidationErrors = validateForm();
 
   // ─────────────────────────────────────────────────────────────────────────────
@@ -537,6 +605,194 @@ export function ServingPage() {
       {/* ── LEFT: scrollable form ── */}
       <div className="min-w-0 flex-1 space-y-3 overflow-y-auto p-4">
 
+        {/* ── Serving Type toggle ── */}
+        <div className="flex items-center gap-3">
+          <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
+            Serving Type
+          </span>
+          <ToggleButton
+            active={servingType === 'tabular'}
+            onClick={() => setServingType('tabular')}
+          >
+            Tabular (Ray Serve)
+          </ToggleButton>
+          <ToggleButton
+            active={servingType === 'llm'}
+            onClick={() => setServingType('llm')}
+          >
+            LLM (vLLM)
+          </ToggleButton>
+        </div>
+
+        {/* ── LLM SERVING FORM ── */}
+        {servingType === 'llm' && (
+          <div className="rounded-lg border border-slate-700 bg-slate-900 px-4 py-4 space-y-4">
+            <p className={SUB_HEADING}>vLLM Serving — Deploy a persistent LLM endpoint</p>
+            <p className="text-xs text-slate-500">
+              Provisions an on-demand GPU VM (RunPod / Vast.ai) running vLLM.
+              The cluster stays up after deployment — tear down with{' '}
+              <code className="rounded bg-slate-800 px-1">sky down</code>.
+            </p>
+
+            {/* Model selection */}
+            <div className="grid grid-cols-2 gap-3">
+              <div className="flex flex-col gap-1">
+                <label className="text-xs text-slate-400">LLM Model</label>
+                <select
+                  value={selectedLlmModel}
+                  onChange={(e) => setSelectedLlmModel(e.target.value)}
+                  className={SELECT_CLS}
+                  disabled={llmCatalogLoading}
+                >
+                  <option value="">
+                    {llmCatalogLoading ? '— loading… —' : '— select model —'}
+                  </option>
+                  {llmCatalog.map((m) => (
+                    <option key={m.model_id} value={m.model_id}>
+                      {m.model_id} ({m.vram_gb} GB VRAM, ≥{m.min_gpus} GPU)
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {selectedLlmModel && (() => {
+                const info = llmCatalog.find((m) => m.model_id === selectedLlmModel);
+                return info ? (
+                  <div className="flex flex-col justify-end gap-1">
+                    <span className="text-[11px] text-slate-500">Recommended GPU</span>
+                    <span className="font-mono text-xs text-blue-300">{info.recommended_gpu}</span>
+                    <span className="text-[11px] text-slate-500">Min VRAM: {info.vram_gb} GB</span>
+                  </div>
+                ) : null;
+              })()}
+            </div>
+
+            {/* HF Token */}
+            <div className="flex flex-col gap-1">
+              <label className="text-xs text-slate-400">
+                HuggingFace Token{' '}
+                <span className="text-slate-600">(required for gated models like LLaMA)</span>
+              </label>
+              <input
+                type="password"
+                value={hfToken}
+                onChange={(e) => setHfToken(e.target.value)}
+                placeholder="hf_..."
+                className={INPUT_CLS}
+              />
+            </div>
+
+            {/* Adapter S3 path */}
+            <div className="flex flex-col gap-1">
+              <label className="text-xs text-slate-400">
+                LoRA Adapter S3 Path{' '}
+                <span className="text-slate-600">(optional — leave empty for base model)</span>
+              </label>
+              <input
+                value={llmAdapterS3}
+                onChange={(e) => setLlmAdapterS3(e.target.value)}
+                placeholder="s3://my-bucket/llm-adapters/my-adapter/"
+                className={INPUT_CLS}
+              />
+            </div>
+
+            {/* vLLM config */}
+            <div className="grid grid-cols-2 gap-3">
+              <div className="flex flex-col gap-1">
+                <label className="text-xs text-slate-400">Serving Port</label>
+                <input
+                  type="number"
+                  min={1}
+                  max={65535}
+                  value={vllmPort}
+                  onChange={(e) => setVllmPort(parseInt(e.target.value) || 8000)}
+                  className={INPUT_CLS}
+                />
+              </div>
+              <div className="flex flex-col gap-1">
+                <label className="text-xs text-slate-400">Max Model Length</label>
+                <input
+                  type="number"
+                  min={256}
+                  value={maxModelLen}
+                  onChange={(e) => setMaxModelLen(parseInt(e.target.value) || 4096)}
+                  className={INPUT_CLS}
+                />
+              </div>
+            </div>
+
+            <div className="rounded border border-amber-800/30 bg-amber-900/10 px-3 py-2">
+              <p className="text-xs text-amber-400">
+                On-demand only (no spot preemptions for serving).
+                Est. ~$2–4/hr for A100. Tear down manually when done.
+              </p>
+            </div>
+
+            {/* Deploy button + result */}
+            {llmDeployResult ? (
+              <div className="space-y-2 rounded-lg border border-slate-700 bg-slate-800/40 p-4">
+                <p className="text-sm font-medium text-green-400">✓ vLLM deployment triggered</p>
+                <div className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1.5 text-xs">
+                  <span className="text-slate-400">Serve run ID</span>
+                  <span className="break-all font-mono text-slate-200">
+                    {llmDeployResult.serve_run_id}
+                  </span>
+                  <span className="text-slate-400">Cluster</span>
+                  <span className="font-mono text-slate-200">
+                    {llmDeployResult.sky_cluster_name}
+                  </span>
+                  <span className="text-slate-400">Endpoint</span>
+                  <span className={`font-mono ${
+                    llmEndpoint?.status === 'healthy'
+                      ? 'text-green-400'
+                      : 'text-amber-400'
+                  }`}>
+                    {llmEndpoint?.status === 'healthy'
+                      ? llmEndpoint.endpoint_url
+                      : llmEndpoint?.status === 'not_found'
+                        ? 'provisioning…'
+                        : 'polling…'}
+                  </span>
+                </div>
+                {llmEndpoint?.status === 'healthy' && (
+                  <div className="rounded border border-green-800/30 bg-green-900/10 px-3 py-2">
+                    <p className="text-xs text-green-400">
+                      ✓ vLLM healthy at{' '}
+                      <span className="font-mono">{llmEndpoint.endpoint_url}/v1</span>
+                    </p>
+                  </div>
+                )}
+                <button
+                  onClick={() => {
+                    setLlmDeployResult(null);
+                    setLlmEndpoint(null);
+                    if (llmPollRef.current) clearInterval(llmPollRef.current);
+                  }}
+                  className={BTN_NEUTRAL}
+                >
+                  New Deployment
+                </button>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {llmDeployError && (
+                  <p className="text-xs text-red-400">{llmDeployError}</p>
+                )}
+                <button
+                  onClick={() => void handleLlmDeploy()}
+                  disabled={llmDeploying || !selectedLlmModel}
+                  className="w-full rounded bg-purple-700 py-2 text-sm font-semibold text-white hover:bg-purple-600 disabled:opacity-40"
+                >
+                  {llmDeploying ? 'Deploying…' : 'Deploy vLLM'}
+                </button>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ── TABULAR SERVING FORM (existing) ── */}
+        {servingType === 'tabular' && (
+          <>
         <StepperHeader
           steps={steps}
           currentStep={currentStep}
@@ -1001,12 +1257,18 @@ export function ServingPage() {
             </button>
           </div>
         )}
+          </>
+        )}
       </div>
 
-      {/* ── RIGHT: raw.yaml preview (only meaningful in kafka mode) ── */}
+      {/* ── RIGHT: raw.yaml preview (only meaningful in tabular kafka mode) ── */}
       <div className="w-[420px] shrink-0 min-h-0 p-4">
         <YamlPreviewPanel
-          content={servingMode === 'kafka' ? rawYamlContent : '# raw.yaml not used in ray_only mode'}
+          content={
+            servingType === 'kafka'
+              ? rawYamlContent
+              : '# raw.yaml not used in this mode'
+          }
           label="raw.yaml preview"
         />
       </div>

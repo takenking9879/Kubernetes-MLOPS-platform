@@ -16,7 +16,7 @@ artifactRoot:
 
 extraEnvVars:
   MLFLOW_S3_IGNORE_TLS: "true"
-  MLFLOW_SERVER_ALLOWED_HOSTS: "my-mlflow,my-mlflow.ray,my-mlflow.ray.svc,my-mlflow.ray.svc.cluster.local,localhost:*,mlflow.localhost,mlflow"
+  MLFLOW_SERVER_ALLOWED_HOSTS: "my-mlflow,my-mlflow.ray,my-mlflow.ray.svc,my-mlflow.ray.svc.cluster.local,localhost:*,mlflow.localhost,mlflow,*.ngrok-free.app"
   MLFLOW_WEBHOOK_ALLOWED_SCHEMES: "http,https"
   MLFLOW_WEBHOOK_SECRET_ENCRYPTION_KEY: "BKOaxFUmdRaDTseWeacCpPQqYbdjrUrs7UJkRamleWM="
 
