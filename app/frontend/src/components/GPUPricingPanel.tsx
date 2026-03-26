@@ -56,6 +56,8 @@ export function GPUPricingPanel() {
   const [minVram, setMinVram] = useState(0);
   const [sortBy, setSortBy] = useState<'spot' | 'ondemand'>('spot');
   const [search, setSearch] = useState('');
+  // Default: show only SkyPilot-launchable GPUs (reduces noise)
+  const [showAllGPUs, setShowAllGPUs] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -85,6 +87,7 @@ export function GPUPricingPanel() {
 
   const filtered = offers
     .filter(o => selectedProviders.includes(o.provider))
+    .filter(o => showAllGPUs || o.skypilot_supported)
     .filter(o => o.vram_gb >= minVram)
     .filter(o => !search || o.gpu_type.toLowerCase().includes(search.toLowerCase()))
     .sort((a, b) => {
@@ -118,6 +121,18 @@ export function GPUPricingPanel() {
           {lastUpdated && (
             <span className="text-[10px] text-slate-600">{secAgo(lastUpdated)}</span>
           )}
+          <button
+            type="button"
+            onClick={() => setShowAllGPUs(v => !v)}
+            className={`text-[10px] font-medium transition-colors ${
+              showAllGPUs
+                ? 'text-amber-400 hover:text-amber-300'
+                : 'text-slate-500 hover:text-slate-300'
+            }`}
+            title={showAllGPUs ? 'Showing all GPUs — click to show SkyPilot-only' : 'Showing SkyPilot-only — click to show all'}
+          >
+            {showAllGPUs ? 'All GPUs' : 'SkyPilot only'}
+          </button>
           <button
             type="button"
             onClick={load}
@@ -221,7 +236,16 @@ export function GPUPricingPanel() {
                     key={`${o.provider}-${o.gpu_type}-${i}`}
                     className="border-b border-slate-800 hover:bg-slate-800/40 transition-colors"
                   >
-                    <td className="py-1 pr-2 text-slate-200 font-mono">{o.gpu_type}</td>
+                    <td className="py-1 pr-2 font-mono">
+                      <span className={o.skypilot_supported ? 'text-slate-200' : 'text-slate-500'}>
+                        {o.gpu_type}
+                      </span>
+                      {!o.skypilot_supported && (
+                        <span className="ml-1 rounded bg-slate-800 px-1 py-0.5 text-[8px] text-slate-600">
+                          no sky
+                        </span>
+                      )}
+                    </td>
                     <td className="py-1 pr-2 text-right text-slate-400">{o.vram_gb}G</td>
                     <td className="py-1 pr-2 text-slate-400 capitalize">{o.provider}</td>
                     <td className={`py-1 pr-2 text-right font-mono ${o.price_spot != null ? 'text-green-400' : 'text-slate-600'}`}>

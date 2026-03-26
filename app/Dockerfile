@@ -30,6 +30,13 @@ RUN pip install --upgrade pip \
     && pip install --prefix=/usr/local -r requirements.txt \
     && pip install --prefix=/usr/local vastai-sdk==0.5.1 --no-deps
 
+# ── SkyPilot venv — isolated to avoid conflicts with Spark/pydantic/boto3 ──
+# --copies: physical binary (no symlinks) so COPY between stages works correctly.
+RUN python3 -m venv --copies /opt/sky-venv \
+    && /opt/sky-venv/bin/pip install --no-cache-dir --upgrade pip \
+    && /opt/sky-venv/bin/pip install --no-cache-dir \
+        "skypilot[aws,runpod,vast]==0.12.0"
+
 ############################
 # Stage 2: Spark + Node.js + frontend + Python runtime
 ############################
@@ -55,6 +62,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # 2. Copiar paquetes Python desde el builder
 # ========================
 COPY --from=python-builder /usr/local /usr/local
+COPY --from=python-builder /opt/sky-venv /opt/sky-venv
 
 # ========================
 # 3. Crear workspace y copiar código

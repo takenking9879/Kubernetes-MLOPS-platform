@@ -13,7 +13,7 @@ ENABLE_MLFLOW=true
 ENABLE_SPARK=true
 ENABLE_APP=true
 ENABLE_MONITORING=true
-ENABLE_AIRFLOW=false
+ENABLE_AIRFLOW=true
 ENABLE_INGRESS=true
 
 # ============================================================

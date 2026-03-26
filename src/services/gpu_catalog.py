@@ -2,80 +2,125 @@
 src/services/gpu_catalog.py
 
 Unified GPU availability catalog: RunPod (real-time) + Vast.ai (real-time) +
-SkyPilot offline catalog (AWS/GCP/Azure).
+AWS via SkyPilot offline catalog + boto3 spot prices.
 
 Each provider query is independent — failure returns [] without raising.
-Results are cached for TTL_SECONDS (60 s) to avoid hammering provider APIs.
+Results are cached: provider offers for TTL_SECONDS (60 s), SkyPilot catalog
+for 5 minutes (slow subprocess call).
+
+Architecture (Espacio Y):
+  gpu_type  = SkyPilot canonical name if skypilot_supported=True, else native
+  skypilot_supported = True only when SkyPilot's offline catalog confirms the
+                       GPU is launchable on that provider (via _sky_supported_names).
 """
 from __future__ import annotations
 
+import json
 import logging
 import os
+import subprocess
 import time
 from dataclasses import dataclass
+from datetime import datetime, timezone
+from pathlib import Path
 from typing import Any
+
+from dotenv import load_dotenv
+
+# Load .env from project root (src/services/ → src/ → project root)
+# This is a no-op in K8s pods (env-secret injects vars directly).
+load_dotenv(Path(__file__).resolve().parents[2] / ".env")
 
 logger = logging.getLogger(__name__)
 
-# ── RunPod GPU ID → SkyPilot accelerator ID ──────────────────────────────────
+# ── SkyPilot venv paths ───────────────────────────────────────────────────────
+_SKY_PYTHON = Path("/opt/sky-venv/bin/python")
+_SKY_SCRIPT = Path(__file__).with_name("_sky_catalog_query.py")
+
+# AWS regions where GPU instances are commonly available
+_AWS_ML_REGIONS = [
+    "us-east-1", "us-east-2", "us-west-2",
+    "eu-west-1", "ap-northeast-1", "ap-southeast-1",
+]
+
+# ── RunPod GPU displayName/id → SkyPilot accelerator ID ──────────────────────
+# Keys are the `id` field returned by RunPod's GraphQL API (often = displayName).
 _RUNPOD_TO_SKYPILOT: dict[str, str] = {
-    "NVIDIA GeForce RTX 4090": "RTX4090",
-    "NVIDIA GeForce RTX 3090": "RTX3090",
-    "NVIDIA GeForce RTX 3090 Ti": "RTX3090",
-    "NVIDIA GeForce RTX 3080": "RTX3080",
-    "NVIDIA GeForce RTX 3070": "RTX3070",
-    "NVIDIA GeForce RTX 3060": "RTX3060",
-    "NVIDIA RTX 2000 Ada Generation": "RTX2000-Ada",
-    "NVIDIA RTX A4000": "RTXA4000",
-    "NVIDIA RTX A5000": "RTXA5000",
-    "NVIDIA RTX A6000": "RTXA6000",
-    "NVIDIA A100 80GB PCIe": "A100-80GB",
-    "NVIDIA A100-SXM4-80GB": "A100-80GB",
-    "NVIDIA A40": "A40",
-    "NVIDIA A10G": "A10G",
-    "NVIDIA H100 80GB HBM3": "H100",
-    "NVIDIA H100 NVL": "H100-NVL",
-    "NVIDIA H100 PCIe": "H100",
-    "NVIDIA L40S": "L40S",
-    "NVIDIA L40": "L40",
-    "NVIDIA L4": "L4",
-    "NVIDIA V100 32GB": "V100-32GB",
-    "Tesla V100-SXM2-16GB": "V100",
-    "NVIDIA Tesla V100 16GB": "V100",
+    # Consumer
+    "NVIDIA GeForce RTX 5090":          "RTX5090",
+    "NVIDIA GeForce RTX 4090":          "RTX4090",
+    "NVIDIA GeForce RTX 3090 Ti":       "RTX3090",
+    "NVIDIA GeForce RTX 3090":          "RTX3090",
+    "NVIDIA GeForce RTX 3080":          "RTX3080",
+    "NVIDIA GeForce RTX 3070":          "RTX3070",
+    "NVIDIA GeForce RTX 3060":          "RTX3060",
+    # Workstation / Ada
+    "NVIDIA RTX 2000 Ada Generation":   "RTX2000-Ada",
+    "NVIDIA RTX 4000 Ada Generation":   "RTX4000-Ada",
+    "NVIDIA RTX 6000 Ada Generation":   "RTX6000-Ada",
+    "NVIDIA RTX A4000":                 "RTXA4000",
+    "NVIDIA RTX A4500":                 "RTXA4500",
+    "NVIDIA RTX A5000":                 "RTXA5000",
+    "NVIDIA RTX A6000":                 "RTXA6000",
+    # Data center — A series
+    "NVIDIA A100 80GB PCIe":            "A100-80GB",
+    "NVIDIA A100-SXM4-80GB":            "A100-80GB-SXM",
+    "NVIDIA A40":                       "A40",
+    "NVIDIA A10G":                      "A10G",
+    # H100 series
+    "NVIDIA H100 80GB HBM3":            "H100-SXM",
+    "NVIDIA H100 NVL":                  "H100-NVL",
+    "NVIDIA H100 PCIe":                 "H100",
+    # H200 series (SkyPilot canonical: H200-SXM for RunPod, H200 for Vast)
+    "NVIDIA H200":                      "H200-SXM",
+    "NVIDIA H200 NVL":                  "H200",
+    # B series
+    "NVIDIA B200":                      "B200",
+    "NVIDIA B300 SXM6 AC":              "B300",
+    # L series
+    "NVIDIA L40S":                      "L40S",
+    "NVIDIA L40":                       "L40",
+    "NVIDIA L4":                        "L4",
+    # V series
+    "NVIDIA V100 32GB":                 "V100-32GB",
+    "Tesla V100-SXM2-16GB":             "V100",
+    "NVIDIA Tesla V100 16GB":           "V100",
+    # AMD
+    "AMD Instinct MI300X":              "MI300X",
 }
 
-# RunPod GPU IDs that expose NVLink / InfiniBand cluster networking.
-# RunPod "Secure Cloud" SXM pods have NVLink; PCIe pods do not.
+# RunPod GPU IDs with NVLink / high-speed interconnect
 _RUNPOD_INFINIBAND_IDS: frozenset[str] = frozenset({
     "NVIDIA A100-SXM4-80GB",
-    "NVIDIA H100 80GB HBM3",      # H100 SXM NVLink pods on RunPod secure cloud
+    "NVIDIA H100 80GB HBM3",
     "NVIDIA H100 NVL",
+    "NVIDIA H200",
+    "NVIDIA B200",
 })
 
-# AWS instance types with EFA (InfiniBand-equivalent, 100–400 Gbps)
-_AWS_EFA_PREFIXES: tuple[str, ...] = ("p4d", "p4de", "p3dn", "p5", "trn1n")
+# AWS instance type prefixes with EFA (InfiniBand-equivalent, 100–400 Gbps)
+_AWS_EFA_PREFIXES: tuple[str, ...] = ("p4d", "p4de", "p3dn", "p5", "p6", "trn1n")
 
-# Vast.ai: treat offers with ≥ 25 Gbps interconnect as InfiniBand-capable.
-# The Vast.ai API exposes `inet_up` (upload Mbps); cluster interconnect is not
-# separately reported, so we use a conservative threshold for identification.
+# Vast.ai: treat offers with ≥ 25 Gbps upload as high-speed interconnect.
 _VAST_IB_INET_MBPS_THRESHOLD: float = 25_000.0
 
 
 @dataclass
 class GPUOffer:
-    provider: str           # "runpod" | "vast" | "aws" | "gcp" | "azure"
-    gpu_type: str           # SkyPilot accelerator ID, e.g. "RTX4090"
+    provider: str           # "runpod" | "vast" | "aws"
+    gpu_type: str           # SkyPilot canonical name if supported, else native name
     gpu_count: int
     vram_gb: float
     vcpus: int
     ram_gb: float
     price_on_demand: float
     price_spot: float | None        # None = no spot option on this provider
-    spot_available: bool            # True = spot stock > 0 right now
+    spot_available: bool            # True = spot stock available right now
     available_count: int            # total units available (best-effort)
     region: str
     infiniband: bool
-    skypilot_accelerator: str       # e.g. "RTX4090:1"  (for YAML any_of)
+    skypilot_supported: bool        # True = SkyPilot can launch this GPU
+    skypilot_accelerator: str       # e.g. "RTX4090:1" — empty if not supported
     skypilot_cloud: str             # e.g. "runpod"
 
 
@@ -85,6 +130,9 @@ class GPUCatalogService:
     def __init__(self) -> None:
         self._cache: dict[str, list[GPUOffer]] = {}
         self._cache_ts: dict[str, float] = {}
+        # SkyPilot catalog has a longer TTL (subprocess is slow)
+        self._sky_catalog_cache: dict | None = None
+        self._sky_catalog_ts: float = 0
 
     # ── Public API ────────────────────────────────────────────────────────────
 
@@ -95,18 +143,18 @@ class GPUCatalogService:
         gpu_types: list[str] | None = None,
     ) -> list[GPUOffer]:
         """Return GPU offers across providers, filtered by constraints."""
-        active = set(providers) if providers else {"runpod", "vast", "aws", "gcp", "azure"}
+        active = set(providers) if providers else {"runpod", "vast", "aws"}
+
+        # Fetch SkyPilot catalog once — shared by all provider queries.
+        sky_catalog = self._get_sky_catalog()
 
         all_offers: list[GPUOffer] = []
         if "runpod" in active:
-            all_offers.extend(self._query_runpod())
+            all_offers.extend(self._query_runpod(sky_catalog))
         if "vast" in active:
-            all_offers.extend(self._query_vast())
-        sky_clouds = active & {"aws", "gcp", "azure", "lambda"}
-        if sky_clouds:
-            all_offers.extend(
-                o for o in self._query_skypilot() if o.provider in sky_clouds
-            )
+            all_offers.extend(self._query_vast(sky_catalog))
+        if "aws" in active:
+            all_offers.extend(self._query_aws(sky_catalog))
 
         if min_vram_gb > 0:
             all_offers = [o for o in all_offers if o.vram_gb >= min_vram_gb]
@@ -116,26 +164,128 @@ class GPUCatalogService:
 
         return all_offers
 
+    # ── SkyPilot catalog (unified, all three providers) ───────────────────────
+
+    def _get_sky_catalog(self) -> dict:
+        """
+        Return SkyPilot's offline GPU catalog for aws+runpod+vast (5-min cache).
+
+        Result: { gpu_name: [{cloud, region, price, spot_price,
+                               accelerator_count, device_memory,
+                               cpu_count, memory, instance_type}] }
+
+        Tries in order:
+          1. Subprocess to /opt/sky-venv (Docker/K8s with SkyPilot venv)
+          2. Direct sky import (local dev environment)
+          3. Returns {} → callers fall back to _static_aws_catalog()
+        """
+        if (
+            self._sky_catalog_cache is not None
+            and (time.time() - self._sky_catalog_ts) < 300
+        ):
+            return self._sky_catalog_cache
+
+        catalog: dict = {}
+
+        # 1. Subprocess to isolated SkyPilot venv
+        if _SKY_PYTHON.exists() and _SKY_SCRIPT.exists():
+            try:
+                r = subprocess.run(
+                    [str(_SKY_PYTHON), str(_SKY_SCRIPT)],
+                    capture_output=True, text=True, timeout=60,
+                )
+                if r.returncode == 0 and r.stdout:
+                    catalog = json.loads(r.stdout)
+                    logger.info(
+                        "SkyPilot catalog loaded via venv subprocess (%d GPU types)",
+                        len(catalog),
+                    )
+            except Exception as exc:
+                logger.warning("SkyPilot venv subprocess failed: %s", exc)
+
+        # 2. Direct import (local dev with sky installed in PATH)
+        if not catalog:
+            try:
+                import math
+                import sky  # type: ignore[import]
+
+                raw = sky.list_accelerators(
+                    gpus_only=True, all=True, clouds=["aws", "runpod", "vast"]
+                )
+                for gpu_name, insts in raw.items():
+                    rows = []
+                    for i in insts:
+                        cloud = str(i.cloud or "").lower().split(".")[-1]
+                        if cloud not in {"aws", "runpod", "vast"}:
+                            continue
+                        rows.append({
+                            "cloud":             cloud,
+                            "region":            str(getattr(i, "region", "") or ""),
+                            "price":             _f_none(getattr(i, "price", 0)) or 0.0,
+                            "spot_price":        _f_none(getattr(i, "spot_price", None)),
+                            "accelerator_count": int(getattr(i, "accelerator_count", 1) or 1),
+                            "device_memory":     _f_none(getattr(i, "device_memory", 0)) or 0.0,
+                            "cpu_count":         int(getattr(i, "cpu_count", 0) or 0),
+                            "memory":            _f_none(getattr(i, "memory", 0)) or 0.0,
+                            "instance_type":     str(getattr(i, "instance_type", "") or ""),
+                        })
+                    if rows:
+                        catalog[gpu_name] = rows
+                if catalog:
+                    logger.info(
+                        "SkyPilot catalog loaded via direct import (%d GPU types)",
+                        len(catalog),
+                    )
+            except ImportError:
+                pass
+            except Exception as exc:
+                logger.warning("SkyPilot direct import failed: %s", exc)
+
+        self._sky_catalog_cache = catalog
+        self._sky_catalog_ts = time.time()
+        return catalog
+
     # ── Provider queries ──────────────────────────────────────────────────────
 
-    def _query_runpod(self) -> list[GPUOffer]:
-        key = "runpod"
-        if self._is_cache_valid(key):
-            return self._cache[key]
+    def _query_runpod(self, sky_catalog: dict) -> list[GPUOffer]:
+        cache_key = "runpod"
+        if self._is_cache_valid(cache_key):
+            return self._cache[cache_key]
         try:
             import runpod  # type: ignore[import]
-            gpus: list[dict[str, Any]] = runpod.get_gpus()
+            # env-secret injects the key after Python imports — set explicitly.
+            runpod.api_key = os.getenv("RUNPOD_API_KEY", "")
+            if not runpod.api_key:
+                logger.warning("RUNPOD_API_KEY not set — skipping RunPod catalog")
+                return []
+            # get_gpus() omits pricing; use GraphQL for full schema.
+            from runpod.api import graphql as _gql  # type: ignore[import]
+            result = _gql.run_graphql_query(
+                "{ gpuTypes { id displayName memoryInGb maxGpuCount "
+                "communityPrice securePrice communitySpotPrice secureSpotPrice } }"
+            )
+            gpus: list[dict[str, Any]] = (
+                result.get("data", {}).get("gpuTypes", []) or []
+            )
+
+            sky_runpod = _sky_supported_names(sky_catalog, "runpod")
             offers: list[GPUOffer] = []
             for gpu in gpus:
                 gpu_id = gpu.get("id", "")
-                skypilot_id = _RUNPOD_TO_SKYPILOT.get(gpu_id) or _infer_skypilot_id(
-                    gpu.get("displayName", "")
-                )
-                if not skypilot_id:
+                display_name = gpu.get("displayName", "") or gpu_id
+                if not gpu_id or gpu_id.lower() == "unknown":
                     continue
 
+                # Map to SkyPilot canonical name; validate against catalog.
+                skypilot_id = _RUNPOD_TO_SKYPILOT.get(gpu_id) or _infer_skypilot_id(display_name)
+                if skypilot_id and skypilot_id in sky_runpod:
+                    sky_supported = True
+                    gpu_type = skypilot_id
+                else:
+                    sky_supported = False
+                    gpu_type = display_name  # show native name when unsupported
+
                 vram = float(gpu.get("memoryInGb", 0))
-                # Community cloud is cheaper; fall back to secure if absent
                 on_demand = float(
                     gpu.get("communityPrice") or gpu.get("securePrice") or 0.0
                 )
@@ -146,39 +296,39 @@ class GPUCatalogService:
                 offers.append(
                     GPUOffer(
                         provider="runpod",
-                        gpu_type=skypilot_id,
+                        gpu_type=gpu_type,
                         gpu_count=1,
                         vram_gb=vram,
-                        vcpus=0,  # RunPod doesn't expose per-GPU vCPU count
+                        vcpus=0,
                         ram_gb=0,
                         price_on_demand=on_demand,
                         price_spot=spot,
                         spot_available=spot_available,
                         available_count=int(gpu.get("maxGpuCount", 1)),
-                        region="runpod",
+                        region="",  # RunPod API doesn't expose per-GPU datacenter
                         infiniband=gpu_id in _RUNPOD_INFINIBAND_IDS,
-                        skypilot_accelerator=f"{skypilot_id}:1",
+                        skypilot_supported=sky_supported,
+                        skypilot_accelerator=f"{gpu_type}:1" if sky_supported else "",
                         skypilot_cloud="runpod",
                     )
                 )
-            self._set_cache(key, offers)
+            self._set_cache(cache_key, offers)
             return offers
         except Exception as exc:
             logger.warning("RunPod catalog query failed: %s", exc)
             return []
 
-    def _query_vast(self) -> list[GPUOffer]:
+    def _query_vast(self, sky_catalog: dict) -> list[GPUOffer]:
         """Query Vast.ai for cheapest offer per GPU type (best-effort)."""
-        key = "vast"
-        if self._is_cache_valid(key):
-            return self._cache[key]
+        cache_key = "vast"
+        if self._is_cache_valid(cache_key):
+            return self._cache[cache_key]
         try:
             from vastai import VastAI  # type: ignore[import]
             api_key = os.getenv("VAST_API_KEY", "")
             if not api_key:
                 return []
             client = VastAI(api_key=api_key)
-            # Search for single-GPU instances with decent reliability
             raw_offers = client.search_offers(
                 query="reliability>0.95 num_gpus=1 rentable=true",
                 limit=100,
@@ -191,87 +341,157 @@ class GPUCatalogService:
                 if gpu_name not in best or price < float(best[gpu_name].get("dph_total", 99)):
                     best[gpu_name] = raw
 
+            sky_vast = _sky_supported_names(sky_catalog, "vast")
             offers: list[GPUOffer] = []
             for gpu_name, raw in best.items():
-                skypilot_id = _RUNPOD_TO_SKYPILOT.get(gpu_name) or _infer_skypilot_id(gpu_name)
-                if not skypilot_id:
+                if not gpu_name:
                     continue
+
+                skypilot_id = _RUNPOD_TO_SKYPILOT.get(gpu_name) or _infer_skypilot_id(gpu_name)
+                if skypilot_id and skypilot_id in sky_vast:
+                    sky_supported = True
+                    gpu_type = skypilot_id
+                else:
+                    sky_supported = False
+                    gpu_type = gpu_name
+
                 vram = float(raw.get("gpu_ram", 0)) / 1024  # MB → GB
                 on_demand = float(raw.get("dph_total", 0))
-                # Vast.ai doesn't expose a dedicated IB flag; use upload
-                # bandwidth as a proxy for high-speed interconnect.
                 inet_up_mbps = float(raw.get("inet_up", 0) or 0)
                 has_ib = inet_up_mbps >= _VAST_IB_INET_MBPS_THRESHOLD
+
                 offers.append(
                     GPUOffer(
                         provider="vast",
-                        gpu_type=skypilot_id,
+                        gpu_type=gpu_type,
                         gpu_count=1,
                         vram_gb=vram,
                         vcpus=int(raw.get("cpu_cores_effective", 0)),
                         ram_gb=float(raw.get("cpu_ram", 0)) / 1024,
                         price_on_demand=on_demand,
-                        price_spot=round(on_demand * 0.7, 4),  # Vast spot ~30% cheaper
-                        spot_available=True,
+                        price_spot=None,        # Vast.ai has NO spot pricing
+                        spot_available=False,   # confirmed by SkyPilot catalog
                         available_count=1,
-                        region=str(raw.get("datacenter", "vast")),
+                        region=str(raw.get("datacenter", "")),
                         infiniband=has_ib,
-                        skypilot_accelerator=f"{skypilot_id}:1",
+                        skypilot_supported=sky_supported,
+                        skypilot_accelerator=f"{gpu_type}:1" if sky_supported else "",
                         skypilot_cloud="vast",
                     )
                 )
-            self._set_cache(key, offers)
+            self._set_cache(cache_key, offers)
             return offers
         except Exception as exc:
             logger.warning("Vast.ai catalog query failed: %s", exc)
             return []
 
-    def _query_skypilot(self) -> list[GPUOffer]:
-        """Query SkyPilot's offline catalog for AWS/GCP/Azure GPUs."""
-        key = "skypilot"
-        if self._is_cache_valid(key):
-            return self._cache[key]
+    def _query_aws(self, sky_catalog: dict) -> list[GPUOffer]:
+        """Query AWS GPU offers using SkyPilot catalog + boto3 real-time spot prices."""
+        cache_key = "aws"
+        if self._is_cache_valid(cache_key):
+            return self._cache[cache_key]
         try:
-            import sky  # type: ignore[import]
-            catalog: dict[str, list[Any]] = sky.list_accelerators(gpus_only=True)
+            aws_entries: dict[str, list[dict]] = {
+                gpu_name: [r for r in rows if r.get("cloud") == "aws"]
+                for gpu_name, rows in sky_catalog.items()
+                if any(r.get("cloud") == "aws" for r in rows)
+            }
+
+            if not aws_entries:
+                logger.info("SkyPilot AWS catalog empty — using static fallback")
+                offers = _static_aws_catalog()
+                self._set_cache(cache_key, offers)
+                return offers
+
+            # Collect unique instance types for spot price lookup
+            instance_types: list[str] = list({
+                r["instance_type"]
+                for rows in aws_entries.values()
+                for r in rows
+                if r.get("instance_type")
+            })
+
+            # Fetch real-time spot prices from EC2
+            spot_prices = self._get_aws_spot_prices(instance_types)
+
             offers: list[GPUOffer] = []
-            for gpu_name, instances in catalog.items():
-                for inst in instances:
-                    cloud_raw = str(inst.cloud).lower() if inst.cloud else ""
-                    # Strip module prefix: "clouds.aws" → "aws"
-                    cloud = cloud_raw.split(".")[-1]
-                    if cloud not in ("aws", "gcp", "azure", "lambda"):
+            seen: set[tuple[str, str]] = set()
+            for gpu_name, rows in aws_entries.items():
+                for row in rows:
+                    region = row.get("region", "")
+                    dedup_key = (gpu_name, region)
+                    if dedup_key in seen:
                         continue
-                    on_demand = float(inst.price or 0)
-                    spot = float(inst.spot_price) if getattr(inst, "spot_price", None) else None
-                    count = int(inst.accelerator_count or 1)
+                    seen.add(dedup_key)
+
+                    instance_type = row.get("instance_type", "")
+                    on_demand = float(row.get("price", 0))
+                    # Real-time spot preferred; fall back to SkyPilot catalog spot
+                    spot = spot_prices.get((instance_type, region)) or _f_none(
+                        row.get("spot_price")
+                    )
+                    count = int(row.get("accelerator_count", 1) or 1)
+
                     offers.append(
                         GPUOffer(
-                            provider=cloud,
+                            provider="aws",
                             gpu_type=gpu_name,
                             gpu_count=count,
-                            vram_gb=float(getattr(inst, "device_memory", 0) or 0),
-                            vcpus=int(getattr(inst, "cpu_count", 0) or 0),
-                            ram_gb=float(getattr(inst, "memory", 0) or 0),
+                            vram_gb=float(row.get("device_memory", 0)),
+                            vcpus=int(row.get("cpu_count", 0)),
+                            ram_gb=float(row.get("memory", 0)),
                             price_on_demand=on_demand,
                             price_spot=spot,
                             spot_available=bool(spot and spot > 0),
-                            available_count=0,  # static catalog — no real-time count
-                            region=str(getattr(inst, "region", "") or ""),
-                            infiniband=_aws_has_efa(
-                                getattr(inst, "instance_type", "") or "", cloud
-                            ),
+                            available_count=0,
+                            region=region,
+                            infiniband=_aws_has_efa(instance_type, "aws"),
+                            skypilot_supported=True,  # AWS always from SkyPilot catalog
                             skypilot_accelerator=f"{gpu_name}:{count}",
-                            skypilot_cloud=cloud,
+                            skypilot_cloud="aws",
                         )
                     )
-            self._set_cache(key, offers)
+
+            self._set_cache(cache_key, offers)
             return offers
         except Exception as exc:
-            logger.warning("SkyPilot catalog query failed: %s", exc)
-            return []
+            logger.warning("AWS catalog query failed (%s) — using static fallback", exc)
+            offers = _static_aws_catalog()
+            self._set_cache(cache_key, offers)
+            return offers
 
-    # ── Helpers ───────────────────────────────────────────────────────────────
+    def _get_aws_spot_prices(
+        self, instance_types: list[str]
+    ) -> dict[tuple[str, str], float]:
+        """Fetch current AWS spot prices via boto3. Returns {(instance_type, region): price}."""
+        spot_prices: dict[tuple[str, str], float] = {}
+        if not instance_types:
+            return spot_prices
+        try:
+            import boto3  # type: ignore[import]
+            batch = instance_types[:50]  # EC2 API limit per call
+            for region in _AWS_ML_REGIONS:
+                try:
+                    ec2 = boto3.client("ec2", region_name=region)
+                    paginator = ec2.get_paginator("describe_spot_price_history")
+                    for page in paginator.paginate(
+                        InstanceTypes=batch,
+                        ProductDescriptions=["Linux/UNIX"],
+                        StartTime=datetime.now(timezone.utc),
+                    ):
+                        for item in page["SpotPriceHistory"]:
+                            itype = item["InstanceType"]
+                            price = float(item["SpotPrice"])
+                            k = (itype, region)
+                            if k not in spot_prices or price < spot_prices[k]:
+                                spot_prices[k] = price
+                except Exception as exc:
+                    logger.debug("Spot price fetch failed for %s: %s", region, exc)
+        except ImportError:
+            logger.debug("boto3 not available — skipping AWS spot prices")
+        return spot_prices
+
+    # ── Cache helpers ─────────────────────────────────────────────────────────
 
     def _is_cache_valid(self, key: str) -> bool:
         return (
@@ -286,9 +506,33 @@ class GPUCatalogService:
 
 # ── Module-level helpers ──────────────────────────────────────────────────────
 
+
+def _sky_supported_names(catalog: dict, cloud: str) -> set[str]:
+    """Return the set of GPU names SkyPilot supports for a given cloud provider."""
+    return {
+        gpu_name
+        for gpu_name, rows in catalog.items()
+        if any(r.get("cloud") == cloud for r in rows)
+    }
+
+
+def _f_none(v: Any) -> float | None:
+    """Parse float; return None on NaN/None/error."""
+    if v is None:
+        return None
+    try:
+        import math
+        x = float(v)
+        return None if math.isnan(x) else x
+    except (TypeError, ValueError):
+        return None
+
+
 def _infer_skypilot_id(display_name: str) -> str:
     """Best-effort: map a free-form GPU name to a SkyPilot accelerator ID."""
     n = display_name.upper().replace(" ", "").replace("-", "").replace("_", "")
+    if "RTX5090" in n:
+        return "RTX5090"
     if "RTX4090" in n:
         return "RTX4090"
     if "RTX3090TI" in n:
@@ -299,18 +543,51 @@ def _infer_skypilot_id(display_name: str) -> str:
         return "RTX3080"
     if "RTX3070" in n:
         return "RTX3070"
+    if "RTX3060" in n:
+        return "RTX3060"
     if "RTX2000ADA" in n or "2000ADAGENERATION" in n:
         return "RTX2000-Ada"
+    if "RTX4000ADA" in n or "4000ADAGENERATION" in n:
+        return "RTX4000-Ada"
+    if "RTX6000ADA" in n or "6000ADAGENERATION" in n:
+        return "RTX6000-Ada"
+    if "RTXPRO6000WK" in n:
+        return "RTXPRO6000-WK"
+    if "RTXPRO6000" in n:
+        return "RTXPRO6000"
+    if "RTXPRO4500" in n:
+        return "RTXPRO4500"
+    if "A100" in n and "80" in n and "SXM" in n:
+        return "A100-80GB-SXM"
     if "A100" in n and "80" in n:
         return "A100-80GB"
+    if "A100" in n and "SXM" in n:
+        return "A100-80GB-SXM"
     if "A100" in n:
         return "A100"
+    # A4500 / A4000 BEFORE A40 — prevents "RTXA4000" → "A40" false match
+    if "A4500" in n:
+        return "RTXA4500"
+    if "A4000" in n:
+        return "RTXA4000"
     if "A40" in n:
         return "A40"
     if "A10G" in n:
         return "A10G"
+    if "B300" in n:
+        return "B300"
+    if "B200" in n:
+        return "B200"
+    if "H200SXM" in n or ("H200" in n and "SXM" in n):
+        return "H200-SXM"
+    if "H200NVL" in n:
+        return "H200"
+    if "H200" in n:
+        return "H200-SXM"  # RunPod H200 is H200-SXM in SkyPilot
     if "H100NVL" in n:
         return "H100-NVL"
+    if "H100SXM" in n or ("H100" in n and "SXM" in n):
+        return "H100-SXM"
     if "H100" in n:
         return "H100"
     if "L40S" in n:
@@ -327,9 +604,53 @@ def _infer_skypilot_id(display_name: str) -> str:
         return "RTXA6000"
     if "A5000" in n:
         return "RTXA5000"
-    if "A4000" in n:
-        return "RTXA4000"
+    if "MI300X" in n:
+        return "MI300X"
     return ""
+
+
+# Static AWS GPU catalog — fallback when SkyPilot is unavailable.
+# Prices are us-east-1 on-demand (2025). Spot ≈ 70% of on-demand.
+_AWS_STATIC: list[tuple[str, int, float, float, int, str, bool]] = [
+    # (gpu_type, vram_gb, od_price, spot_price, count, instance, efa)
+    ("T4",        16,  0.526,  0.158,  1, "g4dn.xlarge",    False),
+    ("T4",        16,  1.686,  0.506,  4, "g4dn.12xlarge",  False),
+    ("A10G",      24,  1.006,  0.302,  1, "g5.xlarge",      False),
+    ("A10G",      24,  1.212,  0.364,  1, "g5.2xlarge",     False),
+    ("A10G",      24,  7.228,  2.168,  4, "g5.24xlarge",    False),
+    ("A10G",      24, 16.288,  4.886,  8, "g5.48xlarge",    False),
+    ("V100",      16,  3.060,  0.918,  1, "p3.2xlarge",     False),
+    ("V100",      16, 12.240,  3.672,  4, "p3.8xlarge",     False),
+    ("V100",      16, 24.480,  7.344,  8, "p3.16xlarge",    False),
+    ("V100-32GB", 32, 31.212,  9.364,  8, "p3dn.24xlarge",  True),
+    ("A100-80GB", 40, 32.770,  9.831,  8, "p4d.24xlarge",   True),
+    ("H100",      80, 98.320, 29.496,  8, "p5.48xlarge",    True),
+]
+
+
+def _static_aws_catalog() -> list[GPUOffer]:
+    offers = []
+    for gpu_type, vram_gb, od, spot, count, instance, efa in _AWS_STATIC:
+        offers.append(
+            GPUOffer(
+                provider="aws",
+                gpu_type=gpu_type,
+                gpu_count=count,
+                vram_gb=float(vram_gb),
+                vcpus=0,
+                ram_gb=0,
+                price_on_demand=od,
+                price_spot=spot,
+                spot_available=True,
+                available_count=0,
+                region="us-east-1",
+                infiniband=efa,
+                skypilot_supported=True,
+                skypilot_accelerator=f"{gpu_type}:{count}",
+                skypilot_cloud="aws",
+            )
+        )
+    return offers
 
 
 def _aws_has_efa(instance_type: str, cloud: str) -> bool:

@@ -168,6 +168,7 @@ def _offer_to_dict(o: GPUOffer) -> dict:
         "available_count": o.available_count,
         "region": o.region,
         "infiniband": o.infiniband,
+        "skypilot_supported": o.skypilot_supported,
         "skypilot_accelerator": o.skypilot_accelerator,
         "skypilot_cloud": o.skypilot_cloud,
     }

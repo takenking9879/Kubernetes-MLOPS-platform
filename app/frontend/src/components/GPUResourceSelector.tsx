@@ -281,6 +281,29 @@ export function GPUResourceSelector({ value, onChange, disabled }: Props) {
             </div>
           </div>
 
+          {/* Preferred regions */}
+          <div className="flex flex-col gap-1">
+            <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">
+              Preferred Regions
+            </span>
+            <input
+              type="text"
+              className={INPUT_CLS}
+              value={(value.preferred_regions ?? []).join(', ')}
+              placeholder="e.g. us-east-1, CA-MTL-1 (leave empty = any)"
+              onChange={(e) => {
+                const regions = e.target.value
+                  .split(',')
+                  .map((r) => r.trim())
+                  .filter(Boolean);
+                set({ preferred_regions: regions });
+              }}
+            />
+            <span className="text-[9px] text-slate-600">
+              AWS: us-east-1, us-west-2 · RunPod zones: CA-MTL-1, US-TX-3
+            </span>
+          </div>
+
           {/* Cost comparison table */}
           {(selectResult || loading) && (
             <div className="flex flex-col gap-1">

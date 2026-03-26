@@ -590,12 +590,13 @@ export interface GPUOffer {
   available_count: number;
   region: string;
   infiniband: boolean;
+  skypilot_supported: boolean;
   skypilot_accelerator: string;
   skypilot_cloud: string;
 }
 
 export interface GPUSelectResult {
-  any_of: Array<{ cloud: string; accelerators: string; use_spot: boolean }>;
+  any_of: Array<{ infra: string; accelerators: string; use_spot: boolean }>;
   spot_entries: number;
   ondemand_entries: number;
   estimated_cost_spot: number | null;
