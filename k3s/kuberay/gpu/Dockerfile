@@ -14,8 +14,8 @@ RUN pip install --no-cache-dir uv
 
 # Python dependencies
 COPY requirements_gpu.txt /tmp/requirements.txt
-RUN uv pip install --system --no-cache -r /tmp/requirements.txt \
-    && rm -rf /tmp/* && pip install --no-cache-dir torch==2.10.0 --index-url https://download.pytorch.org/whl/cu128
+RUN pip install --no-cache-dir torch==2.10.0 --index-url https://download.pytorch.org/whl/cu128 && uv pip install --system --no-cache -r /tmp/requirements.txt \
+    && rm -rf /tmp/*
 
 # Return to default ray user
 USER ray

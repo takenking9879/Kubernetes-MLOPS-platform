@@ -1,13 +1,11 @@
 """Ray+vLLM Multi-Node Serving Pipeline DAG (Kimi-K2 pattern).
 
-Uses sky.launch() (persistent cluster) to deploy vLLM across multiple nodes
-with tensor + pipeline parallelism.
+SkyPilot has a dependency conflict with apache-airflow (protobuf, grpcio).
+All sky.* calls are delegated to the takenking9879/sky-runner:0.12.0 pod.
 
-Unlike the single-node vllm_serving_pipeline, this DAG:
-  - Provisions num_nodes machines (head + workers)
-  - Head node starts Ray + vllm serve with --pipeline-parallel-size=num_nodes
-  - Workers join the Ray cluster and idle (Ray routes work internally)
-  - Endpoint is accessible on the head node's external IP
+Provisions a PERSISTENT multi-node cluster via sky.launch(detach_run=True).
+Head node starts Ray + vllm serve with --pipeline-parallel-size=num_nodes.
+Workers join the Ray cluster and idle; Ray routes work internally.
 
 Use this for models that don't fit on a single node.
 For single-node, use vllm_serving_pipeline instead.
@@ -29,242 +27,29 @@ Endpoint written to:
 Retrieve via:
     GET /api/v2/serving-configs/{serve_run_id}/endpoint
 """
+
 from __future__ import annotations
 
-import json
 import os
-import sys
-import time
 from datetime import datetime, timedelta
-from pathlib import Path
 
 from airflow.sdk import DAG
-from airflow.providers.standard.operators.python import PythonOperator
+from airflow.providers.cncf.kubernetes.operators.pod import KubernetesPodOperator
+from kubernetes.client import models as k8s
 
 # ─── Constants ────────────────────────────────────────────────────────────────
 
-SKY_YAML_VLLM_MULTI = Path(
-    os.getenv(
-        "SKY_VLLM_MULTI_YAML",
-        "/opt/airflow/dags/repo/k3s/sky/ray-vllm-multinode-serving.yaml",
-    )
-)
+_SKY_IMAGE  = os.getenv("SKY_RUNNER_IMAGE", "takenking9879/sky-runner:0.12.0")
+_AIRFLOW_NS = os.getenv("AIRFLOW_NAMESPACE", "airflow")
 VLLM_HEALTH_TIMEOUT_SECONDS = int(os.getenv("VLLM_MULTI_HEALTH_TIMEOUT_SECONDS", "900"))
 S3_BUCKET = os.getenv("S3_BUCKET", "k8s-mlops-platform-bucket")
 
-_DAGS_DIR = Path(__file__).parent.parent         # k3s/airflow/
-_PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent.parent
+# ─── Shared pod helpers ────────────────────────────────────────────────────────
 
-
-# ─── Helpers ──────────────────────────────────────────────────────────────────
-
-
-def _get_cluster_head_ip(cluster_name: str) -> str | None:
-    """Return the head node's external IP, or None on failure."""
-    import sky  # type: ignore[import]
-
-    try:
-        records = sky.get(sky.status(cluster_names=[cluster_name], refresh=True))
-        if not records:
-            return None
-        handle = records[0].get("handle")
-        if handle and hasattr(handle, "external_ips"):
-            ips = handle.external_ips()
-            if ips:
-                return str(ips[0])
-    except Exception as exc:
-        print(f"[warn] Could not get external IPs for {cluster_name}: {exc}")
-    return None
-
-
-def _load_task(
-    yaml_path: str,
-    serve_run_id: str,
-    conf: dict,
-) -> "sky.Task":  # type: ignore[name-defined]
-    """Load SkyPilot Task, optionally injecting dynamic any_of."""
-    import sky  # type: ignore[import]
-    import yaml as _yaml
-
-    resource_constraints_conf = conf.get("resource_constraints")
-    tensor_parallel = int(conf.get("tensor_parallel_size", 8))
-    pipeline_parallel = int(conf.get("pipeline_parallel_size", 2))
-
-    if str(_PROJECT_ROOT) not in sys.path:
-        sys.path.insert(0, str(_PROJECT_ROOT))
-
-    sky_conf: dict | None = None
-
-    if resource_constraints_conf:
-        try:
-            import dataclasses
-            from src.services.gpu_catalog import GPUCatalogService
-            from src.services.gpu_selector import GPUSelectorService, ResourceConstraints
-
-            _valid = {f.name for f in dataclasses.fields(ResourceConstraints)}
-            merged = {k: v for k, v in resource_constraints_conf.items() if k in _valid}
-            merged["prefer_spot"] = False   # serving is always on-demand
-            constraints = ResourceConstraints(**merged)
-
-            offers = GPUCatalogService().query_availability(
-                providers=constraints.providers,
-                min_vram_gb=constraints.min_vram_gb,
-                gpu_types=constraints.gpu_types,
-            )
-            result = GPUSelectorService().select_providers(constraints, offers)
-
-            if result.any_of:
-                with open(yaml_path) as fh:
-                    sky_conf = _yaml.safe_load(fh)
-                sky_conf.setdefault("resources", {})["any_of"] = result.any_of
-                sky_conf["resources"].pop("infra", None)
-        except Exception as exc:
-            print(f"[warn] Dynamic resource selection failed ({exc}) — using static YAML")
-
-    if sky_conf is None:
-        with open(yaml_path) as fh:
-            sky_conf = _yaml.safe_load(fh)
-
-    # Set num_nodes from pipeline_parallel_size
-    sky_conf["num_nodes"] = pipeline_parallel
-
-    tmp = f"/tmp/sky_ray_vllm_{serve_run_id}.yaml"
-    with open(tmp, "w") as fh:
-        _yaml.dump(sky_conf, fh, default_flow_style=False, allow_unicode=True)
-    return sky.Task.from_yaml(tmp)
-
-
-# ─── Tasks ────────────────────────────────────────────────────────────────────
-
-
-def _launch_cluster(**context):
-    """Provision multi-node vLLM cluster via sky.launch()."""
-    import sky  # type: ignore[import]
-
-    sys.path.insert(0, str(_DAGS_DIR))
-    from k8s_helpers import k8s_name  # type: ignore[import]
-
-    conf = context["dag_run"].conf or {}
-    serve_run_id = conf["serve_run_id"]
-    model_id = conf["llm_model_id"]
-    hf_token = conf.get("hf_token", "")
-    adapter_s3 = conf.get("llm_adapter_s3", "")
-    vllm_port = int(conf.get("vllm_port", 8081))
-    max_model_len = int(conf.get("max_model_len", 32768))
-    tensor_parallel = int(conf.get("tensor_parallel_size", 8))
-    pipeline_parallel = int(conf.get("pipeline_parallel_size", 2))
-
-    cluster_name = k8s_name(serve_run_id, "rvllm", max_len=32)
-    task = _load_task(str(SKY_YAML_VLLM_MULTI), serve_run_id, conf)
-
-    task.update_envs({
-        "SERVE_RUN_ID":            serve_run_id,
-        "HF_MODEL_ID":             model_id,
-        "HF_TOKEN":                hf_token,
-        "LLM_ADAPTER_S3":          adapter_s3,
-        "VLLM_PORT":               str(vllm_port),
-        "MAX_MODEL_LEN":           str(max_model_len),
-        "TENSOR_PARALLEL_SIZE":    str(tensor_parallel),
-        "PIPELINE_PARALLEL_SIZE":  str(pipeline_parallel),
-    })
-
-    # Non-blocking submit — see vllm_serving_dag.py comment on why no stream_and_get.
-    sky.launch(
-        task,
-        cluster_name=cluster_name,
-        retry_until_up=True,
-    )
-    print(f"Ray+vLLM cluster launch submitted: {cluster_name} ({pipeline_parallel} nodes)")
-
-    head_ip = _get_cluster_head_ip(cluster_name)
-    context["ti"].xcom_push(key="cluster_name", value=cluster_name)
-    context["ti"].xcom_push(key="serve_run_id", value=serve_run_id)
-    context["ti"].xcom_push(key="head_ip", value=head_ip)
-    context["ti"].xcom_push(key="vllm_port", value=vllm_port)
-
-
-def _wait_for_endpoint(**context):
-    """Poll the vLLM /health endpoint until healthy or timeout."""
-    import requests  # type: ignore[import]
-    import sky  # type: ignore[import]
-
-    ti = context["ti"]
-    head_ip = ti.xcom_pull(task_ids="launch_cluster", key="head_ip")
-    cluster_name = ti.xcom_pull(task_ids="launch_cluster", key="cluster_name")
-    vllm_port = ti.xcom_pull(task_ids="launch_cluster", key="vllm_port") or 8081
-
-    if not head_ip:
-        head_ip = _get_cluster_head_ip(cluster_name)
-
-    if not head_ip:
-        raise RuntimeError(
-            f"Cannot determine head IP for cluster '{cluster_name}'. "
-            "Check sky.status() and ensure the cluster has an external IP."
-        )
-
-    endpoint = f"http://{head_ip}:{vllm_port}"
-    health_url = f"{endpoint}/health"
-    print(
-        f"Polling Ray+vLLM health: {health_url} "
-        f"(timeout={VLLM_HEALTH_TIMEOUT_SECONDS}s)"
-    )
-
-    interval = 20   # multi-node startup takes longer
-    elapsed = 0
-
-    while elapsed < VLLM_HEALTH_TIMEOUT_SECONDS:
-        try:
-            r = requests.get(health_url, timeout=5)
-            if r.status_code == 200:
-                print(f"Ray+vLLM endpoint healthy after {elapsed}s: {endpoint}")
-                ti.xcom_push(key="endpoint_url", value=endpoint)
-                return
-        except Exception:
-            pass
-        time.sleep(interval)
-        elapsed += interval
-        print(f"[{elapsed}s] Ray+vLLM not ready yet, retrying...")
-
-    raise RuntimeError(
-        f"Ray+vLLM endpoint '{health_url}' not healthy after "
-        f"{VLLM_HEALTH_TIMEOUT_SECONDS}s."
-    )
-
-
-def _register_endpoint(**context):
-    """Write the endpoint URL to S3 for the API and UI."""
-    import boto3  # type: ignore[import]
-
-    ti = context["ti"]
-    endpoint_url = ti.xcom_pull(task_ids="wait_for_endpoint", key="endpoint_url")
-    serve_run_id = ti.xcom_pull(task_ids="launch_cluster", key="serve_run_id")
-    cluster_name = ti.xcom_pull(task_ids="launch_cluster", key="cluster_name")
-    conf = context["dag_run"].conf or {}
-    model_id = conf.get("llm_model_id", "")
-
-    s3 = boto3.client(
-        "s3",
-        aws_access_key_id=os.getenv("AWS_ACCESS_KEY_ID") or None,
-        aws_secret_access_key=os.getenv("AWS_SECRET_ACCESS_KEY") or None,
-        region_name=os.getenv("AWS_DEFAULT_REGION", "us-east-1"),
-    )
-    key = f"runs/serving/{serve_run_id}/endpoint.json"
-    payload = json.dumps({
-        "endpoint_url": endpoint_url,
-        "model_id": model_id,
-        "serve_run_id": serve_run_id,
-        "cluster_name": cluster_name,
-        "orchestration": "ray_vllm_multinode",
-        "registered_at": datetime.utcnow().isoformat() + "Z",
-    }).encode()
-
-    s3.put_object(
-        Bucket=S3_BUCKET,
-        Key=key,
-        Body=payload,
-        ContentType="application/json",
-    )
-    print(f"Endpoint registered: {endpoint_url} → s3://{S3_BUCKET}/{key}")
+def _aws_env_from() -> list:
+    # Injects AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, RUNPOD_API_KEY,
+    # VASTAI_API_KEY, MLFLOW_TRACKING_URI from env-secret (.env).
+    return [k8s.V1EnvFromSource(secret_ref=k8s.V1SecretEnvSource(name="env-secret"))]
 
 
 # ─── DAG definition ───────────────────────────────────────────────────────────
@@ -272,7 +57,7 @@ def _register_endpoint(**context):
 with DAG(
     dag_id="ray_vllm_serving_pipeline",
     description=(
-        "Multi-node Ray+vLLM serving cluster (Kimi-K2 pattern). "
+        "Multi-node Ray+vLLM serving cluster — Kimi-K2 pattern (KubernetesPodOperator). "
         "On-demand only. Tensor + pipeline parallelism. "
         "Registers endpoint URL to S3 when healthy."
     ),
@@ -286,20 +71,82 @@ with DAG(
     tags=["mlops", "llm", "vllm", "ray", "multinode", "serving", "skypilot"],
 ) as dag:
 
-    launch_task = PythonOperator(
+    launch_task = KubernetesPodOperator(
         task_id="launch_cluster",
-        python_callable=_launch_cluster,
+        name="sky-launch-ray-vllm",
+        namespace=_AIRFLOW_NS,
+        image=_SKY_IMAGE,
+        image_pull_policy="IfNotPresent",
+        cmds=["python", "/app/sky_runner.py"],
+        arguments=["launch-ray-vllm"],
+        env_vars={
+            "SERVE_RUN_ID":               "{{ dag_run.conf['serve_run_id'] }}",
+            "HF_MODEL_ID":                "{{ dag_run.conf['llm_model_id'] }}",
+            "HF_TOKEN":                   "{{ dag_run.conf.get('hf_token', '') }}",
+            "LLM_ADAPTER_S3":             "{{ dag_run.conf.get('llm_adapter_s3', '') }}",
+            "VLLM_PORT":                  "{{ dag_run.conf.get('vllm_port', 8081) }}",
+            "MAX_MODEL_LEN":              "{{ dag_run.conf.get('max_model_len', 32768) }}",
+            "TENSOR_PARALLEL_SIZE":       "{{ dag_run.conf.get('tensor_parallel_size', 8) }}",
+            "PIPELINE_PARALLEL_SIZE":     "{{ dag_run.conf.get('pipeline_parallel_size', 2) }}",
+            "RESOURCE_CONSTRAINTS_JSON":  "{{ (dag_run.conf.get('resource_constraints') or {}) | tojson }}",
+        },
+        env_from=_aws_env_from(),
+        do_xcom_push=True,
+        get_logs=True,
+        is_delete_operator_pod=True,
+        resources=k8s.V1ResourceRequirements(
+            requests={"cpu": "250m", "memory": "512Mi"},
+            limits={"cpu": "500m", "memory": "1Gi"},
+        ),
     )
 
-    wait_task = PythonOperator(
+    wait_task = KubernetesPodOperator(
         task_id="wait_for_endpoint",
-        python_callable=_wait_for_endpoint,
+        name="sky-wait-ray-vllm",
+        namespace=_AIRFLOW_NS,
+        image=_SKY_IMAGE,
+        image_pull_policy="IfNotPresent",
+        cmds=["python", "/app/sky_runner.py"],
+        arguments=["wait-ray-vllm"],
+        env_vars={
+            "CLUSTER_INFO_JSON":           "{{ ti.xcom_pull(task_ids='launch_cluster', key='return_value') | tojson }}",
+            "VLLM_HEALTH_TIMEOUT_SECONDS": str(VLLM_HEALTH_TIMEOUT_SECONDS),
+        },
+        env_from=_aws_env_from(),
+        do_xcom_push=True,
+        get_logs=True,
+        is_delete_operator_pod=True,
         execution_timeout=timedelta(seconds=VLLM_HEALTH_TIMEOUT_SECONDS + 120),
+        resources=k8s.V1ResourceRequirements(
+            requests={"cpu": "100m", "memory": "256Mi"},
+            limits={"cpu": "250m", "memory": "512Mi"},
+        ),
     )
 
-    register_task = PythonOperator(
+    register_task = KubernetesPodOperator(
         task_id="register_endpoint",
-        python_callable=_register_endpoint,
+        name="sky-register-ray-vllm-endpoint",
+        namespace=_AIRFLOW_NS,
+        image=_SKY_IMAGE,
+        image_pull_policy="IfNotPresent",
+        cmds=["python", "/app/sky_runner.py"],
+        arguments=["register-endpoint"],
+        env_vars={
+            "ENDPOINT_URL":  "{{ ti.xcom_pull(task_ids='wait_for_endpoint', key='return_value') }}",
+            "SERVE_RUN_ID":  "{{ dag_run.conf['serve_run_id'] }}",
+            "HF_MODEL_ID":   "{{ dag_run.conf['llm_model_id'] }}",
+            # cluster_name extracted from launch task xcom for the payload
+            "CLUSTER_NAME":  "{{ (ti.xcom_pull(task_ids='launch_cluster', key='return_value') or {}).get('cluster_name', '') }}",
+            "ORCHESTRATION": "ray_vllm_multinode",
+            "S3_BUCKET":     S3_BUCKET,
+        },
+        env_from=_aws_env_from(),
+        get_logs=True,
+        is_delete_operator_pod=True,
+        resources=k8s.V1ResourceRequirements(
+            requests={"cpu": "100m", "memory": "128Mi"},
+            limits={"cpu": "200m", "memory": "256Mi"},
+        ),
     )
 
     launch_task >> wait_task >> register_task

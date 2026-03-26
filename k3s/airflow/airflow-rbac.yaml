@@ -34,6 +34,38 @@ roleRef:
   apiGroup: rbac.authorization.k8s.io
 
 ---
+# ── Airflow namespace — pod management for KubernetesPodOperator ──────────────
+# KubernetesPodOperator (used by sky-runner DAGs) needs to create, watch,
+# and delete pods in the airflow namespace from the scheduler service account.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: airflow-pod-runner-role
+  namespace: airflow
+rules:
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["create", "get", "list", "watch", "delete", "patch"]
+  - apiGroups: [""]
+    resources: ["pods/log"]
+    verbs: ["get", "list", "watch"]
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: airflow-pod-runner-rolebinding
+  namespace: airflow
+subjects:
+  - kind: ServiceAccount
+    name: my-airflow-scheduler
+    namespace: airflow
+roleRef:
+  kind: Role
+  name: airflow-pod-runner-role
+  apiGroup: rbac.authorization.k8s.io
+
+---
 # ── Ray namespace ─────────────────────────────────────────────────────────────
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role

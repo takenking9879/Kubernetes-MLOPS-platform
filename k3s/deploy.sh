@@ -9,7 +9,7 @@ set -euo pipefail
 ENABLE_REPO_DOWNLOAD=false
 ENABLE_KAFKA=false
 ENABLE_RAY=false
-ENABLE_MLFLOW=false
+ENABLE_MLFLOW=true
 ENABLE_SPARK=true
 ENABLE_APP=true
 ENABLE_MONITORING=true
@@ -67,6 +67,7 @@ kubectl create namespace ray || true
 kubectl create namespace spark || true
 kubectl create namespace monitoring || true
 kubectl create namespace apps || true
+kubectl create namespace airflow || true
 
 info "Creating secrets from .env"
 kubectl create secret generic kafka-secret -n kafka --from-env-file=.env || true
@@ -74,6 +75,7 @@ kubectl create secret generic env-secret -n ray --from-env-file=.env || true
 kubectl create secret generic env-secret -n spark --from-env-file=.env || true
 kubectl create secret generic env-secret -n monitoring --from-env-file=.env || true
 kubectl create secret generic env-secret -n apps --from-env-file=.env || true
+kubectl create secret generic env-secret -n airflow --from-env-file=.env || true
 ok "Namespaces and secrets ready"
 
 # ============================================================
@@ -279,10 +281,30 @@ deploy_monitoring() {
 deploy_airflow() {
   sep
   info "Deploying Airflow"
-  kubectl create namespace airflow || true
-  kubectl create secret generic env-secret -n airflow --from-env-file=.env || true
   helm upgrade --install my-airflow apache-airflow/airflow -n airflow -f k3s/airflow/airflow_values.yaml
   kubectl apply -f k3s/airflow/airflow-rbac.yaml
+
+  # ── SkyPilot runner pod prerequisites ─────────────────────────────────────
+  # sky-runner pods (KubernetesPodOperator) read ALL cloud credentials from
+  # env-secret (already created above from .env). No extra secrets needed.
+  #
+  # Required keys in .env:
+  #   AWS_ACCESS_KEY_ID        → boto3 reads natively (no file setup)
+  #   AWS_SECRET_ACCESS_KEY    → boto3 reads natively
+  #   AWS_DEFAULT_REGION       → e.g. us-east-1
+  #   RUNPOD_API_KEY           → entrypoint writes ~/.runpod/config.toml
+  #   VASTAI_API_KEY           → entrypoint writes ~/.config/vastai/vast_api_key
+  #   MLFLOW_TRACKING_URI      → injected into sky Task envs
+  #
+  # Build the image (once, from REPO ROOT) before deploying:
+  #   docker build -f k3s/sky/Dockerfile -t takenking9879/sky-runner:0.12.0 .
+  #   docker push takenking9879/sky-runner:0.12.0
+  #
+  # Optional: if you need custom SkyPilot behavior config (~/.sky/config.yaml):
+  #   kubectl create secret generic sky-config -n airflow \
+  #     --from-file=config.yaml=~/.sky/config.yaml
+  #   Then uncomment the sky-config volume/mount in sky-runner-pod.yaml and DAGs.
+
   ok "Airflow deployed"
 }
 

@@ -1,0 +1,10 @@
+# SkyPilot runner image dependencies
+# Build: docker build -f k3s/sky/Dockerfile -t takenking9879/sky-runner:0.12.0 .
+#        (run from repo root so COPY src/ and COPY k3s/sky/ resolve correctly)
+
+skypilot[aws,gcp,runpod,vast,cloudflare]==0.12.0
+boto3>=1.34.0
+runpod>=1.6.1
+vastai-sdk>=0.1.12
+requests>=2.31.0
+pyyaml>=6.0.0

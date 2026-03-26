@@ -1,4 +1,0 @@
-mlflow-skinny==3.7.0 #It just uses a few of the features of mlflow, so we can use the skinny version to save space
-apache-airflow-providers-cncf-kubernetes==10.12.4
-skypilot[aws,gcp,runpod,vast,cloudflare]==0.12.0
-

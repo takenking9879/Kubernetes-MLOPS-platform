@@ -1,0 +1,4 @@
+docker build -f k3s/sky/Dockerfile -t takenking9879/sky-runner:0.12.0 .
+
+
+

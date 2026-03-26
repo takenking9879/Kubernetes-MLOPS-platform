@@ -1,0 +1,95 @@
+# SkyPilot Runner — Kubernetes Pod Template
+#
+# Used as reference documentation and as a template by KubernetesPodOperator.
+# The actual command / env vars are injected by the operator at runtime.
+# See k3s/airflow/dags/training_dag_skypilot.py for usage.
+#
+# ── Credential flow (all from a single secret) ────────────────────────────────
+#
+# All cloud API keys live in env-secret (created from .env):
+#   kubectl create secret generic env-secret -n airflow --from-env-file=.env
+#
+# Required keys in .env:
+#   AWS_ACCESS_KEY_ID        — boto3 reads natively (no file setup needed)
+#   AWS_SECRET_ACCESS_KEY    — boto3 reads natively
+#   AWS_DEFAULT_REGION       — e.g. us-east-1
+#   RUNPOD_API_KEY           — docker-entrypoint.sh writes ~/.runpod/config.toml
+#   VASTAI_API_KEY           — docker-entrypoint.sh writes ~/.config/vastai/vast_api_key
+#   MLFLOW_TRACKING_URI      — injected into sky Task envs
+#
+# The entrypoint script (docker-entrypoint.sh) writes the provider config files
+# from env vars at container startup, before sky_runner.py is executed.
+#
+# No extra secrets or volume mounts are needed for cloud credentials.
+#
+# ── Optional: SkyPilot behavior config ────────────────────────────────────────
+#
+# If you need to customize SkyPilot itself (e.g. API server endpoint, spot
+# controller settings), create:
+#   kubectl create secret generic sky-config -n airflow \
+#     --from-file=config.yaml=~/.sky/config.yaml
+# Then uncomment the sky-config volume/mount sections below.
+#
+# Build the image first (from repo root):
+#   docker build -f k3s/sky/Dockerfile -t takenking9879/sky-runner:0.12.0 .
+#   docker push takenking9879/sky-runner:0.12.0
+
+apiVersion: v1
+kind: Pod
+metadata:
+  name: sky-runner
+  namespace: airflow
+  labels:
+    app: sky-runner
+    component: skypilot
+spec:
+  restartPolicy: Never
+  serviceAccountName: my-airflow-scheduler
+
+  containers:
+    - name: sky-runner
+      image: takenking9879/sky-runner:0.12.0
+      imagePullPolicy: IfNotPresent
+
+      # Command overridden by KubernetesPodOperator
+      command: ["python", "/app/sky_runner.py"]
+      args: ["--help"]
+
+      resources:
+        requests:
+          cpu: "250m"
+          memory: "512Mi"
+        limits:
+          cpu: "500m"
+          memory: "1Gi"
+
+      # All credentials from a single secret (env-secret from .env)
+      envFrom:
+        - secretRef:
+            name: env-secret
+
+      volumeMounts:
+        # XCom exchange with Airflow (emptyDir injected by KubernetesPodOperator)
+        - name: xcom
+          mountPath: /airflow/xcom
+
+        # ── Optional: SkyPilot behavior config ──────────────────────────────
+        # Uncomment if you need to customize ~/.sky/config.yaml
+        # - name: sky-config
+        #   mountPath: /root/.sky/config.yaml
+        #   subPath: config.yaml
+        #   readOnly: true
+
+  volumes:
+    # Injected automatically by KubernetesPodOperator when do_xcom_push=True
+    - name: xcom
+      emptyDir: {}
+
+    # ── Optional: SkyPilot behavior config ──────────────────────────────────
+    # Uncomment if sky-config secret exists
+    # - name: sky-config
+    #   secret:
+    #     secretName: sky-config
+    #     items:
+    #       - key: config.yaml
+    #         path: config.yaml

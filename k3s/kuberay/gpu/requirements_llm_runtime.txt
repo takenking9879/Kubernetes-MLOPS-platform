@@ -13,11 +13,11 @@ ray[data,train,tune,serve]==2.53.0
 # =========================
 # HuggingFace / LLM Training
 # =========================
-transformers==5.3.0
+transformers==4.57.6
 peft==0.18.1
 trl==0.29.1
 accelerate==1.13.0
-datasets[s3]==4.8.4
+datasets==4.8.4
 
 # =========================
 # Distributed Training
@@ -27,7 +27,7 @@ deepspeed==0.18.8
 # =========================
 # Experiment Tracking
 # =========================
-mlflow==3.7.0
+mlflow-skinny==3.7.0
 
 # =========================
 # Cloud / Config

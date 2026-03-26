@@ -51,4 +51,4 @@ https://github.com/skypilot-org/skypilot-catalog/tree/master/.github/workflows
 Para infinband:
 https://docs.skypilot.co/en/latest/examples/performance/index.html
 
-Añadir 
+Checar si se pueden optimizar las imagenes de ray para multi-node
