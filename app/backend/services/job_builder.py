@@ -81,11 +81,31 @@ _MLFLOW_URI = os.getenv("MLFLOW_TRACKING_URI", "")  # injected by Airflow pod en
 
 # Base YAML templates (paths relative to repo root, resolved at build time)
 _REPO_ROOT = Path(__file__).resolve().parent.parent.parent.parent
-_SKY_GPU_YAML = _REPO_ROOT / "k3s/sky/ray-gpu-training.yaml"
-_SKY_LLM_YAML = _REPO_ROOT / "k3s/sky/ray-llm-training.yaml"
-_SKY_MULTINODE_YAML = _REPO_ROOT / "k3s/sky/ray-gpu-multinode-aws.yaml"
-_SKY_VLLM_YAML = _REPO_ROOT / "k3s/sky/vllm-serving.yaml"
-_SKY_VLLM_MULTI_YAML = _REPO_ROOT / "k3s/sky/ray-vllm-multinode-serving.yaml"
+_SKY_DIR = _REPO_ROOT / "k3s/sky"
+
+# Tabular training — provider-specific (RunPod/Vast templates, AWS custom image)
+_SKY_GPU_RUNPOD_YAML = _SKY_DIR / "ray-gpu-training-runpod.yaml"
+_SKY_GPU_VAST_YAML   = _SKY_DIR / "ray-gpu-training-vast.yaml"
+_SKY_MULTINODE_YAML  = _SKY_DIR / "ray-gpu-multinode-aws.yaml"
+
+# LLM training — provider-specific
+_SKY_LLM_RUNPOD_YAML = _SKY_DIR / "ray-llm-training-runpod.yaml"
+_SKY_LLM_VAST_YAML   = _SKY_DIR / "ray-llm-training-vast.yaml"
+_SKY_LLM_AWS_YAML    = _SKY_DIR / "ray-llm-training-aws.yaml"
+
+# vLLM serving — single-node provider-specific, multi-node (AWS)
+_SKY_VLLM_RUNPOD_YAML = _SKY_DIR / "vllm-serving-runpod.yaml"
+_SKY_VLLM_VAST_YAML   = _SKY_DIR / "vllm-serving-vast.yaml"
+_SKY_VLLM_MULTI_YAML  = _SKY_DIR / "ray-vllm-multinode-serving.yaml"
+
+
+def _provider_from_any_of(any_of: list[dict]) -> str:
+    """Derive the primary provider name from the first any_of entry."""
+    if not any_of:
+        return "runpod"
+    cloud = str(any_of[0].get("cloud", "runpod")).lower()
+    # SkyPilot uses "runpod", "vast", "aws" as cloud names
+    return cloud
 
 
 class JobBuilder:
@@ -105,13 +125,19 @@ class JobBuilder:
 
         is_llm = config.model_type == "llm"
         is_multinode = config.num_nodes > 1 and not is_llm
+        provider = _provider_from_any_of(config.any_of)
 
-        if is_llm:
-            base_yaml_path = _SKY_LLM_YAML
-        elif is_multinode:
+        if is_multinode:
             base_yaml_path = _SKY_MULTINODE_YAML
+        elif is_llm:
+            if provider == "vast":
+                base_yaml_path = _SKY_LLM_VAST_YAML
+            elif provider == "aws":
+                base_yaml_path = _SKY_LLM_AWS_YAML
+            else:
+                base_yaml_path = _SKY_LLM_RUNPOD_YAML
         else:
-            base_yaml_path = _SKY_GPU_YAML
+            base_yaml_path = _SKY_GPU_VAST_YAML if provider == "vast" else _SKY_GPU_RUNPOD_YAML
 
         sky_conf = self._load_base_yaml(base_yaml_path)
 
@@ -183,7 +209,11 @@ class JobBuilder:
         if not config.serve_run_id:
             config.serve_run_id = f"serve-{uuid.uuid4().hex[:8]}"
 
-        base_yaml_path = _SKY_VLLM_MULTI_YAML if multinode else _SKY_VLLM_YAML
+        if multinode:
+            base_yaml_path = _SKY_VLLM_MULTI_YAML
+        else:
+            provider = _provider_from_any_of(config.any_of)
+            base_yaml_path = _SKY_VLLM_VAST_YAML if provider == "vast" else _SKY_VLLM_RUNPOD_YAML
         sky_conf = self._load_base_yaml(base_yaml_path)
 
         if config.any_of:
@@ -227,21 +257,30 @@ class JobBuilder:
     def yaml_preview(self, config: TrainingJobConfig | ServingJobConfig) -> str:
         """Return the generated YAML as a string (for UI preview)."""
         is_serving = isinstance(config, ServingJobConfig)
-        multinode = (not is_serving) and isinstance(config, TrainingJobConfig) and config.num_nodes > 1
+        any_of = config.any_of if hasattr(config, "any_of") else []
+        provider = _provider_from_any_of(any_of)
 
         if is_serving:
             assert isinstance(config, ServingJobConfig)
-            multi = config.num_nodes > 1
-            base = _SKY_VLLM_MULTI_YAML if multi else _SKY_VLLM_YAML
-        elif isinstance(config, TrainingJobConfig) and config.model_type == "llm":
-            base = _SKY_LLM_YAML
-        elif multinode:
+            if config.num_nodes > 1:
+                base = _SKY_VLLM_MULTI_YAML
+            elif provider == "vast":
+                base = _SKY_VLLM_VAST_YAML
+            else:
+                base = _SKY_VLLM_RUNPOD_YAML
+        elif isinstance(config, TrainingJobConfig) and config.num_nodes > 1:
             base = _SKY_MULTINODE_YAML
+        elif isinstance(config, TrainingJobConfig) and config.model_type == "llm":
+            if provider == "vast":
+                base = _SKY_LLM_VAST_YAML
+            elif provider == "aws":
+                base = _SKY_LLM_AWS_YAML
+            else:
+                base = _SKY_LLM_RUNPOD_YAML
         else:
-            base = _SKY_GPU_YAML
+            base = _SKY_GPU_VAST_YAML if provider == "vast" else _SKY_GPU_RUNPOD_YAML
 
         sky_conf = self._load_base_yaml(base)
-        any_of = config.any_of if hasattr(config, "any_of") else []
         if any_of:
             sky_conf.setdefault("resources", {})["any_of"] = any_of
         return _yaml.dump(sky_conf, default_flow_style=False, allow_unicode=True)

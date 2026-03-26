@@ -1,0 +1,29 @@
+FROM rayproject/ray:2.53.0-py311
+
+USER root
+
+# ----------------------------
+# System dependencies and uv
+# ----------------------------
+RUN apt-get update -qq \
+ && apt-get install -y --no-install-recommends \
+    curl \
+    wget \
+    ca-certificates \
+    git \
+    build-essential \
+ && pip install --no-cache-dir uv \
+ && rm -rf /var/lib/apt/lists/* /tmp/*
+
+# ----------------------------
+# Install Python packages
+# (torch via cu128 wheel — brings its own CUDA, no system CUDA needed)
+# ----------------------------
+COPY requirements_llm.txt /tmp/requirements.txt
+RUN uv pip install --system --no-cache \
+    --index-strategy unsafe-best-match \
+    -r /tmp/requirements.txt \
+ && rm -rf /tmp/* && pip install --no-cache-dir torch==2.10.0 --index-url https://download.pytorch.org/whl/cu128
+
+
+USER ray

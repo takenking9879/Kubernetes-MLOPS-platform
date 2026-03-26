@@ -1,0 +1,36 @@
+# =========================
+# Runtime deps for LLM training on provider-native templates
+# (RunPod / Vast.ai — torch is PRE-INSTALLED in provider base image, DO NOT add torch here)
+# Used by: ray-llm-training-runpod.yaml, ray-llm-training-vast.yaml
+
+# =========================
+# Ray (full training + serving stack)
+# =========================
+packaging==25.0
+ray[data,train,tune,serve]==2.53.0
+
+
+# =========================
+# HuggingFace / LLM Training
+# =========================
+transformers==5.3.0
+peft==0.18.1
+trl==0.29.1
+accelerate==1.13.0
+datasets[s3]==4.8.4
+
+# =========================
+# Distributed Training
+# =========================
+deepspeed==0.18.8
+
+# =========================
+# Experiment Tracking
+# =========================
+mlflow==3.7.0
+
+# =========================
+# Cloud / Config
+# =========================
+boto3==1.42.28
+prometheus-client==0.24.1

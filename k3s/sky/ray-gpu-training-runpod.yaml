@@ -1,17 +1,13 @@
-# k3s/sky/ray-gpu-training.yaml
-#
-# DEPRECATED — superseded by provider-specific variants:
-#   RunPod: ray-gpu-training-runpod.yaml
-#   Vast.ai: ray-gpu-training-vast.yaml
+# k3s/sky/ray-gpu-training-runpod.yaml
 #
 # Single-node GPU training on RunPod via SkyPilot.
-# Ray + all ML libs are pre-installed in the Docker image (no pip at runtime).
+# Provider template: runpod/pytorch (torch pre-installed — NOT reinstalled at runtime).
+# Ray + tabular ML libs installed at runtime from requirements_tabular_runtime.txt.
 #
-# Spot-first ordering: RTX2000-Ada spot → RTX4090 spot → A40 spot → on-demand fallbacks.
-# Check current availability: `sky show-gpus --cloud runpod`
+# Spot-first ordering. Check current availability: `sky show-gpus --cloud runpod`
 #
 # Usage (manual test, from repo root):
-#   sky launch k3s/sky/ray-gpu-training.yaml \
+#   sky launch k3s/sky/ray-gpu-training-runpod.yaml \
 #     --name rtx2000-test \
 #     --env TRAIN_RUN_ID=train-test-001 \
 #     --env MODEL_TYPE=pytorch \
@@ -20,18 +16,16 @@
 #     --env AWS_SECRET_ACCESS_KEY=$(aws configure get aws_secret_access_key) \
 #     --yes
 #
-# Triggered automatically by training_dag_skypilot.py (sky.jobs.launch) when model_type == "pytorch".
+# Triggered automatically by training_dag_skypilot.py (sky.jobs.launch) when provider=runpod.
 
-name: ray-gpu-training
+name: ray-gpu-training-runpod
 
 # Single-node: head + GPU worker on the same VM.
-# The Ray head gets all GPUs (--num-gpus=SKYPILOT_NUM_GPUS_PER_NODE) so
-# training tasks can schedule on the GPU from the head node directly.
 num_nodes: 1
 
 resources:
-  # Image: k3s/kuberay/gpu/Dockerfile.e1
-  # Contains: Ray 2.53.0, PyTorch 2.10 (cu128), XGBoost, MLflow, boto3 via uv
+  # RunPod PyTorch template — torch 2.8.0 (cu12.8.1) pre-installed.
+  # DO NOT reinstall torch/CUDA at runtime.
   image_id: runpod/pytorch:1.0.2-cu1281-torch280-ubuntu2404
   any_of:
     - infra: runpod/CA/CA-MTL-1
@@ -66,11 +60,11 @@ envs:
   AWS_S3_ENDPOINT_URL: ""
 
   # ── GPU metrics (optional Grafana Cloud remote_write) ──
-  GPU_PRICE_PER_HOUR: "0"   # injected by Airflow for cost tracking
-  SKY_CLUSTER_NAME: ""      # injected by Airflow (cluster name for metric labels)
-  GRAFANA_REMOTE_WRITE_URL: ""    # Grafana Cloud remote_write URL (leave empty to skip)
-  GRAFANA_INSTANCE_ID: ""         # Grafana Cloud instance ID
-  GRAFANA_API_KEY: ""             # Grafana Cloud API key
+  GPU_PRICE_PER_HOUR: "0"
+  SKY_CLUSTER_NAME: ""
+  GRAFANA_REMOTE_WRITE_URL: ""
+  GRAFANA_INSTANCE_ID: ""
+  GRAFANA_API_KEY: ""
 
   # ── Ray training parameters ──
   NUM_WORKERS: "1"
@@ -90,18 +84,6 @@ envs:
   RAY_DEFAULT_OBJECT_STORE_MEMORY_PROPORTION: "0.7"
   RAY_ACCEL_ENV_VAR_OVERRIDE_ON_ZERO: "0"
 
-# ── Dev/debug warm-cluster cache (MOUNT_CACHED) ──────────────────────────────
-# Uncomment for repeated `sky exec` development runs to avoid re-downloading
-# checkpoints from S3 on every launch.
-# DO NOT enable for production managed jobs (sky.jobs.launch) — ephemeral
-# clusters use Ray Train's storage_path=S3 for checkpoint recovery instead.
-#
-# file_mounts:
-#   /tmp/ray_checkpoints:
-#     source: s3://k8s-mlops-platform-bucket/sky-cache/${TRAIN_RUN_ID}/checkpoints
-#     mode: MOUNT_CACHED
-# ─────────────────────────────────────────────────────────────────────────────
-
 setup: |
   set -euo pipefail
 
@@ -113,7 +95,6 @@ setup: |
     SUDO="sudo"
   fi
 
-  # Match the expected Ray image layout (user + home + temp dirs).
   if ! id -u ray >/dev/null 2>&1; then
     ${SUDO} useradd -m -s /bin/bash -d /home/ray ray
   fi
@@ -134,22 +115,16 @@ setup: |
     git -C /home/ray/app/repo pull --ff-only origin main
   fi
 
-  REQ_FILE="/home/ray/app/repo/k3s/kuberay/gpu/requirements_e1.txt"
+  REQ_FILE="/home/ray/app/repo/k3s/kuberay/gpu/requirements_tabular_runtime.txt"
   [ -f "${REQ_FILE}" ] || { echo "ERROR: requirements file not found: ${REQ_FILE}"; exit 1; }
-  cp "${REQ_FILE}" /tmp/requirements_e1.txt
 
-  # Install uv only if missing, then install repo requirements with uv.
   if ! command -v uv >/dev/null 2>&1; then
     ${SUDO} python3 -m pip install --no-cache-dir uv
   fi
-  ${SUDO} uv pip install --system --no-cache \
-    -r /tmp/requirements_e1.txt
+  ${SUDO} uv pip install --system --no-cache -r "${REQ_FILE}"
 
-  echo "Setup complete. Repo and requirements ready for Ray training."
+  echo "Setup complete."
 
-  # ── GPU metrics exporter deps ──────────────────────────────────────────────
-  # prometheus_client is already in requirements_e1.txt; install grafana-agent
-  # binary only if Grafana Cloud remote_write is configured.
   if [ -n "${GRAFANA_REMOTE_WRITE_URL:-}" ]; then
     AGENT_BIN=/usr/local/bin/grafana-agent
     if [ ! -f "${AGENT_BIN}" ]; then
@@ -166,22 +141,15 @@ run: |
   set -e
   export PYTHONPATH=/home/ray/app/repo:/home/ray/app/repo/src
 
-  # ── GPU metrics exporter (prometheus_client → :9400) ──────────────────────
-  # Script lives in the repo so there's no heredoc inside the YAML block.
   python3 /home/ray/app/repo/k3s/sky/gpu_exporter.py &
-  echo "[setup] GPU exporter started (PID=$!)"
+  echo "[run] GPU exporter started (PID=$!)"
 
-  # Optional: Grafana Agent remote_write to Grafana Cloud.
-  # Set GRAFANA_REMOTE_WRITE_URL (+ GRAFANA_INSTANCE_ID / GRAFANA_API_KEY)
-  # and install grafana-agent in setup to enable.
   if [ -n "${GRAFANA_REMOTE_WRITE_URL:-}" ] && command -v grafana-agent >/dev/null 2>&1; then
     python3 /home/ray/app/repo/k3s/sky/write_grafana_config.py
     grafana-agent --config.file=/tmp/grafana-agent-config.yaml &
-    echo "[setup] Grafana Agent started → ${GRAFANA_REMOTE_WRITE_URL}"
+    echo "[run] Grafana Agent started → ${GRAFANA_REMOTE_WRITE_URL}"
   fi
 
-  # Start Ray head on port 6379 (SkyPilot uses 6380 internally).
-  # Never use ray.init(address="auto") in training code.
   RAY_START_CMD="ray start --head \
     --port=6379 \
     --dashboard-port=8265 \
@@ -195,7 +163,6 @@ run: |
 
   eval "${RAY_START_CMD}"
 
-  # Wait for Ray head to be healthy (up to 60 s)
   for i in $(seq 1 60); do
     ray health-check --address=127.0.0.1:6379 &>/dev/null && break
     echo "Waiting for Ray head ($i/60)"

@@ -39,11 +39,11 @@ _LLM_TRAINING_DAG = "llm_training_pipeline"
 _VLLM_SERVING_DAG = "vllm_serving_pipeline"
 _RAY_VLLM_SERVING_DAG = "ray_vllm_serving_pipeline"
 
-# ── SkyPilot YAML templates ───────────────────────────────────────────────────
+# ── SkyPilot YAML templates (display labels — actual file chosen by provider) ─
 
-_SKY_YAML_GPU = "k3s/sky/ray-gpu-training.yaml"
-_SKY_YAML_LLM = "k3s/sky/ray-llm-training.yaml"
-_SKY_YAML_VLLM_SINGLE = "k3s/sky/vllm-serving.yaml"
+_SKY_YAML_GPU = "k3s/sky/ray-gpu-training-{runpod|vast}.yaml"
+_SKY_YAML_LLM = "k3s/sky/ray-llm-training-{runpod|vast|aws}.yaml"
+_SKY_YAML_VLLM_SINGLE = "k3s/sky/vllm-serving-{runpod|vast}.yaml"
 _SKY_YAML_VLLM_MULTI = "k3s/sky/ray-vllm-multinode-serving.yaml"
 
 

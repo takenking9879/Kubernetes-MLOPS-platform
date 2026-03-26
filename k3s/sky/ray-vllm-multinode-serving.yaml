@@ -25,6 +25,8 @@ name: ray-vllm-multinode-serving
 num_nodes: 2   # overridden by JobBuilder from serving config
 
 resources:
+  # Custom image — all deps baked in (torch 2.10.0 cu128, ray 2.53.0, vllm 0.18.0).
+  image_id: docker:takenking9879/ray-llm:2.53.0
   any_of:
     # Prefer NVLink-capable nodes for multi-GPU tensor parallelism
     - cloud: runpod
@@ -76,24 +78,15 @@ setup: |
 
   nvidia-smi || { echo "ERROR: nvidia-smi failed — GPU not attached"; exit 1; }
 
-  if [ "$(id -u)" -eq 0 ]; then SUDO=""; else SUDO="sudo"; fi
-
-  if ! command -v uv >/dev/null 2>&1; then
-    ${SUDO} python3 -m pip install --no-cache-dir uv
-  fi
-
-  # vLLM with Ray for multi-node serving
-  ${SUDO} uv pip install --system --no-cache \
-    vllm==0.6.4 \
-    ray[default]==2.40.0
+  # All Python deps are baked into the image (ray-llm:2.53.0 — vllm 0.18.0, ray 2.53.0).
+  # No pip install needed.
 
   # Optional LoRA adapter download
   if [ -n "${LLM_ADAPTER_S3:-}" ]; then
-    ${SUDO} uv pip install --system --no-cache boto3
     aws s3 sync "${LLM_ADAPTER_S3}" /tmp/lora_adapter/ --quiet || true
   fi
 
-  echo "Setup complete — Ray+vLLM multi-node ready."
+  echo "Setup complete — Ray+vLLM multi-node ready (image pre-baked)."
 
 run: |
   set -e

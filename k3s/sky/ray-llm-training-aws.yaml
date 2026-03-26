@@ -1,0 +1,103 @@
+# k3s/sky/ray-llm-training-aws.yaml
+#
+# LLM fine-tuning on AWS p4d.24xlarge via SkyPilot managed jobs.
+# Uses custom Docker image (takenking9879/ray-llm:2.53.0) — all deps baked in.
+# No runtime pip install (image contains: torch, ray, transformers, peft, trl, deepspeed, vllm).
+#
+# p4d.24xlarge: 8×A100-40GB, 400 Gbps EFA networking — for large models or multi-GPU LoRA.
+#
+# Usage:
+#   sky jobs launch k3s/sky/ray-llm-training-aws.yaml \
+#     --name llm-aws \
+#     --env LLM_TRAIN_RUN_ID=llm-aws-001 \
+#     --env LLM_MODEL_ID=meta-llama/Llama-3.1-8B \
+#     --env TRAIN_DATASET_S3=s3://k8s-mlops-platform-bucket/llm-data/train.jsonl \
+#     --yes
+#
+# Triggered by llm_training_dag.py when provider=aws.
+
+name: ray-llm-training-aws
+
+num_nodes: 1
+
+resources:
+  # Custom image — all deps baked in (torch 2.10.0 cu128, ray 2.53.0, HF stack, vllm 0.18.0).
+  image_id: docker:takenking9879/ray-llm:2.53.0
+  any_of:
+    - cloud: aws
+      instance_type: p4d.24xlarge
+      use_spot: true
+    - cloud: aws
+      instance_type: p4d.24xlarge
+      use_spot: false
+  disk_size: 200
+
+envs:
+  # ── Per-run parameters ──
+  LLM_TRAIN_RUN_ID: ""
+  LLM_MODEL_ID: "meta-llama/Llama-3.1-8B"
+  HF_TOKEN: ""
+  TRAIN_DATASET_S3: ""      # s3://bucket/path/train.jsonl
+
+  # ── Training control ──
+  MAX_SEQ_LEN: "2048"
+  MAX_STEPS: "500"
+  SAVE_STEPS: "100"
+  PER_DEVICE_BATCH_SIZE: "1"
+  GRADIENT_ACCUM_STEPS: "4"
+  LEARNING_RATE: "2e-4"
+
+  # ── LoRA ──
+  LORA_ENABLED: "true"
+  LORA_RANK: "8"
+
+  # ── DeepSpeed ──
+  USE_DEEPSPEED: "true"
+  DEEPSPEED_STAGE: "3"
+
+  # ── Spot recovery ──
+  USE_SPOT: "true"
+
+  # ── Infrastructure ──
+  MLFLOW_TRACKING_URI: ""         # injected by Airflow DAG via task.update_envs()
+  AWS_ACCESS_KEY_ID: ""
+  AWS_SECRET_ACCESS_KEY: ""
+  AWS_DEFAULT_REGION: "us-east-1"
+  S3_BUCKET: "k8s-mlops-platform-bucket"
+  GPU_PRICE_PER_HOUR: "0"
+
+  # ── GPU metrics ──
+  SKY_CLUSTER_NAME: ""
+  GRAFANA_REMOTE_WRITE_URL: ""
+  GRAFANA_INSTANCE_ID: ""
+  GRAFANA_API_KEY: ""
+
+setup: |
+  set -euo pipefail
+
+  nvidia-smi || { echo "ERROR: nvidia-smi failed — GPU not attached"; exit 1; }
+
+  # All Python deps are baked into the image. Only clone repo.
+  if [ ! -d /home/ray/app/repo/.git ]; then
+    git clone --depth=1 --branch main \
+      https://github.com/takenking9879/Kubernetes-MLOPS-platform.git \
+      /home/ray/app/repo
+  else
+    git -C /home/ray/app/repo pull --ff-only origin main
+  fi
+
+  echo "Setup complete — image deps pre-baked."
+
+run: |
+  set -e
+  export PYTHONPATH=/home/ray/app/repo:/home/ray/app/repo/src
+
+  python3 /home/ray/app/repo/k3s/sky/gpu_exporter.py &
+  echo "[run] GPU exporter started (PID=$!)"
+
+  if [ -n "${GRAFANA_REMOTE_WRITE_URL:-}" ] && command -v grafana-agent >/dev/null 2>&1; then
+    python3 /home/ray/app/repo/k3s/sky/write_grafana_config.py
+    grafana-agent --config.file=/tmp/grafana-agent-config.yaml &
+  fi
+
+  python3 /home/ray/app/repo/k3s/kuberay/llm_main.py

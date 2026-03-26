@@ -43,10 +43,18 @@ from airflow.providers.standard.operators.python import PythonOperator
 
 # ─── Constants ────────────────────────────────────────────────────────────────
 
-SKY_YAML_VLLM = Path(
+# Provider-specific vLLM serving YAMLs (each uses its own cached base template).
+# Multi-node vLLM uses ray-vllm-multinode-serving.yaml (separate DAG).
+SKY_YAML_VLLM_RUNPOD = Path(
     os.getenv(
-        "SKY_VLLM_YAML",
-        "/opt/airflow/dags/repo/k3s/sky/vllm-serving.yaml",
+        "SKY_VLLM_RUNPOD_YAML",
+        "/opt/airflow/dags/repo/k3s/sky/vllm-serving-runpod.yaml",
+    )
+)
+SKY_YAML_VLLM_VAST = Path(
+    os.getenv(
+        "SKY_VLLM_VAST_YAML",
+        "/opt/airflow/dags/repo/k3s/sky/vllm-serving-vast.yaml",
     )
 )
 VLLM_HEALTH_TIMEOUT_SECONDS = int(os.getenv("VLLM_HEALTH_TIMEOUT_SECONDS", "600"))
@@ -57,6 +65,15 @@ _PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent.parent  # repo roo
 
 
 # ─── Helpers ──────────────────────────────────────────────────────────────────
+
+
+def _vllm_yaml(resource_constraints_conf: dict | None) -> str:
+    """Return the correct single-node vLLM serving YAML path based on provider."""
+    providers = (resource_constraints_conf or {}).get("providers") or []
+    p = str(providers[0]).lower() if providers else "runpod"
+    if p == "vast":
+        return str(SKY_YAML_VLLM_VAST)
+    return str(SKY_YAML_VLLM_RUNPOD)
 
 
 def _get_cluster_head_ip(cluster_name: str) -> str | None:
@@ -154,10 +171,14 @@ def _launch_vllm_cluster(**context):
     # Cluster name: short, RFC-1123 safe
     cluster_name = k8s_name(serve_run_id, "vllm", max_len=32)
 
+    resource_constraints_conf = conf.get("resource_constraints")
+    yaml_path = _vllm_yaml(resource_constraints_conf)
+    print(f"Using vLLM SkyPilot YAML: {yaml_path}")
+
     task = _load_vllm_task(
-        str(SKY_YAML_VLLM),
+        yaml_path,
         serve_run_id,
-        conf.get("resource_constraints"),
+        resource_constraints_conf,
     )
 
     task.update_envs({

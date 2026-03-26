@@ -438,6 +438,8 @@ async def launch_job(body: LaunchRequest) -> LaunchResponse:
                     model_architecture_s3=body.model.architecture_s3,
                 )
             )
+            if body.resource_constraints:
+                dag_conf["resource_constraints"] = body.resource_constraints.model_dump()
             train_dag_id = "llm_training_pipeline"
         else:
             # Tabular: generate params_training.yaml → include train_params_s3_path in dag_conf
@@ -504,6 +506,8 @@ async def launch_job(body: LaunchRequest) -> LaunchResponse:
             any_of=any_of,
         )
         _, serve_dag_conf = _builder.build_serving_job(s_cfg, multinode=multinode)
+        if body.resource_constraints:
+            serve_dag_conf["resource_constraints"] = body.resource_constraints.model_dump()
         serve_dag_id = rec.dag_id
         job_ids["serving"] = _trigger_dag(serve_dag_id, serve_dag_conf)
 

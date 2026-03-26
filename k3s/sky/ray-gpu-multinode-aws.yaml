@@ -29,6 +29,8 @@ name: ray-gpu-multinode
 num_nodes: 2
 
 resources:
+  # Custom image — all deps baked in (torch 2.10.0 cu128, ray 2.53.0, deepspeed 0.18.8, xgboost).
+  image_id: docker:takenking9879/ray-train:2.53.0
   any_of:
     # Spot-first — EFA-capable (InfiniBand equivalent on AWS)
     - cloud: aws
@@ -100,19 +102,15 @@ setup: |
 
   nvidia-smi || { echo "ERROR: nvidia-smi failed — GPU not attached"; exit 1; }
 
-  # Clone repo on every node
-  mkdir -p /home/ubuntu/app
-  if [ ! -d /home/ubuntu/app/repo ]; then
+  # All Python deps are baked into the image (ray-train:2.53.0).
+  # Only clone repo on every node — no pip install needed.
+  mkdir -p /home/ray/app
+  if [ ! -d /home/ray/app/repo ]; then
     git clone --depth=1 --branch main \
       https://github.com/takenking9879/Kubernetes-MLOPS-platform.git \
-      /home/ubuntu/app/repo
+      /home/ray/app/repo
   fi
-  echo "Repo ready: $(ls /home/ubuntu/app/repo/k3s/kuberay/)"
-
-  # Install Ray + DeepSpeed (fast path: skip if already present)
-  python3 -c "import ray" 2>/dev/null || pip install ray[train,tune,data]==2.53.0
-  python3 -c "import deepspeed" 2>/dev/null || pip install deepspeed==0.15.4
-  python3 -c "import prometheus_client" 2>/dev/null || pip install prometheus-client==0.24.1
+  echo "Repo ready: $(ls /home/ray/app/repo/k3s/kuberay/)"
 
   # Optional: Grafana Agent binary for remote_write to Grafana Cloud
   if [ -n "${GRAFANA_REMOTE_WRITE_URL:-}" ]; then
@@ -129,7 +127,7 @@ setup: |
 
 run: |
   set -e
-  export PYTHONPATH=/home/ubuntu/app/repo:/home/ubuntu/app/repo/src
+  export PYTHONPATH=/home/ray/app/repo:/home/ray/app/repo/src
 
   HEAD_IP=$(echo "${SKYPILOT_NODE_IPS}" | head -n1)
   NUM_GPUS=${SKYPILOT_NUM_GPUS_PER_NODE:-8}
@@ -146,17 +144,17 @@ run: |
       --disable-usage-stats
 
     # Wait for all worker nodes to register their GPUs
-    python3 /home/ubuntu/app/repo/k3s/sky/wait_for_workers.py
+    python3 /home/ray/app/repo/k3s/sky/wait_for_workers.py
 
     # GPU metrics exporter (head node — all GPU labels include cluster/is_spot)
-    python3 /home/ubuntu/app/repo/k3s/sky/gpu_exporter.py &
+    python3 /home/ray/app/repo/k3s/sky/gpu_exporter.py &
     echo "[setup] GPU exporter started (PID=$!)"
     if [ -n "${GRAFANA_REMOTE_WRITE_URL:-}" ] && command -v grafana-agent >/dev/null 2>&1; then
-      python3 /home/ubuntu/app/repo/k3s/sky/write_grafana_config.py
+      python3 /home/ray/app/repo/k3s/sky/write_grafana_config.py
       grafana-agent --config.file=/tmp/grafana-agent-config.yaml &
     fi
 
-    python3 /home/ubuntu/app/repo/k3s/kuberay/main.py
+    python3 /home/ray/app/repo/k3s/kuberay/main.py
 
   else
     # ── Worker nodes: join the Ray cluster ──

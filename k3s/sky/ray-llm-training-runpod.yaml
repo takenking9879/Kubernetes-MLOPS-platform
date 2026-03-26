@@ -1,37 +1,31 @@
-# k3s/sky/ray-llm-training.yaml
+# k3s/sky/ray-llm-training-runpod.yaml
 #
-# DEPRECATED — superseded by provider-specific variants:
-#   RunPod: ray-llm-training-runpod.yaml
-#   Vast.ai: ray-llm-training-vast.yaml
-#   AWS:     ray-llm-training-aws.yaml
+# LLM fine-tuning on RunPod via SkyPilot managed jobs.
+# Provider template: runpod/pytorch (torch pre-installed — NOT reinstalled at runtime).
+# HuggingFace TRL + PEFT LoRA + DeepSpeed ZeRO-3 installed at runtime.
 #
-# LLM fine-tuning on spot-first GPUs via SkyPilot managed jobs.
-# Uses HuggingFace TRL SFTTrainer + PEFT LoRA + DeepSpeed ZeRO stage 3.
+# Spot-first: RunPod A100-80GB ideal for 8B models with LoRA.
+# Checkpoints synced to S3 every SAVE_STEPS for spot recovery.
 #
-# Spot-first: RunPod A100-80GB spot → RunPod A100x2 NVLink spot →
-#             AWS p4d.24xlarge spot → Vast.ai A100-80GB spot →
-#             on-demand fallbacks.
-#
-# ZeRO stage 3 is ON by default (DEEPSPEED_STAGE=3).
-# LoRA is ON by default (LORA_ENABLED=true).
-# Checkpoints synced to S3 every SAVE_STEPS (default 100) for spot recovery.
-#
-# Test with an ungated model first (no HF token required):
-#   sky jobs launch k3s/sky/ray-llm-training.yaml \
-#     --name qwen-test \
+# Usage:
+#   sky jobs launch k3s/sky/ray-llm-training-runpod.yaml \
+#     --name qwen-runpod \
 #     --env LLM_TRAIN_RUN_ID=llm-test-001 \
 #     --env LLM_MODEL_ID=Qwen/Qwen2.5-7B \
 #     --env TRAIN_DATASET_S3=s3://k8s-mlops-platform-bucket/llm-data/train.jsonl \
 #     --env MAX_STEPS=50 \
 #     --yes
 #
-# Triggered by llm_training_dag.py (sky.jobs.launch) when dag_run.conf has llm_model_id.
+# Triggered by llm_training_dag.py when provider=runpod.
 
-name: ray-llm-training
+name: ray-llm-training-runpod
 
 num_nodes: 1
 
 resources:
+  # RunPod PyTorch template — torch 2.8.0 (cu12.8.1) pre-installed.
+  # DO NOT reinstall torch/CUDA at runtime.
+  image_id: runpod/pytorch:1.0.2-cu1281-torch280-ubuntu2404
   any_of:
     # Spot-first — A100-80GB: ideal VRAM for 8B models with LoRA
     - cloud: runpod
@@ -41,20 +35,9 @@ resources:
     - cloud: runpod
       accelerators: A100:2
       use_spot: true
-    # AWS p4d.24xlarge: 8×A100-40GB, 400 Gbps EFA
-    - cloud: aws
-      instance_type: p4d.24xlarge
-      use_spot: true
-    # Vast.ai spot fallback
-    - cloud: vast
-      accelerators: A100-80GB:1
-      use_spot: true
-    # On-demand fallbacks
+    # On-demand fallback
     - cloud: runpod
       accelerators: A100-80GB:1
-      use_spot: false
-    - cloud: aws
-      instance_type: p4d.24xlarge
       use_spot: false
   disk_size: 200
 
@@ -68,7 +51,7 @@ envs:
   # ── Training control ──
   MAX_SEQ_LEN: "2048"
   MAX_STEPS: "500"
-  SAVE_STEPS: "100"          # sync checkpoint to S3 every N steps
+  SAVE_STEPS: "100"
   PER_DEVICE_BATCH_SIZE: "1"
   GRADIENT_ACCUM_STEPS: "4"
   LEARNING_RATE: "2e-4"
@@ -90,10 +73,10 @@ envs:
   AWS_SECRET_ACCESS_KEY: ""
   AWS_DEFAULT_REGION: "us-east-1"
   S3_BUCKET: "k8s-mlops-platform-bucket"
-  GPU_PRICE_PER_HOUR: "0"    # injected by Airflow for cost tracking
+  GPU_PRICE_PER_HOUR: "0"
 
-  # ── GPU metrics (optional Grafana Cloud remote_write) ──
-  SKY_CLUSTER_NAME: ""       # injected by Airflow (cluster name for metric labels)
+  # ── GPU metrics ──
+  SKY_CLUSTER_NAME: ""
   GRAFANA_REMOTE_WRITE_URL: ""
   GRAFANA_INSTANCE_ID: ""
   GRAFANA_API_KEY: ""
@@ -105,31 +88,17 @@ setup: |
 
   if [ "$(id -u)" -eq 0 ]; then SUDO=""; else SUDO="sudo"; fi
 
-  # Install git if missing
   if ! command -v git >/dev/null 2>&1; then
     ${SUDO} apt-get update -qq
     ${SUDO} apt-get install -y --no-install-recommends git
     ${SUDO} rm -rf /var/lib/apt/lists/*
   fi
 
-  # Install uv if missing
   if ! command -v uv >/dev/null 2>&1; then
     ${SUDO} python3 -m pip install --no-cache-dir uv
   fi
 
-  # Install HuggingFace LLM stack (torch expected from base image or pre-installed)
-  ${SUDO} uv pip install --system --no-cache \
-    torch==2.5.1 \
-    transformers==4.46.0 \
-    peft==0.13.2 \
-    "datasets[s3]==3.1.0" \
-    trl==0.12.2 \
-    deepspeed==0.15.4 \
-    accelerate==1.2.1 \
-    boto3==1.42.28 \
-    mlflow==3.7.0
-
-  # Clone repo
+  # Clone repo (requirements_llm_runtime.txt lives here)
   if [ ! -d /home/ubuntu/app/repo/.git ]; then
     git clone --depth=1 --branch main \
       https://github.com/takenking9879/Kubernetes-MLOPS-platform.git \
@@ -138,11 +107,12 @@ setup: |
     git -C /home/ubuntu/app/repo pull --ff-only origin main
   fi
 
-  # GPU metrics exporter dep (prometheus_client)
-  python3 -c "import prometheus_client" 2>/dev/null || \
-    ${SUDO} uv pip install --system --no-cache prometheus-client==0.24.1
+  # Install HF stack — torch skipped (pre-installed in provider template)
+  REQ_FILE="/home/ubuntu/app/repo/k3s/kuberay/gpu/requirements_llm_runtime.txt"
+  [ -f "${REQ_FILE}" ] || { echo "ERROR: ${REQ_FILE} not found"; exit 1; }
+  ${SUDO} uv pip install --system --no-cache -r "${REQ_FILE}"
 
-  # Optional: Grafana Agent binary for remote_write to Grafana Cloud
+  # Optional: Grafana Agent
   if [ -n "${GRAFANA_REMOTE_WRITE_URL:-}" ]; then
     AGENT_BIN=/usr/local/bin/grafana-agent
     if [ ! -f "${AGENT_BIN}" ]; then
@@ -161,13 +131,13 @@ run: |
   set -e
   export PYTHONPATH=/home/ubuntu/app/repo:/home/ubuntu/app/repo/src
 
-  # ── GPU metrics exporter ─────────────────────────────────────────────────
   python3 /home/ubuntu/app/repo/k3s/sky/gpu_exporter.py &
-  echo "[setup] GPU exporter started (PID=$!)"
+  echo "[run] GPU exporter started (PID=$!)"
+
   if [ -n "${GRAFANA_REMOTE_WRITE_URL:-}" ] && command -v grafana-agent >/dev/null 2>&1; then
     python3 /home/ubuntu/app/repo/k3s/sky/write_grafana_config.py
     grafana-agent --config.file=/tmp/grafana-agent-config.yaml &
-    echo "[setup] Grafana Agent started → ${GRAFANA_REMOTE_WRITE_URL}"
+    echo "[run] Grafana Agent started → ${GRAFANA_REMOTE_WRITE_URL}"
   fi
 
   python3 /home/ubuntu/app/repo/k3s/kuberay/llm_main.py

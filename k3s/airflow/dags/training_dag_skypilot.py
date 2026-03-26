@@ -59,12 +59,20 @@ SKY_YAML_CPU = Path(
         "/opt/airflow/dags/repo/k3s/sky/ray-training.yaml",
     )
 )
-SKY_YAML_GPU = Path(
+# Single-node GPU: provider-specific (RunPod template vs Vast.ai template)
+SKY_YAML_GPU_RUNPOD = Path(
     os.getenv(
-        "SKY_TRAINING_GPU_YAML",
-        "/opt/airflow/dags/repo/k3s/sky/ray-gpu-training.yaml",
+        "SKY_TRAINING_GPU_RUNPOD_YAML",
+        "/opt/airflow/dags/repo/k3s/sky/ray-gpu-training-runpod.yaml",
     )
 )
+SKY_YAML_GPU_VAST = Path(
+    os.getenv(
+        "SKY_TRAINING_GPU_VAST_YAML",
+        "/opt/airflow/dags/repo/k3s/sky/ray-gpu-training-vast.yaml",
+    )
+)
+# Multi-node GPU: AWS custom image (ray-train:2.53.0), EFA/DeepSpeed
 SKY_YAML_GPU_MULTINODE = Path(
     os.getenv(
         "SKY_TRAINING_GPU_MULTINODE_YAML",
@@ -84,6 +92,20 @@ _DAGS_DIR = Path(__file__).parent.parent  # k3s/airflow/
 # ─── Helpers ──────────────────────────────────────────────────────────────────
 
 _PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent.parent  # repo root
+
+
+def _gpu_single_node_yaml(resource_constraints_conf: dict | None) -> str:
+    """Return the correct single-node GPU YAML path based on target provider.
+
+    RunPod uses its own cached template (runpod/pytorch:...) and
+    Vast.ai uses its own template (vastai/pytorch:...).
+    Defaults to RunPod when no provider is specified.
+    """
+    providers = (resource_constraints_conf or {}).get("providers") or []
+    p = str(providers[0]).lower() if providers else "runpod"
+    if p == "vast":
+        return str(SKY_YAML_GPU_VAST)
+    return str(SKY_YAML_GPU_RUNPOD)
 
 
 def _load_task_with_resources(
@@ -164,8 +186,10 @@ def _submit_sky_job(**context):
     """Load a SkyPilot task YAML, inject per-run env vars, and launch a managed job.
 
     Routing:
-        model_type == "pytorch"  → ray-gpu-training.yaml  (RunPod GPU, spot-first)
-        model_type == "xgboost"  → ray-training.yaml       (RunPod CPU)
+        pytorch/ssm/bae + num_nodes > 1 → ray-gpu-multinode-aws.yaml  (AWS EFA, custom image)
+        pytorch/ssm/bae + runpod        → ray-gpu-training-runpod.yaml (RunPod template)
+        pytorch/ssm/bae + vast          → ray-gpu-training-vast.yaml   (Vast.ai template)
+        xgboost / default               → ray-training.yaml            (RunPod CPU)
 
     Uses sky.jobs.launch() (managed jobs):
       - Spot preemptions are handled automatically: new node provisioned + job restarted
@@ -189,24 +213,24 @@ def _submit_sky_job(**context):
     # Job name: max 40 chars, RFC-1123 slug (SkyPilot managed job naming requirement)
     job_name = k8s_name(train_run_id, "sky", max_len=40)
 
-    # Select YAML based on model type and node count
-    #   pytorch + num_nodes > 1  → multi-node AWS  (EFA, DeepSpeed)
-    #   pytorch + num_nodes == 1 → single-node GPU  (RunPod spot-first)
+    # Select YAML based on model type, node count, and target provider
+    #   pytorch + num_nodes > 1  → multi-node AWS  (EFA, DeepSpeed, custom image)
+    #   pytorch + num_nodes == 1 → single-node GPU  (RunPod or Vast.ai template)
     #   everything else          → CPU              (RunPod CPU)
+    resource_constraints_conf = conf.get("resource_constraints")
     use_gpu = model_type in ("pytorch", "ssm", "bae")
     if use_gpu and num_nodes > 1:
         yaml_path = str(SKY_YAML_GPU_MULTINODE)
     elif use_gpu:
-        yaml_path = str(SKY_YAML_GPU)
+        yaml_path = _gpu_single_node_yaml(resource_constraints_conf)
     else:
         yaml_path = str(SKY_YAML_CPU)
     print(f"Using SkyPilot YAML: {yaml_path}  (gpu={use_gpu}, num_nodes={num_nodes})")
 
-    # ── Dynamic any_of from resource_constraints (Phase 3) ─────────────────────
+    # ── Dynamic any_of from resource_constraints ───────────────────────────────
     # When resource_constraints is provided in dag_run.conf, we query the live
     # GPU catalog and replace the static any_of in the YAML with a dynamically
     # ranked spot-first list.  Falls back to static YAML if catalog returns nothing.
-    resource_constraints_conf = conf.get("resource_constraints")
     task = _load_task_with_resources(
         yaml_path, train_run_id, resource_constraints_conf, use_gpu,
         num_nodes=num_nodes,

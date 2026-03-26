@@ -57,6 +57,102 @@ print(r.status_code)
 
 ---
 
+## Phase A: Docker Image Build (AWS multi-node only)
+
+> **Skip this phase if you are only using RunPod or Vast.ai.**
+> Those providers use native base templates (`runpod/pytorch:...`, `vastai/pytorch:...`) pulled
+> directly at VM provisioning time — no custom images needed.
+>
+> **Required only for:**
+> - Tabular multi-node training on AWS (`ray-gpu-multinode-aws.yaml`)
+> - LLM fine-tuning on AWS (`ray-llm-training-aws.yaml`)
+> - vLLM multi-node serving on AWS (`ray-vllm-multinode-serving.yaml`)
+
+### A1. Prerequisites
+
+```bash
+# You must be logged in to DockerHub
+docker login
+# You need NVIDIA Container Runtime if you want to run GPU smoke tests locally
+# (optional — import-only smoke tests work without it)
+```
+
+### A2. Build and push both images
+
+```bash
+cd k3s/kuberay/gpu
+chmod +x build.sh
+
+# Build + push both (takes 10-20 min on first build; subsequent builds use layer cache)
+./build.sh
+
+# Or selectively:
+./build.sh train   # ray-train:2.53.0 only (tabular)
+./build.sh llm     # ray-llm:2.53.0 only (LLM + vLLM)
+
+# Build without pushing (local validation only):
+./build.sh --no-push
+```
+
+Expected output ends with:
+```
+Done. Images:
+takenking9879/ray-train:2.53.0   ...GB   ...
+takenking9879/ray-llm:2.53.0     ...GB   ...
+```
+
+### A3. Import smoke tests (no GPU needed)
+
+Verify all critical packages are importable and versions are correct:
+
+```bash
+# Tabular training image
+docker run --rm takenking9879/ray-train:2.53.0 \
+  python3 -c "import ray, torch, deepspeed, xgboost, mlflow; \
+  print('ray:', ray.__version__); \
+  print('torch:', torch.__version__); \
+  print('deepspeed:', deepspeed.__version__); \
+  print('xgboost:', xgboost.__version__)"
+# Expected: ray 2.53.0, torch 2.10.x, deepspeed 0.18.x, xgboost 3.x
+
+# LLM / vLLM image
+docker run --rm takenking9879/ray-llm:2.53.0 \
+  python3 -c "import ray, torch, transformers, peft, trl, vllm; \
+  print('ray:', ray.__version__); \
+  print('torch:', torch.__version__); \
+  print('vllm:', vllm.__version__); \
+  print('transformers:', transformers.__version__)"
+# Expected: ray 2.53.0, torch 2.10.x, vllm 0.18.x, transformers 4.46.x
+```
+
+**Common failure:** `ModuleNotFoundError: deepspeed` on ray-train — means `requirements_gpu.txt`
+is missing the `deepspeed==0.18.8` line. Add it, then rebuild.
+
+### A4. CUDA smoke test (requires NVIDIA runtime)
+
+```bash
+docker run --rm --gpus all takenking9879/ray-train:2.53.0 \
+  python3 -c "import torch; assert torch.cuda.is_available(), 'No CUDA!'; \
+  print('CUDA:', torch.version.cuda, '| Device:', torch.cuda.get_device_name(0))"
+# Expected: CUDA: 12.8.x | Device: NVIDIA ...
+
+docker run --rm --gpus all takenking9879/ray-llm:2.53.0 \
+  python3 -c "import torch; assert torch.cuda.is_available(); \
+  print('CUDA:', torch.version.cuda)"
+```
+
+### A5. Verify images are on DockerHub
+
+```bash
+docker pull takenking9879/ray-train:2.53.0 && echo "ray-train OK"
+docker pull takenking9879/ray-llm:2.53.0   && echo "ray-llm OK"
+```
+
+These must succeed from any network (not just your local machine) because SkyPilot pulls them
+on the AWS worker VMs.
+
+---
+
 ## Phase B: Internal Integration Tests (Docker Desktop only, no cloud cost)
 
 ### B1: Preprocessing pipeline via App
@@ -305,6 +401,7 @@ Run through this before every cloud test session:
 - [ ] AWS credentials configured in Airflow environment
 - [ ] `sky check` shows at least one cloud provider configured
 - [ ] `sky launch k3s/sky/hello-sky.yaml --yes` completes in < 5 minutes
+- [ ] *(AWS only)* `docker pull takenking9879/ray-train:2.53.0` succeeds — images are on DockerHub
 
 After each cloud test session:
 
@@ -328,3 +425,7 @@ After each cloud test session:
 | `400 Could not resolve dataset` on serving | Missing lineage block | Fixed — `_upload_training_params` always writes lineage; re-trigger training to regenerate params |
 | hello-sky hangs > 10 min | Cloud auth or quota issue | Run `sky check`, verify API keys; check RunPod quota / spot availability |
 | SkyPilot VM can't reach S3 | AWS creds not injected | Verify `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` are in Airflow env vars |
+| AWS VM: `docker pull` fails for ray-train/ray-llm | Images not pushed to DockerHub | Run `./k3s/kuberay/gpu/build.sh` and push; then verify with `docker pull takenking9879/ray-train:2.53.0` |
+| `ModuleNotFoundError: deepspeed` on AWS job | Missing `deepspeed` in requirements_gpu.txt | Add `deepspeed==0.18.8` to `k3s/kuberay/gpu/requirements_gpu.txt`, rebuild with `./build.sh train` |
+| RunPod/Vast: CUDA version mismatch | Wrong base image or torch reinstalled | Never reinstall torch on provider templates — `requirements_tabular_runtime.txt` and `requirements_llm_runtime.txt` must exclude torch |
+| Wrong YAML loaded for provider | `resource_constraints` missing from dag_conf | Fixed in `jobs.py` — check Airflow conf tab shows `resource_constraints` key |

@@ -39,10 +39,25 @@ from airflow.providers.standard.operators.python import PythonOperator
 
 # ─── Constants ────────────────────────────────────────────────────────────────
 
-SKY_YAML_LLM = Path(
+# Provider-specific LLM training YAMLs (each uses its own cached base template).
+# RunPod and Vast.ai: provider templates (torch pre-installed).
+# AWS: custom image docker:takenking9879/ray-llm:2.53.0 (all deps baked in).
+SKY_YAML_LLM_RUNPOD = Path(
     os.getenv(
-        "SKY_LLM_YAML",
-        "/opt/airflow/dags/repo/k3s/sky/ray-llm-training.yaml",
+        "SKY_LLM_RUNPOD_YAML",
+        "/opt/airflow/dags/repo/k3s/sky/ray-llm-training-runpod.yaml",
+    )
+)
+SKY_YAML_LLM_VAST = Path(
+    os.getenv(
+        "SKY_LLM_VAST_YAML",
+        "/opt/airflow/dags/repo/k3s/sky/ray-llm-training-vast.yaml",
+    )
+)
+SKY_YAML_LLM_AWS = Path(
+    os.getenv(
+        "SKY_LLM_AWS_YAML",
+        "/opt/airflow/dags/repo/k3s/sky/ray-llm-training-aws.yaml",
     )
 )
 MLFLOW_TRACKING_URI = os.getenv(
@@ -56,6 +71,17 @@ _PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent.parent  # repo roo
 
 
 # ─── Helpers ──────────────────────────────────────────────────────────────────
+
+
+def _llm_yaml(resource_constraints_conf: dict | None) -> str:
+    """Return the correct LLM training YAML path based on target provider."""
+    providers = (resource_constraints_conf or {}).get("providers") or []
+    p = str(providers[0]).lower() if providers else "runpod"
+    if p == "vast":
+        return str(SKY_YAML_LLM_VAST)
+    if p == "aws":
+        return str(SKY_YAML_LLM_AWS)
+    return str(SKY_YAML_LLM_RUNPOD)
 
 
 def _load_llm_task(
@@ -137,10 +163,14 @@ def _submit_llm_job(**context):
 
     job_name = k8s_name(run_id, "llm", max_len=40)
 
+    resource_constraints_conf = conf.get("resource_constraints")
+    yaml_path = _llm_yaml(resource_constraints_conf)
+    print(f"Using LLM SkyPilot YAML: {yaml_path}")
+
     task = _load_llm_task(
-        str(SKY_YAML_LLM),
+        yaml_path,
         run_id,
-        conf.get("resource_constraints"),
+        resource_constraints_conf,
     )
 
     task.update_envs({

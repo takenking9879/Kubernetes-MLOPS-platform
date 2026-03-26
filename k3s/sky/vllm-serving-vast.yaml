@@ -1,50 +1,43 @@
-# k3s/sky/vllm-serving.yaml
+# k3s/sky/vllm-serving-vast.yaml
 #
-# DEPRECATED — superseded by provider-specific variants:
-#   RunPod: vllm-serving-runpod.yaml
-#   Vast.ai: vllm-serving-vast.yaml
+# Persistent vLLM serving cluster on Vast.ai via SkyPilot sky.launch() (NOT managed jobs).
+# Provider template: vastai/pytorch (torch pre-installed — NOT reinstalled at runtime).
+# vLLM 0.18.0 installed at runtime (lightweight — torch excluded).
 #
-# Persistent vLLM serving cluster via SkyPilot sky.launch() (NOT managed jobs).
 # On-demand only — serving needs uptime, spot preemptions are unacceptable.
 #
 # Usage (manual test):
-#   sky launch k3s/sky/vllm-serving.yaml \
-#     --cluster-name vllm-test \
+#   sky launch k3s/sky/vllm-serving-vast.yaml \
+#     --cluster-name vllm-vast \
 #     --env HF_MODEL_ID=Qwen/Qwen2.5-7B \
 #     --yes
 #
-# Check endpoint:
-#   sky status --endpoint 8000 vllm-test
-#
 # Tear down:
-#   sky down vllm-test
+#   sky down vllm-vast
 #
-# Triggered by vllm_serving_dag.py (sky.launch, persistent cluster).
-# The DAG polls GET /health until healthy, then registers the endpoint to S3.
+# Triggered by vllm_serving_dag.py when provider=vast.
 
-name: vllm-serving
+name: vllm-serving-vast
 
 num_nodes: 1
 
 resources:
+  # Vast.ai PyTorch template — torch 2.10.0 (cu13.0) pre-installed.
+  # DO NOT reinstall torch/CUDA at runtime.
+  image_id: vastai/pytorch:2.10.0-cu130-cuda-13.1-mini-py311-2026-03-19
   any_of:
-    # On-demand only — no spot for serving
-    - cloud: runpod
-      accelerators: A100:1
-      use_spot: false
-    - cloud: runpod
-      accelerators: RTX4090:1
-      use_spot: false
     - cloud: vast
       accelerators: A100:1
       use_spot: false
-    - cloud: runpod
+    - cloud: vast
+      accelerators: RTX4090:1
+      use_spot: false
+    - cloud: vast
       accelerators: A40:1
       use_spot: false
   disk_size: 100
 
-# Safety net: auto-terminate if idle for 60 min (prevents runaway on-demand costs
-# if the operator forgets to sky down after serving is no longer needed).
+# Safety net: auto-terminate if idle for 60 min
 idle_minutes_to_autostop: 60
 
 envs:
@@ -58,7 +51,7 @@ envs:
   VLLM_PORT: "8000"
   MAX_MODEL_LEN: "4096"
   GPU_MEMORY_UTILIZATION: "0.90"
-  TENSOR_PARALLEL_SIZE: "1"  # set to GPU count for multi-GPU
+  TENSOR_PARALLEL_SIZE: "1"
 
   # ── Infrastructure ──
   AWS_ACCESS_KEY_ID: ""
@@ -77,10 +70,8 @@ setup: |
     ${SUDO} python3 -m pip install --no-cache-dir uv
   fi
 
-  # Install vLLM + boto3 for adapter download
-  ${SUDO} uv pip install --system --no-cache \
-    vllm==0.6.4 \
-    boto3==1.42.28
+  # Install vLLM 0.18.0 + boto3 — torch skipped (pre-installed in provider template)
+  ${SUDO} uv pip install --system --no-cache vllm==0.18.0 boto3==1.42.28
 
   # Download LoRA adapter from S3 if provided
   if [ -n "${LLM_ADAPTER_S3:-}" ]; then
@@ -90,7 +81,7 @@ setup: |
     echo "Adapter downloaded to /tmp/lora_adapter/"
   fi
 
-  echo "Setup complete — vLLM ready."
+  echo "Setup complete — vLLM 0.18.0 ready."
 
 run: |
   set -e

@@ -1,22 +1,26 @@
 # =========================
-# Core ML / Data
+# Full LLM stack — used inside Dockerfile.llm (baked into ray-llm:2.53.0 image)
+# torch IS included here (base image is python:3.11-slim, no GPU pre-installed)
 # =========================
-numpy==2.3.3
-pandas==2.3.3
-pyarrow==22.0.0
-scikit-learn==1.8.0
-matplotlib==3.10.0
-pyiceberg==0.10.0
 
 # =========================
-# Gradient Boosting
+# HuggingFace / LLM Training
 # =========================
-xgboost==3.1.3
+transformers==5.3.0
+peft==0.18.1
+trl==0.29.1
+accelerate==1.13.0
+datasets[s3]==4.8.4
 
 # =========================
 # Distributed Training
 # =========================
 deepspeed==0.18.8
+
+# =========================
+# vLLM Serving
+# =========================
+vllm==0.18.0
 
 # =========================
 # Experiment Tracking
@@ -30,4 +34,3 @@ boto3==1.42.28
 python-dotenv==1.2.1
 PyYAML==6.0.3
 prometheus-client==0.24.1
-kubernetes==35.0.0
