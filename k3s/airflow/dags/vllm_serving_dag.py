@@ -85,7 +85,7 @@ with DAG(
         do_xcom_push=True,
         get_logs=True,
         is_delete_operator_pod=True,
-        resources=k8s.V1ResourceRequirements(
+        container_resources=k8s.V1ResourceRequirements(
             requests={"cpu": "250m", "memory": "512Mi"},
             limits={"cpu": "500m", "memory": "1Gi"},
         ),
@@ -109,7 +109,7 @@ with DAG(
         get_logs=True,
         is_delete_operator_pod=True,
         execution_timeout=timedelta(seconds=VLLM_HEALTH_TIMEOUT_SECONDS + 60),
-        resources=k8s.V1ResourceRequirements(
+        container_resources=k8s.V1ResourceRequirements(
             requests={"cpu": "100m", "memory": "256Mi"},
             limits={"cpu": "250m", "memory": "512Mi"},
         ),
@@ -134,7 +134,7 @@ with DAG(
         env_from=_aws_env_from(),
         get_logs=True,
         is_delete_operator_pod=True,
-        resources=k8s.V1ResourceRequirements(
+        container_resources=k8s.V1ResourceRequirements(
             requests={"cpu": "100m", "memory": "128Mi"},
             limits={"cpu": "200m", "memory": "256Mi"},
         ),
