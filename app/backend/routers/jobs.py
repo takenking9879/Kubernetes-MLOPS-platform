@@ -335,6 +335,23 @@ async def launch_job(body: LaunchRequest) -> LaunchResponse:
     """
     any_of = _get_any_of(body.resource_constraints)
 
+    # ── Serving validation: only LLM models supported via vLLM/SkyPilot ──────
+    if body.job_type in ("serving", "both"):
+        if body.model.model_type and body.model.model_type not in ("llm", ""):
+            raise HTTPException(
+                status_code=422,
+                detail=(
+                    "Serving is only supported for LLM models (vLLM). "
+                    "For tabular inference use the in-cluster Serving tab."
+                ),
+            )
+        if not body.model.model_id:
+            raise HTTPException(
+                status_code=422,
+                detail="model.model_id (HuggingFace model name) is required for serving jobs.",
+            )
+        body.model.model_type = "llm"  # normalize empty → llm
+
     # ── Recommendation ────────────────────────────────────────────────────────
     is_serving = body.job_type in ("serving", "both")
     is_training = body.job_type in ("training", "both")
