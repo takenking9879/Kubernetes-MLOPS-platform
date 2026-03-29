@@ -350,7 +350,7 @@ class GPUCatalogService:
             if not _home or not pathlib.Path(_home).is_dir():
                 os.environ["HOME"] = "/tmp"
             from vastai import VastAI  # type: ignore[import]
-            api_key = os.getenv("VAST_API_KEY", "")
+            api_key = os.getenv("VAST_API_KEY", "") or os.getenv("VASTAI_API_KEY", "")
             if not api_key:
                 return []
             client = VastAI(api_key=api_key)

@@ -16,8 +16,11 @@
 #   AWS_SECRET_ACCESS_KEY    — boto3 reads natively
 #   AWS_DEFAULT_REGION       — e.g. us-east-1
 #   RUNPOD_API_KEY           — docker-entrypoint.sh writes ~/.runpod/config.toml
-#   VASTAI_API_KEY           — docker-entrypoint.sh writes ~/.config/vastai/vast_api_key
+#   VAST_API_KEY             — docker-entrypoint.sh writes ~/.config/vastai/vast_api_key
+#   VASTAI_API_KEY           — supported alias for VAST_API_KEY
 #   MLFLOW_TRACKING_URI      — injected into sky Task envs
+#   SKY_JOBS_CONTROLLER_DISK_SIZE — optional override for managed jobs controller disk
+#                                  (default 30 GB; clamped to 40 GB for RunPod)
 #
 # The entrypoint script (docker-entrypoint.sh) writes the provider config files
 # from env vars at container startup, before sky_runner.py is executed.

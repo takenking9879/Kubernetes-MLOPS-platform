@@ -9,8 +9,47 @@
 #   AWS_SECRET_ACCESS_KEY    — boto3 reads natively, no file needed
 #   AWS_DEFAULT_REGION       — optional, defaults to us-east-1
 #   RUNPOD_API_KEY           — written to ~/.runpod/config.toml
-#   VASTAI_API_KEY           — written to ~/.config/vastai/vast_api_key
+#   VAST_API_KEY / VASTAI_API_KEY — written to ~/.config/vastai/vast_api_key
+#   SKY_JOBS_CONTROLLER_DISK_SIZE — optional (default: 30); must be <= 40 on RunPod
 set -e
+
+# ── SkyPilot config (managed jobs controller sizing) ─────────────────────────
+# RunPod rejects controller pods with disk_size > 40 GB.
+# Merge a safe default into ~/.sky/config.yaml while preserving existing fields.
+SKY_JOBS_CONTROLLER_DISK_SIZE="${SKY_JOBS_CONTROLLER_DISK_SIZE:-30}"
+mkdir -p ~/.sky
+python3 - <<'PY'
+import os
+from pathlib import Path
+
+import yaml
+
+config_path = Path.home() / '.sky' / 'config.yaml'
+disk_size = int(os.getenv('SKY_JOBS_CONTROLLER_DISK_SIZE', '30'))
+
+if disk_size > 40:
+    print(
+        f"[entrypoint] WARNING: SKY_JOBS_CONTROLLER_DISK_SIZE={disk_size} exceeds RunPod cap 40; forcing 40"
+    )
+    disk_size = 40
+
+config = {}
+if config_path.exists():
+    try:
+        loaded = yaml.safe_load(config_path.read_text())
+        if isinstance(loaded, dict):
+            config = loaded
+    except Exception as exc:
+        print(f"[entrypoint] WARNING: could not parse ~/.sky/config.yaml ({exc}); rewriting minimal config")
+
+jobs = config.setdefault('jobs', {})
+controller = jobs.setdefault('controller', {})
+resources = controller.setdefault('resources', {})
+resources['disk_size'] = disk_size
+
+config_path.write_text(yaml.safe_dump(config, sort_keys=False), encoding='utf-8')
+print(f"[entrypoint] SkyPilot jobs controller disk_size set to {disk_size} GB")
+PY
 
 # ── RunPod ─────────────────────────────────────────────────────────────────────
 # SkyPilot reads ~/.runpod/config.toml via Python tomllib.
@@ -28,12 +67,13 @@ fi
 
 # ── VastAI ─────────────────────────────────────────────────────────────────────
 # SkyPilot reads ~/.config/vastai/vast_api_key (plain text, single line).
-if [ -n "${VASTAI_API_KEY}" ]; then
+VAST_KEY="${VAST_API_KEY:-${VASTAI_API_KEY:-}}"
+if [ -n "${VAST_KEY}" ]; then
     mkdir -p ~/.config/vastai
-    printf '%s' "${VASTAI_API_KEY}" > ~/.config/vastai/vast_api_key
+    printf '%s' "${VAST_KEY}" > ~/.config/vastai/vast_api_key
     echo "[entrypoint] VastAI credentials written to ~/.config/vastai/vast_api_key"
 else
-    echo "[entrypoint] WARNING: VASTAI_API_KEY not set — VastAI provider unavailable"
+    echo "[entrypoint] WARNING: VAST_API_KEY/VASTAI_API_KEY not set — VastAI provider unavailable"
 fi
 
 # ── AWS ────────────────────────────────────────────────────────────────────────
