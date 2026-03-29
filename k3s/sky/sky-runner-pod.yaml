@@ -1,8 +1,10 @@
 # SkyPilot Runner — Kubernetes Pod Template
 #
-# Used as reference documentation and as a template by KubernetesPodOperator.
-# The actual command / env vars are injected by the operator at runtime.
-# See k3s/airflow/dags/training_dag_skypilot.py for usage.
+# Used as reference documentation/template only.
+# Airflow KubernetesPodOperator builds pods from DAG arguments directly; this
+# file is not applied at runtime unless you kubectl apply it manually.
+# Runtime resources/command/env for training are defined in
+# k3s/airflow/dags/training_dag_skypilot.py.
 #
 # ── Credential flow (all from a single secret) ────────────────────────────────
 #

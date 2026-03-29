@@ -40,6 +40,26 @@ from kubernetes.client import models as k8s
 _SKY_IMAGE   = os.getenv("SKY_RUNNER_IMAGE", "takenking9879/sky-runner:0.12.0")
 _AIRFLOW_NS  = os.getenv("AIRFLOW_NAMESPACE", "airflow")
 SKY_TIMEOUT_SECONDS = int(os.getenv("SKY_TIMEOUT_SECONDS", "7200"))
+_SKY_IMAGE_PULL_POLICY = os.getenv("SKY_RUNNER_IMAGE_PULL_POLICY", "IfNotPresent")
+
+# SkyPilot API server can transiently use >1Gi memory during startup.
+_SKY_SUBMIT_REQUESTS = {
+    "cpu": os.getenv("SKY_SUBMIT_CPU_REQUEST", "500m"),
+    "memory": os.getenv("SKY_SUBMIT_MEMORY_REQUEST", "1Gi"),
+}
+_SKY_SUBMIT_LIMITS = {
+    "cpu": os.getenv("SKY_SUBMIT_CPU_LIMIT", "1000m"),
+    "memory": os.getenv("SKY_SUBMIT_MEMORY_LIMIT", "2Gi"),
+}
+
+_SKY_POLL_REQUESTS = {
+    "cpu": os.getenv("SKY_POLL_CPU_REQUEST", "250m"),
+    "memory": os.getenv("SKY_POLL_MEMORY_REQUEST", "1Gi"),
+}
+_SKY_POLL_LIMITS = {
+    "cpu": os.getenv("SKY_POLL_CPU_LIMIT", "500m"),
+    "memory": os.getenv("SKY_POLL_MEMORY_LIMIT", "2Gi"),
+}
 
 # ─── Shared pod configuration helpers ─────────────────────────────────────────
 
@@ -74,7 +94,7 @@ with DAG(
         name="sky-submit-training",
         namespace=_AIRFLOW_NS,
         image=_SKY_IMAGE,
-        image_pull_policy="IfNotPresent",
+        image_pull_policy=_SKY_IMAGE_PULL_POLICY,
         cmds=["python", "/app/sky_runner.py"],
         arguments=["submit-training"],
         env_vars={
@@ -92,8 +112,8 @@ with DAG(
         get_logs=True,
         is_delete_operator_pod=True,
         container_resources=k8s.V1ResourceRequirements(
-            requests={"cpu": "250m", "memory": "512Mi"},
-            limits={"cpu": "500m", "memory": "1Gi"},
+            requests=_SKY_SUBMIT_REQUESTS,
+            limits=_SKY_SUBMIT_LIMITS,
         ),
     )
 
@@ -102,7 +122,7 @@ with DAG(
         name="sky-poll-training",
         namespace=_AIRFLOW_NS,
         image=_SKY_IMAGE,
-        image_pull_policy="IfNotPresent",
+        image_pull_policy=_SKY_IMAGE_PULL_POLICY,
         cmds=["python", "/app/sky_runner.py"],
         arguments=["poll-training"],
         env_vars={
@@ -115,8 +135,8 @@ with DAG(
         is_delete_operator_pod=True,
         execution_timeout=timedelta(seconds=SKY_TIMEOUT_SECONDS + 300),
         container_resources=k8s.V1ResourceRequirements(
-            requests={"cpu": "100m", "memory": "256Mi"},
-            limits={"cpu": "250m", "memory": "512Mi"},
+            requests=_SKY_POLL_REQUESTS,
+            limits=_SKY_POLL_LIMITS,
         ),
     )
 

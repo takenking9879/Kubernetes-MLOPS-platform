@@ -10,4 +10,4 @@
 
 - **Kafka connector polling terminal states**: `serving_dag.py:poll_spark_connector_running` polls for `RUNNING` state; if Spark Operator returns a new state name in a future version, this will silently hang.
 
-- **`sky-runner-pod.yaml` credentials**: KubernetesPodOperator uses `sky-runner-pod.yaml`; RunPod/Vast/AWS API keys must be in `env-secret` K8s Secret. Not documented in DAG files.
+- **`sky-runner-pod.yaml` vs DAG runtime spec**: Airflow KubernetesPodOperator does not read `sky-runner-pod.yaml` at runtime; resources/env/command come from DAG arguments. This causes confusion when users tune memory in the YAML but submit/poll pods still use limits defined in `training_dag_skypilot.py`.

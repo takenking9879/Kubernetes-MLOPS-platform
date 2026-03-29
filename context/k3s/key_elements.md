@@ -6,7 +6,7 @@
 |--------|------|--------|-------------|
 | `preprocessing_pipeline` | `preprocessing_dag.py` | ACTIVE | Submit + poll SparkApplication; cleanup in finally |
 | `training_pipeline` | `training_dag.py` | ACTIVE | Submit + poll RayJob (KubeRay local); cleanup in finally |
-| `training_pipeline_skypilot` | `training_dag_skypilot.py` | ACTIVE | KubernetesPodOperator → sky-runner pod → SkyPilot managed jobs (pytorch→GPU spot-first, xgboost→CPU) with fallback when `/api/stream` transiently fails |
+| `training_pipeline_skypilot` | `training_dag_skypilot.py` | ACTIVE | KubernetesPodOperator → sky-runner pod → SkyPilot managed jobs (pytorch→GPU spot-first, xgboost→CPU) with fallback when `/api/stream` transiently fails; submit/poll pod resources tunable via `SKY_SUBMIT_*` and `SKY_POLL_*` env vars |
 | `llm_training_pipeline` | `llm_training_dag.py` | ACTIVE | KubernetesPodOperator → sky-runner pod → SkyPilot LLM fine-tuning (TRL + LoRA + DeepSpeed ZeRO) |
 | `full_ml_pipeline` | `full_pipeline_dag.py` | ACTIVE | preprocessing_pipeline tasks → training_pipeline tasks (sequential chain) |
 | `ml_pipeline` | `ml_pipeline_dag.py` | ACTIVE | Flexible mode: preprocessing_only / training_only / full; UI-triggered |
