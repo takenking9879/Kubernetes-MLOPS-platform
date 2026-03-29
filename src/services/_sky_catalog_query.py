@@ -46,7 +46,7 @@ out: dict = {}
 # all=True: includes COMMON GPUs + OTHER GPUs (RTX4090, RTXA4000, MI300X, etc.)
 # Without all=True, only COMMON GPUs are returned — misses many RunPod/Vast offers.
 for gpu_name, instances in sky.list_accelerators(
-    gpus_only=True, all=True, clouds=list(VALID_CLOUDS)
+    gpus_only=True, clouds=list(VALID_CLOUDS)
 ).items():
     rows = []
     for inst in instances:

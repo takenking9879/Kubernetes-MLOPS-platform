@@ -73,7 +73,7 @@ _RUNPOD_TO_SKYPILOT: dict[str, str] = {
     "NVIDIA H100 PCIe":                 "H100",
     # H200 series (SkyPilot canonical: H200-SXM for RunPod, H200 for Vast)
     "NVIDIA H200":                      "H200-SXM",
-    "NVIDIA H200 NVL":                  "H200",
+    "NVIDIA H200 NVL":                  "NVIDIA-H200-NVL",
     # B series
     "NVIDIA B200":                      "B200",
     "NVIDIA B300 SXM6 AC":              "B300",
@@ -210,7 +210,7 @@ class GPUCatalogService:
                 import sky  # type: ignore[import]
 
                 raw = sky.list_accelerators(
-                    gpus_only=True, all=True, clouds=["aws", "runpod", "vast"]
+                    gpus_only=True, clouds=["aws", "runpod", "vast"]
                 )
                 for gpu_name, insts in raw.items():
                     rows = []
@@ -352,8 +352,17 @@ class GPUCatalogService:
                     sky_supported = True
                     gpu_type = skypilot_id
                 else:
-                    sky_supported = False
-                    gpu_type = gpu_name
+                    # Vast uses bare canonical names ("H100", "A100") while inference
+                    # may return RunPod-biased variant-suffixed names ("H100-SXM",
+                    # "A100-80GB"). Try exact match on the base component only.
+                    base = skypilot_id.split("-")[0] if skypilot_id else ""
+                    base_candidates = [k for k in sky_vast if k == base]
+                    if len(base_candidates) == 1:
+                        sky_supported = True
+                        gpu_type = base_candidates[0]
+                    else:
+                        sky_supported = False
+                        gpu_type = gpu_name
 
                 vram = float(raw.get("gpu_ram", 0)) / 1024  # MB → GB
                 on_demand = float(raw.get("dph_total", 0))
@@ -533,8 +542,16 @@ def _infer_skypilot_id(display_name: str) -> str:
     n = display_name.upper().replace(" ", "").replace("-", "").replace("_", "")
     if "RTX5090" in n:
         return "RTX5090"
+    if "RTX5880" in n:
+        return "RTX5880-Ada"
+    if "RTX5070" in n:
+        return "RTX5070"
     if "RTX4090" in n:
         return "RTX4090"
+    if "RTX4070" in n:
+        return "RTX4070"
+    if "RTX4060" in n:
+        return "RTX4060"
     if "RTX3090TI" in n:
         return "RTX3090"
     if "RTX3090" in n:
@@ -551,6 +568,8 @@ def _infer_skypilot_id(display_name: str) -> str:
         return "RTX4000-Ada"
     if "RTX6000ADA" in n or "6000ADAGENERATION" in n:
         return "RTX6000-Ada"
+    if "RTXPRO6000WS" in n:
+        return "RTXPRO6000WS"
     if "RTXPRO6000WK" in n:
         return "RTXPRO6000-WK"
     if "RTXPRO6000" in n:
@@ -613,18 +632,28 @@ def _infer_skypilot_id(display_name: str) -> str:
 # Prices are us-east-1 on-demand (2025). Spot ≈ 70% of on-demand.
 _AWS_STATIC: list[tuple[str, int, float, float, int, str, bool]] = [
     # (gpu_type, vram_gb, od_price, spot_price, count, instance, efa)
-    ("T4",        16,  0.526,  0.158,  1, "g4dn.xlarge",    False),
-    ("T4",        16,  1.686,  0.506,  4, "g4dn.12xlarge",  False),
-    ("A10G",      24,  1.006,  0.302,  1, "g5.xlarge",      False),
-    ("A10G",      24,  1.212,  0.364,  1, "g5.2xlarge",     False),
-    ("A10G",      24,  7.228,  2.168,  4, "g5.24xlarge",    False),
-    ("A10G",      24, 16.288,  4.886,  8, "g5.48xlarge",    False),
-    ("V100",      16,  3.060,  0.918,  1, "p3.2xlarge",     False),
-    ("V100",      16, 12.240,  3.672,  4, "p3.8xlarge",     False),
-    ("V100",      16, 24.480,  7.344,  8, "p3.16xlarge",    False),
-    ("V100-32GB", 32, 31.212,  9.364,  8, "p3dn.24xlarge",  True),
-    ("A100-80GB", 40, 32.770,  9.831,  8, "p4d.24xlarge",   True),
-    ("H100",      80, 98.320, 29.496,  8, "p5.48xlarge",    True),
+    ("T4",          16,   0.526,  0.158,  1, "g4dn.xlarge",       False),
+    ("T4",          16,   1.686,  0.506,  4, "g4dn.12xlarge",     False),
+    ("A10G",        24,   1.006,  0.344,  1, "g5.xlarge",         False),
+    ("A10G",        24,   1.212,  0.320,  1, "g5.2xlarge",        False),
+    ("A10G",        24,   7.228,  2.168,  4, "g5.24xlarge",       False),
+    ("A10G",        24,  16.288,  4.987,  8, "g5.48xlarge",       False),
+    ("V100",        16,   3.060,  0.918,  1, "p3.2xlarge",        False),
+    ("V100",        16,  12.240,  3.672,  4, "p3.8xlarge",        False),
+    ("V100",        16,  24.480,  7.344,  8, "p3.16xlarge",       False),
+    ("V100-32GB",   32,  31.212,  9.364,  8, "p3dn.24xlarge",     True),
+    ("A100",        40,  21.958, 10.302,  8, "p4d.24xlarge",      True),   # 40 GB PCIe
+    ("A100-80GB",   80,  27.447, 15.532,  8, "p4de.24xlarge",     True),   # 80 GB PCIe
+    ("L4",          22,   0.805,  0.217,  1, "g6.xlarge",         False),
+    ("L4",          22,  13.350,  3.367,  8, "g6.48xlarge",       False),
+    ("L40S",        45,   1.861,  0.525,  1, "g6e.xlarge",        False),
+    ("L40S",        45,  30.131,  5.103,  8, "g6e.48xlarge",      False),
+    ("H100",        80,   6.880,  2.966,  1, "p5.4xlarge",        True),
+    ("H100",        80,  55.040, 10.009,  8, "p5.48xlarge",       True),
+    ("H200",       141,  63.296,  9.868,  8, "p5en.48xlarge",     True),
+    ("B200",       179, 113.933, 11.393,  8, "p6-b200.48xlarge",  True),
+    ("RTXPRO6000",  96,   3.363,  0.904,  1, "g7e.2xlarge",       False),
+    ("RTXPRO6000",  96,  33.144,  4.036,  8, "g7e.48xlarge",      False),
 ]
 
 
