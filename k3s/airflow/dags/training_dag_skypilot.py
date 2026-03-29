@@ -46,7 +46,7 @@ from datetime import datetime, timedelta
 
 from airflow.sdk import DAG
 from airflow.providers.cncf.kubernetes.operators.pod import KubernetesPodOperator
-from airflow.utils.trigger_rule import TriggerRule
+from airflow.task.trigger_rule import TriggerRule
 from kubernetes.client import models as k8s
 
 # ─── Constants ────────────────────────────────────────────────────────────────

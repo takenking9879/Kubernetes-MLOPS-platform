@@ -24,9 +24,11 @@ pyiceberg==0.10.0
 xgboost==3.1.3
 
 # =========================
-# Distributed Training
+# Distributed Training (optional)
 # =========================
-deepspeed==0.18.8
+# DeepSpeed is installed conditionally in SkyPilot setup only when
+# USE_DEEPSPEED=true. Keep it out of the default tabular runtime path to
+# avoid setup failures on provider-native images.
 
 # =========================
 # Experiment Tracking

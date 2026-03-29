@@ -1,3 +1,8 @@
+## 2026-03-29 — SkyPilot tabular setup hardening (FAILED_SETUP mitigation)
+- Reduced setup fragility for provider-native tabular training jobs (`ray-gpu-training-runpod.yaml`, `ray-gpu-training-vast.yaml`): `requirements_tabular_runtime.txt` no longer forces DeepSpeed in the default path; DeepSpeed is now installed only when `USE_DEEPSPEED=true`.
+- Improved managed-job failure observability in `k3s/sky/sky_runner.py`: when a job reaches FAILED/CANCELLED, raised errors now include queue diagnostics such as `failure_reason`, `failure_type`, and `cluster_name` when available.
+- Updated context: `context/k3s/key_elements.md`.
+
 ## 2026-03-29 — Single-pod SkyPilot lifecycle + GPU manual fallback list
 - **Single-pod lifecycle**: `training_pipeline_skypilot` and `llm_training_pipeline` DAGs now use a single KubernetesPodOperator (`run-training` / `run-llm` commands) that handles submit → poll → cancel-on-failure in one pod, eliminating cross-pod SkyPilot API server state fragmentation and cold-start overhead. A safety-net cleanup task (trigger_rule=ONE_FAILED) still tears down the jobs-controller VM if Airflow kills the main pod.
 - **New sky_runner.py commands**: `run-training`, `run-llm`. Legacy split-phase commands kept for debugging.

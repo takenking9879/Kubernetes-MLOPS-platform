@@ -130,6 +130,12 @@ setup: |
   fi
   ${SUDO} uv pip install --system --no-cache -r "${REQ_FILE}"
 
+  if [ "${USE_DEEPSPEED:-false}" = "true" ]; then
+    ${SUDO} uv pip install --system --no-cache deepspeed==0.18.8
+  else
+    echo "Skipping DeepSpeed install (USE_DEEPSPEED=${USE_DEEPSPEED:-false})."
+  fi
+
   echo "Setup complete."
 
   if [ -n "${GRAFANA_REMOTE_WRITE_URL:-}" ]; then

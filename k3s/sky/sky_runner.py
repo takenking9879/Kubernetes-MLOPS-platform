@@ -242,6 +242,24 @@ def _status_text(status: object) -> str:
     return str(value) if value is not None else str(status)
 
 
+def _failure_details(job: dict) -> str:
+    """Build a compact diagnostics string from queue(version=2) job fields."""
+    fields = [
+        "failure_reason",
+        "failure_type",
+        "message",
+        "cluster_name",
+        "job_id",
+        "task_id",
+    ]
+    details: list[str] = []
+    for key in fields:
+        val = job.get(key)
+        if val not in (None, "", [], {}):
+            details.append(f"{key}={val}")
+    return "; ".join(details)
+
+
 def _is_terminal_status(status: object) -> bool:
     text = _status_text(status).upper()
     return any(s in text for s in ("SUCCEEDED", "FAILED", "CANCELLED", "CANCELED"))
@@ -399,6 +417,11 @@ def poll_training():
                 print("Training completed successfully.")
                 return
             if "FAILED" in status or "CANCELLED" in status:
+                details = _failure_details(our[-1])
+                if details:
+                    raise RuntimeError(
+                        f"Job '{job_name}' ended with status: {status}. Details: {details}"
+                    )
                 raise RuntimeError(f"Job '{job_name}' ended with status: {status}")
 
         raise RuntimeError(f"Job '{job_name}' timed out after {timeout}s.")
@@ -480,6 +503,11 @@ def poll_llm():
                 print("LLM training completed successfully.")
                 return
             if "FAILED" in status or "CANCELLED" in status:
+                details = _failure_details(our[-1])
+                if details:
+                    raise RuntimeError(
+                        f"LLM job '{job_name}' ended: {status}. Details: {details}"
+                    )
                 raise RuntimeError(f"LLM job '{job_name}' ended: {status}")
 
         raise RuntimeError(f"LLM job '{job_name}' timed out after {timeout}s.")
@@ -793,6 +821,11 @@ def run_training():
                 print("[run-training] Training completed successfully.")
                 return
             if "FAILED" in status or "CANCELLED" in status:
+                details = _failure_details(our[-1])
+                if details:
+                    raise RuntimeError(
+                        f"Job '{job_name}' ended with status: {status}. Details: {details}"
+                    )
                 raise RuntimeError(f"Job '{job_name}' ended with status: {status}")
 
         raise RuntimeError(f"Job '{job_name}' timed out after {timeout}s.")
@@ -878,6 +911,11 @@ def run_llm():
                 print("[run-llm] LLM training completed successfully.")
                 return
             if "FAILED" in status or "CANCELLED" in status:
+                details = _failure_details(our[-1])
+                if details:
+                    raise RuntimeError(
+                        f"LLM job '{job_name}' ended: {status}. Details: {details}"
+                    )
                 raise RuntimeError(f"LLM job '{job_name}' ended: {status}")
 
         raise RuntimeError(f"LLM job '{job_name}' timed out after {timeout}s.")

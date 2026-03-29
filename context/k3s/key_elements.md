@@ -52,6 +52,8 @@ Sky runner runtime notes:
 - It also writes/merges `~/.sky/config.yaml` to enforce `jobs.controller.resources.disk_size` (default 30 GB, clamped to 40 GB for RunPod compatibility).
 - **Single-pod lifecycle** (`run-training`, `run-llm`): submit + poll run in the same pod, reusing one SkyPilot local API server. Legacy split-phase commands (`submit-training`, `poll-training`, `submit-llm`, `poll-llm`) are kept for debugging but no longer used by DAGs.
 - Managed jobs polling uses `sky.jobs.queue(version=2)` with `all_users=True`.
+- For provider-native tabular training YAMLs (`ray-gpu-training-runpod.yaml`, `ray-gpu-training-vast.yaml`), DeepSpeed is installed only when `USE_DEEPSPEED=true`; default path skips it to reduce setup-time failures.
+- On managed job terminal failure, `k3s/sky/sky_runner.py` now includes queue-provided diagnostics (`failure_reason`, `failure_type`, `cluster_name`, etc.) in raised errors.
 - `rc['gpu_fallbacks']` (list of `{infra, accelerators, use_spot}`) bypasses the auto-catalog selector and injects the list directly into `resources.any_of`. Set from `ResourceConstraints.gpu_fallbacks` in the frontend.
 
 ---
