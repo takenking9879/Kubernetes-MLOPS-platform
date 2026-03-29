@@ -1,3 +1,10 @@
+## 2026-03-29 — Single-pod SkyPilot lifecycle + GPU manual fallback list
+- **Single-pod lifecycle**: `training_pipeline_skypilot` and `llm_training_pipeline` DAGs now use a single KubernetesPodOperator (`run-training` / `run-llm` commands) that handles submit → poll → cancel-on-failure in one pod, eliminating cross-pod SkyPilot API server state fragmentation and cold-start overhead. A safety-net cleanup task (trigger_rule=ONE_FAILED) still tears down the jobs-controller VM if Airflow kills the main pod.
+- **New sky_runner.py commands**: `run-training`, `run-llm`. Legacy split-phase commands kept for debugging.
+- **GPU fallback list** (`gpu_fallbacks`): new `GPUFallbackEntry[]` field on `ResourceConstraints`; when set, `_load_task()` injects entries directly into SkyPilot `any_of`, bypassing the catalog auto-selector.
+- **GPUResourceSelector**: added mode toggle (Auto / Manual). Manual mode shows an ordered list of GPU options with infra + accelerator + spot toggle + up/down reorder arrows. First entry = highest priority.
+- Updated context: `context/k3s/key_elements.md`, `context/app/front/key_elements.md`.
+
 ## 2026-03-29 — SkyPilot RunPod controller and credential bootstrap hardening
 - Updated SkyPilot DAG KubernetesPodOperator tasks to run image ENTRYPOINT and pass runner command via task arguments.
 - Increased `training_pipeline_skypilot` submit/poll pod resources and made them tunable (`SKY_SUBMIT_*`, `SKY_POLL_*`).

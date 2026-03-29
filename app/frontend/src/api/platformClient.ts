@@ -153,6 +153,15 @@ export interface ModelConfig {
   model_type?: string;
 }
 
+/** One entry in a manually-ranked GPU fallback list (mirrors SkyPilot any_of format). */
+export interface GPUFallbackEntry {
+  /** SkyPilot infra path: "runpod", "vast", "aws/us-east-1", etc. */
+  infra: string;
+  /** Accelerator spec, e.g. "A100-80GB:1", "A100:2", "H100:8" */
+  accelerators: string;
+  use_spot: boolean;
+}
+
 export interface ResourceConstraints {
   providers?: string[];
   gpu_types?: string[] | null;
@@ -164,6 +173,8 @@ export interface ResourceConstraints {
   num_nodes?: number;
   num_gpus_per_node?: number;
   job_type?: string;
+  /** Explicit ranked fallback list; when set, overrides the auto-catalog selector. */
+  gpu_fallbacks?: GPUFallbackEntry[] | null;
 }
 
 export interface RunRequest {

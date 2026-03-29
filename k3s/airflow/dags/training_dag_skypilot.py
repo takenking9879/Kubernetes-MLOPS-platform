@@ -1,10 +1,20 @@
-"""Training Pipeline DAG — SkyPilot via KubernetesPodOperator.
+"""Training Pipeline DAG — SkyPilot via single KubernetesPodOperator.
 
 SkyPilot has a dependency conflict with apache-airflow (protobuf, grpcio).
 All sky.* calls are delegated to the takenking9879/sky-runner:0.12.0 pod
 which runs in the airflow namespace via KubernetesPodOperator.
 
-dag_run.conf (same as before):
+Architecture: single-pod lifecycle
+  Previously submit, poll, and cleanup each ran in separate pods. Each pod
+  would spin up its own SkyPilot local API server (cold start ~30-60s) and
+  had no shared state, causing:
+    - Cross-pod state fragmentation (poll pod couldn't see jobs controller)
+    - Repeated cold-start overhead
+
+  Now: one pod runs `run-training` which does submit → poll → cancel-on-error
+  in sequence, reusing the same local API server throughout.
+
+dag_run.conf keys:
     train_run_id            : str        — unique training run ID
     preprocess_run_id       : str        — referenced preprocessing run ID
     dataset                 : str        — canonical dataset name
@@ -14,11 +24,13 @@ dag_run.conf (same as before):
     model_type              : str        — "xgboost" → CPU  |  "pytorch/ssm/bae" → GPU
     num_nodes               : int        — number of nodes (default 1)
     resource_constraints    : dict|None  — optional GPUSelectorService constraints
+                                           (may include gpu_fallbacks: [{infra, accelerators, use_spot}])
 
 Tasks:
-    1. submit_sky_job  — launches sky-runner pod → sky.jobs.launch(); pushes job_name to XCom
-    2. poll_sky_job    — launches sky-runner pod → polls sky.jobs.queue() until terminal state
-    3. cleanup_skypilot_controller_on_failure — best-effort controller teardown on DAG failure
+    1. run_sky_job   — single pod: submit + poll + cancel-on-failure
+    2. cleanup_skypilot_controller_on_failure — safety-net controller teardown
+                       (trigger_rule=ONE_FAILED; the main pod already cancels
+                        the job inline, this task handles the controller VM)
 
 Prerequisites:
     - Secret "sky-config"  in airflow namespace (from ~/.sky/config.yaml)
@@ -44,22 +56,22 @@ _AIRFLOW_NS  = os.getenv("AIRFLOW_NAMESPACE", "airflow")
 SKY_TIMEOUT_SECONDS = int(os.getenv("SKY_TIMEOUT_SECONDS", "7200"))
 _SKY_IMAGE_PULL_POLICY = os.getenv("SKY_RUNNER_IMAGE_PULL_POLICY", "IfNotPresent")
 
-# SkyPilot API server can transiently use >1Gi memory during startup.
-_SKY_SUBMIT_REQUESTS = {
-    "cpu": os.getenv("SKY_SUBMIT_CPU_REQUEST", "500m"),
+# The single run pod needs enough memory for both SkyPilot API init and polling.
+_SKY_RUN_REQUESTS = {
+    "cpu":    os.getenv("SKY_SUBMIT_CPU_REQUEST", "500m"),
     "memory": os.getenv("SKY_SUBMIT_MEMORY_REQUEST", "2Gi"),
 }
-_SKY_SUBMIT_LIMITS = {
-    "cpu": os.getenv("SKY_SUBMIT_CPU_LIMIT", "750m"),
+_SKY_RUN_LIMITS = {
+    "cpu":    os.getenv("SKY_SUBMIT_CPU_LIMIT", "750m"),
     "memory": os.getenv("SKY_SUBMIT_MEMORY_LIMIT", "3Gi"),
 }
 
-_SKY_POLL_REQUESTS = {
-    "cpu": os.getenv("SKY_POLL_CPU_REQUEST", "500m"),
+_SKY_CLEANUP_REQUESTS = {
+    "cpu":    os.getenv("SKY_POLL_CPU_REQUEST", "500m"),
     "memory": os.getenv("SKY_POLL_MEMORY_REQUEST", "2Gi"),
 }
-_SKY_POLL_LIMITS = {
-    "cpu": os.getenv("SKY_POLL_CPU_LIMIT", "750m"),
+_SKY_CLEANUP_LIMITS = {
+    "cpu":    os.getenv("SKY_POLL_CPU_LIMIT", "750m"),
     "memory": os.getenv("SKY_POLL_MEMORY_LIMIT", "3Gi"),
 }
 
@@ -78,7 +90,8 @@ def _aws_env_from() -> list:
 with DAG(
     dag_id="training_pipeline_skypilot",
     description=(
-        "SkyPilot managed-jobs training pipeline (KubernetesPodOperator). "
+        "SkyPilot managed-jobs training pipeline (single KubernetesPodOperator). "
+        "One pod handles submit → poll → cleanup to avoid state fragmentation. "
         "Routes pytorch/ssm/bae → GPU spot-first, xgboost → CPU on RunPod."
     ),
     start_date=datetime(2026, 1, 1),
@@ -91,13 +104,13 @@ with DAG(
     tags=["mlops", "training", "skypilot"],
 ) as dag:
 
-    submit_sky = KubernetesPodOperator(
-        task_id="submit_sky_job",
-        name="sky-submit-training",
+    run_sky = KubernetesPodOperator(
+        task_id="run_sky_job",
+        name="sky-run-training",
         namespace=_AIRFLOW_NS,
         image=_SKY_IMAGE,
         image_pull_policy=_SKY_IMAGE_PULL_POLICY,
-        arguments=["python", "/app/sky_runner.py", "submit-training"],
+        arguments=["python", "/app/sky_runner.py", "run-training"],
         env_vars={
             "TRAIN_RUN_ID":               "{{ dag_run.conf['train_run_id'] }}",
             "PREPROCESS_RUN_ID":          "{{ dag_run.conf['preprocess_run_id'] }}",
@@ -112,34 +125,16 @@ with DAG(
         do_xcom_push=True,
         get_logs=True,
         is_delete_operator_pod=True,
+        # execution_timeout covers submit + full poll window + 10 min buffer
+        execution_timeout=timedelta(seconds=SKY_TIMEOUT_SECONDS + 600),
         container_resources=k8s.V1ResourceRequirements(
-            requests=_SKY_SUBMIT_REQUESTS,
-            limits=_SKY_SUBMIT_LIMITS,
+            requests=_SKY_RUN_REQUESTS,
+            limits=_SKY_RUN_LIMITS,
         ),
     )
 
-    poll_sky = KubernetesPodOperator(
-        task_id="poll_sky_job",
-        name="sky-poll-training",
-        namespace=_AIRFLOW_NS,
-        image=_SKY_IMAGE,
-        image_pull_policy=_SKY_IMAGE_PULL_POLICY,
-        arguments=["python", "/app/sky_runner.py", "poll-training"],
-        env_vars={
-            # return_value from submit task is the job_name string
-            "SKY_JOB_NAME":        "{{ ti.xcom_pull(task_ids='submit_sky_job', key='return_value') }}",
-            "SKY_TIMEOUT_SECONDS": str(SKY_TIMEOUT_SECONDS),
-        },
-        env_from=_aws_env_from(),
-        get_logs=True,
-        is_delete_operator_pod=True,
-        execution_timeout=timedelta(seconds=SKY_TIMEOUT_SECONDS + 300),
-        container_resources=k8s.V1ResourceRequirements(
-            requests=_SKY_POLL_REQUESTS,
-            limits=_SKY_POLL_LIMITS,
-        ),
-    )
-
+    # Safety-net: tears down the SkyPilot jobs-controller VM if it's idle after
+    # the run pod failed (e.g. Airflow killed the pod before in-pod cleanup ran).
     cleanup_on_failure = KubernetesPodOperator(
         task_id="cleanup_skypilot_controller_on_failure",
         name="sky-cleanup-training-controller",
@@ -148,17 +143,19 @@ with DAG(
         image_pull_policy=_SKY_IMAGE_PULL_POLICY,
         arguments=["python", "/app/sky_runner.py", "cleanup-failed-training-controller"],
         env_vars={
-            "SKY_JOB_NAME": "{{ ti.xcom_pull(task_ids='submit_sky_job', key='return_value') or '' }}",
+            # run_sky pushes job_name via XCom; fall back to empty string if task
+            # was killed before the push (cleanup_failed_training_controller
+            # handles the empty-name case gracefully).
+            "SKY_JOB_NAME": "{{ ti.xcom_pull(task_ids='run_sky_job', key='return_value') or '' }}",
         },
         env_from=_aws_env_from(),
         get_logs=True,
         is_delete_operator_pod=True,
         trigger_rule=TriggerRule.ONE_FAILED,
         container_resources=k8s.V1ResourceRequirements(
-            requests=_SKY_POLL_REQUESTS,
-            limits=_SKY_POLL_LIMITS,
+            requests=_SKY_CLEANUP_REQUESTS,
+            limits=_SKY_CLEANUP_LIMITS,
         ),
     )
 
-    submit_sky >> poll_sky
-    [submit_sky, poll_sky] >> cleanup_on_failure
+    run_sky >> cleanup_on_failure

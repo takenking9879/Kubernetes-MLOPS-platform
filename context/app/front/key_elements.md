@@ -73,12 +73,15 @@ Components used: `GPUResourceSelector`, `GPUPricingPanel`, `OrchestrationRecomme
 File: `app/frontend/src/components/GPUResourceSelector.tsx`
 
 Does:
-- Collapsible GPU configuration panel (providers, VRAM, spot preference, regions, cost estimate)
-- Exposes `preferred_regions` text input (AWS regions or RunPod zones like CA-MTL-1)
-- Queries catalog and select endpoints
+- Collapsible GPU configuration panel with two modes:
+  - **Auto (catalog)**: provider checkboxes, VRAM filter, spot preference, regions, cost estimate — backend auto-generates `any_of`
+  - **Manual (fallback list)**: user builds an ordered list of `{infra, accelerators, use_spot}` entries; first = highest priority; stored in `ResourceConstraints.gpu_fallbacks`
+- Mode toggle at top of expanded section
+- Manual mode supports add/remove/reorder (↑↓) of entries
+- `gpu_fallbacks` propagated to DAG via `RESOURCE_CONSTRAINTS_JSON`; `_load_task()` injects them directly into SkyPilot `any_of`, bypassing the catalog selector
 
 Inputs: `value: ResourceConstraints`, `onChange`, `disabled?`
-API calls: `queryGPUCatalog`, `selectGPUResources`
+API calls: `queryGPUCatalog` (auto mode only), `selectGPUResources` (auto mode only)
 
 ---
 
@@ -120,7 +123,7 @@ All TypeScript interfaces and API functions live here. Key groups:
 | Training runs | `submitRun`, `listTrainingRunIds`, `getRunStatus`, `checkArtifact`, `getTrainingConfig` |
 | Schemas | `uploadSchemas`, `uploadFullSchema`, `uploadRawSchema` |
 | Serving | `submitServingConfig`, `triggerServingDeploy`, `getServingDeployStatus`, `triggerVllmDeploy`, `getVllmEndpoint` |
-| GPU resources | `queryGPUCatalog`, `selectGPUResources`, `getLLMCatalog` |
+| GPU resources | `queryGPUCatalog`, `selectGPUResources`, `getLLMCatalog`; `GPUFallbackEntry` interface exported |
 | Jobs | `launchJob`, `getJobStatus`, `listJobs`, `cancelJob` |
 | Architectures | `listArchitectures`, `uploadArchitecture` |
 

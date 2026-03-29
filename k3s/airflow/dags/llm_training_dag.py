@@ -1,7 +1,11 @@
-"""LLM Training Pipeline DAG — SkyPilot via KubernetesPodOperator.
+"""LLM Training Pipeline DAG — SkyPilot via single KubernetesPodOperator.
 
 SkyPilot has a dependency conflict with apache-airflow (protobuf, grpcio).
 All sky.* calls are delegated to the takenking9879/sky-runner:0.12.0 pod.
+
+Architecture: single-pod lifecycle
+  One pod runs `run-llm` which does submit → poll → cancel-on-error in sequence,
+  reusing the same SkyPilot local API server throughout.
 
 dag_run.conf keys:
     llm_train_run_id        : str        — unique LLM training run ID
@@ -14,10 +18,10 @@ dag_run.conf keys:
     lora_rank               : int        — LoRA rank (default 8)
     deepspeed_stage         : int        — ZeRO stage 1|2|3 (default 3)
     resource_constraints    : dict|None  — optional GPUSelectorService constraints
+                                           (may include gpu_fallbacks: [{infra, accelerators, use_spot}])
 
 Tasks:
-    1. submit_llm_job  — sky-runner pod → sky.jobs.launch(); pushes job_name to XCom
-    2. poll_llm_job    — sky-runner pod → polls sky.jobs.queue() until terminal state
+    1. run_llm_job  — single pod: submit + poll + cancel-on-failure
 """
 
 from __future__ import annotations
@@ -48,7 +52,8 @@ def _aws_env_from() -> list:
 with DAG(
     dag_id="llm_training_pipeline",
     description=(
-        "SkyPilot managed-jobs LLM fine-tuning (KubernetesPodOperator). "
+        "SkyPilot managed-jobs LLM fine-tuning (single KubernetesPodOperator). "
+        "One pod handles submit → poll → cleanup to avoid state fragmentation. "
         "HuggingFace TRL SFTTrainer + PEFT LoRA + DeepSpeed ZeRO. "
         "Spot-first with S3 checkpoint recovery."
     ),
@@ -62,13 +67,13 @@ with DAG(
     tags=["mlops", "llm", "skypilot"],
 ) as dag:
 
-    submit_llm = KubernetesPodOperator(
-        task_id="submit_llm_job",
-        name="sky-submit-llm",
+    run_llm = KubernetesPodOperator(
+        task_id="run_llm_job",
+        name="sky-run-llm",
         namespace=_AIRFLOW_NS,
         image=_SKY_IMAGE,
         image_pull_policy="IfNotPresent",
-        arguments=["python", "/app/sky_runner.py", "submit-llm"],
+        arguments=["python", "/app/sky_runner.py", "run-llm"],
         env_vars={
             "LLM_TRAIN_RUN_ID":           "{{ dag_run.conf['llm_train_run_id'] }}",
             "LLM_MODEL_ID":               "{{ dag_run.conf['llm_model_id'] }}",
@@ -80,36 +85,16 @@ with DAG(
             "LORA_RANK":                  "{{ dag_run.conf.get('lora_rank', 8) }}",
             "DEEPSPEED_STAGE":            "{{ dag_run.conf.get('deepspeed_stage', 3) }}",
             "RESOURCE_CONSTRAINTS_JSON":  "{{ (dag_run.conf.get('resource_constraints') or {}) | tojson }}",
+            "SKY_TIMEOUT_SECONDS":        str(SKY_TIMEOUT_SECONDS),
         },
         env_from=_aws_env_from(),
         do_xcom_push=True,
         get_logs=True,
         is_delete_operator_pod=True,
+        # execution_timeout covers submit + full poll window + 10 min buffer
+        execution_timeout=timedelta(seconds=SKY_TIMEOUT_SECONDS + 600),
         container_resources=k8s.V1ResourceRequirements(
-            requests={"cpu": "250m", "memory": "512Mi"},
-            limits={"cpu": "500m", "memory": "1Gi"},
+            requests={"cpu": "500m", "memory": "2Gi"},
+            limits={"cpu": "750m", "memory": "3Gi"},
         ),
     )
-
-    poll_llm = KubernetesPodOperator(
-        task_id="poll_llm_job",
-        name="sky-poll-llm",
-        namespace=_AIRFLOW_NS,
-        image=_SKY_IMAGE,
-        image_pull_policy="IfNotPresent",
-        arguments=["python", "/app/sky_runner.py", "poll-llm"],
-        env_vars={
-            "SKY_JOB_NAME":        "{{ ti.xcom_pull(task_ids='submit_llm_job', key='return_value') }}",
-            "SKY_TIMEOUT_SECONDS": str(SKY_TIMEOUT_SECONDS),
-        },
-        env_from=_aws_env_from(),
-        get_logs=True,
-        is_delete_operator_pod=True,
-        execution_timeout=timedelta(seconds=SKY_TIMEOUT_SECONDS + 300),
-        container_resources=k8s.V1ResourceRequirements(
-            requests={"cpu": "100m", "memory": "256Mi"},
-            limits={"cpu": "250m", "memory": "512Mi"},
-        ),
-    )
-
-    submit_llm >> poll_llm

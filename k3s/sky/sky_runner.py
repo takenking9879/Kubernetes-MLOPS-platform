@@ -94,7 +94,8 @@ def _yaml_path(kind: str, rc: dict | None) -> str:
 
 def _load_task(yaml_path: str, run_id: str, rc: dict | None, prefer_spot: bool = True):
     """Load a SkyPilot Task from yaml_path, optionally replacing any_of with a
-    dynamically ranked spot-first list from the GPU catalog.
+    dynamically ranked spot-first list from the GPU catalog, or with an explicit
+    user-defined fallback list from rc['gpu_fallbacks'].
 
     Falls back to the static YAML on any import/catalog error.
     """
@@ -103,6 +104,24 @@ def _load_task(yaml_path: str, run_id: str, rc: dict | None, prefer_spot: bool =
 
     if not rc:
         return sky.Task.from_yaml(yaml_path)
+
+    # ── Explicit user-defined fallback list ────────────────────────────────
+    gpu_fallbacks = rc.get("gpu_fallbacks")
+    if gpu_fallbacks and isinstance(gpu_fallbacks, list) and len(gpu_fallbacks) > 0:
+        try:
+            with open(yaml_path) as fh:
+                sky_conf = _yaml.safe_load(fh)
+            sky_conf.setdefault("resources", {})["any_of"] = gpu_fallbacks
+            sky_conf["resources"].pop("infra", None)
+            tmp = f"/tmp/sky_task_{run_id}_fallback.yaml"
+            with open(tmp, "w") as fh:
+                _yaml.dump(sky_conf, fh, default_flow_style=False, allow_unicode=True)
+            print(f"Using explicit gpu_fallbacks: {len(gpu_fallbacks)} entries (spot-first order)")
+            for i, entry in enumerate(gpu_fallbacks):
+                print(f"  [{i+1}] infra={entry.get('infra','?')} accel={entry.get('accelerators','?')} spot={entry.get('use_spot','?')}")
+            return sky.Task.from_yaml(tmp)
+        except Exception as exc:
+            print(f"[warn] gpu_fallbacks injection failed ({exc}) — falling back to catalog selector")
 
     try:
         import dataclasses
@@ -704,6 +723,175 @@ def wait_ray_vllm():
     raise RuntimeError(f"Ray+vLLM endpoint '{health_url}' not healthy after {timeout}s.")
 
 
+def run_training():
+    """Single-pod full training lifecycle: submit → poll → cleanup on failure.
+
+    Runs all SkyPilot calls within one pod so a single local API server handles
+    the entire job lifecycle, eliminating cold-start overhead and cross-pod
+    state fragmentation.
+    """
+    train_run_id      = _env("TRAIN_RUN_ID")
+    preprocess_run_id = _env("PREPROCESS_RUN_ID")
+    processed_table   = _env("PROCESSED_TABLE")
+    model_type        = _env("MODEL_TYPE", "xgboost")
+    params_s3_path    = _env("PARAMS_S3_PATH")
+    num_nodes         = int(_env("NUM_NODES", "1"))
+    mlflow_uri        = _env("MLFLOW_TRACKING_URI")
+    rc                = _rc()
+    timeout           = int(_env("SKY_TIMEOUT_SECONDS", "7200"))
+
+    job_name = _k8s_name(train_run_id, "sky")
+    use_gpu  = model_type in ("pytorch", "ssm", "bae")
+    kind     = "train_multi" if (use_gpu and num_nodes > 1) else "train"
+
+    yaml_path = _yaml_path(kind, rc)
+    print(f"[run-training] YAML: {yaml_path}  (model={model_type} gpu={use_gpu} nodes={num_nodes})")
+
+    task = _load_task(yaml_path, train_run_id, rc if use_gpu else None)
+    envs: dict[str, str] = {
+        "TRAIN_RUN_ID":        train_run_id,
+        "PREPROCESS_RUN_ID":   preprocess_run_id,
+        "MODEL_TYPE":          model_type,
+        "PARAMS_S3_PATH":      params_s3_path,
+        "PROCESSED_TABLE":     processed_table,
+        "MLFLOW_TRACKING_URI": mlflow_uri,
+    }
+    if num_nodes > 1:
+        envs["NUM_WORKERS"] = str(num_nodes * 8)
+    task.update_envs(envs)
+
+    # ── Submit ────────────────────────────────────────────────────────────────
+    _launch_managed_job_with_stream_fallback(task, job_name)
+    print(f"[run-training] Managed job launched: {job_name}")
+    _xcom_push(job_name)
+
+    # ── Poll (same API server — no state fragmentation) ───────────────────────
+    print(f"[run-training] Polling managed job: {job_name} (timeout={timeout}s)")
+    interval, elapsed = 30, 0
+    try:
+        while elapsed < timeout:
+            time.sleep(interval)
+            elapsed += interval
+            try:
+                all_jobs = _queue_managed_jobs(
+                    refresh=(elapsed == interval),
+                    skip_finished=False,
+                    all_users=True,
+                )
+            except Exception as exc:
+                print(f"[{elapsed}s] sky.jobs.queue error: {exc} — retrying...")
+                continue
+
+            our = [j for j in all_jobs if j.get("job_name") == job_name]
+            if not our:
+                print(f"[{elapsed}s] Job '{job_name}' not visible yet (provisioning...)")
+                continue
+
+            status = _status_text(our[-1].get("status", ""))
+            print(f"[{elapsed}s] Status: {status}")
+            if "SUCCEEDED" in status:
+                print("[run-training] Training completed successfully.")
+                return
+            if "FAILED" in status or "CANCELLED" in status:
+                raise RuntimeError(f"Job '{job_name}' ended with status: {status}")
+
+        raise RuntimeError(f"Job '{job_name}' timed out after {timeout}s.")
+
+    except Exception:
+        print(f"[run-training] Cancelling job '{job_name}' due to error/timeout.")
+        try:
+            import sky
+            sky.get(sky.jobs.cancel(name=job_name))
+        except Exception as exc:
+            print(f"Warning: cancel failed: {exc}")
+        raise
+
+
+def run_llm():
+    """Single-pod full LLM training lifecycle: submit → poll → cancel on failure.
+
+    Runs all SkyPilot calls within one pod so a single local API server handles
+    the entire job lifecycle, eliminating cold-start overhead and cross-pod
+    state fragmentation.
+    """
+    run_id     = _env("LLM_TRAIN_RUN_ID")
+    model_id   = _env("LLM_MODEL_ID")
+    dataset_s3 = _env("TRAIN_DATASET_S3")
+    hf_token   = _env("HF_TOKEN")
+    max_steps  = int(_env("MAX_STEPS", "500"))
+    save_steps = int(_env("SAVE_STEPS", "100"))
+    lora_on    = _env("LORA_ENABLED", "true")
+    lora_rank  = int(_env("LORA_RANK", "8"))
+    ds_stage   = int(_env("DEEPSPEED_STAGE", "3"))
+    mlflow_uri = _env("MLFLOW_TRACKING_URI")
+    rc         = _rc()
+    timeout    = int(_env("SKY_TIMEOUT_SECONDS", "28800"))
+
+    job_name  = _k8s_name(run_id, "llm")
+    yaml_path = _yaml_path("llm", rc)
+    print(f"[run-llm] LLM YAML: {yaml_path}")
+
+    task = _load_task(yaml_path, run_id, rc)
+    task.update_envs({
+        "LLM_TRAIN_RUN_ID":    run_id,
+        "LLM_MODEL_ID":        model_id,
+        "HF_TOKEN":            hf_token,
+        "TRAIN_DATASET_S3":    dataset_s3,
+        "MAX_STEPS":           str(max_steps),
+        "SAVE_STEPS":          str(save_steps),
+        "LORA_ENABLED":        lora_on,
+        "LORA_RANK":           str(lora_rank),
+        "DEEPSPEED_STAGE":     str(ds_stage),
+        "MLFLOW_TRACKING_URI": mlflow_uri,
+    })
+
+    # ── Submit ────────────────────────────────────────────────────────────────
+    _launch_managed_job_with_stream_fallback(task, job_name)
+    print(f"[run-llm] LLM managed job launched: {job_name}")
+    _xcom_push(job_name)
+
+    # ── Poll (same API server — no state fragmentation) ───────────────────────
+    print(f"[run-llm] Polling LLM managed job: {job_name} (timeout={timeout}s)")
+    interval, elapsed = 60, 0
+    try:
+        while elapsed < timeout:
+            time.sleep(interval)
+            elapsed += interval
+            try:
+                all_jobs = _queue_managed_jobs(
+                    refresh=(elapsed == interval),
+                    skip_finished=False,
+                    all_users=True,
+                )
+            except Exception as exc:
+                print(f"[{elapsed}s] sky.jobs.queue error: {exc} — retrying...")
+                continue
+
+            our = [j for j in all_jobs if j.get("job_name") == job_name]
+            if not our:
+                print(f"[{elapsed}s] Job '{job_name}' not visible yet")
+                continue
+
+            status = _status_text(our[-1].get("status", ""))
+            print(f"[{elapsed}s] Status: {status}")
+            if "SUCCEEDED" in status:
+                print("[run-llm] LLM training completed successfully.")
+                return
+            if "FAILED" in status or "CANCELLED" in status:
+                raise RuntimeError(f"LLM job '{job_name}' ended: {status}")
+
+        raise RuntimeError(f"LLM job '{job_name}' timed out after {timeout}s.")
+
+    except Exception:
+        print(f"[run-llm] Cancelling LLM job '{job_name}'")
+        try:
+            import sky
+            sky.get(sky.jobs.cancel(name=job_name))
+        except Exception as exc:
+            print(f"Warning: cancel failed: {exc}")
+        raise
+
+
 def register_endpoint():
     import boto3
     from datetime import datetime
@@ -743,11 +931,16 @@ def register_endpoint():
 # ─── Entry point ──────────────────────────────────────────────────────────────
 
 _COMMANDS = {
+    # ── Unified single-pod lifecycle (preferred) ──────────────────────────────
+    "run-training":      run_training,
+    "run-llm":           run_llm,
+    # ── Legacy split-phase commands (kept for reference/debugging) ────────────
     "submit-training":   submit_training,
     "poll-training":     poll_training,
     "cleanup-failed-training-controller": cleanup_failed_training_controller,
     "submit-llm":        submit_llm,
     "poll-llm":          poll_llm,
+    # ── vLLM serving (persistent cluster — split-phase is intentional here) ───
     "launch-vllm":       launch_vllm,
     "wait-vllm":         wait_vllm,
     "launch-ray-vllm":   launch_ray_vllm,
