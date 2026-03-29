@@ -38,7 +38,7 @@ Tasks:
 | `vllm-serving-runpod.yaml` | RunPod | vllm | ACTIVE |
 | `vllm-serving-vast.yaml` | Vast.ai | vllm | ACTIVE |
 | `ray-vllm-multinode-serving.yaml` | AWS | vllm_multi | ACTIVE |
-| `sky-runner-pod.yaml` | K8s | utility | ACTIVE (used by KubernetesPodOperator in DAGs) |
+| `sky-runner-pod.yaml` | K8s | utility | ACTIVE (reference/template only; KubernetesPodOperator runtime spec is defined in DAG files) |
 | `ray-gpu-training.yaml` | generic | train | **LEGACY** |
 | `ray-llm-training.yaml` | generic | llm | **LEGACY** |
 | `vllm-serving.yaml` | generic | vllm | **LEGACY** |

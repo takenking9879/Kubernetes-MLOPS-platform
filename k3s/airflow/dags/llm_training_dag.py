@@ -68,8 +68,7 @@ with DAG(
         namespace=_AIRFLOW_NS,
         image=_SKY_IMAGE,
         image_pull_policy="IfNotPresent",
-        cmds=["python", "/app/sky_runner.py"],
-        arguments=["submit-llm"],
+        arguments=["python", "/app/sky_runner.py", "submit-llm"],
         env_vars={
             "LLM_TRAIN_RUN_ID":           "{{ dag_run.conf['llm_train_run_id'] }}",
             "LLM_MODEL_ID":               "{{ dag_run.conf['llm_model_id'] }}",
@@ -98,8 +97,7 @@ with DAG(
         namespace=_AIRFLOW_NS,
         image=_SKY_IMAGE,
         image_pull_policy="IfNotPresent",
-        cmds=["python", "/app/sky_runner.py"],
-        arguments=["poll-llm"],
+        arguments=["python", "/app/sky_runner.py", "poll-llm"],
         env_vars={
             "SKY_JOB_NAME":        "{{ ti.xcom_pull(task_ids='submit_llm_job', key='return_value') }}",
             "SKY_TIMEOUT_SECONDS": str(SKY_TIMEOUT_SECONDS),

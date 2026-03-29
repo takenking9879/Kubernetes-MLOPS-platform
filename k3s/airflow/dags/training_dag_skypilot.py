@@ -95,8 +95,7 @@ with DAG(
         namespace=_AIRFLOW_NS,
         image=_SKY_IMAGE,
         image_pull_policy=_SKY_IMAGE_PULL_POLICY,
-        cmds=["python", "/app/sky_runner.py"],
-        arguments=["submit-training"],
+        arguments=["python", "/app/sky_runner.py", "submit-training"],
         env_vars={
             "TRAIN_RUN_ID":               "{{ dag_run.conf['train_run_id'] }}",
             "PREPROCESS_RUN_ID":          "{{ dag_run.conf['preprocess_run_id'] }}",
@@ -123,8 +122,7 @@ with DAG(
         namespace=_AIRFLOW_NS,
         image=_SKY_IMAGE,
         image_pull_policy=_SKY_IMAGE_PULL_POLICY,
-        cmds=["python", "/app/sky_runner.py"],
-        arguments=["poll-training"],
+        arguments=["python", "/app/sky_runner.py", "poll-training"],
         env_vars={
             # return_value from submit task is the job_name string
             "SKY_JOB_NAME":        "{{ ti.xcom_pull(task_ids='submit_sky_job', key='return_value') }}",

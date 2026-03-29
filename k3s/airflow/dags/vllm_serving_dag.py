@@ -70,8 +70,7 @@ with DAG(
         namespace=_AIRFLOW_NS,
         image=_SKY_IMAGE,
         image_pull_policy="IfNotPresent",
-        cmds=["python", "/app/sky_runner.py"],
-        arguments=["launch-vllm"],
+        arguments=["python", "/app/sky_runner.py", "launch-vllm"],
         env_vars={
             "SERVE_RUN_ID":               "{{ dag_run.conf['serve_run_id'] }}",
             "HF_MODEL_ID":                "{{ dag_run.conf['llm_model_id'] }}",
@@ -97,8 +96,7 @@ with DAG(
         namespace=_AIRFLOW_NS,
         image=_SKY_IMAGE,
         image_pull_policy="IfNotPresent",
-        cmds=["python", "/app/sky_runner.py"],
-        arguments=["wait-vllm"],
+        arguments=["python", "/app/sky_runner.py", "wait-vllm"],
         env_vars={
             # cluster_info dict from launch task: {"cluster_name":..., "head_ip":..., "vllm_port":...}
             "CLUSTER_INFO_JSON":              "{{ ti.xcom_pull(task_ids='launch_vllm_cluster', key='return_value') | tojson }}",
@@ -121,8 +119,7 @@ with DAG(
         namespace=_AIRFLOW_NS,
         image=_SKY_IMAGE,
         image_pull_policy="IfNotPresent",
-        cmds=["python", "/app/sky_runner.py"],
-        arguments=["register-endpoint"],
+        arguments=["python", "/app/sky_runner.py", "register-endpoint"],
         env_vars={
             # endpoint_url string from wait task
             "ENDPOINT_URL":   "{{ ti.xcom_pull(task_ids='wait_for_endpoint', key='return_value') }}",
