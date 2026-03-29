@@ -4,3 +4,12 @@
 - Added runtime safeguard in `k3s/sky/docker-entrypoint.sh` to merge `~/.sky/config.yaml` and force managed jobs controller `disk_size` to a RunPod-compatible value (default 30 GB, max 40 GB).
 - Added Vast credential alias support (`VAST_API_KEY` and `VASTAI_API_KEY`) in runner entrypoint and `src/services/gpu_catalog.py`.
 - Updated context docs: `context/k3s/key_elements.md` and `context/k3s/mismatches.md`.
+
+## 2026-03-29 — SkyPilot polling stability in Airflow KPO pods
+- Updated `k3s/sky/sky_runner.py` polling and launch-visibility checks to use `sky.jobs.queue(version=2)`.
+- Added normalization for queue v2 records and handled "No in-progress managed jobs." as an empty queue state.
+- Enabled `all_users=True` in polling path to avoid user-hash visibility mismatches between submit/poll pods with non-shared `~/.sky` state.
+
+## 2026-03-29 — Auto teardown of jobs controller on DAG failure
+- Added `cleanup_skypilot_controller_on_failure` task to `training_pipeline_skypilot` with `TriggerRule.ONE_FAILED`.
+- Added `cleanup-failed-training-controller` command in `k3s/sky/sky_runner.py` to cancel the failed managed job (best effort), check for remaining active managed jobs, and tear down `sky-jobs-controller-*` only when safe.

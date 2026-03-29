@@ -18,6 +18,7 @@ dag_run.conf (same as before):
 Tasks:
     1. submit_sky_job  — launches sky-runner pod → sky.jobs.launch(); pushes job_name to XCom
     2. poll_sky_job    — launches sky-runner pod → polls sky.jobs.queue() until terminal state
+    3. cleanup_skypilot_controller_on_failure — best-effort controller teardown on DAG failure
 
 Prerequisites:
     - Secret "sky-config"  in airflow namespace (from ~/.sky/config.yaml)
@@ -33,6 +34,7 @@ from datetime import datetime, timedelta
 
 from airflow.sdk import DAG
 from airflow.providers.cncf.kubernetes.operators.pod import KubernetesPodOperator
+from airflow.utils.trigger_rule import TriggerRule
 from kubernetes.client import models as k8s
 
 # ─── Constants ────────────────────────────────────────────────────────────────
@@ -138,4 +140,25 @@ with DAG(
         ),
     )
 
+    cleanup_on_failure = KubernetesPodOperator(
+        task_id="cleanup_skypilot_controller_on_failure",
+        name="sky-cleanup-training-controller",
+        namespace=_AIRFLOW_NS,
+        image=_SKY_IMAGE,
+        image_pull_policy=_SKY_IMAGE_PULL_POLICY,
+        arguments=["python", "/app/sky_runner.py", "cleanup-failed-training-controller"],
+        env_vars={
+            "SKY_JOB_NAME": "{{ ti.xcom_pull(task_ids='submit_sky_job', key='return_value') or '' }}",
+        },
+        env_from=_aws_env_from(),
+        get_logs=True,
+        is_delete_operator_pod=True,
+        trigger_rule=TriggerRule.ONE_FAILED,
+        container_resources=k8s.V1ResourceRequirements(
+            requests=_SKY_POLL_REQUESTS,
+            limits=_SKY_POLL_LIMITS,
+        ),
+    )
+
     submit_sky >> poll_sky
+    [submit_sky, poll_sky] >> cleanup_on_failure

@@ -8,6 +8,9 @@ All inputs come from environment variables; return values are written to
 Commands:
     submit-training     Launch managed tabular training job; pushes job_name (str)
     poll-training       Poll managed training job until terminal state
+    cleanup-failed-training-controller
+                        Best-effort cleanup: cancel failed training job and
+                        tear down SkyPilot jobs controller when safe
     submit-llm          Launch managed LLM fine-tuning job; pushes job_name (str)
     poll-llm            Poll managed LLM job until terminal state
     launch-vllm         Provision persistent single-node vLLM cluster; pushes cluster_info (dict)
@@ -184,18 +187,90 @@ def _is_stream_connection_error(exc: Exception) -> bool:
     )
 
 
+def _job_record_to_dict(job: object) -> dict:
+    """Normalize queue records to plain dicts across SkyPilot versions."""
+    if isinstance(job, dict):
+        return job
+
+    model_dump = getattr(job, "model_dump", None)
+    if callable(model_dump):
+        try:
+            dumped = model_dump()
+            if isinstance(dumped, dict):
+                return dumped
+        except Exception:
+            pass
+
+    legacy_dict = getattr(job, "dict", None)
+    if callable(legacy_dict):
+        try:
+            dumped = legacy_dict()
+            if isinstance(dumped, dict):
+                return dumped
+        except Exception:
+            pass
+
+    return {
+        "job_name": str(getattr(job, "job_name", "")),
+        "status": str(getattr(job, "status", "")),
+    }
+
+
+def _status_text(status: object) -> str:
+    if status is None:
+        return ""
+    value = getattr(status, "value", None)
+    return str(value) if value is not None else str(status)
+
+
+def _is_terminal_status(status: object) -> bool:
+    text = _status_text(status).upper()
+    return any(s in text for s in ("SUCCEEDED", "FAILED", "CANCELLED", "CANCELED"))
+
+
+def _queue_managed_jobs(
+    refresh: bool,
+    skip_finished: bool = False,
+    all_users: bool = True,
+) -> list[dict]:
+    """Fetch managed jobs via queue(version=2) and normalize records.
+
+    `all_users=True` avoids cross-pod user-hash mismatches in ephemeral
+    Airflow KPO pods where ~/.sky state is not shared.
+    """
+    import sky
+
+    try:
+        result = sky.get(
+            sky.jobs.queue(
+                refresh=refresh,
+                skip_finished=skip_finished,
+                all_users=all_users,
+                version=2,
+            ))
+    except Exception as exc:
+        # SkyPilot may raise this when no job is currently in progress.
+        if "No in-progress managed jobs." in str(exc):
+            return []
+        raise
+
+    records = result[0] if isinstance(result, tuple) else result
+    if records is None:
+        return []
+    return [_job_record_to_dict(job) for job in records]
+
+
 def _managed_job_visible(
     job_name: str,
     timeout_seconds: int = 120,
     poll_interval_seconds: int = 10,
 ) -> bool:
-    """Return True if a managed job is visible in sky.jobs.queue() within timeout."""
-    import sky
+    """Return True if a managed job is visible in queue(version=2) within timeout."""
 
     waited = 0
     while waited <= timeout_seconds:
         try:
-            all_jobs = sky.get(sky.jobs.queue(refresh=False))
+            all_jobs = _queue_managed_jobs(refresh=True, skip_finished=False, all_users=True)
             if any(j.get("job_name") == job_name for j in all_jobs):
                 return True
         except Exception as queue_exc:
@@ -227,7 +302,7 @@ def _launch_managed_job_with_stream_fallback(task, job_name: str) -> None:
             raise
 
         print(f"[warn] stream_and_get failed for '{job_name}': {exc}")
-        print("Verifying job visibility in sky.jobs.queue() before failing...")
+        print("Verifying job visibility in sky.jobs.queue(version=2) before failing...")
         if _managed_job_visible(job_name):
             print("Managed job is visible in queue; continuing despite stream error.")
             return
@@ -275,8 +350,6 @@ def submit_training():
 
 
 def poll_training():
-    import sky
-
     job_name = _env("SKY_JOB_NAME")
     timeout  = int(_env("SKY_TIMEOUT_SECONDS", "7200"))
     print(f"Polling managed training job: {job_name}")
@@ -287,9 +360,13 @@ def poll_training():
             time.sleep(interval)
             elapsed += interval
             try:
-                all_jobs = sky.get(sky.jobs.queue(refresh=False))
+                all_jobs = _queue_managed_jobs(
+                    refresh=(elapsed == interval),
+                    skip_finished=False,
+                    all_users=True,
+                )
             except Exception as exc:
-                print(f"[{elapsed}s] sky.jobs.queue() error: {exc} — retrying...")
+                print(f"[{elapsed}s] sky.jobs.queue(version=2) error: {exc} — retrying...")
                 continue
 
             our = [j for j in all_jobs if j.get("job_name") == job_name]
@@ -297,7 +374,7 @@ def poll_training():
                 print(f"[{elapsed}s] Job '{job_name}' not visible yet (provisioning...)")
                 continue
 
-            status = str(our[-1].get("status", ""))
+            status = _status_text(our[-1].get("status", ""))
             print(f"[{elapsed}s] Status: {status}")
             if "SUCCEEDED" in status:
                 print("Training completed successfully.")
@@ -310,6 +387,7 @@ def poll_training():
     except Exception:
         print(f"Cancelling job '{job_name}' due to error/timeout.")
         try:
+            import sky
             sky.get(sky.jobs.cancel(name=job_name))
         except Exception as exc:
             print(f"Warning: cancel failed: {exc}")
@@ -353,8 +431,6 @@ def submit_llm():
 
 
 def poll_llm():
-    import sky
-
     job_name = _env("SKY_JOB_NAME")
     timeout  = int(_env("SKY_TIMEOUT_SECONDS", "28800"))
     print(f"Polling LLM managed job: {job_name}")
@@ -365,9 +441,13 @@ def poll_llm():
             time.sleep(interval)
             elapsed += interval
             try:
-                all_jobs = sky.get(sky.jobs.queue(refresh=False))
+                all_jobs = _queue_managed_jobs(
+                    refresh=(elapsed == interval),
+                    skip_finished=False,
+                    all_users=True,
+                )
             except Exception as exc:
-                print(f"[{elapsed}s] sky.jobs.queue() error: {exc} — retrying...")
+                print(f"[{elapsed}s] sky.jobs.queue(version=2) error: {exc} — retrying...")
                 continue
 
             our = [j for j in all_jobs if j.get("job_name") == job_name]
@@ -375,7 +455,7 @@ def poll_llm():
                 print(f"[{elapsed}s] Job '{job_name}' not visible yet")
                 continue
 
-            status = str(our[-1].get("status", ""))
+            status = _status_text(our[-1].get("status", ""))
             print(f"[{elapsed}s] Status: {status}")
             if "SUCCEEDED" in status:
                 print("LLM training completed successfully.")
@@ -388,10 +468,77 @@ def poll_llm():
     except Exception:
         print(f"Cancelling LLM job '{job_name}'")
         try:
+            import sky
             sky.get(sky.jobs.cancel(name=job_name))
         except Exception as exc:
             print(f"Warning: cancel failed: {exc}")
         raise
+
+
+def cleanup_failed_training_controller():
+    """Best-effort cleanup for failed training DAG runs.
+
+    Strategy:
+      1) Cancel current managed job by name (if provided).
+      2) Inspect queue across all users.
+      3) Tear down jobs controller only if there are no active managed jobs.
+    """
+    import importlib
+    import sky
+    controller_utils = importlib.import_module("sky.utils.controller_utils")
+
+    job_name_raw = _env("SKY_JOB_NAME", "").strip()
+    job_name = "" if job_name_raw in ("", "None", "null") else job_name_raw
+
+    if job_name:
+        print(f"Cleanup: cancelling managed job '{job_name}' (best effort)")
+        try:
+            sky.get(sky.jobs.cancel(name=job_name, all_users=True))
+        except Exception as exc:
+            print(f"[warn] cancel by name failed: {exc}")
+
+    try:
+        jobs = _queue_managed_jobs(refresh=True, skip_finished=False, all_users=True)
+    except Exception as exc:
+        print(f"[warn] could not query managed jobs before controller cleanup: {exc}")
+        jobs = []
+
+    active_jobs = [j for j in jobs if not _is_terminal_status(j.get("status"))]
+    if active_jobs:
+        sample = ", ".join(str(j.get("job_name", "<unnamed>")) for j in active_jobs[:3])
+        print(
+            f"Skipping jobs-controller teardown: {len(active_jobs)} managed jobs still active "
+            f"({sample})."
+        )
+        return
+
+    prefix = controller_utils.common.JOB_CONTROLLER_PREFIX
+    try:
+        clusters = sky.get(sky.status(all_users=True, refresh=False))
+    except Exception as exc:
+        print(f"[warn] could not list clusters for controller teardown: {exc}")
+        return
+
+    controller_names: list[str] = []
+    for cluster in clusters or []:
+        if isinstance(cluster, dict):
+            name = str(cluster.get("name", "") or "")
+        else:
+            name = str(getattr(cluster, "name", "") or "")
+        if name.startswith(prefix):
+            controller_names.append(name)
+
+    if not controller_names:
+        print("No active SkyPilot jobs controller found to delete.")
+        return
+
+    for controller_name in controller_names:
+        try:
+            print(f"Tearing down SkyPilot jobs controller: {controller_name}")
+            sky.get(sky.down(controller_name, purge=False))
+            print(f"Controller deleted: {controller_name}")
+        except Exception as exc:
+            print(f"[warn] controller teardown failed for {controller_name}: {exc}")
 
 
 def launch_vllm():
@@ -598,6 +745,7 @@ def register_endpoint():
 _COMMANDS = {
     "submit-training":   submit_training,
     "poll-training":     poll_training,
+    "cleanup-failed-training-controller": cleanup_failed_training_controller,
     "submit-llm":        submit_llm,
     "poll-llm":          poll_llm,
     "launch-vllm":       launch_vllm,
