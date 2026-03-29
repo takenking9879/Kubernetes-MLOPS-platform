@@ -47,20 +47,20 @@ _SKY_IMAGE_PULL_POLICY = os.getenv("SKY_RUNNER_IMAGE_PULL_POLICY", "IfNotPresent
 # SkyPilot API server can transiently use >1Gi memory during startup.
 _SKY_SUBMIT_REQUESTS = {
     "cpu": os.getenv("SKY_SUBMIT_CPU_REQUEST", "500m"),
-    "memory": os.getenv("SKY_SUBMIT_MEMORY_REQUEST", "1Gi"),
+    "memory": os.getenv("SKY_SUBMIT_MEMORY_REQUEST", "2Gi"),
 }
 _SKY_SUBMIT_LIMITS = {
-    "cpu": os.getenv("SKY_SUBMIT_CPU_LIMIT", "1000m"),
-    "memory": os.getenv("SKY_SUBMIT_MEMORY_LIMIT", "2Gi"),
+    "cpu": os.getenv("SKY_SUBMIT_CPU_LIMIT", "750m"),
+    "memory": os.getenv("SKY_SUBMIT_MEMORY_LIMIT", "3Gi"),
 }
 
 _SKY_POLL_REQUESTS = {
-    "cpu": os.getenv("SKY_POLL_CPU_REQUEST", "250m"),
-    "memory": os.getenv("SKY_POLL_MEMORY_REQUEST", "1Gi"),
+    "cpu": os.getenv("SKY_POLL_CPU_REQUEST", "500m"),
+    "memory": os.getenv("SKY_POLL_MEMORY_REQUEST", "2Gi"),
 }
 _SKY_POLL_LIMITS = {
-    "cpu": os.getenv("SKY_POLL_CPU_LIMIT", "500m"),
-    "memory": os.getenv("SKY_POLL_MEMORY_LIMIT", "2Gi"),
+    "cpu": os.getenv("SKY_POLL_CPU_LIMIT", "750m"),
+    "memory": os.getenv("SKY_POLL_MEMORY_LIMIT", "3Gi"),
 }
 
 # ─── Shared pod configuration helpers ─────────────────────────────────────────
