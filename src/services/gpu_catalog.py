@@ -43,6 +43,26 @@ _AWS_ML_REGIONS = [
     "eu-west-1", "ap-northeast-1", "ap-southeast-1",
 ]
 
+# ── Hardcoded fallback GPU sets (used when SkyPilot is not installed) ─────────
+# Derived from `sky show-gpus --infra {cloud} -a` with SkyPilot 0.12.0.
+# These are updated when new GPU types are added to the SkyPilot catalogs.
+_SKY_RUNPOD_KNOWN: frozenset[str] = frozenset({
+    "A100-80GB", "A100-80GB-SXM", "A40", "B200", "H100", "H100-NVL",
+    "H100-SXM", "H200-SXM", "L4", "L40", "L40S", "MI300X", "NVIDIA-H200-NVL",
+    "RTX2000-Ada", "RTX3090", "RTX4000-Ada", "RTX4090", "RTX5090", "RTX6000-Ada",
+    "RTXA4000", "RTXA4500", "RTXA5000", "RTXA6000", "RTXPRO4500", "RTXPRO6000",
+    "RTXPRO6000-WK",
+})
+_SKY_VAST_KNOWN: frozenset[str] = frozenset({
+    "A100", "H100", "H200", "L40S", "RTX3060", "RTX3090", "RTX4060", "RTX4070",
+    "RTX4090", "RTX5070", "RTX5090", "RTX5880-Ada", "RTX6000-Ada",
+    "RTXA5000", "RTXA6000", "RTXPRO6000WS", "V100",
+})
+_SKY_AWS_KNOWN: frozenset[str] = frozenset({
+    "A100", "A100-80GB", "A10G", "B200", "B300", "H100", "H200",
+    "L4", "L40S", "RTXPRO6000", "T4", "V100", "V100-32GB",
+})
+
 # ── RunPod GPU displayName/id → SkyPilot accelerator ID ──────────────────────
 # Keys are the `id` field returned by RunPod's GraphQL API (often = displayName).
 _RUNPOD_TO_SKYPILOT: dict[str, str] = {
@@ -324,6 +344,11 @@ class GPUCatalogService:
         if self._is_cache_valid(cache_key):
             return self._cache[cache_key]
         try:
+            # vastai reads ~/.vast_ai/ at import; K8s pods may have HOME=/nonexistent.
+            import pathlib
+            _home = os.environ.get("HOME", "")
+            if not _home or not pathlib.Path(_home).is_dir():
+                os.environ["HOME"] = "/tmp"
             from vastai import VastAI  # type: ignore[import]
             api_key = os.getenv("VAST_API_KEY", "")
             if not api_key:
@@ -517,12 +542,22 @@ class GPUCatalogService:
 
 
 def _sky_supported_names(catalog: dict, cloud: str) -> set[str]:
-    """Return the set of GPU names SkyPilot supports for a given cloud provider."""
-    return {
-        gpu_name
-        for gpu_name, rows in catalog.items()
-        if any(r.get("cloud") == cloud for r in rows)
-    }
+    """Return GPU names SkyPilot supports for a cloud. Falls back to hardcoded
+    sets when the catalog is unavailable (e.g. sky not installed in the pod)."""
+    if catalog:
+        return {
+            gpu_name
+            for gpu_name, rows in catalog.items()
+            if any(r.get("cloud") == cloud for r in rows)
+        }
+    # Sky not available — use hardcoded sets from the last known catalog.
+    if cloud == "runpod":
+        return set(_SKY_RUNPOD_KNOWN)
+    if cloud == "vast":
+        return set(_SKY_VAST_KNOWN)
+    if cloud == "aws":
+        return set(_SKY_AWS_KNOWN)
+    return set()
 
 
 def _f_none(v: Any) -> float | None:

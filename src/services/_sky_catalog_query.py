@@ -7,7 +7,7 @@ Outputs JSON to stdout: { gpu_name: [{cloud, region, price, spot_price,
                                        accelerator_count, device_memory,
                                        cpu_count, memory, instance_type}] }
 
-Includes aws, runpod, vast (COMMON + OTHER GPUs via all=True).
+Includes aws, runpod, vast (COMMON + OTHER GPUs — all=True removed in SkyPilot 0.12.0).
 GCP/Azure excluded for now.
 
 Usage (from gpu_catalog.py):
@@ -43,8 +43,8 @@ def _i(v, default=0):
 
 
 out: dict = {}
-# all=True: includes COMMON GPUs + OTHER GPUs (RTX4090, RTXA4000, MI300X, etc.)
-# Without all=True, only COMMON GPUs are returned — misses many RunPod/Vast offers.
+# sky.list_accelerators() returns all GPU types (COMMON + OTHER) by default.
+# The `all` parameter was removed in SkyPilot 0.12.0.
 for gpu_name, instances in sky.list_accelerators(
     gpus_only=True, clouds=list(VALID_CLOUDS)
 ).items():
