@@ -175,11 +175,71 @@ def _get_head_ip(cluster_name: str) -> str | None:
     return None
 
 
+def _is_stream_connection_error(exc: Exception) -> bool:
+    """Best-effort detection for transient SkyPilot stream API failures."""
+    msg = str(exc)
+    return (
+        "/api/stream" in msg
+        and ("Connection refused" in msg or "Max retries exceeded" in msg)
+    )
+
+
+def _managed_job_visible(
+    job_name: str,
+    timeout_seconds: int = 120,
+    poll_interval_seconds: int = 10,
+) -> bool:
+    """Return True if a managed job is visible in sky.jobs.queue() within timeout."""
+    import sky
+
+    waited = 0
+    while waited <= timeout_seconds:
+        try:
+            all_jobs = sky.get(sky.jobs.queue(refresh=False))
+            if any(j.get("job_name") == job_name for j in all_jobs):
+                return True
+        except Exception as queue_exc:
+            print(f"[warn] queue visibility check failed: {queue_exc}")
+
+        if waited == timeout_seconds:
+            break
+        time.sleep(poll_interval_seconds)
+        waited += poll_interval_seconds
+
+    return False
+
+
+def _launch_managed_job_with_stream_fallback(task, job_name: str) -> None:
+    """Launch managed job and tolerate transient stream API errors.
+
+    SkyPilot may occasionally fail the local /api/stream follow request even when
+    launch succeeded. In that case, validate the job appears in queue before
+    failing the task.
+    """
+    import sky
+
+    request_id = sky.jobs.launch(task, name=job_name)
+    try:
+        sky.stream_and_get(request_id)
+        return
+    except Exception as exc:
+        if not _is_stream_connection_error(exc):
+            raise
+
+        print(f"[warn] stream_and_get failed for '{job_name}': {exc}")
+        print("Verifying job visibility in sky.jobs.queue() before failing...")
+        if _managed_job_visible(job_name):
+            print("Managed job is visible in queue; continuing despite stream error.")
+            return
+
+        raise RuntimeError(
+            f"Managed job '{job_name}' launch stream failed and the job is not visible in queue."
+        ) from exc
+
+
 # ─── Operations ───────────────────────────────────────────────────────────────
 
 def submit_training():
-    import sky
-
     train_run_id      = _env("TRAIN_RUN_ID")
     preprocess_run_id = _env("PREPROCESS_RUN_ID")
     processed_table   = _env("PROCESSED_TABLE")
@@ -209,7 +269,7 @@ def submit_training():
         envs["NUM_WORKERS"] = str(num_nodes * 8)
     task.update_envs(envs)
 
-    sky.stream_and_get(sky.jobs.launch(task, name=job_name))
+    _launch_managed_job_with_stream_fallback(task, job_name)
     print(f"Managed training job launched: {job_name}")
     _xcom_push(job_name)
 
@@ -257,8 +317,6 @@ def poll_training():
 
 
 def submit_llm():
-    import sky
-
     run_id     = _env("LLM_TRAIN_RUN_ID")
     model_id   = _env("LLM_MODEL_ID")
     dataset_s3 = _env("TRAIN_DATASET_S3")
@@ -289,7 +347,7 @@ def submit_llm():
         "MLFLOW_TRACKING_URI": mlflow_uri,
     })
 
-    sky.stream_and_get(sky.jobs.launch(task, name=job_name))
+    _launch_managed_job_with_stream_fallback(task, job_name)
     print(f"LLM managed job launched: {job_name}")
     _xcom_push(job_name)
 

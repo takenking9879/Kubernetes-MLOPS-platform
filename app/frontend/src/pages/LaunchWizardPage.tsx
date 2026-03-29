@@ -36,6 +36,7 @@ import {
 import {
   launchJob,
   submitRun,
+  listDatasets,
   getLLMCatalog,
   listArchitectures,
   uploadArchitecture,
@@ -45,6 +46,7 @@ import {
   type LaunchResponse,
   type OrchestratorRecommendation,
   type LLMModelInfo,
+  type DatasetInfo,
   type ResourceConstraints,
   type PreprocessRunId,
   type TrainingRunResult,
@@ -131,6 +133,7 @@ export function LaunchWizardPage() {
   const [preprocessRunIds, setPreprocessRunIds] = useState<PreprocessRunId[]>([]);
   const [preprocessLoading, setPreprocessLoading] = useState(false);
   const [datasetFilter, setDatasetFilter] = useState('');
+  const [availableDatasets, setAvailableDatasets] = useState<DatasetInfo[]>([]);
   const [preprocessRunId, setPreprocessRunId] = useState('');
   const [preprocessInfo, setPreprocessInfo] = useState<{
     dataset: string;
@@ -209,7 +212,9 @@ export function LaunchWizardPage() {
   }, [preprocessRunId]);
 
   // Unique datasets from loaded preprocess runs
-  const datasetOptions = [...new Set(preprocessRunIds.map(r => r.dataset).filter(Boolean))];
+  const datasetOptions = availableDatasets.length > 0
+    ? availableDatasets.map((d) => d.name)
+    : [...new Set(preprocessRunIds.map((r) => r.dataset).filter(Boolean))];
 
   // ── LLM / serving state ──────────────────────────────────────────────────
   const [llmModel, setLlmModel] = useState('');
@@ -251,6 +256,9 @@ export function LaunchWizardPage() {
   useEffect(() => {
     getLLMCatalog().then(setLlmCatalog).catch(() => {});
     listArchitectures().catch(() => {});
+    listDatasets()
+      .then((datasets) => setAvailableDatasets(datasets))
+      .catch(() => setAvailableDatasets([]));
   }, []);
 
   useEffect(() => {
