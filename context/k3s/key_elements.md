@@ -30,6 +30,7 @@ Tasks:
 | File | Provider | Kind | Status |
 |------|----------|------|--------|
 | `ray-gpu-training-runpod.yaml` | RunPod | train | ACTIVE |
+| `ray-gpu-training-runpod-smoke.yaml` | RunPod | utility/smoke | ACTIVE (manual validation of setup + Ray bootstrap; no full training) |
 | `ray-gpu-training-vast.yaml` | Vast.ai | train | ACTIVE |
 | `ray-gpu-multinode-aws.yaml` | AWS | train_multi | ACTIVE |
 | `ray-llm-training-runpod.yaml` | RunPod | llm | ACTIVE |
@@ -52,7 +53,8 @@ Sky runner runtime notes:
 - It also writes/merges `~/.sky/config.yaml` to enforce `jobs.controller.resources.disk_size` (default 30 GB, clamped to 40 GB for RunPod compatibility).
 - **Single-pod lifecycle** (`run-training`, `run-llm`): submit + poll run in the same pod, reusing one SkyPilot local API server. Legacy split-phase commands (`submit-training`, `poll-training`, `submit-llm`, `poll-llm`) are kept for debugging but no longer used by DAGs.
 - Managed jobs polling uses `sky.jobs.queue(version=2)` with `all_users=True`.
-- For provider-native tabular training YAMLs (`ray-gpu-training-runpod.yaml`, `ray-gpu-training-vast.yaml`), DeepSpeed is installed only when `USE_DEEPSPEED=true`; default path skips it to reduce setup-time failures.
+- All provider-native (RunPod/Vast) YAMLs use a **probe-based venv pattern**: setup probes for the image Python with torch+CUDA, creates `/opt/ml-platform-runtime` via `${PYTHON_BIN} -m venv --system-site-packages` (inherits provider torch), writes the venv Python path to `<APP_HOME>/runtime_python.txt`, and installs deps via `${RUNTIME_PYTHON} -m pip`. Run reads the file and uses explicit binary paths (`"${PYTHON_BIN}"`, `"${RAY_BIN}"`, `"${VLLM_BIN}"`) — no PATH-dependent bare commands.
+- For GPU training YAMLs, DeepSpeed is installed only when `USE_DEEPSPEED=true`; default skips it. `job_builder.py` always overrides this env from `config.use_deepspeed` — the YAML default is never used at runtime. `LaunchWizardPage` sets `use_deepspeed=true, deepspeed_stage=3` for LLM jobs and `false/1` for tabular, matching the YAML defaults.
 - On managed job terminal failure, `k3s/sky/sky_runner.py` now includes queue-provided diagnostics (`failure_reason`, `failure_type`, `cluster_name`, etc.) in raised errors.
 - `rc['gpu_fallbacks']` (list of `{infra, accelerators, use_spot}`) bypasses the auto-catalog selector and injects the list directly into `resources.any_of`. Set from `ResourceConstraints.gpu_fallbacks` in the frontend.
 

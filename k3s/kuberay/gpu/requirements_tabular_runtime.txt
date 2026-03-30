@@ -11,7 +11,10 @@ ray[data,train,tune,serve]==2.53.0
 # =========================
 # Core ML / Data
 # =========================
-numpy==2.3.3
+# RunPod/Vast provider templates currently expose Python 3.10 in /root/miniconda3.
+# Keep a Python-conditional pin so setup works on both 3.10 and 3.11+.
+numpy==2.2.6; python_version < "3.11"
+numpy==2.3.3; python_version >= "3.11"
 pandas==2.3.3
 pyarrow==22.0.0
 scikit-learn==1.8.0

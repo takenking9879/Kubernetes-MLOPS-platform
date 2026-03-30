@@ -47,6 +47,7 @@ import {
   type OrchestratorRecommendation,
   type LLMModelInfo,
   type DatasetInfo,
+  type GPUFallbackEntry,
   type ResourceConstraints,
   type PreprocessRunId,
   type TrainingRunResult,
@@ -240,6 +241,15 @@ export function LaunchWizardPage() {
   const [numNodes, setNumNodes] = useState(1);
   const [useInfiniband, setUseInfiniband] = useState(false);
 
+  // Append a GPU entry from the pricing panel to the manual fallback list.
+  // Only wired up when step === 1 and constraints.gpu_fallbacks is an array (manual mode).
+  const handleAddFromPricing = useCallback((entry: GPUFallbackEntry) => {
+    setConstraints(prev => ({
+      ...prev,
+      gpu_fallbacks: [...(prev.gpu_fallbacks ?? []), entry],
+    }));
+  }, []);
+
   // ── Step 3 state (LLM path) ──────────────────────────────────────────────
   const [recommendation, setRecommendation] = useState<OrchestratorRecommendation | null>(null);
   const [yamlPreview, setYamlPreview] = useState('');
@@ -251,6 +261,12 @@ export function LaunchWizardPage() {
   const [launching, setLaunching] = useState(false);
   const [launchResult, setLaunchResult] = useState<LaunchResponse | null>(null);
   const [launchError, setLaunchError] = useState('');
+
+  // ── DeepSpeed ─────────────────────────────────────────────────────────────
+  const [useDeepspeed, setUseDeepspeed] = useState(false);
+  useEffect(() => {
+    setUseDeepspeed(modelCategory === 'llm');
+  }, [modelCategory]);
 
   // ── Load catalogs on mount ────────────────────────────────────────────────
   useEffect(() => {
@@ -301,6 +317,8 @@ export function LaunchWizardPage() {
           hf_token:        hfToken,
           max_steps:       parseInt(maxSteps, 10) || 500,
           num_nodes:       numNodes,
+          use_deepspeed:   useDeepspeed,
+          deepspeed_stage: useDeepspeed ? 3 : 1,
         },
         serving: {
           hf_token:             hfToken,
@@ -394,6 +412,8 @@ export function LaunchWizardPage() {
           hf_token:        hfToken,
           max_steps:       parseInt(maxSteps, 10) || 500,
           num_nodes:       numNodes,
+          use_deepspeed:   useDeepspeed,
+          deepspeed_stage: useDeepspeed ? 3 : 1,
         },
         serving: {
           hf_token:             hfToken,
@@ -460,7 +480,13 @@ export function LaunchWizardPage() {
       <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1.6fr)] gap-6 items-start">
 
         {/* ── Left: GPU Pricing Panel ──────────────────────────────────────── */}
-        <GPUPricingPanel />
+        <GPUPricingPanel
+          onAddToFallback={
+            step === 1 && Array.isArray(constraints.gpu_fallbacks)
+              ? handleAddFromPricing
+              : undefined
+          }
+        />
 
         {/* ── Right: Wizard ────────────────────────────────────────────────── */}
         <div className="flex flex-col gap-4">
@@ -722,6 +748,19 @@ export function LaunchWizardPage() {
                           onChange={e => setSeed(parseInt(e.target.value) || 42)}
                         />
                       </div>
+                      <div className="flex flex-col gap-1">
+                        <span className="text-[10px] text-slate-500">DeepSpeed ZeRO</span>
+                        <div className="flex gap-1.5">
+                          <button type="button" onClick={() => setUseDeepspeed(true)}
+                            className={useDeepspeed ? BTN_TOGGLE_ON : BTN_TOGGLE_OFF}>
+                            Enabled
+                          </button>
+                          <button type="button" onClick={() => setUseDeepspeed(false)}
+                            className={!useDeepspeed ? BTN_TOGGLE_ON : BTN_TOGGLE_OFF}>
+                            Disabled
+                          </button>
+                        </div>
+                      </div>
                     </div>
                   </div>
 
@@ -909,6 +948,19 @@ export function LaunchWizardPage() {
                           min={1}
                           onChange={e => setMaxSteps(e.target.value)}
                         />
+                      </div>
+                      <div className="flex flex-col gap-1.5">
+                        <span className={LABEL_CLS}>DeepSpeed ZeRO</span>
+                        <div className="flex gap-1.5">
+                          <button type="button" onClick={() => setUseDeepspeed(true)}
+                            className={useDeepspeed ? BTN_TOGGLE_ON : BTN_TOGGLE_OFF}>
+                            Enabled
+                          </button>
+                          <button type="button" onClick={() => setUseDeepspeed(false)}
+                            className={!useDeepspeed ? BTN_TOGGLE_ON : BTN_TOGGLE_OFF}>
+                            Disabled
+                          </button>
+                        </div>
                       </div>
                     </>
                   )}

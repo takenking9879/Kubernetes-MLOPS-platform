@@ -91,9 +91,7 @@ setup: |
     ${SUDO} rm -rf /var/lib/apt/lists/*
   fi
 
-  if ! command -v uv >/dev/null 2>&1; then
-    ${SUDO} python3 -m pip install --no-cache-dir uv
-  fi
+  ${SUDO} mkdir -p /home/ubuntu/app
 
   # Clone repo (requirements_llm_runtime.txt lives here)
   if [ ! -d /home/ubuntu/app/repo/.git ]; then
@@ -107,7 +105,65 @@ setup: |
   # Install HF stack — torch skipped (pre-installed in provider template)
   REQ_FILE="/home/ubuntu/app/repo/k3s/kuberay/gpu/requirements_llm_runtime.txt"
   [ -f "${REQ_FILE}" ] || { echo "ERROR: ${REQ_FILE} not found"; exit 1; }
-  ${SUDO} uv pip install --system --no-cache -r "${REQ_FILE}"
+
+  for probe in python3.12 /usr/bin/python3.12 /usr/local/bin/python3.12 /root/miniconda3/bin/python python3 python; do
+    if [ -x "${probe}" ]; then
+      "${probe}" --version || true
+    elif command -v "${probe}" >/dev/null 2>&1; then
+      "$(command -v "${probe}")" --version || true
+    fi
+  done
+
+  # Pick ONE interpreter from the provider image and use it for everything:
+  # torch check, dependency install, and runtime execution.
+  PYTHON_BIN=""
+  PYTHON_VERSION=""
+  for candidate in python3.12 /usr/bin/python3.12 /usr/local/bin/python3.12 /root/miniconda3/bin/python python3 python; do
+    if [ -x "${candidate}" ]; then
+      CAND_PATH="${candidate}"
+    elif command -v "${candidate}" >/dev/null 2>&1; then
+      CAND_PATH="$(command -v "${candidate}")"
+    else
+      continue
+    fi
+
+    if CAND_VER="$("${CAND_PATH}" -c "import sys, torch; assert torch.cuda.is_available(); print('.'.join(map(str, sys.version_info[:3])))" 2>/dev/null)"; then
+      PYTHON_BIN="${CAND_PATH}"
+      PYTHON_VERSION="${CAND_VER}"
+      break
+    fi
+  done
+
+  [ -n "${PYTHON_BIN}" ] || {
+    echo "ERROR: No base-image Python with torch+CUDA found."
+    echo "Checked candidates: python3.12 /usr/bin/python3.12 /usr/local/bin/python3.12 /root/miniconda3/bin/python python3 python"
+    exit 1
+  }
+
+  echo "[setup] Selected runtime base Python: ${PYTHON_BIN} (version=${PYTHON_VERSION})"
+
+  "${PYTHON_BIN}" - <<'PY'
+  import sys
+  import torch
+
+  print(f"[setup] base torch={torch.__version__} cuda_runtime={torch.version.cuda} python={sys.version.split()[0]}")
+  if not torch.cuda.is_available():
+      raise SystemExit("ERROR: base torch.cuda.is_available() is False")
+  print("[setup] GPU detected successfully")
+  print(f"[setup] base torch GPU visible: {torch.cuda.get_device_name(0)}")
+  PY
+
+  RUNTIME_VENV="/opt/ml-platform-runtime"
+  ${SUDO} rm -rf "${RUNTIME_VENV}"
+  ${SUDO} "${PYTHON_BIN}" -m venv --system-site-packages "${RUNTIME_VENV}"
+
+  RUNTIME_PYTHON="${RUNTIME_VENV}/bin/python"
+  [ -x "${RUNTIME_PYTHON}" ] || { echo "ERROR: venv python not found: ${RUNTIME_PYTHON}"; exit 1; }
+
+  echo "${RUNTIME_PYTHON}" | ${SUDO} tee /home/ubuntu/app/runtime_python.txt >/dev/null
+  echo "[setup] Runtime venv Python: ${RUNTIME_PYTHON}"
+
+  ${SUDO} "${RUNTIME_PYTHON}" -m pip install --no-cache-dir -r "${REQ_FILE}"
 
   # Optional: Grafana Agent
   if [ -n "${GRAFANA_REMOTE_WRITE_URL:-}" ]; then
@@ -125,16 +181,20 @@ setup: |
   echo "Setup complete — LLM stack ready."
 
 run: |
-  set -e
+  set -euo pipefail
+
+  PYTHON_BIN="$(cat /home/ubuntu/app/runtime_python.txt)"
+  [ -x "${PYTHON_BIN}" ] || { echo "ERROR: runtime python not executable: ${PYTHON_BIN}"; exit 1; }
+
   export PYTHONPATH=/home/ubuntu/app/repo:/home/ubuntu/app/repo/src
 
-  python3 /home/ubuntu/app/repo/k3s/sky/gpu_exporter.py &
+  "${PYTHON_BIN}" /home/ubuntu/app/repo/k3s/sky/gpu_exporter.py &
   echo "[run] GPU exporter started (PID=$!)"
 
   if [ -n "${GRAFANA_REMOTE_WRITE_URL:-}" ] && command -v grafana-agent >/dev/null 2>&1; then
-    python3 /home/ubuntu/app/repo/k3s/sky/write_grafana_config.py
+    "${PYTHON_BIN}" /home/ubuntu/app/repo/k3s/sky/write_grafana_config.py
     grafana-agent --config.file=/tmp/grafana-agent-config.yaml &
     echo "[run] Grafana Agent started → ${GRAFANA_REMOTE_WRITE_URL}"
   fi
 
-  python3 /home/ubuntu/app/repo/k3s/kuberay/llm_main.py
+  "${PYTHON_BIN}" /home/ubuntu/app/repo/k3s/kuberay/llm_main.py

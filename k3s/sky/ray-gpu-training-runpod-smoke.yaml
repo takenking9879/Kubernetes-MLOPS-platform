@@ -1,31 +1,19 @@
-# k3s/sky/ray-gpu-training-runpod.yaml
+# k3s/sky/ray-gpu-training-runpod-smoke.yaml
 #
-# Single-node GPU training on RunPod via SkyPilot.
-# Provider template: runpod/pytorch (torch pre-installed — NOT reinstalled at runtime).
-# Ray + tabular ML libs installed at runtime from requirements_tabular_runtime.txt.
+# Smoke test for provider-native RunPod training environment.
+# Goal: validate provisioning + setup + dependency installation + Ray head
+# startup before running full managed training.
 #
-# Spot-first ordering. Check current availability: `sky show-gpus --cloud runpod`
+# Run as managed job (recommended):
+#   sky jobs launch -n runpod-smoke k3s/sky/ray-gpu-training-runpod-smoke.yaml --yes
 #
-# Usage (manual test, from repo root):
-#   sky launch k3s/sky/ray-gpu-training-runpod.yaml \
-#     --name rtx2000-test \
-#     --env TRAIN_RUN_ID=train-test-001 \
-#     --env MODEL_TYPE=pytorch \
-#     --env PARAMS_S3_PATH=s3://bucket/... \
-#     --env AWS_ACCESS_KEY_ID=$(aws configure get aws_access_key_id) \
-#     --env AWS_SECRET_ACCESS_KEY=$(aws configure get aws_secret_access_key) \
-#     --yes
-#
-# Triggered automatically by training_dag_skypilot.py (sky.jobs.launch) when provider=runpod.
+# Or quick unmanaged test:
+#   sky launch k3s/sky/ray-gpu-training-runpod-smoke.yaml --name runpod-smoke --yes
 
-name: ray-gpu-training-runpod
-
-# Single-node: head + GPU worker on the same VM.
+name: ray-gpu-training-runpod-smoke
 num_nodes: 1
 
 resources:
-  # RunPod PyTorch template — torch 2.8.0 (cu12.8.1) pre-installed.
-  # DO NOT reinstall torch/CUDA at runtime.
   image_id: runpod/pytorch:1.0.2-cu1281-torch280-ubuntu2404
   any_of:
     - infra: runpod/CA/CA-MTL-1
@@ -36,58 +24,27 @@ resources:
     - infra: runpod/CA/CA-MTL-1
       accelerators: A40:1
       use_spot: false
-
   disk_size: 30
 
 envs:
-  # ── Per-run parameters (overridden at launch time by training_dag_skypilot.py) ──
-  TRAIN_RUN_ID: ""
-  PREPROCESS_RUN_ID: ""
+  TRAIN_RUN_ID: "smoke-test"
   MODEL_TYPE: "pytorch"
-  PARAMS_S3_PATH: ""
-  PROCESSED_TABLE: ""
+  PARAMS_S3_PATH: "s3://smoke-bucket/params_training.yaml"
+  PROCESSED_TABLE: "iceberg.processed.smoke"
 
-  # ── GPU control ──
   USE_GPU: "true"
   USE_SPOT: "true"
-  USE_DEEPSPEED: "false"    # set to "true" to enable DeepSpeed ZeRO stage 1
+  USE_DEEPSPEED: "false"
 
-  # ── Infrastructure ──
-  MLFLOW_TRACKING_URI: ""         # injected by Airflow DAG via task.update_envs()
   AWS_ACCESS_KEY_ID: ""
   AWS_SECRET_ACCESS_KEY: ""
   AWS_DEFAULT_REGION: "us-east-1"
-  AWS_S3_ENDPOINT_URL: ""
-
-  # ── GPU metrics (optional Grafana Cloud remote_write) ──
-  GPU_PRICE_PER_HOUR: "0"
-  SKY_CLUSTER_NAME: ""
-  GRAFANA_REMOTE_WRITE_URL: ""
-  GRAFANA_INSTANCE_ID: ""
-  GRAFANA_API_KEY: ""
-
-  # ── Ray training parameters ──
-  NUM_WORKERS: "1"
-  CPUS_PER_WORKER: "4"
-  NUM_WORKERS_TUNE: "1"
-  CPUS_PER_WORKER_TUNE: "4"
-  MAX_CONCURRENT_TRIALS: "1"
-  TUNE_MAX_TRAIN_ROWS: "250000"
-  TUNE_MAX_VAL_ROWS: "150000"
-  RAY_MATERIALIZE_DATASETS: "1"
-  RAY_MATERIALIZE_DATASETS_TUNE: "1"
-  PROMETHEUS_GRACE_SECONDS: "10"
-  REPORT_FREQUENCY: "4"
-
-  # ── Ray internals ──
-  RAY_enable_infeasible_task_early_exit: "true"
-  RAY_DEFAULT_OBJECT_STORE_MEMORY_PROPORTION: "0.7"
-  RAY_ACCEL_ENV_VAR_OVERRIDE_ON_ZERO: "0"
 
 setup: |
   set -euo pipefail
 
   nvidia-smi || { echo "ERROR: nvidia-smi failed - GPU not attached"; exit 1; }
+  echo "[setup] GPU detected successfully (nvidia-smi)."
 
   if [ "$(id -u)" -eq 0 ]; then
     SUDO=""
@@ -234,19 +191,7 @@ setup: |
   print(f'[setup] runtime GPU visible: {torch.cuda.get_device_name(0)}')
   PY
 
-  echo "Setup complete."
-
-  if [ -n "${GRAFANA_REMOTE_WRITE_URL:-}" ]; then
-    AGENT_BIN=/usr/local/bin/grafana-agent
-    if [ ! -f "${AGENT_BIN}" ]; then
-      AGENT_VER=v0.43.3 ARCH=amd64
-      curl -sL "https://github.com/grafana/agent/releases/download/${AGENT_VER}/grafana-agent-linux-${ARCH}.zip" \
-        -o /tmp/grafana-agent.zip
-      unzip -q /tmp/grafana-agent.zip -d /tmp/
-      mv /tmp/grafana-agent-linux-${ARCH} "${AGENT_BIN}"
-      chmod +x "${AGENT_BIN}"
-    fi
-  fi
+  echo "Setup smoke checks completed."
 
 run: |
   set -euo pipefail
@@ -266,15 +211,6 @@ run: |
 
   export PYTHONPATH=/home/ray/app/repo:/home/ray/app/repo/src
 
-  "${PYTHON_BIN}" /home/ray/app/repo/k3s/sky/gpu_exporter.py &
-  echo "[run] GPU exporter started (PID=$!)"
-
-  if [ -n "${GRAFANA_REMOTE_WRITE_URL:-}" ] && command -v grafana-agent >/dev/null 2>&1; then
-    "${PYTHON_BIN}" /home/ray/app/repo/k3s/sky/write_grafana_config.py
-    grafana-agent --config.file=/tmp/grafana-agent-config.yaml &
-    echo "[run] Grafana Agent started → ${GRAFANA_REMOTE_WRITE_URL}"
-  fi
-
   if [ "${SKYPILOT_NUM_GPUS_PER_NODE:-0}" -gt 0 ]; then
     "${RAY_BIN}" start --head \
       --port=6379 \
@@ -292,14 +228,25 @@ run: |
       --include-dashboard=True
   fi
 
-  for i in $(seq 1 60); do
+  for i in $(seq 1 30); do
     "${RAY_BIN}" health-check --address=127.0.0.1:6379 &>/dev/null && break
-    echo "Waiting for Ray head ($i/60)"
+    echo "Waiting for Ray head ($i/30)"
     sleep 1
   done
   "${RAY_BIN}" health-check --address=127.0.0.1:6379 \
     || { echo "ERROR: Ray head did not become healthy"; exit 1; }
 
-  sleep 5
+  "${PYTHON_BIN}" - <<'PY'
+  import ray
+  ray.init(address='127.0.0.1:6379')
 
-  "${PYTHON_BIN}" /home/ray/app/repo/k3s/kuberay/main.py
+  @ray.remote
+  def probe():
+      return 'ok'
+
+  print('Ray remote smoke test:', ray.get(probe.remote()))
+  ray.shutdown()
+  PY
+
+  # Do not stop Ray here: SkyPilot's job runtime also relies on local raylets.
+  echo "Run smoke checks completed."

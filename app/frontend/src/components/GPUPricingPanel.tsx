@@ -5,11 +5,16 @@
  * sortable table of GPU offers across RunPod, Vast.ai, and AWS.
  *
  * Shown on the left column of the Launch tab alongside the wizard.
+ *
+ * Props:
+ *   onAddToFallback — when provided (manual-mode, step 2), rows become
+ *     clickable and show a "+" button; clicking appends the GPU to the
+ *     manual fallback list in GPUResourceSelector.
  */
 
 import { useCallback, useEffect, useState } from 'react';
-import { RefreshCw, Zap } from 'lucide-react';
-import { queryGPUCatalog, type GPUOffer } from '../api/platformClient';
+import { Plus, RefreshCw, Zap } from 'lucide-react';
+import { queryGPUCatalog, type GPUFallbackEntry, type GPUOffer } from '../api/platformClient';
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -43,9 +48,28 @@ function secAgo(d: Date): string {
   return `${Math.round(s / 60)}m ago`;
 }
 
+function buildEntry(o: GPUOffer): GPUFallbackEntry {
+  const accel = o.skypilot_accelerator.includes(':')
+    ? o.skypilot_accelerator
+    : `${o.skypilot_accelerator}:${o.gpu_count}`;
+  return {
+    infra: o.provider,
+    accelerators: accel,
+    use_spot: o.spot_available && (o.price_spot ?? 0) > 0,
+  };
+}
+
+// ── Props ─────────────────────────────────────────────────────────────────────
+
+interface Props {
+  /** When defined, rows become clickable and show a "+" button to add the GPU
+   *  directly to the manual fallback list. Pass undefined in auto mode. */
+  onAddToFallback?: (entry: GPUFallbackEntry) => void;
+}
+
 // ── Component ─────────────────────────────────────────────────────────────────
 
-export function GPUPricingPanel() {
+export function GPUPricingPanel({ onAddToFallback }: Props) {
   const [offers, setOffers] = useState<GPUOffer[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -116,6 +140,9 @@ export function GPUPricingPanel() {
         <div className="flex items-center gap-1.5">
           <Zap size={13} className="text-amber-400" />
           <span className="text-xs font-semibold text-slate-200">GPU Pricing</span>
+          {onAddToFallback && (
+            <span className="text-[9px] text-blue-400 font-medium">— click row to add</span>
+          )}
         </div>
         <div className="flex items-center gap-2">
           {lastUpdated && (
@@ -226,15 +253,22 @@ export function GPUPricingPanel() {
                 <th className="text-right py-1 pr-2 font-semibold">Spot/hr</th>
                 <th className="text-right py-1 pr-2 font-semibold">OD/hr</th>
                 <th className="text-right py-1 font-semibold">Save</th>
+                {onAddToFallback && <th className="w-5" />}
               </tr>
             </thead>
             <tbody>
               {filtered.map((o, i) => {
                 const sv = savings(o.price_spot, o.price_on_demand);
+                const noStock = o.available_count === 0;
                 return (
                   <tr
                     key={`${o.provider}-${o.gpu_type}-${i}`}
-                    className="border-b border-slate-800 hover:bg-slate-800/40 transition-colors"
+                    className={`group border-b border-slate-800 transition-colors ${
+                      onAddToFallback
+                        ? 'cursor-pointer hover:bg-slate-700/60'
+                        : 'hover:bg-slate-800/40'
+                    }`}
+                    onClick={onAddToFallback ? () => onAddToFallback(buildEntry(o)) : undefined}
                   >
                     <td className="py-1 pr-2 font-mono">
                       <span className={o.skypilot_supported ? 'text-slate-200' : 'text-slate-500'}>
@@ -243,6 +277,11 @@ export function GPUPricingPanel() {
                       {!o.skypilot_supported && (
                         <span className="ml-1 rounded bg-slate-800 px-1 py-0.5 text-[8px] text-slate-600">
                           no sky
+                        </span>
+                      )}
+                      {noStock && (
+                        <span className="ml-1 rounded bg-red-900/60 px-1 py-0.5 text-[8px] text-red-400 font-mono">
+                          no stock
                         </span>
                       )}
                     </td>
@@ -263,6 +302,18 @@ export function GPUPricingPanel() {
                         <span className="text-slate-600">—</span>
                       )}
                     </td>
+                    {onAddToFallback && (
+                      <td className="py-1 pl-1 text-center">
+                        <button
+                          type="button"
+                          title={`Add ${o.gpu_type} to fallback list`}
+                          onClick={e => { e.stopPropagation(); onAddToFallback(buildEntry(o)); }}
+                          className="opacity-0 group-hover:opacity-100 rounded p-0.5 text-blue-400 hover:bg-blue-900/50 transition-opacity"
+                        >
+                          <Plus size={10} />
+                        </button>
+                      </td>
+                    )}
                   </tr>
                 );
               })}
