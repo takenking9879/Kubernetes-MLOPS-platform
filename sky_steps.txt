@@ -101,3 +101,5 @@ kubectl rollout status deployment/prometheus -n monitoring --timeout=60s
 
 # Wait ~30s then verify the target is UP:
 # Prometheus UI -> Status -> Targets -> "skypilot-api-server" should show State: UP
+
+se mapea a localhost skypilot, para ver el dash puedes ir a localhost/dashboard

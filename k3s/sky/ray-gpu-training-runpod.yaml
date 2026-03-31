@@ -118,12 +118,19 @@ setup: |
   REQ_FILE="/home/ray/app/repo/k3s/kuberay/gpu/requirements_tabular_runtime.txt"
   [ -f "${REQ_FILE}" ] || { echo "ERROR: requirements file not found: ${REQ_FILE}"; exit 1; }
 
+  echo "[setup] Probing Python candidates (path + version):"
   for probe in python3.12 /usr/bin/python3.12 /usr/local/bin/python3.12 /root/miniconda3/bin/python python3 python; do
     if [ -x "${probe}" ]; then
-      "${probe}" --version || true
+      PROBE_PATH="${probe}"
     elif command -v "${probe}" >/dev/null 2>&1; then
-      "$(command -v "${probe}")" --version || true
+      PROBE_PATH="$(command -v "${probe}")"
+    else
+      echo "[setup] - ${probe}: not found"
+      continue
     fi
+
+    PROBE_VER="$("${PROBE_PATH}" -c "import sys; print(sys.version.split()[0])" 2>/dev/null || echo unknown)"
+    echo "[setup] - ${probe} -> ${PROBE_PATH} (python=${PROBE_VER})"
   done
 
   # Pick ONE interpreter from the provider image and use it for everything:
@@ -139,10 +146,14 @@ setup: |
       continue
     fi
 
+    echo "[setup] Evaluating candidate: ${CAND_PATH}"
     if CAND_VER="$("${CAND_PATH}" -c "import sys, torch; assert torch.cuda.is_available(); print('.'.join(map(str, sys.version_info[:3])))" 2>/dev/null)"; then
+      echo "[setup] Candidate accepted: ${CAND_PATH} (python=${CAND_VER}, torch+cuda OK)"
       PYTHON_BIN="${CAND_PATH}"
       PYTHON_VERSION="${CAND_VER}"
       break
+    else
+      echo "[setup] Candidate rejected: ${CAND_PATH} (missing torch+cuda check)"
     fi
   done
 
@@ -153,6 +164,11 @@ setup: |
   }
 
   echo "[setup] Selected runtime base Python: ${PYTHON_BIN} (version=${PYTHON_VERSION})"
+  "${PYTHON_BIN}" --version
+  "${PYTHON_BIN}" - <<'PY'
+  import sys
+  print(f"[setup] selected sys.executable={sys.executable}")
+  PY
 
   "${PYTHON_BIN}" - <<'PY'
   import sys
@@ -203,6 +219,11 @@ setup: |
 
   echo "${RUNTIME_PYTHON}" | ${SUDO} tee /home/ray/app/runtime_python.txt >/dev/null
   echo "[setup] Runtime venv Python: ${RUNTIME_PYTHON}"
+  "${RUNTIME_PYTHON}" - <<'PY'
+  import sys
+  print(f"[setup] runtime sys.executable={sys.executable} python={sys.version.split()[0]}")
+  PY
+  ${SUDO} "${RUNTIME_PYTHON}" -m pip --version
 
   ${SUDO} "${RUNTIME_PYTHON}" -m pip install --no-cache-dir -r "${REQ_FILE}"
 
@@ -253,6 +274,14 @@ run: |
 
   PYTHON_BIN="$(cat /home/ray/app/runtime_python.txt)"
   [ -x "${PYTHON_BIN}" ] || { echo "ERROR: runtime python not executable: ${PYTHON_BIN}"; exit 1; }
+  "${PYTHON_BIN}" - <<'PY'
+  import sys
+  import torch
+
+  print(f"[run] runtime python={sys.version.split()[0]} exe={sys.executable}")
+  print(f"[run] runtime torch={torch.__version__} cuda_runtime={torch.version.cuda}")
+  print(f"[run] runtime cuda_available={torch.cuda.is_available()}")
+  PY
 
   RAY_BIN="$(dirname "${PYTHON_BIN}")/ray"
   if [ ! -x "${RAY_BIN}" ]; then

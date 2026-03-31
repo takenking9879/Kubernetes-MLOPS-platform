@@ -19,15 +19,6 @@
 #   - Add to .env: SKYPILOT_API_SERVER_ENDPOINT=http://skypilot:<password>@skypilot-api-server.skypilot.svc.cluster.local
 #   - Refresh env-secret: kubectl create secret generic env-secret -n airflow --from-env-file=.env --dry-run=client -o yaml | kubectl apply -f -
 
-# ── Image ─────────────────────────────────────────────────────────────────────
-# Custom image: python:3.11-slim + SkyPilot 0.12.0 + docker-entrypoint.sh.
-# The entrypoint writes RunPod/VastAI credential files then runs `exec "$@"`,
-# so Helm's args become the command after credential setup.
-# Fallback: berkeleyskypilot/skypilot:0.12.0 (official, no credential setup script)
-image:
-  repository: takenking9879/sky-runner
-  tag: "0.12.0"
-  pullPolicy: IfNotPresent
 
 # ── API server startup ────────────────────────────────────────────────────────
 # docker-entrypoint.sh writes provider credential files, then `exec "$@"`.
@@ -55,7 +46,6 @@ apiService:
       controller:
         consolidation_mode: true
       bucket: s3://k8s-mlops-platform-bucket/sky-workdir
-
   # ── Cloud credentials (injected via chart-native credential values below) ────
   # Do NOT use envFrom here — the chart has dedicated values for each provider.
   # See runpodCredentials / vastCredentials / awsCredentials sections below.
