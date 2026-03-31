@@ -33,7 +33,7 @@ import os
 from datetime import datetime, timedelta
 
 from airflow.sdk import DAG
-from airflow.operators.python import PythonOperator
+from airflow.providers.standard.operators.python import PythonOperator
 from airflow.task.trigger_rule import TriggerRule
 
 # ─── Constants ────────────────────────────────────────────────────────────────
@@ -113,10 +113,20 @@ def _run_sky_training(
 
     if rc:
         gpu_fallbacks = rc.get("gpu_fallbacks")
+        explicit_gpu_selection = bool(
+            (rc.get("gpu_types") or [])
+            or (rc.get("preferred_regions") or [])
+            or (rc.get("gpu_fallbacks") or [])
+        )
         if gpu_fallbacks and isinstance(gpu_fallbacks, list):
             sky_conf.setdefault("resources", {})["any_of"] = gpu_fallbacks
             sky_conf["resources"].pop("infra", None)
             print(f"[sky-training] Injecting {len(gpu_fallbacks)} gpu_fallbacks into any_of.")
+        elif explicit_gpu_selection:
+            raise RuntimeError(
+                "resource_constraints included explicit GPU/region selections but "
+                "gpu_fallbacks is empty; refusing static YAML fallback."
+            )
 
     # Bake per-run env vars into the YAML so sky launch receives them without --env flags
     sky_conf.setdefault("envs", {}).update({

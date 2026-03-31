@@ -24,17 +24,15 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 
 from .gpu_catalog import GPUCatalogService, GPUOffer
+from .provider_region_mapping import (
+    build_infra_from_provider_region,
+    normalized_region_code,
+)
 
 # On-demand multiplier — keeps on-demand entries ranked after all spot options
 _ON_DEMAND_PENALTY = 2.5
 _REGION_BONUS = 0.95      # score multiplier for preferred regions
 _IB_BONUS = 0.85          # score multiplier when InfiniBand is required and available
-
-# Valid RunPod region codes (2-letter country prefix of zone names)
-_RUNPOD_REGION_CODES: frozenset[str] = frozenset(
-    {"CA", "US", "CZ", "IS", "NL", "SE", "RO", "NO"}
-)
-
 
 @dataclass
 class ResourceConstraints:
@@ -75,20 +73,40 @@ def _build_infra(
     - Vast:   Always "vast" — SkyPilot does not support region for Vast.
     """
     if skypilot_cloud == "aws":
-        if region and region not in ("aws", ""):
-            return f"aws/{region}"
+        mapped = build_infra_from_provider_region("aws", region)
+        if mapped:
+            return mapped
+        for candidate in (preferred_regions or []):
+            mapped = build_infra_from_provider_region("aws", candidate)
+            if mapped:
+                return mapped
         return "aws"
     elif skypilot_cloud == "runpod":
-        # Try to match a user-supplied RunPod zone (e.g. "CA-MTL-1", "US-TX-3")
-        for zone in (preferred_regions or []):
-            zone = zone.strip().upper()
-            runpod_region = zone.split("-")[0]
-            if runpod_region in _RUNPOD_REGION_CODES:
-                return f"runpod/{runpod_region}/{zone}"
+        mapped = build_infra_from_provider_region("runpod", region)
+        if mapped:
+            return mapped
+        for candidate in (preferred_regions or []):
+            mapped = build_infra_from_provider_region("runpod", candidate)
+            if mapped:
+                return mapped
         return "runpod"
     else:
         # Vast.ai — region not supported in infra path
         return "vast"
+
+
+def _preferred_region_codes(provider: str, preferred_regions: list[str]) -> set[str]:
+    codes: set[str] = set()
+    p = provider.lower()
+    for region in preferred_regions or []:
+        code = normalized_region_code(p, region)
+        if not code:
+            continue
+        if p == "runpod":
+            codes.add(code.upper())
+        else:
+            codes.add(code.lower())
+    return codes
 
 
 class GPUSelectorService:
@@ -111,6 +129,9 @@ class GPUSelectorService:
                 gpu_types=constraints.gpu_types,
             )
 
+        runpod_preferred = _preferred_region_codes("runpod", constraints.preferred_regions)
+        aws_preferred = _preferred_region_codes("aws", constraints.preferred_regions)
+
         # ── 1. Hard-filter ────────────────────────────────────────────────────
         filtered: list[GPUOffer] = []
         for o in offers:
@@ -124,25 +145,46 @@ class GPUSelectorService:
                 continue
             if constraints.gpu_types and o.gpu_type not in constraints.gpu_types:
                 continue
+
+            if o.skypilot_cloud == "runpod" and runpod_preferred:
+                offer_region = normalized_region_code("runpod", o.region).upper()
+                if not offer_region or offer_region not in runpod_preferred:
+                    continue
+
+            if o.skypilot_cloud == "aws" and aws_preferred:
+                offer_region = normalized_region_code("aws", o.region).lower()
+                if not offer_region or offer_region not in aws_preferred:
+                    continue
+
             filtered.append(o)
 
-        # ── 2. Deduplicate: keep cheapest on-demand offer per (provider, gpu_type) ─
-        best: dict[tuple[str, str], GPUOffer] = {}
+        # ── 2. Deduplicate: keep cheapest on-demand offer per (infra, gpu_type) ─
+        best: dict[tuple[str, str], tuple[GPUOffer, str]] = {}
         for o in filtered:
-            k = (o.skypilot_cloud, o.gpu_type)
-            if k not in best or o.price_on_demand < best[k].price_on_demand:
-                best[k] = o
-        unique: list[GPUOffer] = list(best.values())
+            infra = _build_infra(o.skypilot_cloud, o.region, constraints.preferred_regions)
+            k = (infra, o.gpu_type)
+            if k not in best or o.price_on_demand < best[k][0].price_on_demand:
+                best[k] = (o, infra)
+        unique: list[tuple[GPUOffer, str]] = list(best.values())
 
         # ── 3. Score and build (spot, on-demand) entry pairs ─────────────────
         scored: list[tuple[float, dict, bool]] = []  # (score, yaml_entry, is_spot)
-        for o in unique:
-            r_bonus = _REGION_BONUS if o.region in constraints.preferred_regions else 1.0
+        for o, infra in unique:
+            runpod_match = (
+                bool(runpod_preferred)
+                and o.skypilot_cloud == "runpod"
+                and normalized_region_code("runpod", o.region).upper() in runpod_preferred
+            )
+            aws_match = (
+                bool(aws_preferred)
+                and o.skypilot_cloud == "aws"
+                and normalized_region_code("aws", o.region).lower() in aws_preferred
+            )
+            r_bonus = _REGION_BONUS if (runpod_match or aws_match) else 1.0
             ib_bonus = (
                 _IB_BONUS if constraints.require_infiniband and o.infiniband else 1.0
             )
             gpus_str = f"{o.gpu_type}:{constraints.num_gpus_per_node}"
-            infra = _build_infra(o.skypilot_cloud, o.region, constraints.preferred_regions)
 
             # Spot entry — only when spot is available AND user prefers spot
             if o.spot_available and o.price_spot is not None and constraints.prefer_spot:
@@ -183,9 +225,10 @@ class GPUSelectorService:
         ondemand_entries = sum(1 for _, _, is_spot in scored if not is_spot)
 
         # Cost estimates: cheapest available spot and on-demand
-        spot_offers = [o for o in unique if o.price_spot is not None and o.spot_available]
+        unique_offers = [o for o, _ in unique]
+        spot_offers = [o for o in unique_offers if o.price_spot is not None and o.spot_available]
         est_spot = min((o.price_spot for o in spot_offers), default=None)  # type: ignore[type-var]
-        est_od = min((o.price_on_demand for o in unique), default=None)
+        est_od = min((o.price_on_demand for o in unique_offers), default=None)
 
         return GPUSelectResult(
             any_of=any_of,

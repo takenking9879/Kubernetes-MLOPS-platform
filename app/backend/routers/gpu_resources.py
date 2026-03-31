@@ -171,4 +171,8 @@ def _offer_to_dict(o: GPUOffer) -> dict:
         "skypilot_supported": o.skypilot_supported,
         "skypilot_accelerator": o.skypilot_accelerator,
         "skypilot_cloud": o.skypilot_cloud,
+        "provider_region_id": o.provider_region_id,
+        "skypilot_region": o.skypilot_region,
+        "skypilot_zone": o.skypilot_zone,
+        "skypilot_infra": o.skypilot_infra,
     }

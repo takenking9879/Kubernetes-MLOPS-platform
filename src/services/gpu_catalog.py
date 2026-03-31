@@ -27,6 +27,7 @@ from typing import Any
 
 from dotenv import load_dotenv
 
+from .provider_region_mapping import normalize_provider_region
 from .runpod_adapter import RunPodAdapter
 
 # Load .env from project root (src/services/ → src/ → project root)
@@ -144,6 +145,10 @@ class GPUOffer:
     skypilot_supported: bool        # True = SkyPilot can launch this GPU
     skypilot_accelerator: str       # e.g. "RTX4090:1" — empty if not supported
     skypilot_cloud: str             # e.g. "runpod"
+    provider_region_id: str = ""
+    skypilot_region: str = ""
+    skypilot_zone: str = ""
+    skypilot_infra: str = ""
 
 
 class GPUCatalogService:
@@ -283,12 +288,15 @@ class GPUCatalogService:
             # get_gpus() omits pricing; use GraphQL for full schema.
             from runpod.api import graphql as _gql  # type: ignore[import]
             result = _gql.run_graphql_query(
-                "{ gpuTypes { id displayName memoryInGb "
+                "{ dataCenters { id name location } gpuTypes { id displayName memoryInGb "
                 "communityPrice securePrice communitySpotPrice secureSpotPrice "
                 "lowestPrice(input: { gpuCount: 1, secureCloud: true, "
                 "minVcpuCount: 2, minMemoryInGb: 8 }) { "
                 "stockStatus availableGpuCounts maxUnreservedGpuCount "
                 "uninterruptablePrice minimumBidPrice } } }"
+            )
+            datacenters: list[dict[str, Any]] = (
+                result.get("data", {}).get("dataCenters", []) or []
             )
             gpus: list[dict[str, Any]] = (
                 result.get("data", {}).get("gpuTypes", []) or []
@@ -314,9 +322,79 @@ class GPUCatalogService:
                 vram = float(gpu.get("memoryInGb", 0))
                 lowest_price = gpu.get("lowestPrice")
 
+                region_offers: list[GPUOffer] = []
+                for dc in datacenters:
+                    dc_id = str(dc.get("id") or "").strip()
+                    if not dc_id:
+                        continue
+
+                    # Query regional stock for this GPU/datacenter pair.
+                    query = (
+                        "query { "
+                        f"gpuTypes(input: {{ id: {json.dumps(gpu_id)} }}) {{ "
+                        "lowestPrice(input: { "
+                        "secureCloud: true, "
+                        "gpuCount: 1, "
+                        "minVcpuCount: 2, "
+                        "minMemoryInGb: 8, "
+                        "minDisk: 0, "
+                        f"dataCenterId: {json.dumps(dc_id)}, "
+                        "globalNetwork: false, "
+                        "compliance: null "
+                        "}) { "
+                        "stockStatus availableGpuCounts maxUnreservedGpuCount "
+                        "uninterruptablePrice minimumBidPrice "
+                        "} } }"
+                    )
+                    try:
+                        dc_result = _gql.run_graphql_query(query)
+                        dc_rows = dc_result.get("data", {}).get("gpuTypes", []) or []
+                        dc_lowest = (dc_rows[0] or {}).get("lowestPrice") if dc_rows else None
+                    except Exception:
+                        dc_lowest = None
+
+                    # lowestPrice is null when this GPU is not listed in that datacenter.
+                    if dc_lowest is None:
+                        continue
+
+                    on_demand, spot = RunPodAdapter.extract_price(dc_lowest, gpu)
+                    available = RunPodAdapter.is_available(dc_lowest, gpu_count=1)
+                    count = RunPodAdapter.available_count(dc_lowest)
+                    mapping = normalize_provider_region("runpod", dc_id)
+
+                    region_offers.append(
+                        GPUOffer(
+                            provider="runpod",
+                            gpu_type=gpu_type,
+                            gpu_count=1,
+                            vram_gb=vram,
+                            vcpus=0,
+                            ram_gb=0,
+                            price_on_demand=on_demand,
+                            price_spot=spot,
+                            spot_available=available,
+                            available_count=count,
+                            region=dc_id,
+                            infiniband=gpu_id in _RUNPOD_INFINIBAND_IDS,
+                            skypilot_supported=sky_supported,
+                            skypilot_accelerator=f"{gpu_type}:1" if sky_supported else "",
+                            skypilot_cloud="runpod",
+                            provider_region_id=dc_id,
+                            skypilot_region=mapping.skypilot_region,
+                            skypilot_zone=mapping.skypilot_zone,
+                            skypilot_infra=mapping.skypilot_infra,
+                        )
+                    )
+
+                if region_offers:
+                    offers.extend(region_offers)
+                    continue
+
+                # Fallback to provider-global pricing when per-region query fails.
                 on_demand, spot = RunPodAdapter.extract_price(lowest_price, gpu)
                 available = RunPodAdapter.is_available(lowest_price, gpu_count=1)
                 count = RunPodAdapter.available_count(lowest_price)
+                mapping = normalize_provider_region("runpod", "")
 
                 offers.append(
                     GPUOffer(
@@ -330,11 +408,15 @@ class GPUCatalogService:
                         price_spot=spot,
                         spot_available=available,
                         available_count=count,
-                        region="",  # RunPod API doesn't expose per-GPU datacenter
+                        region="",
                         infiniband=gpu_id in _RUNPOD_INFINIBAND_IDS,
                         skypilot_supported=sky_supported,
                         skypilot_accelerator=f"{gpu_type}:1" if sky_supported else "",
                         skypilot_cloud="runpod",
+                        provider_region_id="",
+                        skypilot_region=mapping.skypilot_region,
+                        skypilot_zone=mapping.skypilot_zone,
+                        skypilot_infra=mapping.skypilot_infra,
                     )
                 )
             self._set_cache(cache_key, offers)
@@ -398,6 +480,8 @@ class GPUCatalogService:
                 on_demand = float(raw.get("dph_total", 0))
                 inet_up_mbps = float(raw.get("inet_up", 0) or 0)
                 has_ib = inet_up_mbps >= _VAST_IB_INET_MBPS_THRESHOLD
+                provider_region = str(raw.get("datacenter", ""))
+                mapping = normalize_provider_region("vast", provider_region)
 
                 offers.append(
                     GPUOffer(
@@ -411,11 +495,15 @@ class GPUCatalogService:
                         price_spot=None,        # Vast.ai has NO spot pricing
                         spot_available=False,   # confirmed by SkyPilot catalog
                         available_count=1,
-                        region=str(raw.get("datacenter", "")),
+                        region=provider_region,
                         infiniband=has_ib,
                         skypilot_supported=sky_supported,
                         skypilot_accelerator=f"{gpu_type}:1" if sky_supported else "",
                         skypilot_cloud="vast",
+                        provider_region_id=provider_region,
+                        skypilot_region=mapping.skypilot_region,
+                        skypilot_zone=mapping.skypilot_zone,
+                        skypilot_infra=mapping.skypilot_infra,
                     )
                 )
             self._set_cache(cache_key, offers)
@@ -470,6 +558,7 @@ class GPUCatalogService:
                         row.get("spot_price")
                     )
                     count = int(row.get("accelerator_count", 1) or 1)
+                    mapping = normalize_provider_region("aws", region)
 
                     offers.append(
                         GPUOffer(
@@ -488,6 +577,10 @@ class GPUCatalogService:
                             skypilot_supported=True,  # AWS always from SkyPilot catalog
                             skypilot_accelerator=f"{gpu_name}:{count}",
                             skypilot_cloud="aws",
+                            provider_region_id=region,
+                            skypilot_region=mapping.skypilot_region,
+                            skypilot_zone=mapping.skypilot_zone,
+                            skypilot_infra=mapping.skypilot_infra,
                         )
                     )
 
@@ -700,6 +793,7 @@ _AWS_STATIC: list[tuple[str, int, float, float, int, str, bool]] = [
 def _static_aws_catalog() -> list[GPUOffer]:
     offers = []
     for gpu_type, vram_gb, od, spot, count, instance, efa in _AWS_STATIC:
+        mapping = normalize_provider_region("aws", "us-east-1")
         offers.append(
             GPUOffer(
                 provider="aws",
@@ -717,6 +811,10 @@ def _static_aws_catalog() -> list[GPUOffer]:
                 skypilot_supported=True,
                 skypilot_accelerator=f"{gpu_type}:{count}",
                 skypilot_cloud="aws",
+                provider_region_id="us-east-1",
+                skypilot_region=mapping.skypilot_region,
+                skypilot_zone=mapping.skypilot_zone,
+                skypilot_infra=mapping.skypilot_infra,
             )
         )
     return offers

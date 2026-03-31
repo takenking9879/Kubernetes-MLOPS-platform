@@ -30,7 +30,7 @@ def _make_offer(
     price_spot: float | None = 0.20,
     spot_available: bool = True,
     infiniband: bool = False,
-    region: str = "runpod",
+    region: str = "CA-MTL-1",
 ) -> GPUOffer:
     return GPUOffer(
         provider=provider,
@@ -45,6 +45,7 @@ def _make_offer(
         available_count=4,
         region=region,
         infiniband=infiniband,
+        skypilot_supported=True,
         skypilot_accelerator=f"{gpu_type}:1",
         skypilot_cloud=provider,
     )
@@ -252,6 +253,20 @@ def test_provider_filter_excludes_other_providers():
     result = SVC.select_providers(
         ResourceConstraints(providers=["runpod"]), offers=offers
     )
-    clouds = {e["cloud"] for e in result.any_of}
+    clouds = {e["infra"].split("/")[0] for e in result.any_of}
     assert "vast" not in clouds
     assert "runpod" in clouds
+
+
+def test_runpod_preferred_region_filters_entries():
+    """Preferred RunPod regions keep only matching region candidates."""
+    offers = [
+        _make_offer(provider="runpod", gpu_type="RTX4090", region="CA-MTL-1"),
+        _make_offer(provider="runpod", gpu_type="RTX4090", region="US-TX-3", price_on_demand=0.50),
+    ]
+    result = SVC.select_providers(
+        ResourceConstraints(providers=["runpod"], preferred_regions=["CA-MTL-1"]),
+        offers=offers,
+    )
+    assert result.any_of
+    assert all(e["infra"].startswith("runpod/CA") for e in result.any_of)

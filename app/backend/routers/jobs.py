@@ -44,6 +44,10 @@ from services.job_builder import (  # noqa: E402
     TrainingJobConfig,
     ServingJobConfig,
 )
+from services.resource_constraints import (  # noqa: E402
+    build_any_of_from_constraints,
+    has_explicit_resource_selection,
+)
 
 # Reuse Airflow helpers + S3 helpers from runs.py to avoid duplication
 from routers.runs import (  # noqa: E402
@@ -75,6 +79,11 @@ def _s3_client():
 
 
 class ResourceConstraintsIn(BaseModel):
+    class GPUFallbackEntryIn(BaseModel):
+        infra: str
+        accelerators: str
+        use_spot: bool = False
+
     providers: list[str] = Field(default_factory=lambda: ["runpod"])
     gpu_types: list[str] | None = None
     min_vram_gb: float = 0
@@ -85,6 +94,7 @@ class ResourceConstraintsIn(BaseModel):
     num_nodes: int = 1
     num_gpus_per_node: int = 1
     job_type: str = "tabular"
+    gpu_fallbacks: list[GPUFallbackEntryIn] | None = None
 
 
 class ModelConfigIn(BaseModel):
@@ -296,50 +306,10 @@ def _rec_to_out(rec: OrchestratorRecommendation) -> RecommendationOut:
     )
 
 
-def _build_fallback_any_of(constraints: ResourceConstraintsIn) -> list[dict]:
-    """Build a minimal any_of from explicit user choices (no catalog needed).
-
-    Used when GPUCatalogService is unavailable or returns no matching offers.
-    Spot entries precede on-demand entries, matching the selector's ordering.
-    """
-    entries: list[dict] = []
-    for provider in constraints.providers:
-        for gpu_type in (constraints.gpu_types or []):
-            gpus_str = f"{gpu_type}:{constraints.num_gpus_per_node}"
-            if constraints.prefer_spot:
-                entries.append({"infra": provider, "accelerators": gpus_str, "use_spot": True})
-            entries.append({"infra": provider, "accelerators": gpus_str, "use_spot": False})
-    return entries
-
-
 def _get_any_of(constraints: ResourceConstraintsIn | None) -> list[dict]:
-    """Build the any_of list from GPU catalog + selector.
-
-    Falls back to _build_fallback_any_of when the catalog is unavailable or
-    returns no matching offers (e.g., RunPod/Vast API unreachable in this env).
-    """
     if not constraints:
         return []
-    try:
-        import dataclasses
-        from src.services.gpu_catalog import GPUCatalogService
-        from src.services.gpu_selector import GPUSelectorService, ResourceConstraints
-
-        _valid = {f.name for f in dataclasses.fields(ResourceConstraints)}
-        merged = {k: v for k, v in constraints.model_dump().items() if k in _valid}
-        rc = ResourceConstraints(**merged)
-        offers = GPUCatalogService().query_availability(
-            providers=rc.providers,
-            min_vram_gb=rc.min_vram_gb,
-            gpu_types=rc.gpu_types,
-        )
-        result = GPUSelectorService().select_providers(rc, offers)
-        if result.any_of:
-            return result.any_of
-    except Exception:
-        pass
-    # Catalog unavailable or returned nothing — use explicit user choices directly
-    return _build_fallback_any_of(constraints)
+    return build_any_of_from_constraints(constraints.model_dump())
 
 
 # ── Endpoints ─────────────────────────────────────────────────────────────────
@@ -356,7 +326,17 @@ async def launch_job(body: LaunchRequest) -> LaunchResponse:
     - Triggers the appropriate Airflow DAG(s)
     - Returns YAML preview + DAG run IDs
     """
+    constraints_dict = body.resource_constraints.model_dump() if body.resource_constraints else None
     any_of = _get_any_of(body.resource_constraints)
+
+    if constraints_dict and has_explicit_resource_selection(constraints_dict) and not any_of:
+        raise HTTPException(
+            status_code=422,
+            detail=(
+                "No valid SkyPilot resource entries could be generated from the selected "
+                "GPUs/regions. Adjust gpu_types/preferred_regions or provide gpu_fallbacks."
+            ),
+        )
 
     # ── Serving validation: only LLM models supported via vLLM/SkyPilot ──────
     if body.job_type in ("serving", "both"):
@@ -479,7 +459,7 @@ async def launch_job(body: LaunchRequest) -> LaunchResponse:
                 )
             )
             if body.resource_constraints:
-                rc_dict = body.resource_constraints.model_dump()
+                rc_dict = constraints_dict or body.resource_constraints.model_dump()
                 if any_of:
                     rc_dict["gpu_fallbacks"] = any_of
                 dag_conf["resource_constraints"] = rc_dict
@@ -530,7 +510,7 @@ async def launch_job(body: LaunchRequest) -> LaunchResponse:
             )
             dag_conf["train_params_s3_path"] = train_params_s3_path
             if body.resource_constraints:
-                rc_dict = body.resource_constraints.model_dump()
+                rc_dict = constraints_dict or body.resource_constraints.model_dump()
                 if any_of:
                     rc_dict["gpu_fallbacks"] = any_of
                 dag_conf["resource_constraints"] = rc_dict
@@ -553,7 +533,7 @@ async def launch_job(body: LaunchRequest) -> LaunchResponse:
         )
         _, serve_dag_conf = _builder.build_serving_job(s_cfg, multinode=multinode)
         if body.resource_constraints:
-            rc_dict = body.resource_constraints.model_dump()
+            rc_dict = constraints_dict or body.resource_constraints.model_dump()
             if any_of:
                 rc_dict["gpu_fallbacks"] = any_of
             serve_dag_conf["resource_constraints"] = rc_dict

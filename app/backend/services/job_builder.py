@@ -103,9 +103,16 @@ def _provider_from_any_of(any_of: list[dict]) -> str:
     """Derive the primary provider name from the first any_of entry."""
     if not any_of:
         return "runpod"
-    cloud = str(any_of[0].get("cloud", "runpod")).lower()
-    # SkyPilot uses "runpod", "vast", "aws" as cloud names
-    return cloud
+    first = any_of[0] or {}
+    cloud = str(first.get("cloud", "")).strip().lower()
+    if cloud:
+        return cloud
+
+    infra = str(first.get("infra", "")).strip().lower()
+    if infra:
+        return infra.split("/", 1)[0]
+
+    return "runpod"
 
 
 class JobBuilder:

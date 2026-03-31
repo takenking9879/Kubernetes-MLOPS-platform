@@ -52,8 +52,9 @@ function buildEntry(o: GPUOffer): GPUFallbackEntry {
   const accel = o.skypilot_accelerator.includes(':')
     ? o.skypilot_accelerator
     : `${o.skypilot_accelerator}:${o.gpu_count}`;
+  const infra = o.skypilot_infra || o.provider;
   return {
-    infra: o.provider,
+    infra,
     accelerators: accel,
     use_spot: o.spot_available && (o.price_spot ?? 0) > 0,
   };
@@ -250,6 +251,7 @@ export function GPUPricingPanel({ onAddToFallback }: Props) {
                 <th className="text-left py-1 pr-2 font-semibold">GPU</th>
                 <th className="text-right py-1 pr-2 font-semibold">VRAM</th>
                 <th className="text-left py-1 pr-2 font-semibold">Provider</th>
+                <th className="text-left py-1 pr-2 font-semibold">Region</th>
                 <th className="text-right py-1 pr-2 font-semibold">Spot/hr</th>
                 <th className="text-right py-1 pr-2 font-semibold">OD/hr</th>
                 <th className="text-right py-1 font-semibold">Save</th>
@@ -263,7 +265,7 @@ export function GPUPricingPanel({ onAddToFallback }: Props) {
                 const noStock = o.available_count === 0;
                 return (
                   <tr
-                    key={`${o.provider}-${o.gpu_type}-${i}`}
+                    key={`${o.provider}-${o.gpu_type}-${o.provider_region_id || o.region || 'global'}-${i}`}
                     className={`group border-b border-slate-800 transition-colors ${
                       onAddToFallback
                         ? 'cursor-pointer hover:bg-slate-700/60'
@@ -288,6 +290,9 @@ export function GPUPricingPanel({ onAddToFallback }: Props) {
                     </td>
                     <td className="py-1 pr-2 text-right text-slate-400">{o.vram_gb}G</td>
                     <td className="py-1 pr-2 text-slate-400 capitalize">{o.provider}</td>
+                    <td className="py-1 pr-2 text-slate-500 font-mono">
+                      {o.provider_region_id || o.region || o.skypilot_region || '—'}
+                    </td>
                     <td className={`py-1 pr-2 text-right font-mono ${o.price_spot != null ? 'text-green-400' : 'text-slate-600'}`}>
                       {fmt(o.price_spot)}
                     </td>

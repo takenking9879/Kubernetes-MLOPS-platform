@@ -604,6 +604,10 @@ export interface GPUOffer {
   skypilot_supported: boolean;
   skypilot_accelerator: string;
   skypilot_cloud: string;
+  provider_region_id: string;
+  skypilot_region: string;
+  skypilot_zone: string;
+  skypilot_infra: string;
 }
 
 export interface GPUSelectResult {

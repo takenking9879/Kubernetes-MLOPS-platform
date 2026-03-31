@@ -22,6 +22,10 @@ import yaml as _yaml
 from botocore.exceptions import ClientError
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field, model_validator
+from services.resource_constraints import (
+    build_any_of_from_constraints,
+    has_explicit_resource_selection,
+)
 
 router = APIRouter(prefix="/api/v2/runs", tags=["runs"])
 
@@ -129,6 +133,11 @@ class ModelConfig(BaseModel):
 
 class ResourceConstraintsConfig(BaseModel):
     """GPU resource constraints forwarded to GPUSelectorService in the Airflow DAG."""
+    class GPUFallbackEntryConfig(BaseModel):
+        infra: str
+        accelerators: str
+        use_spot: bool = False
+
     providers: list[str] = Field(default_factory=lambda: ["runpod"])
     gpu_types: list[str] | None = None
     min_vram_gb: float = 0
@@ -139,6 +148,7 @@ class ResourceConstraintsConfig(BaseModel):
     num_nodes: int = 1
     num_gpus_per_node: int = 1
     job_type: str = "tabular"
+    gpu_fallbacks: list[GPUFallbackEntryConfig] | None = None
 
 
 class RunRequest(BaseModel):
@@ -500,7 +510,22 @@ async def submit_run(request: RunRequest):
         "num_nodes": request.num_nodes,
     }
     if request.resource_constraints is not None:
-        dag_conf["resource_constraints"] = request.resource_constraints.model_dump()
+        rc_dict = request.resource_constraints.model_dump()
+        any_of = build_any_of_from_constraints(rc_dict)
+
+        if has_explicit_resource_selection(rc_dict) and not any_of:
+            raise HTTPException(
+                status_code=422,
+                detail=(
+                    "No valid SkyPilot resource entries could be generated from the selected "
+                    "GPUs/regions. Adjust gpu_types/preferred_regions or provide gpu_fallbacks."
+                ),
+            )
+
+        if any_of:
+            rc_dict["gpu_fallbacks"] = any_of
+
+        dag_conf["resource_constraints"] = rc_dict
 
     try:
         status, data = _airflow_request(
