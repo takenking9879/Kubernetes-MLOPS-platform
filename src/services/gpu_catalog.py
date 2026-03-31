@@ -303,12 +303,50 @@ class GPUCatalogService:
             )
 
             sky_runpod = _sky_supported_names(sky_catalog, "runpod")
-            offers: list[GPUOffer] = []
+            gpu_meta_by_id: dict[str, dict[str, Any]] = {}
             for gpu in gpus:
-                gpu_id = gpu.get("id", "")
-                display_name = gpu.get("displayName", "") or gpu_id
-                if not gpu_id or gpu_id.lower() == "unknown":
+                gpu_id = str(gpu.get("id") or "")
+                if gpu_id:
+                    gpu_meta_by_id[gpu_id] = gpu
+
+            # Build regional availability with one query per datacenter.
+            regional_lowest_price: dict[tuple[str, str], dict[str, Any]] = {}
+            for dc in datacenters:
+                dc_id = str(dc.get("id") or "").strip()
+                if not dc_id:
                     continue
+
+                query = (
+                    "query { gpuTypes { id lowestPrice(input: { "
+                    "secureCloud: true, "
+                    "gpuCount: 1, "
+                    "minVcpuCount: 2, "
+                    "minMemoryInGb: 8, "
+                    "minDisk: 0, "
+                    f"dataCenterId: {json.dumps(dc_id)}, "
+                    "globalNetwork: false, "
+                    "compliance: null "
+                    "}) { "
+                    "stockStatus availableGpuCounts maxUnreservedGpuCount "
+                    "uninterruptablePrice minimumBidPrice "
+                    "} } }"
+                )
+                try:
+                    dc_result = _gql.run_graphql_query(query)
+                    dc_rows = dc_result.get("data", {}).get("gpuTypes", []) or []
+                except Exception:
+                    dc_rows = []
+
+                for row in dc_rows:
+                    gpu_id = str((row or {}).get("id") or "")
+                    lowest_price = (row or {}).get("lowestPrice")
+                    if not gpu_id or lowest_price is None:
+                        continue
+                    regional_lowest_price[(gpu_id, dc_id)] = lowest_price
+
+            offers: list[GPUOffer] = []
+            for gpu_id, gpu in gpu_meta_by_id.items():
+                display_name = gpu.get("displayName", "") or gpu_id
 
                 # Map to SkyPilot canonical name; validate against catalog.
                 skypilot_id = _RUNPOD_TO_SKYPILOT.get(gpu_id) or _infer_skypilot_id(display_name)
@@ -320,40 +358,13 @@ class GPUCatalogService:
                     gpu_type = display_name  # show native name when unsupported
 
                 vram = float(gpu.get("memoryInGb", 0))
-                lowest_price = gpu.get("lowestPrice")
 
                 region_offers: list[GPUOffer] = []
                 for dc in datacenters:
                     dc_id = str(dc.get("id") or "").strip()
                     if not dc_id:
                         continue
-
-                    # Query regional stock for this GPU/datacenter pair.
-                    query = (
-                        "query { "
-                        f"gpuTypes(input: {{ id: {json.dumps(gpu_id)} }}) {{ "
-                        "lowestPrice(input: { "
-                        "secureCloud: true, "
-                        "gpuCount: 1, "
-                        "minVcpuCount: 2, "
-                        "minMemoryInGb: 8, "
-                        "minDisk: 0, "
-                        f"dataCenterId: {json.dumps(dc_id)}, "
-                        "globalNetwork: false, "
-                        "compliance: null "
-                        "}) { "
-                        "stockStatus availableGpuCounts maxUnreservedGpuCount "
-                        "uninterruptablePrice minimumBidPrice "
-                        "} } }"
-                    )
-                    try:
-                        dc_result = _gql.run_graphql_query(query)
-                        dc_rows = dc_result.get("data", {}).get("gpuTypes", []) or []
-                        dc_lowest = (dc_rows[0] or {}).get("lowestPrice") if dc_rows else None
-                    except Exception:
-                        dc_lowest = None
-
-                    # lowestPrice is null when this GPU is not listed in that datacenter.
+                    dc_lowest = regional_lowest_price.get((gpu_id, dc_id))
                     if dc_lowest is None:
                         continue
 
@@ -390,7 +401,8 @@ class GPUCatalogService:
                     offers.extend(region_offers)
                     continue
 
-                # Fallback to provider-global pricing when per-region query fails.
+                # Fallback to provider-global pricing when regional queries fail.
+                lowest_price = gpu.get("lowestPrice")
                 on_demand, spot = RunPodAdapter.extract_price(lowest_price, gpu)
                 available = RunPodAdapter.is_available(lowest_price, gpu_count=1)
                 count = RunPodAdapter.available_count(lowest_price)

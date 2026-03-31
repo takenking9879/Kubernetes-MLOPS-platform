@@ -90,7 +90,7 @@ class GPUSelectResponse(BaseModel):
 
 
 @router.get("/catalog")
-async def get_gpu_catalog(
+def get_gpu_catalog(
     providers: str | None = Query(
         default=None,
         description="Comma-separated provider list: runpod,vast,aws,gcp,azure",
@@ -118,7 +118,7 @@ async def get_gpu_catalog(
 
 
 @router.post("/select", response_model=GPUSelectResponse)
-async def select_gpu_resources(body: ResourceConstraintsRequest) -> GPUSelectResponse:
+def select_gpu_resources(body: ResourceConstraintsRequest) -> GPUSelectResponse:
     """
     Given resource constraints, return a ranked `any_of` SkyPilot list.
     Spot entries appear before on-demand entries of equivalent GPU type.
@@ -146,7 +146,7 @@ async def select_gpu_resources(body: ResourceConstraintsRequest) -> GPUSelectRes
 
 
 @router.get("/llm-catalog")
-async def get_llm_catalog() -> list[dict]:
+def get_llm_catalog() -> list[dict]:
     """Static catalog of LLM models with minimum GPU/VRAM requirements."""
     return _LLM_CATALOG
 
