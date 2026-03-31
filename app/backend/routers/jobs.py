@@ -110,6 +110,7 @@ class TrainingConfigIn(BaseModel):
     processed_table: str = ""
     dataset_s3_path: str = ""            # JSONL for LLM
     use_gpu: bool = True
+    use_managed_jobs: bool = False
     use_deepspeed: bool = False
     deepspeed_stage: int = 1
     lora_enabled: bool = True
@@ -509,6 +510,7 @@ async def launch_job(body: LaunchRequest) -> LaunchResponse:
                 )
             )
             dag_conf["train_params_s3_path"] = train_params_s3_path
+            dag_conf["use_managed_jobs"] = bool(body.training.use_managed_jobs)
             if body.resource_constraints:
                 rc_dict = constraints_dict or body.resource_constraints.model_dump()
                 if any_of:

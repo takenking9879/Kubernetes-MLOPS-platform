@@ -120,10 +120,13 @@ export interface ProcessingRunResult {
 /** Result from POST /api/v2/runs */
 export interface TrainingRunResult {
   dag_run_id: string;
+  dag_id?: string;
   train_run_id: string;
   preprocess_run_id: string;
   train_params_s3_path: string;
   processed_table: string;
+  skypilot?: boolean;
+  use_managed_jobs?: boolean;
 }
 
 export interface RunStatus {
@@ -182,6 +185,8 @@ export interface RunRequest {
   execution_id?: string;
   framework: 'xgboost' | 'pytorch';
   use_gpu?: boolean;
+  // true -> sky jobs launch (managed), false -> sky launch --retry-until-up (direct)
+  use_managed_jobs?: boolean;
   resource_constraints?: ResourceConstraints | null;
   tuning?: TuningConfig;
   model?: ModelConfig;
@@ -801,6 +806,7 @@ export interface TrainingConfigIn {
   processed_table?: string;
   dataset_s3_path?: string;
   use_gpu?: boolean;
+  use_managed_jobs?: boolean;
   use_deepspeed?: boolean;
   deepspeed_stage?: number;
   lora_enabled?: boolean;

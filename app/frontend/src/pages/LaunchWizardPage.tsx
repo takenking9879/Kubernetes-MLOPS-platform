@@ -92,6 +92,7 @@ const MODEL_CATEGORIES = [
 ] as const;
 
 const PYTORCH_MODEL_TYPES = ['mlp', 'ssm', 'bae'] as const;
+type SkyLaunchMode = 'launch' | 'jobs_launch';
 
 const RUNTIME_PRESETS = [
   { label: '0.5 h', hours: 0.5 },
@@ -165,6 +166,7 @@ export function LaunchWizardPage() {
   const [tabularResult, setTabularResult] = useState<TrainingRunResult | null>(null);
   const [tabularError, setTabularError] = useState('');
   const [tabularLaunching, setTabularLaunching] = useState(false);
+  const [skyLaunchMode, setSkyLaunchMode] = useState<SkyLaunchMode>('launch');
 
   // Reset hyperparams + tuning when framework or task changes
   useEffect(() => {
@@ -361,6 +363,7 @@ export function LaunchWizardPage() {
         preprocess_run_id: preprocessRunId,
         framework,
         use_gpu: useGpu,
+        use_managed_jobs: skyLaunchMode === 'jobs_launch',
         resource_constraints: {
           ...constraints,
           num_nodes:          numNodes,
@@ -1096,6 +1099,31 @@ export function LaunchWizardPage() {
             <div className="flex flex-col gap-5 rounded border border-slate-700 bg-slate-900/50 p-5">
               <GPUResourceSelector value={constraints} onChange={setConstraints} />
 
+              {isTabularPath && (
+                <div className="flex flex-col gap-1.5 rounded border border-slate-700/60 p-3">
+                  <span className={LABEL_CLS}>SkyPilot launch mode</span>
+                  <div className="flex flex-wrap gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => setSkyLaunchMode('launch')}
+                      className={skyLaunchMode === 'launch' ? BTN_TOGGLE_ON : BTN_TOGGLE_OFF}
+                    >
+                      sky launch --retry-until-up
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setSkyLaunchMode('jobs_launch')}
+                      className={skyLaunchMode === 'jobs_launch' ? BTN_TOGGLE_ON : BTN_TOGGLE_OFF}
+                    >
+                      sky jobs launch (managed)
+                    </button>
+                  </div>
+                  <p className="text-[10px] text-slate-500">
+                    Direct launch keeps retry-until-up enabled. Managed jobs skip that flag.
+                  </p>
+                </div>
+              )}
+
               {/* Serving note */}
               {isServing && !isTraining && (
                 <div className="rounded border border-amber-700/40 bg-amber-900/10 px-3 py-2 text-[10px] text-amber-400">
@@ -1185,6 +1213,12 @@ export function LaunchWizardPage() {
                     <dd className="text-slate-200">{numNodes}</dd>
                     <dt className="text-slate-500">Spot</dt>
                     <dd className="text-slate-200">{constraints.prefer_spot !== false ? 'Preferred' : 'Off'}</dd>
+                    <dt className="text-slate-500">Launch mode</dt>
+                    <dd className="text-slate-200">
+                      {skyLaunchMode === 'jobs_launch'
+                        ? 'sky jobs launch (managed)'
+                        : 'sky launch --retry-until-up'}
+                    </dd>
                   </dl>
                 </>
               ) : (
@@ -1279,6 +1313,16 @@ export function LaunchWizardPage() {
                   <dd className="text-slate-200">{(constraints.providers ?? ['runpod']).join(', ')}</dd>
                   <dt className="text-slate-500">Nodes</dt>
                   <dd className="text-slate-200">{numNodes}</dd>
+                  {isTabularPath && (
+                    <>
+                      <dt className="text-slate-500">Launch mode</dt>
+                      <dd className="text-slate-200">
+                        {skyLaunchMode === 'jobs_launch'
+                          ? 'sky jobs launch (managed)'
+                          : 'sky launch --retry-until-up'}
+                      </dd>
+                    </>
+                  )}
                   {isServing && llmAdapterS3 && (
                     <>
                       <dt className="text-slate-500">Adapter</dt>

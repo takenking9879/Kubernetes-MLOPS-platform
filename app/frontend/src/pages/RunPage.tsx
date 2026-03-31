@@ -11,7 +11,7 @@
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Check, ChevronDown, ChevronUp, Copy, RefreshCw } from 'lucide-react';
+import { Check, Copy, RefreshCw } from 'lucide-react';
 import {
   getPreprocessParams,
   getRunStatus,
@@ -38,7 +38,6 @@ import {
   getTuneSettingsDefaults,
   getAllowedKeys,
   getSearchSpace,
-  getParamMeta,
   getTuneSettingsMeta,
   getNonTunableKeys,
   type ParamMeta,
@@ -60,6 +59,7 @@ const STEP_LABELS = ['Preprocessing Run', 'Model', 'Tuning', 'Review'];
 
 type Framework = 'xgboost' | 'pytorch';
 type TuneMode = 'predefined' | 'override';
+type SkyLaunchMode = 'launch' | 'jobs_launch';
 
 // ─── Style tokens ─────────────────────────────────────────────────────────────
 
@@ -498,6 +498,7 @@ export function RunPage() {
   const [taskType, setTaskType] = useState<TaskType>('classification');
   const [modelType, setModelType] = useState<string>('mlp');
   const [useGpu, setUseGpu] = useState<boolean>(false);
+  const [skyLaunchMode, setSkyLaunchMode] = useState<SkyLaunchMode>('launch');
   const [resourceConstraints, setResourceConstraints] = useState<ResourceConstraints>({
     providers: ['runpod'],
     prefer_spot: true,
@@ -582,7 +583,10 @@ export function RunPage() {
     if (pollRef.current) clearInterval(pollRef.current);
     pollRef.current = setInterval(async () => {
       try {
-        const s = await getRunStatus(submitResult.dag_run_id);
+        const s = await getRunStatus(
+          submitResult.dag_run_id,
+          Boolean(submitResult.skypilot),
+        );
         setRunStatus(s.state);
         if (TERMINAL.includes(s.state.toLowerCase())) {
           if (pollRef.current) clearInterval(pollRef.current);
@@ -722,6 +726,7 @@ export function RunPage() {
         preprocess_run_id: selectedPreprocessRunId,
         framework,
         use_gpu: useGpu,
+        use_managed_jobs: skyLaunchMode === 'jobs_launch',
         resource_constraints: useResourceSelector ? resourceConstraints : null,
         tuning: { enabled: tuningEnabled, number_of_trials: numberOfTrials },
         model: {
@@ -1019,6 +1024,29 @@ export function RunPage() {
                   )}
                 </div>
               )}
+
+              <div className="space-y-2">
+                <p className={SUB_HEADING}>SkyPilot Launch Mode</p>
+                <div className="flex flex-wrap gap-2">
+                  <ToggleButton
+                    active={skyLaunchMode === 'launch'}
+                    onClick={() => setSkyLaunchMode('launch')}
+                  >
+                    sky launch --retry-until-up
+                  </ToggleButton>
+                  <ToggleButton
+                    active={skyLaunchMode === 'jobs_launch'}
+                    onClick={() => setSkyLaunchMode('jobs_launch')}
+                  >
+                    sky jobs launch (managed)
+                  </ToggleButton>
+                </div>
+                <p className="text-[11px] text-slate-500">
+                  This applies when the run is routed to SkyPilot. Direct launch keeps
+                  <span className="mx-1 font-mono text-slate-400">--retry-until-up</span>
+                  enabled; managed jobs do not use that flag.
+                </p>
+              </div>
 
               {/* Experiment */}
               <div className="space-y-2">
@@ -1329,6 +1357,12 @@ export function RunPage() {
                   ['Task type', taskType],
                   ...(framework === 'pytorch' ? [['Model type', modelType] as [string, string]] : []),
                   ['GPU', useGpu ? 'enabled' : 'disabled (CPU only)'],
+                  [
+                    'SkyPilot launch mode',
+                    skyLaunchMode === 'jobs_launch'
+                      ? 'sky jobs launch (managed)'
+                      : 'sky launch --retry-until-up',
+                  ],
                   ['Target', `${modelConfig.target} (${modelConfig.num_classes} classes)`],
                   ['Experiment', modelConfig.experiment_name],
                   ['Registry', modelConfig.registry_model_name],

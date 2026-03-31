@@ -23,6 +23,7 @@ dag_run.conf keys:
     num_nodes               : int        — number of nodes (default 1)
     use_deepspeed           : bool       — install + enable DeepSpeed (default False)
     deepspeed_stage         : int        — ZeRO stage 1|2|3 (default 1)
+    use_managed_jobs        : bool       — true -> sky jobs launch, false -> sky launch --retry-until-up
     resource_constraints    : dict|None  — optional GPU constraints
                                            (must include gpu_fallbacks: [{infra, accelerators, use_spot}])
 """
@@ -399,7 +400,7 @@ with DAG(
             "sky_timeout_seconds":       SKY_TIMEOUT_SECONDS,
             "sky_yaml_dir":              _SKY_YAML_DIR,
             "sky_bin":                   _SKY_BIN,
-            "use_managed_jobs":          "{{ 'true' if params.sky_use_managed_jobs else 'false' }}",
+            "use_managed_jobs":          "{{ dag_run.conf.get('use_managed_jobs', params.sky_use_managed_jobs) }}",
         },
         do_xcom_push=True,
         execution_timeout=timedelta(seconds=SKY_TIMEOUT_SECONDS + 600),

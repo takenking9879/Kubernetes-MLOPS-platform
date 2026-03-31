@@ -156,6 +156,7 @@ class RunRequest(BaseModel):
     execution_id: str = ""            # auto-generated if empty; becomes train_run_id
     framework: Literal["xgboost", "pytorch", "ssm", "bae"] = "xgboost"
     use_gpu: bool = False
+    use_managed_jobs: bool = False    # SkyPilot mode: jobs.launch vs launch
     num_nodes: int = Field(1, ge=1, le=64)                        # Phase 5: multi-node training
     resource_constraints: ResourceConstraintsConfig | None = None  # Phase 3: dynamic GPU selection
     tuning: TuningConfig = Field(default_factory=TuningConfig)
@@ -509,6 +510,9 @@ async def submit_run(request: RunRequest):
         "model_type": request.framework,
         "num_nodes": request.num_nodes,
     }
+    if use_skypilot:
+        dag_conf["use_managed_jobs"] = bool(request.use_managed_jobs)
+
     if request.resource_constraints is not None:
         rc_dict = request.resource_constraints.model_dump()
         any_of = build_any_of_from_constraints(rc_dict)
@@ -552,6 +556,7 @@ async def submit_run(request: RunRequest):
         "train_params_s3_path": train_params_s3_path,
         "processed_table": lineage["processed_table"],
         "skypilot": use_skypilot,
+        "use_managed_jobs": bool(request.use_managed_jobs) if use_skypilot else False,
     }
 
 

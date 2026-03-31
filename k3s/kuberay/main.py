@@ -400,28 +400,74 @@ class KubeRayTraining(BaseUtils):
         job_start_time = time.time()
 
         try:
-            # Log cluster resources
-            status = subprocess.run(
-                ["ray", "status"], capture_output=True, text=True, check=False
-            )
-            stdout = status.stdout
-            cpu = re.search(r"([\d.]+)/([\d.]+) CPU", stdout)
-            mem = re.search(r"([\dA-Za-z.]+)/([\dA-Za-z.]+) memory", stdout)
-            obj = re.search(r"([\dA-Za-z.]+)/([\dA-Za-z.]+) object_store_memory", stdout)
-            cpu_used, cpu_total = cpu.groups() if cpu else ("?", "?")
-            mem_used, mem_total = mem.groups() if mem else ("?", "?")
-            obj_used, obj_total = obj.groups() if obj else ("?", "?")
+            # Log cluster resources without relying on the `ray` CLI in PATH.
+            try:
+                cluster_resources = ray.cluster_resources()
+                available_resources = ray.available_resources()
 
-            pretty_log = f"""
-            [RAY CLUSTER RESOURCES]
-            ────────────────────────────────
-            CPU           : {cpu_used} / {cpu_total}
-            Memory        : {mem_used} / {mem_total}
-            Object Store  : {obj_used} / {obj_total}
-            ────────────────────────────────
-            """.strip()
+                cpu_total = float(cluster_resources.get("CPU", 0.0))
+                cpu_available = float(available_resources.get("CPU", 0.0))
+                cpu_used = max(cpu_total - cpu_available, 0.0)
 
-            self.logger.info(pretty_log)
+                mem_total = float(cluster_resources.get("memory", 0.0))
+                mem_available = float(available_resources.get("memory", 0.0))
+                mem_used = max(mem_total - mem_available, 0.0)
+
+                obj_total = float(cluster_resources.get("object_store_memory", 0.0))
+                obj_available = float(available_resources.get("object_store_memory", 0.0))
+                obj_used = max(obj_total - obj_available, 0.0)
+
+                def _fmt_gib(value: float) -> str:
+                    return f"{(value / (1024 ** 3)):.2f} GiB"
+
+                pretty_log = f"""
+                [RAY CLUSTER RESOURCES]
+                ────────────────────────────────
+                CPU           : {cpu_used:.2f} / {cpu_total:.2f}
+                Memory        : {_fmt_gib(mem_used)} / {_fmt_gib(mem_total)}
+                Object Store  : {_fmt_gib(obj_used)} / {_fmt_gib(obj_total)}
+                ────────────────────────────────
+                """.strip()
+                self.logger.info(pretty_log)
+            except Exception as ray_api_error:
+                self.logger.warning(
+                    "Could not fetch Ray resources via API (%s). Falling back to ray status CLI.",
+                    ray_api_error,
+                )
+                try:
+                    status = subprocess.run(
+                        ["ray", "status"],
+                        capture_output=True,
+                        text=True,
+                        check=False,
+                    )
+                    stdout = status.stdout
+                    cpu = re.search(r"([\d.]+)/([\d.]+) CPU", stdout)
+                    mem = re.search(r"([\dA-Za-z.]+)/([\dA-Za-z.]+) memory", stdout)
+                    obj = re.search(r"([\dA-Za-z.]+)/([\dA-Za-z.]+) object_store_memory", stdout)
+                    cpu_used, cpu_total = cpu.groups() if cpu else ("?", "?")
+                    mem_used, mem_total = mem.groups() if mem else ("?", "?")
+                    obj_used, obj_total = obj.groups() if obj else ("?", "?")
+
+                    pretty_log = f"""
+                    [RAY CLUSTER RESOURCES]
+                    ────────────────────────────────
+                    CPU           : {cpu_used} / {cpu_total}
+                    Memory        : {mem_used} / {mem_total}
+                    Object Store  : {obj_used} / {obj_total}
+                    ────────────────────────────────
+                    """.strip()
+                    self.logger.info(pretty_log)
+                except FileNotFoundError:
+                    self.logger.warning(
+                        "Ray CLI binary not found in PATH; skipping `ray status` resource log."
+                    )
+                except Exception as ray_cli_error:
+                    self.logger.warning(
+                        "Could not fetch cluster resources via `ray status`: %s",
+                        ray_cli_error,
+                    )
+
             self._check_minio_connection()
 
             # Resolve Iceberg processed table from metadata
