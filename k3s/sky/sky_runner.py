@@ -22,6 +22,7 @@ Commands:
 
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import re
@@ -177,6 +178,22 @@ def _k8s_name(name: str, prefix: str, max_len: int = 40) -> str:
     slug = re.sub(r"[^a-z0-9-]", "-", f"{prefix}-{name}".lower())
     slug = re.sub(r"-+", "-", slug).strip("-")
     return slug[:max_len]
+
+
+def _managed_job_name(name: str, prefix: str, max_len: int = 40) -> str:
+    """Build a managed-job name unique to this Airflow task attempt."""
+    base = _k8s_name(name, prefix, max_len=max_len) or prefix
+    seed = (
+        f"{os.getenv('AIRFLOW_CTX_DAG_RUN_ID', '')}-"
+        f"{os.getenv('AIRFLOW_CTX_TASK_ID', '')}-"
+        f"{os.getenv('AIRFLOW_CTX_TRY_NUMBER', '')}-"
+        f"{time.time_ns()}-{os.getpid()}"
+    )
+    suffix = hashlib.sha1(seed.encode("utf-8")).hexdigest()[:8]
+
+    base_max_len = max(1, max_len - len(suffix) - 1)
+    trimmed = base[:base_max_len].rstrip("-") or prefix
+    return f"{trimmed}-{suffix}"
 
 
 # ─── Cluster IP helper ────────────────────────────────────────────────────────
@@ -361,7 +378,7 @@ def submit_training():
     mlflow_uri        = _env("MLFLOW_TRACKING_URI")
     rc                = _rc()
 
-    job_name = _k8s_name(train_run_id, "sky")
+    job_name = _managed_job_name(train_run_id, "sky")
     use_gpu  = model_type in ("pytorch", "ssm", "bae")
     kind     = "train_multi" if (use_gpu and num_nodes > 1) else ("train" if use_gpu else "train")
 
@@ -449,7 +466,7 @@ def submit_llm():
     mlflow_uri = _env("MLFLOW_TRACKING_URI")
     rc         = _rc()
 
-    job_name  = _k8s_name(run_id, "llm")
+    job_name  = _managed_job_name(run_id, "llm")
     yaml_path = _yaml_path("llm", rc)
     print(f"Using LLM YAML: {yaml_path}")
 
@@ -770,7 +787,7 @@ def run_training():
     rc                = _rc()
     timeout           = int(_env("SKY_TIMEOUT_SECONDS", "7200"))
 
-    job_name = _k8s_name(train_run_id, "sky")
+    job_name = _managed_job_name(train_run_id, "sky")
     use_gpu  = model_type in ("pytorch", "ssm", "bae")
     kind     = "train_multi" if (use_gpu and num_nodes > 1) else "train"
 
@@ -864,7 +881,7 @@ def run_llm():
     rc         = _rc()
     timeout    = int(_env("SKY_TIMEOUT_SECONDS", "28800"))
 
-    job_name  = _k8s_name(run_id, "llm")
+    job_name  = _managed_job_name(run_id, "llm")
     yaml_path = _yaml_path("llm", rc)
     print(f"[run-llm] LLM YAML: {yaml_path}")
 

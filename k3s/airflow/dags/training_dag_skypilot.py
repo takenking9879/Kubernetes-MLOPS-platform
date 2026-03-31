@@ -51,6 +51,8 @@ SKY_TIMEOUT_SECONDS = int(os.getenv("SKY_TIMEOUT_SECONDS", "7200"))
 
 def _run_sky_training(
     train_run_id: str,
+    airflow_run_id: str,
+    airflow_task_try_number: str,
     preprocess_run_id: str,
     processed_table: str,
     model_type: str,
@@ -198,9 +200,22 @@ def _run_sky_training(
         yaml.dump(sky_conf, fh, default_flow_style=False, allow_unicode=True)
 
     # ── Job name ──────────────────────────────────────────────────────────────
+    # Keep managed job names unique per Airflow run attempt so cancel/recovery
+    # from one run cannot accidentally target another run with the same
+    # train_run_id.
     slug = re.sub(r"[^a-z0-9-]", "-", f"sky-{train_run_id}".lower())
-    slug = re.sub(r"-+", "-", slug).strip("-")
-    job_name = slug[:40]
+    slug = re.sub(r"-+", "-", slug).strip("-") or "sky-training"
+
+    run_marker = f"{airflow_run_id}-{airflow_task_try_number}".strip("-")
+    if not run_marker:
+        run_marker = f"{time.time_ns()}-{os.getpid()}"
+
+    import hashlib
+
+    suffix = hashlib.sha1(run_marker.encode("utf-8")).hexdigest()[:8]
+    base_max_len = max(1, 40 - len(suffix) - 1)
+    base = slug[:base_max_len].rstrip("-") or "sky"
+    job_name = f"{base}-{suffix}"
 
     # ── Launch ────────────────────────────────────────────────────────────────
     launch_cmd = [sky_bin, "jobs", "launch", "-y", "--name", job_name, tmp]
@@ -292,6 +307,8 @@ with DAG(
         python_callable=_run_sky_training,
         op_kwargs={
             "train_run_id":              "{{ dag_run.conf['train_run_id'] }}",
+            "airflow_run_id":            "{{ run_id }}",
+            "airflow_task_try_number":   "{{ ti.try_number | string }}",
             "preprocess_run_id":         "{{ dag_run.conf['preprocess_run_id'] }}",
             "processed_table":           "{{ dag_run.conf.get('processed_table', '') }}",
             "model_type":                "{{ dag_run.conf.get('model_type', 'xgboost') }}",
