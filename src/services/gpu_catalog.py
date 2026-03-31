@@ -285,68 +285,27 @@ class GPUCatalogService:
             if not runpod.api_key:
                 logger.warning("RUNPOD_API_KEY not set — skipping RunPod catalog")
                 return []
-            # get_gpus() omits pricing; use GraphQL for full schema.
+            # Use a single global query for pricing + availability.
             from runpod.api import graphql as _gql  # type: ignore[import]
             result = _gql.run_graphql_query(
-                "{ dataCenters { id name location } gpuTypes { id displayName memoryInGb "
+                "{ gpuTypes { id displayName memoryInGb "
                 "communityPrice securePrice communitySpotPrice secureSpotPrice "
                 "lowestPrice(input: { gpuCount: 1, secureCloud: true, "
                 "minVcpuCount: 2, minMemoryInGb: 8 }) { "
                 "stockStatus availableGpuCounts maxUnreservedGpuCount "
                 "uninterruptablePrice minimumBidPrice } } }"
             )
-            datacenters: list[dict[str, Any]] = (
-                result.get("data", {}).get("dataCenters", []) or []
-            )
             gpus: list[dict[str, Any]] = (
                 result.get("data", {}).get("gpuTypes", []) or []
             )
 
             sky_runpod = _sky_supported_names(sky_catalog, "runpod")
-            gpu_meta_by_id: dict[str, dict[str, Any]] = {}
+            offers: list[GPUOffer] = []
             for gpu in gpus:
                 gpu_id = str(gpu.get("id") or "")
-                if gpu_id:
-                    gpu_meta_by_id[gpu_id] = gpu
-
-            # Build regional availability with one query per datacenter.
-            regional_lowest_price: dict[tuple[str, str], dict[str, Any]] = {}
-            for dc in datacenters:
-                dc_id = str(dc.get("id") or "").strip()
-                if not dc_id:
-                    continue
-
-                query = (
-                    "query { gpuTypes { id lowestPrice(input: { "
-                    "secureCloud: true, "
-                    "gpuCount: 1, "
-                    "minVcpuCount: 2, "
-                    "minMemoryInGb: 8, "
-                    "minDisk: 0, "
-                    f"dataCenterId: {json.dumps(dc_id)}, "
-                    "globalNetwork: false, "
-                    "compliance: null "
-                    "}) { "
-                    "stockStatus availableGpuCounts maxUnreservedGpuCount "
-                    "uninterruptablePrice minimumBidPrice "
-                    "} } }"
-                )
-                try:
-                    dc_result = _gql.run_graphql_query(query)
-                    dc_rows = dc_result.get("data", {}).get("gpuTypes", []) or []
-                except Exception:
-                    dc_rows = []
-
-                for row in dc_rows:
-                    gpu_id = str((row or {}).get("id") or "")
-                    lowest_price = (row or {}).get("lowestPrice")
-                    if not gpu_id or lowest_price is None:
-                        continue
-                    regional_lowest_price[(gpu_id, dc_id)] = lowest_price
-
-            offers: list[GPUOffer] = []
-            for gpu_id, gpu in gpu_meta_by_id.items():
                 display_name = gpu.get("displayName", "") or gpu_id
+                if not gpu_id or gpu_id.lower() == "unknown":
+                    continue
 
                 # Map to SkyPilot canonical name; validate against catalog.
                 skypilot_id = _RUNPOD_TO_SKYPILOT.get(gpu_id) or _infer_skypilot_id(display_name)
@@ -358,50 +317,6 @@ class GPUCatalogService:
                     gpu_type = display_name  # show native name when unsupported
 
                 vram = float(gpu.get("memoryInGb", 0))
-
-                region_offers: list[GPUOffer] = []
-                for dc in datacenters:
-                    dc_id = str(dc.get("id") or "").strip()
-                    if not dc_id:
-                        continue
-                    dc_lowest = regional_lowest_price.get((gpu_id, dc_id))
-                    if dc_lowest is None:
-                        continue
-
-                    on_demand, spot = RunPodAdapter.extract_price(dc_lowest, gpu)
-                    available = RunPodAdapter.is_available(dc_lowest, gpu_count=1)
-                    count = RunPodAdapter.available_count(dc_lowest)
-                    mapping = normalize_provider_region("runpod", dc_id)
-
-                    region_offers.append(
-                        GPUOffer(
-                            provider="runpod",
-                            gpu_type=gpu_type,
-                            gpu_count=1,
-                            vram_gb=vram,
-                            vcpus=0,
-                            ram_gb=0,
-                            price_on_demand=on_demand,
-                            price_spot=spot,
-                            spot_available=available,
-                            available_count=count,
-                            region=dc_id,
-                            infiniband=gpu_id in _RUNPOD_INFINIBAND_IDS,
-                            skypilot_supported=sky_supported,
-                            skypilot_accelerator=f"{gpu_type}:1" if sky_supported else "",
-                            skypilot_cloud="runpod",
-                            provider_region_id=dc_id,
-                            skypilot_region=mapping.skypilot_region,
-                            skypilot_zone=mapping.skypilot_zone,
-                            skypilot_infra=mapping.skypilot_infra,
-                        )
-                    )
-
-                if region_offers:
-                    offers.extend(region_offers)
-                    continue
-
-                # Fallback to provider-global pricing when regional queries fail.
                 lowest_price = gpu.get("lowestPrice")
                 on_demand, spot = RunPodAdapter.extract_price(lowest_price, gpu)
                 available = RunPodAdapter.is_available(lowest_price, gpu_count=1)

@@ -282,9 +282,13 @@ export function GPUPricingPanel({ onAddToFallback }: Props) {
                           no sky
                         </span>
                       )}
-                      {noStock && (
+                      {noStock ? (
                         <span className="ml-1 rounded bg-red-900/60 px-1 py-0.5 text-[8px] text-red-400 font-mono">
-                          no stock
+                          no-stock
+                        </span>
+                      ) : (
+                        <span className="ml-1 rounded bg-green-900/60 px-1 py-0.5 text-[8px] text-green-300 font-mono">
+                          available
                         </span>
                       )}
                     </td>

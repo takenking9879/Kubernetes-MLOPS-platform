@@ -21,12 +21,16 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ChevronDown, ChevronUp, Zap, Plus, Trash2, ArrowUp, ArrowDown } from 'lucide-react';
 import {
+  getRunpodSupportedRegions,
   queryGPUCatalog,
+  queryRunpodRegionAvailability,
   selectGPUResources,
   type GPUOffer,
   type GPUSelectResult,
   type ResourceConstraints,
   type GPUFallbackEntry,
+  type RunPodRegionOption,
+  type RunPodRegionAvailability,
 } from '../api/platformClient';
 
 // ── Constants ─────────────────────────────────────────────────────────────────
@@ -81,6 +85,9 @@ export function GPUResourceSelector({ value, onChange, disabled }: Props) {
   const [open, setOpen] = useState(false);
   const [catalog, setCatalog] = useState<GPUOffer[]>([]);
   const [selectResult, setSelectResult] = useState<GPUSelectResult | null>(null);
+  const [runpodRegions, setRunpodRegions] = useState<RunPodRegionOption[]>([]);
+  const [runpodAvailability, setRunpodAvailability] = useState<RunPodRegionAvailability[]>([]);
+  const [checkingRegionAvailability, setCheckingRegionAvailability] = useState(false);
   const [loading, setLoading] = useState(false);
   const [runtimeHours, setRuntimeHours] = useState<number>(2);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -116,6 +123,13 @@ export function GPUResourceSelector({ value, onChange, disabled }: Props) {
       .catch(() => {/* silent — catalog unavailable */});
   }, [open, mode]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  useEffect(() => {
+    if (!open || mode !== 'auto') return;
+    getRunpodSupportedRegions()
+      .then(setRunpodRegions)
+      .catch(() => setRunpodRegions([]));
+  }, [open, mode]);
+
   // Debounced select call whenever constraints change (auto mode only)
   useEffect(() => {
     if (!open || mode !== 'auto') return;
@@ -132,6 +146,37 @@ export function GPUResourceSelector({ value, onChange, disabled }: Props) {
     };
   }, [value, open, mode]);
 
+  // Region-specific RunPod availability for selected GPU + selected RunPod regions only.
+  useEffect(() => {
+    if (!open || mode !== 'auto') return;
+
+    const providers = value.providers ?? ['runpod'];
+    if (!providers.includes('runpod')) {
+      setRunpodAvailability([]);
+      return;
+    }
+
+    const selectedGpu = value.gpu_types?.[0];
+    const runpodRegionSet = new Set(runpodRegions.map((r) => r.provider_region_id.toUpperCase()));
+    const selectedRunpodRegions = (value.preferred_regions ?? [])
+      .map((r) => r.toUpperCase())
+      .filter((r) => runpodRegionSet.has(r));
+
+    if (!selectedGpu || selectedRunpodRegions.length === 0) {
+      setRunpodAvailability([]);
+      return;
+    }
+
+    setCheckingRegionAvailability(true);
+    queryRunpodRegionAvailability({
+      gpu_types: [selectedGpu],
+      regions: selectedRunpodRegions,
+    })
+      .then(setRunpodAvailability)
+      .catch(() => setRunpodAvailability([]))
+      .finally(() => setCheckingRegionAvailability(false));
+  }, [value.gpu_types, value.preferred_regions, value.providers, open, mode, runpodRegions]);
+
   const toggleProvider = useCallback(
     (id: string) => {
       const cur = value.providers ?? ['runpod'];
@@ -140,6 +185,19 @@ export function GPUResourceSelector({ value, onChange, disabled }: Props) {
       set({ providers: next });
     },
     [value.providers, set],
+  );
+
+  const toggleRunpodRegion = useCallback(
+    (regionId: string) => {
+      const id = regionId.toUpperCase();
+      const cur = value.preferred_regions ?? [];
+      const exists = cur.some((r) => r.toUpperCase() === id);
+      const next = exists
+        ? cur.filter((r) => r.toUpperCase() !== id)
+        : [...cur, id];
+      set({ preferred_regions: next });
+    },
+    [set, value.preferred_regions],
   );
 
   // ── Fallback list helpers ─────────────────────────────────────────────────
@@ -165,6 +223,7 @@ export function GPUResourceSelector({ value, onChange, disabled }: Props) {
   const updateFallback = useCallback(
     (idx: number, patch: Partial<GPUFallbackEntry>) => {
       const cur = [...(value.gpu_fallbacks ?? [])];
+      if (!cur[idx]) return;
       cur[idx] = { ...cur[idx], ...patch };
       set({ gpu_fallbacks: cur });
     },
@@ -176,6 +235,7 @@ export function GPUResourceSelector({ value, onChange, disabled }: Props) {
       const cur = [...(value.gpu_fallbacks ?? [])];
       const target = idx + dir;
       if (target < 0 || target >= cur.length) return;
+      if (!cur[idx] || !cur[target]) return;
       [cur[idx], cur[target]] = [cur[target], cur[idx]];
       set({ gpu_fallbacks: cur });
     },
@@ -185,6 +245,13 @@ export function GPUResourceSelector({ value, onChange, disabled }: Props) {
   // ── Derived (auto mode) ───────────────────────────────────────────────────
 
   const gpuTypes = Array.from(new Set(catalog.map((o) => o.gpu_type))).sort();
+  const runpodRegionSet = new Set(runpodRegions.map((r) => r.provider_region_id.toUpperCase()));
+  const selectedRunpodRegions = (value.preferred_regions ?? [])
+    .map((r) => r.toUpperCase())
+    .filter((r) => runpodRegionSet.has(r));
+  const customRegions = (value.preferred_regions ?? []).filter(
+    (r) => !runpodRegionSet.has(r.toUpperCase()),
+  );
 
   const savings =
     selectResult?.estimated_cost_spot != null &&
@@ -404,25 +471,91 @@ export function GPUResourceSelector({ value, onChange, disabled }: Props) {
               {/* Preferred regions */}
               <div className="flex flex-col gap-1">
                 <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">
-                  Preferred Regions
+                  RunPod Regions (SkyPilot-supported)
                 </span>
+                <div className="flex flex-wrap gap-1.5">
+                  {runpodRegions.length === 0 && (
+                    <span className="text-[10px] text-slate-600">No region data available</span>
+                  )}
+                  {runpodRegions.map((region) => {
+                    const id = region.provider_region_id.toUpperCase();
+                    const active = selectedRunpodRegions.includes(id);
+                    return (
+                      <button
+                        key={id}
+                        type="button"
+                        onClick={() => toggleRunpodRegion(id)}
+                        className={`rounded px-2 py-0.5 text-[10px] font-medium transition-colors ${
+                          active
+                            ? 'bg-blue-700 text-white'
+                            : 'bg-slate-700 text-slate-400 hover:bg-slate-600'
+                        }`}
+                        title={`${region.name} (${region.skypilot_infra})`}
+                      >
+                        {id}
+                      </button>
+                    );
+                  })}
+                </div>
                 <input
                   type="text"
                   className={INPUT_CLS}
-                  value={(value.preferred_regions ?? []).join(', ')}
-                  placeholder="e.g. us-east-1, CA-MTL-1 (leave empty = any)"
+                  value={customRegions.join(', ')}
+                  placeholder="Extra regions (AWS/GCP/etc), comma-separated"
                   onChange={(e) => {
-                    const regions = e.target.value
+                    const manual = e.target.value
                       .split(',')
                       .map((r) => r.trim())
                       .filter(Boolean);
-                    set({ preferred_regions: regions });
+                    set({ preferred_regions: [...selectedRunpodRegions, ...manual] });
                   }}
                 />
                 <span className="text-[9px] text-slate-600">
-                  AWS: us-east-1, us-west-2 · RunPod zones: CA-MTL-1, US-TX-3
+                  Only RunPod regions supported by SkyPilot are listed here.
                 </span>
               </div>
+
+              {(value.gpu_types?.[0] && selectedRunpodRegions.length > 0) && (
+                <div className="flex flex-col gap-1">
+                  <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">
+                    Region Availability
+                    {checkingRegionAvailability && (
+                      <span className="ml-2 font-normal normal-case text-slate-600">checking…</span>
+                    )}
+                  </span>
+                  {!checkingRegionAvailability && runpodAvailability.length === 0 && (
+                    <span className="text-[10px] text-slate-600">No data for selected GPU/regions.</span>
+                  )}
+                  {runpodAvailability.length > 0 && (
+                    <div className="overflow-hidden rounded border border-slate-700">
+                      <table className="w-full text-[10px]">
+                        <thead>
+                          <tr className="bg-slate-800 text-left text-slate-400">
+                            <th className="px-2 py-1">Region</th>
+                            <th className="px-2 py-1">Status</th>
+                            <th className="px-2 py-1 text-right">Max</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {runpodAvailability.map((row) => (
+                            <tr key={`${row.gpu_type}-${row.provider_region_id}`} className="border-t border-slate-700">
+                              <td className="px-2 py-1 font-mono text-slate-300">{row.provider_region_id}</td>
+                              <td className="px-2 py-1">
+                                {row.available ? (
+                                  <span className="rounded bg-green-900/50 px-1 py-0.5 text-green-300">available</span>
+                                ) : (
+                                  <span className="rounded bg-red-900/50 px-1 py-0.5 text-red-300">no-stock</span>
+                                )}
+                              </td>
+                              <td className="px-2 py-1 text-right font-mono text-slate-400">{row.max_available}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </div>
+              )}
 
               {/* Cost comparison table */}
               {(selectResult || loading) && (

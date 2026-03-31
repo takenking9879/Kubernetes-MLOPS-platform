@@ -610,6 +610,28 @@ export interface GPUOffer {
   skypilot_infra: string;
 }
 
+export interface RunPodRegionOption {
+  provider: string;
+  provider_region_id: string;
+  name: string;
+  location: string;
+  skypilot_region: string;
+  skypilot_zone: string;
+  skypilot_infra: string;
+}
+
+export interface RunPodRegionAvailability {
+  gpu_type: string;
+  provider: string;
+  provider_region_id: string;
+  skypilot_region: string;
+  skypilot_zone: string;
+  skypilot_infra: string;
+  available: boolean;
+  available_counts: number[];
+  max_available: number;
+}
+
 export interface GPUSelectResult {
   any_of: Array<{ infra: string; accelerators: string; use_spot: boolean }>;
   spot_entries: number;
@@ -647,6 +669,20 @@ export async function selectGPUResources(
 
 export async function getLLMCatalog(): Promise<LLMModelInfo[]> {
   return _fetch<LLMModelInfo[]>('/api/v2/gpu-resources/llm-catalog');
+}
+
+export async function getRunpodSupportedRegions(): Promise<RunPodRegionOption[]> {
+  return _fetch<RunPodRegionOption[]>('/api/v2/gpu-resources/runpod/regions');
+}
+
+export async function queryRunpodRegionAvailability(payload: {
+  gpu_types: string[];
+  regions: string[];
+}): Promise<RunPodRegionAvailability[]> {
+  return _fetch<RunPodRegionAvailability[]>('/api/v2/gpu-resources/runpod/availability', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
 }
 
 // ─── vLLM Serving API (Phase 6) ───────────────────────────────────────────────

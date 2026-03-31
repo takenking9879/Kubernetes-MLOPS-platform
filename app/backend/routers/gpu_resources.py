@@ -10,8 +10,11 @@ Endpoints:
 """
 from __future__ import annotations
 
+import os
 import sys
+import time
 from pathlib import Path
+from typing import Any
 
 from fastapi import APIRouter, Query
 from pydantic import BaseModel, Field
@@ -20,18 +23,33 @@ from pydantic import BaseModel, Field
 _PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent.parent
 if str(_PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(_PROJECT_ROOT))
+_BACKEND_ROOT = Path(__file__).resolve().parent.parent
+if str(_BACKEND_ROOT) not in sys.path:
+    sys.path.insert(0, str(_BACKEND_ROOT))
 
 from src.services.gpu_catalog import GPUCatalogService, GPUOffer  # noqa: E402
 from src.services.gpu_selector import (  # noqa: E402
     GPUSelectorService,
     ResourceConstraints,
 )
+from src.services.gpu_catalog import (  # noqa: E402
+    _RUNPOD_TO_SKYPILOT,
+    _infer_skypilot_id,
+)
+from src.services.provider_region_mapping import (  # noqa: E402
+    RUNPOD_SKYPILOT_REGION_CODES,
+    normalize_provider_region,
+)
+from services.resource_constraints import normalize_gpu_type  # noqa: E402
 
 router = APIRouter(prefix="/api/v2/gpu-resources", tags=["gpu-resources"])
 
 # Module-level singletons (shared cache across requests)
 _catalog_svc = GPUCatalogService()
 _selector_svc = GPUSelectorService()
+_RUNPOD_REGIONS_TTL_SECONDS = 300
+_runpod_regions_cache: list[dict[str, Any]] = []
+_runpod_regions_cache_ts: float = 0.0
 
 # ── Static LLM catalog ────────────────────────────────────────────────────────
 _LLM_CATALOG: list[dict] = [
@@ -84,6 +102,83 @@ class GPUSelectResponse(BaseModel):
     ondemand_entries: int
     estimated_cost_spot: float | None
     estimated_cost_ondemand: float | None
+
+
+class RunPodAvailabilityRequest(BaseModel):
+    gpu_types: list[str] = Field(default_factory=list)
+    regions: list[str] = Field(default_factory=list)
+
+
+def _fallback_runpod_regions() -> list[dict[str, Any]]:
+    return [
+        {
+            "provider": "runpod",
+            "provider_region_id": code,
+            "name": code,
+            "location": code,
+            "skypilot_region": code,
+            "skypilot_zone": "",
+            "skypilot_infra": f"runpod/{code}",
+        }
+        for code in sorted(RUNPOD_SKYPILOT_REGION_CODES)
+    ]
+
+
+def _get_runpod_supported_regions() -> list[dict[str, Any]]:
+    global _runpod_regions_cache_ts
+    global _runpod_regions_cache
+
+    if _runpod_regions_cache and (time.time() - _runpod_regions_cache_ts) < _RUNPOD_REGIONS_TTL_SECONDS:
+        return _runpod_regions_cache
+
+    api_key = os.getenv("RUNPOD_API_KEY", "")
+    if not api_key:
+        _runpod_regions_cache = _fallback_runpod_regions()
+        _runpod_regions_cache_ts = time.time()
+        return _runpod_regions_cache
+
+    try:
+        import runpod  # type: ignore[import]
+        from runpod.api import graphql as _gql  # type: ignore[import]
+
+        runpod.api_key = api_key
+        result = _gql.run_graphql_query("{ dataCenters { id name location } }")
+        datacenters = (result.get("data", {}) or {}).get("dataCenters", []) or []
+
+        items: list[dict[str, Any]] = []
+        seen: set[str] = set()
+        for dc in datacenters:
+            dc_id = str((dc or {}).get("id") or "").strip()
+            if not dc_id:
+                continue
+            mapping = normalize_provider_region("runpod", dc_id)
+            if not mapping.resolved:
+                continue
+            if mapping.skypilot_region not in RUNPOD_SKYPILOT_REGION_CODES:
+                continue
+            if dc_id in seen:
+                continue
+            seen.add(dc_id)
+            items.append(
+                {
+                    "provider": "runpod",
+                    "provider_region_id": dc_id,
+                    "name": str((dc or {}).get("name") or dc_id),
+                    "location": str((dc or {}).get("location") or ""),
+                    "skypilot_region": mapping.skypilot_region,
+                    "skypilot_zone": mapping.skypilot_zone,
+                    "skypilot_infra": mapping.skypilot_infra,
+                }
+            )
+
+        items.sort(key=lambda x: (x["skypilot_region"], x["provider_region_id"]))
+        _runpod_regions_cache = items or _fallback_runpod_regions()
+        _runpod_regions_cache_ts = time.time()
+        return _runpod_regions_cache
+    except Exception:
+        _runpod_regions_cache = _fallback_runpod_regions()
+        _runpod_regions_cache_ts = time.time()
+        return _runpod_regions_cache
 
 
 # ── Endpoints ─────────────────────────────────────────────────────────────────
@@ -143,6 +238,92 @@ def select_gpu_resources(body: ResourceConstraintsRequest) -> GPUSelectResponse:
         estimated_cost_spot=result.estimated_cost_spot,
         estimated_cost_ondemand=result.estimated_cost_ondemand,
     )
+
+
+@router.get("/runpod/regions")
+def get_runpod_regions() -> list[dict[str, Any]]:
+    """Return RunPod datacenter IDs that can be mapped to SkyPilot regions."""
+    return _get_runpod_supported_regions()
+
+
+@router.post("/runpod/availability")
+def get_runpod_region_availability(body: RunPodAvailabilityRequest) -> list[dict[str, Any]]:
+    """Check RunPod availability for selected GPU types on selected supported regions only."""
+    gpu_types = [normalize_gpu_type(g) for g in (body.gpu_types or []) if str(g).strip()]
+    region_ids = [str(r).strip().upper() for r in (body.regions or []) if str(r).strip()]
+
+    if not gpu_types or not region_ids:
+        return []
+
+    supported = {r["provider_region_id"].upper() for r in _get_runpod_supported_regions()}
+    region_ids = [r for r in region_ids if r in supported]
+    if not region_ids:
+        return []
+
+    api_key = os.getenv("RUNPOD_API_KEY", "")
+    if not api_key:
+        return []
+
+    try:
+        import runpod  # type: ignore[import]
+        from runpod.api import graphql as _gql  # type: ignore[import]
+
+        runpod.api_key = api_key
+        selected = {normalize_gpu_type(g) for g in gpu_types}
+        rows: list[dict[str, Any]] = []
+
+        for region_id in region_ids:
+            mapping = normalize_provider_region("runpod", region_id)
+            if not mapping.resolved:
+                continue
+
+            query = (
+                "query { gpuTypes { id displayName lowestPrice(input: { "
+                "secureCloud: true, "
+                "gpuCount: 1, "
+                "minVcpuCount: 2, "
+                "minMemoryInGb: 8, "
+                "minDisk: 0, "
+                f"dataCenterId: \"{region_id}\", "
+                "globalNetwork: false, "
+                "compliance: null "
+                "}) { stockStatus availableGpuCounts maxUnreservedGpuCount } } }"
+            )
+
+            result = _gql.run_graphql_query(query)
+            gpu_rows = (result.get("data", {}) or {}).get("gpuTypes", []) or []
+
+            for gpu in gpu_rows:
+                gpu_id = str((gpu or {}).get("id") or "")
+                display_name = str((gpu or {}).get("displayName") or gpu_id)
+                skypilot_gpu = _RUNPOD_TO_SKYPILOT.get(gpu_id) or _infer_skypilot_id(display_name)
+                gpu_type = normalize_gpu_type(skypilot_gpu or display_name)
+                if gpu_type not in selected:
+                    continue
+
+                lowest = (gpu or {}).get("lowestPrice")
+                counts = list((lowest or {}).get("availableGpuCounts") or []) if lowest else []
+                available = len(counts) > 0
+                max_available = int(max(counts)) if counts else 0
+
+                rows.append(
+                    {
+                        "gpu_type": gpu_type,
+                        "provider": "runpod",
+                        "provider_region_id": region_id,
+                        "skypilot_region": mapping.skypilot_region,
+                        "skypilot_zone": mapping.skypilot_zone,
+                        "skypilot_infra": mapping.skypilot_infra,
+                        "available": available,
+                        "available_counts": counts,
+                        "max_available": max_available,
+                    }
+                )
+
+        rows.sort(key=lambda x: (x["gpu_type"], x["provider_region_id"]))
+        return rows
+    except Exception:
+        return []
 
 
 @router.get("/llm-catalog")

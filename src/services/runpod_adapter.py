@@ -4,11 +4,8 @@ src/services/runpod_adapter.py
 Adapter that normalises RunPod GraphQL `lowestPrice` payloads into the
 fields expected by GPUOffer. All methods are pure functions (no I/O).
 
-A GPU is AVAILABLE for a given gpu_count only if ALL four conditions hold:
-  1. lowestPrice exists (not None)
-  2. stockStatus is "Available" or "Low"
-  3. maxUnreservedGpuCount >= gpu_count
-  4. gpu_count is listed in availableGpuCounts
+A GPU is AVAILABLE when RunPod reports at least one available quantity
+for that GPU in `availableGpuCounts`.
 
 AWS-backed GPUs returned by RunPod's API may appear out-of-stock due to
 RunPod marketplace limitations — not real AWS capacity. The separate
@@ -16,30 +13,21 @@ _query_aws() path is authoritative for AWS; RunPod data must not override it.
 """
 from __future__ import annotations
 
-_AVAILABLE_STATUSES: frozenset[str] = frozenset({"Available", "Low"})
-
-
 class RunPodAdapter:
     """Stateless adapter: converts raw RunPod API dicts → GPUOffer fields."""
 
     @staticmethod
     def is_available(lowest_price: dict | None, gpu_count: int) -> bool:
         """
-        Return True only when ALL four availability conditions are satisfied:
-          1. lowestPrice exists
-          2. stockStatus is "Available" or "Low"
-          3. maxUnreservedGpuCount >= gpu_count
-          4. gpu_count is in availableGpuCounts
+        Return True when RunPod reports at least one available quantity.
+
+        User-facing rule for this project:
+          - no stock only when availableGpuCounts == []
         """
         if not lowest_price:
             return False
-        if (lowest_price.get("stockStatus") or "") not in _AVAILABLE_STATUSES:
-            return False
-        max_unreserved = lowest_price.get("maxUnreservedGpuCount")
-        if max_unreserved is None or max_unreserved < gpu_count:
-            return False
         available_counts = lowest_price.get("availableGpuCounts") or []
-        return gpu_count in available_counts
+        return len(available_counts) > 0
 
     @staticmethod
     def extract_price(
@@ -72,10 +60,15 @@ class RunPodAdapter:
     @staticmethod
     def available_count(lowest_price: dict | None) -> int:
         """
-        Return maxUnreservedGpuCount from lowestPrice, or 0 if absent.
+        Return the largest available quantity from availableGpuCounts.
         0 means confirmed no stock right now for RunPod.
         """
         if not lowest_price:
             return 0
-        val = lowest_price.get("maxUnreservedGpuCount")
-        return int(val) if val is not None else 0
+        counts = lowest_price.get("availableGpuCounts") or []
+        if not counts:
+            return 0
+        try:
+            return int(max(counts))
+        except Exception:
+            return 0
