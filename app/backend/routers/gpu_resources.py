@@ -36,6 +36,7 @@ from src.services.gpu_catalog import (  # noqa: E402
     _RUNPOD_TO_SKYPILOT,
     _infer_skypilot_id,
 )
+from src.services.runpod_adapter import RunPodAdapter  # noqa: E402
 from src.services.provider_region_mapping import (  # noqa: E402
     RUNPOD_SKYPILOT_REGION_CODES,
     normalize_provider_region,
@@ -247,13 +248,24 @@ def _aggregate_runpod_availability_rows(
                     parsed = int(value)
                 except Exception:
                     continue
-                if parsed >= 0:
+                if parsed > 0:
                     counts.append(parsed)
 
             # Deduplicate/normalize count vectors from aliased responses.
             counts = sorted(set(counts))
-            available = len(counts) > 0
-            max_available = int(max(counts)) if counts else 0
+
+            max_unreserved = 0
+            if lowest:
+                try:
+                    max_unreserved = int((lowest or {}).get("maxUnreservedGpuCount") or 0)
+                except Exception:
+                    max_unreserved = 0
+            if max_unreserved > 0 and max_unreserved not in counts:
+                counts.append(max_unreserved)
+                counts = sorted(set(counts))
+
+            available = RunPodAdapter.is_available(lowest, gpu_count=1)
+            max_available = RunPodAdapter.available_count(lowest)
 
             key = (gpu_type, region_id)
             existing = rows_by_key.get(key)

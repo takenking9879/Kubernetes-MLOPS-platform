@@ -30,7 +30,7 @@ apiService:
   # With the patched local chart, this toggles `--deploy` in `sky api start`.
   # false => local-mode semantics (single API worker) while still binding
   # host 0.0.0.0 inside Kubernetes.
-  
+
   #useDeployMode: false
 
   # Hotfix for SkyPilot managed-jobs race in consolidation mode.
@@ -54,55 +54,23 @@ apiService:
         print(f"[hotfix] {label}: patched")
 
     patch(
-        '/usr/local/lib/python3.10/site-packages/sky/utils/controller_utils.py',
-        "def get_number_of_jobs_controllers() -> int:\n"
-        "    return min(\n"
-        "        MAX_CONTROLLERS,\n"
-        "        _get_parallelism(pool=True, raw_resource_per_unit=JOB_WORKER_MEMORY_MB))\n",
-        "def get_number_of_jobs_controllers() -> int:\n"
-        "    # Hotfix: force a single controller to avoid duplicate controller races\n"
-        "    # in consolidation mode under heavy recovery.\n"
-        "    return 1\n",
-        'controller_utils.get_number_of_jobs_controllers',
-    )
-
-    patch(
-        '/usr/local/lib/python3.10/site-packages/sky/jobs/scheduler.py',
-        "        async with starting_lock:\n"
-        "            starting.remove(job_id)\n"
-        "            starting_signal.notify()\n",
-        "        async with starting_lock:\n"
-        "            # Hotfix: idempotent cleanup in case launch contexts race.\n"
-        "            starting.discard(job_id)\n"
-        "            starting_signal.notify()\n",
-        'scheduler.scheduled_launch.finally',
-    )
-
-    patch(
-        '/usr/local/lib/python3.10/site-packages/sky/jobs/controller.py',
-        "                if job_id in self.job_tasks:\n"
-        "                    logger.error(f'Job {job_id} already exists in job_tasks')\n"
-        "                    raise ValueError(f'Job {job_id} already exists')\n\n"
-        "                # Create the task and store it\n",
-        "                if job_id in self.job_tasks:\n"
-        "                    logger.warning(\n"
-        "                        f'Job {job_id} already exists in job_tasks; '\n"
-        "                        'skipping duplicate start request')\n"
-        "                    return\n\n"
-        "                # Create the task and store it\n",
-        'controller.run_job_loop.duplicate_guard',
-    )
-
-    patch(
       '/usr/local/lib/python3.10/site-packages/sky/jobs/recovery_strategy.py',
       "                                await asyncio.to_thread(sdk.api_start)\n"
       "                                logger.info('API server started.')\n",
-      "                                # Hotfix: do not start a nested local API\n"
-      "                                # server from managed-jobs controllers;\n"
-      "                                # reuse the already running API server.\n"
-      "                                logger.debug(\n"
-      "                                    'Skipping sdk.api_start in managed-jobs '\n"
-      "                                    'controller context')\n",
+      "                                # Hotfix: avoid starting a nested local API\n"
+      "                                # server from managed-jobs controllers.\n"
+      "                                # Reuse and validate the existing API server\n"
+      "                                # endpoint configured for this process.\n"
+      "                                try:\n"
+      "                                    await asyncio.to_thread(sdk.api_info)\n"
+      "                                    logger.debug(\n"
+      "                                        'Using existing SkyPilot API server '\n"
+      "                                        'endpoint in recovery flow')\n"
+      "                                except Exception as e:\n"
+      "                                    logger.warning(\n"
+      "                                        'API health check failed during '\n"
+      "                                        'recovery (continuing without '\n"
+      "                                        'sdk.api_start): %s', e)\n",
       'recovery_strategy.skip_nested_api_start',
     )
     PY

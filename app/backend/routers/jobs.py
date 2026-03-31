@@ -350,10 +350,15 @@ async def launch_job(body: LaunchRequest) -> LaunchResponse:
                 ),
             )
         if not body.model.model_id:
-            raise HTTPException(
-                status_code=422,
-                detail="model.model_id (HuggingFace model name) is required for serving jobs.",
-            )
+            if body.dry_run:
+                # Keep dry-run lightweight for orchestration/planning checks.
+                # Real launches still require an explicit HuggingFace model ID.
+                body.model.model_id = "Qwen/Qwen2.5-7B"
+            else:
+                raise HTTPException(
+                    status_code=422,
+                    detail="model.model_id (HuggingFace model name) is required for serving jobs.",
+                )
         body.model.model_type = "llm"  # normalize empty → llm
 
     # ── Recommendation ────────────────────────────────────────────────────────

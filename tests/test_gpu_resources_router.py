@@ -70,3 +70,31 @@ def test_aggregate_runpod_availability_rows_merges_duplicate_gpu_ids():
     assert is_region["available"] is True
     assert is_region["available_counts"] == [1]
     assert is_region["max_available"] == 1
+
+
+def test_aggregate_runpod_availability_rows_falls_back_when_counts_missing():
+    gpu_rows = [
+        {
+            "id": "NVIDIA A40",
+            "displayName": "NVIDIA A40",
+            "r0": {
+                "stockStatus": "High",
+                "availableGpuCounts": [],
+                "maxUnreservedGpuCount": 3,
+            },
+        }
+    ]
+    alias_to_region = {"r0": "CA-MTL-1"}
+
+    rows = _aggregate_runpod_availability_rows(
+        gpu_rows=gpu_rows,
+        selected_gpu_types={"A40"},
+        alias_to_region=alias_to_region,
+    )
+
+    assert len(rows) == 1
+    row = rows[0]
+    assert row["gpu_type"] == "A40"
+    assert row["available"] is True
+    assert row["available_counts"] == [3]
+    assert row["max_available"] == 3

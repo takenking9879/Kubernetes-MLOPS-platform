@@ -26,6 +26,15 @@ def test_is_available_false_when_available_counts_empty():
         "availableGpuCounts": [],
         "maxUnreservedGpuCount": 8,
     }
+    assert RunPodAdapter.is_available(lowest_price, gpu_count=1) is True
+
+
+def test_is_available_false_when_no_capacity_signals():
+    lowest_price = {
+        "stockStatus": "OUT_OF_STOCK",
+        "availableGpuCounts": [],
+        "maxUnreservedGpuCount": 0,
+    }
     assert RunPodAdapter.is_available(lowest_price, gpu_count=1) is False
 
 
@@ -40,3 +49,21 @@ def test_available_count_uses_max_available_counts():
 def test_available_count_zero_when_empty_or_missing():
     assert RunPodAdapter.available_count({"availableGpuCounts": []}) == 0
     assert RunPodAdapter.available_count(None) == 0
+
+
+def test_available_count_falls_back_to_max_unreserved():
+    lowest_price = {
+        "stockStatus": "Available",
+        "availableGpuCounts": [],
+        "maxUnreservedGpuCount": 5,
+    }
+    assert RunPodAdapter.available_count(lowest_price) == 5
+
+
+def test_available_count_falls_back_to_stock_status_when_counts_missing():
+    lowest_price = {
+        "stockStatus": "High",
+        "availableGpuCounts": [],
+        "maxUnreservedGpuCount": 0,
+    }
+    assert RunPodAdapter.available_count(lowest_price) == 1
