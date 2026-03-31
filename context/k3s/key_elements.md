@@ -6,7 +6,7 @@
 |--------|------|--------|-------------|
 | `preprocessing_pipeline` | `preprocessing_dag.py` | ACTIVE | Submit + poll SparkApplication; cleanup in finally |
 | `training_pipeline` | `training_dag.py` | ACTIVE | Submit + poll RayJob (KubeRay local); cleanup in finally |
-| `training_pipeline_skypilot` | `training_dag_skypilot.py` | ACTIVE | **ExternalPythonOperator** using `/opt/skypilot-venv/bin/python` (skypilot==0.12.0). Calls `sky.*` directly from Airflow scheduler; connects to in-cluster SkyPilot API server via `SKYPILOT_API_SERVER_ENDPOINT`. Sky YAMLs read from `/opt/airflow/sky-yamls/current/k3s/sky/` (git-sync sidecar). Safety-net cleanup task on failure. |
+| `training_pipeline_skypilot` | `training_dag_skypilot.py` | ACTIVE | **PythonOperator + subprocess**. Calls `/opt/skypilot-venv/bin/sky` CLI directly. Patches YAML → `sky jobs launch` → polls `sky jobs queue` → cancel-on-failure. `SKYPILOT_API_SERVER_ENDPOINT` inherited from scheduler pod env. Sky YAMLs at `/opt/airflow/dags/repo/k3s/sky/` (DAG git-sync full repo clone). |
 | `llm_training_pipeline` | `llm_training_dag.py` | ACTIVE | **Single-pod lifecycle**: one KubernetesPodOperator runs `sky_runner.py run-llm` (submit → poll → cancel-on-failure). SkyPilot LLM fine-tuning (TRL + LoRA + DeepSpeed ZeRO). |
 | `full_ml_pipeline` | `full_pipeline_dag.py` | ACTIVE | preprocessing_pipeline tasks → training_pipeline tasks (sequential chain) |
 | `ml_pipeline` | `ml_pipeline_dag.py` | ACTIVE | Flexible mode: preprocessing_only / training_only / full; UI-triggered |
@@ -49,7 +49,7 @@ Tasks:
 Routing table (kind, provider) → YAML: defined in `app/backend/services/job_builder.py` and `k3s/airflow/dags/sky_runner.py`.
 
 Sky runner runtime notes:
-- **SkyPilot client runs inside Airflow scheduler** via `ExternalPythonOperator` using `/opt/skypilot-venv/bin/python` (skypilot==0.12.0 isolated venv built in `k3s/airflow/Dockerfile`). No separate KubernetesPodOperator pod is needed.
+- **SkyPilot client runs inside Airflow scheduler** via `PythonOperator` + `subprocess.run(["/opt/skypilot-venv/bin/sky", ...])`. The `sky` CLI is installed in `/opt/skypilot-venv` (skypilot==0.12.0, built in `k3s/airflow/Dockerfile`). No separate KubernetesPodOperator pod is needed.
 - **SkyPilot API server** runs via Helm chart using the **official SkyPilot image** with `consolidation_mode = true` — the jobs controller runs inside that same pod (no separate controller VM is provisioned). `sky.jobs.launch()` from the Airflow scheduler connects to it via `SKYPILOT_API_SERVER_ENDPOINT` env var (from env-secret).
 - **Sky YAMLs** are available at `/opt/airflow/dags/repo/k3s/sky/` — the DAG git-sync clones the full repo (not just the `subPath`), so no separate sidecar is needed. YAML updates in the repo propagate within the git-sync period — no image rebuild required.
 - **Worker VM** on RunPod uses `image_id` from the YAML (e.g. `runpod/pytorch:1.0.2-cu1281-torch280-ubuntu2404`). The setup/run scripts arrive from the `sky.Task` object built by the Airflow scheduler from the git-synced YAML.

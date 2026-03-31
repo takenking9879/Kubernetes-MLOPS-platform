@@ -296,8 +296,28 @@ def _rec_to_out(rec: OrchestratorRecommendation) -> RecommendationOut:
     )
 
 
+def _build_fallback_any_of(constraints: ResourceConstraintsIn) -> list[dict]:
+    """Build a minimal any_of from explicit user choices (no catalog needed).
+
+    Used when GPUCatalogService is unavailable or returns no matching offers.
+    Spot entries precede on-demand entries, matching the selector's ordering.
+    """
+    entries: list[dict] = []
+    for provider in constraints.providers:
+        for gpu_type in (constraints.gpu_types or []):
+            gpus_str = f"{gpu_type}:{constraints.num_gpus_per_node}"
+            if constraints.prefer_spot:
+                entries.append({"infra": provider, "accelerators": gpus_str, "use_spot": True})
+            entries.append({"infra": provider, "accelerators": gpus_str, "use_spot": False})
+    return entries
+
+
 def _get_any_of(constraints: ResourceConstraintsIn | None) -> list[dict]:
-    """Query GPUSelectorService for the any_of list (used only for YAML preview)."""
+    """Build the any_of list from GPU catalog + selector.
+
+    Falls back to _build_fallback_any_of when the catalog is unavailable or
+    returns no matching offers (e.g., RunPod/Vast API unreachable in this env).
+    """
     if not constraints:
         return []
     try:
@@ -314,9 +334,12 @@ def _get_any_of(constraints: ResourceConstraintsIn | None) -> list[dict]:
             gpu_types=rc.gpu_types,
         )
         result = GPUSelectorService().select_providers(rc, offers)
-        return result.any_of
+        if result.any_of:
+            return result.any_of
     except Exception:
-        return []
+        pass
+    # Catalog unavailable or returned nothing — use explicit user choices directly
+    return _build_fallback_any_of(constraints)
 
 
 # ── Endpoints ─────────────────────────────────────────────────────────────────

@@ -14,6 +14,7 @@ ENABLE_SPARK=true
 ENABLE_APP=true
 ENABLE_MONITORING=true
 ENABLE_AIRFLOW=true
+ENABLE_SKYPILOT=true
 ENABLE_INGRESS=true
 
 # ============================================================
@@ -53,6 +54,7 @@ if [ "${ENABLE_REPO_DOWNLOAD}" = true ]; then
   helm repo add ingress-nginx https://kubernetes.github.io/ingress-nginx
   helm repo add kuberay https://ray-project.github.io/kuberay-helm/
   helm repo add spark-kubernetes-operator https://apache.github.io/spark-kubernetes-operator/
+  helm repo add skypilot https://helm.skypilot.co/
   helm repo update
   ok "Helm repos ready"
 fi
@@ -68,6 +70,8 @@ kubectl create namespace spark || true
 kubectl create namespace monitoring || true
 kubectl create namespace apps || true
 kubectl create namespace airflow || true
+kubectl create namespace skypilot || true
+
 
 info "Creating secrets from .env"
 kubectl create secret generic kafka-secret -n kafka --from-env-file=.env || true
@@ -76,6 +80,19 @@ kubectl create secret generic env-secret -n spark --from-env-file=.env || true
 kubectl create secret generic env-secret -n monitoring --from-env-file=.env || true
 kubectl create secret generic env-secret -n apps --from-env-file=.env || true
 kubectl create secret generic env-secret -n airflow --from-env-file=.env || true
+kubectl create secret generic runpod-credentials \
+  -n skypilot \
+  --from-literal=api_key=$(grep RUNPOD_API_KEY .env | cut -d '=' -f2) || true
+
+kubectl create secret generic vastai-credentials \
+  -n skypilot \
+  --from-literal=api_key=$(grep -E 'VASTAI_API_KEY|VAST_API_KEY' .env | head -n1 | cut -d '=' -f2) || true
+
+kubectl create secret generic aws-credentials \
+  -n skypilot \
+  --from-literal=aws_access_key_id=$(grep AWS_ACCESS_KEY_ID .env | cut -d '=' -f2) \
+  --from-literal=aws_secret_access_key=$(grep AWS_SECRET_ACCESS_KEY .env | cut -d '=' -f2) \
+  --from-literal=aws_default_region=$(grep AWS_DEFAULT_REGION .env | cut -d '=' -f2 || echo us-east-1) || true
 ok "Namespaces and secrets ready"
 
 # ============================================================
@@ -228,6 +245,16 @@ deploy_dsl_app() {
   ok "DSL App deployed"
 }
 
+deploy_skypilot() {
+  sep
+  info "Deploying SkyPilot helm chart"
+  helm upgrade --install my-skypilot skypilot/skypilot \
+    --version 0.12.0 \
+    -n skypilot -f k3s/sky/helm/values.yaml
+
+  ok "SkyPilot deployed"
+}
+
 # ============================================================
 # MONITORING (Prometheus + Grafana + kube-state-metrics)
 # ============================================================
@@ -362,6 +389,10 @@ fi
 
 if [ "${ENABLE_APP}" = true ]; then
   deploy_dsl_app & PIDS+=($!)
+fi
+
+if [ "${ENABLE_SKYPILOT}" = true ]; then
+  deploy_skypilot & PIDS+=($!)
 fi
 
 if [ "${ENABLE_AIRFLOW}" = true ]; then
