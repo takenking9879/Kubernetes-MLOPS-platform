@@ -10,8 +10,8 @@ Sky YAMLs come from the DAG git-sync repo clone (full repo is checked out):
     /opt/airflow/dags/repo/k3s/sky/
 
 Architecture: single-task lifecycle
-    run_sky_job:  patch YAML → launch → poll → cancel-on-failure
-    cleanup_skypilot_controller_on_failure: safety-net cancel (ONE_FAILED)
+    run_sky_job:  patch YAML → launch → poll/cancel depending on launch mode
+    cleanup_skypilot_controller_on_failure: safety-net cleanup (ONE_FAILED)
 
 dag_run.conf keys:
     train_run_id            : str        — unique training run ID
@@ -46,6 +46,15 @@ _SKY_YAML_DIR = os.getenv("SKY_YAML_DIR", "/opt/airflow/dags/repo/k3s/sky")
 
 SKY_TIMEOUT_SECONDS = int(os.getenv("SKY_TIMEOUT_SECONDS", "7200"))
 
+# Managed jobs are prone to controller-state races in some SkyPilot versions
+# under heavy recovery. Default to direct `sky launch` to avoid that path.
+SKY_USE_MANAGED_JOBS = os.getenv("SKY_USE_MANAGED_JOBS", "false").strip().lower() in (
+    "1",
+    "true",
+    "yes",
+    "on",
+)
+
 
 # ─── Callables ────────────────────────────────────────────────────────────────
 
@@ -64,8 +73,14 @@ def _run_sky_training(
     sky_timeout_seconds: int,
     sky_yaml_dir: str,
     sky_bin: str,
+    use_managed_jobs: str,
 ) -> str:
-    """Patch YAML → launch → poll → cancel-on-failure. Returns job_name (XCom).
+    """Patch YAML and run training via SkyPilot.
+
+    Returns:
+        Resource name pushed to XCom:
+        - managed mode: managed job name
+        - direct mode: cluster name
 
     MLFLOW_TRACKING_URI is forwarded as a SkyPilot secret when present.
     Sensitive values (AWS credentials, etc.) are forwarded via `sky jobs launch --secret`
@@ -213,73 +228,136 @@ def _run_sky_training(
     import hashlib
 
     suffix = hashlib.sha1(run_marker.encode("utf-8")).hexdigest()[:8]
-    base_max_len = max(1, 40 - len(suffix) - 1)
-    base = slug[:base_max_len].rstrip("-") or "sky"
-    job_name = f"{base}-{suffix}"
+    managed_mode = str(use_managed_jobs).strip().lower() in (
+        "1",
+        "true",
+        "yes",
+        "on",
+    )
 
-    # ── Launch ────────────────────────────────────────────────────────────────
-    launch_cmd = [sky_bin, "jobs", "launch", "-y", "--name", job_name, tmp]
+    if managed_mode:
+        base_max_len = max(1, 40 - len(suffix) - 1)
+    else:
+        # Keep cluster names slightly shorter for cloud/provider compatibility.
+        base_max_len = max(1, 32 - len(suffix) - 1)
+
+    base = slug[:base_max_len].rstrip("-") or "sky"
+    resource_name = f"{base}-{suffix}"
+
+    if managed_mode:
+        # ── Managed jobs mode (optional) ─────────────────────────────────────
+        launch_cmd = [sky_bin, "jobs", "launch", "-y", "--name", resource_name, tmp]
+        for secret_key in secret_env_keys:
+            launch_cmd.extend(["--secret", secret_key])
+
+        print(
+            f"[sky-training] Launching MANAGED job '{resource_name}' with secrets: "
+            + ", ".join(secret_env_keys)
+        )
+        subprocess.run(
+            launch_cmd,
+            check=True,
+            env=os.environ,
+        )
+        print(f"[sky-training] Managed job launched: {resource_name}")
+
+        interval, elapsed = 30, 0
+        try:
+            while elapsed < sky_timeout_seconds:
+                time.sleep(interval)
+                elapsed += interval
+                result = subprocess.run(
+                    [sky_bin, "jobs", "queue", "--all-users"],
+                    capture_output=True, text=True, check=False, env=os.environ,
+                )
+                output = result.stdout
+                for line in output.splitlines():
+                    if resource_name not in line:
+                        continue
+                    upper = line.upper()
+                    if "SUCCEEDED" in upper:
+                        print(f"[sky-training] Job '{resource_name}' succeeded.")
+                        return resource_name
+                    if "FAILED" in upper or "CANCELLED" in upper:
+                        raise RuntimeError(
+                            f"Job '{resource_name}' reached terminal state: {line.strip()}"
+                        )
+                    print(f"[{elapsed}s] {line.strip()}")
+            raise RuntimeError(
+                f"Job '{resource_name}' timed out after {sky_timeout_seconds}s."
+            )
+        except Exception:
+            print(f"[sky-training] Cancelling managed job '{resource_name}'.")
+            subprocess.run(
+                [sky_bin, "jobs", "cancel", "-y", "--name", resource_name],
+                check=False,
+                env=os.environ,
+            )
+            raise
+
+    # ── Direct launch mode (default; avoids managed-jobs controller races) ───
+    launch_cmd = [
+        sky_bin,
+        "launch",
+        "-y",
+        "--retry-until-up",
+        "-c",
+        resource_name,
+        tmp,
+    ]
     for secret_key in secret_env_keys:
         launch_cmd.extend(["--secret", secret_key])
 
     print(
-        f"[sky-training] Launching job '{job_name}' with secrets: "
+        f"[sky-training] Launching DIRECT cluster '{resource_name}' with secrets: "
         + ", ".join(secret_env_keys)
     )
-    subprocess.run(
-        launch_cmd,
-        check=True,
-        env=os.environ,
+
+    keep_cluster = os.getenv("SKY_KEEP_CLUSTER_AFTER_TRAINING", "false").strip().lower() in (
+        "1",
+        "true",
+        "yes",
+        "on",
     )
-    print(f"[sky-training] Job launched: {job_name}")
 
-    # ── Poll ──────────────────────────────────────────────────────────────────
-    interval, elapsed = 30, 0
     try:
-        while elapsed < sky_timeout_seconds:
-            time.sleep(interval)
-            elapsed += interval
-            result = subprocess.run(
-                [sky_bin, "jobs", "queue", "--all-users"],
-                capture_output=True, text=True, check=False, env=os.environ,
+        # Blocking run; returns when task command exits.
+        subprocess.run(launch_cmd, check=True, env=os.environ)
+        print(f"[sky-training] Direct run completed on cluster: {resource_name}")
+        return resource_name
+    finally:
+        if keep_cluster:
+            print(
+                f"[sky-training] Keeping cluster '{resource_name}' "
+                "(SKY_KEEP_CLUSTER_AFTER_TRAINING=true)."
             )
-            output = result.stdout
-            for line in output.splitlines():
-                if job_name not in line:
-                    continue
-                upper = line.upper()
-                if "SUCCEEDED" in upper:
-                    print(f"[sky-training] Job '{job_name}' succeeded.")
-                    return job_name
-                if "FAILED" in upper or "CANCELLED" in upper:
-                    raise RuntimeError(
-                        f"Job '{job_name}' reached terminal state: {line.strip()}"
-                    )
-                print(f"[{elapsed}s] {line.strip()}")
-        raise RuntimeError(f"Job '{job_name}' timed out after {sky_timeout_seconds}s.")
-    except Exception:
-        print(f"[sky-training] Cancelling job '{job_name}'.")
-        subprocess.run(
-            [sky_bin, "jobs", "cancel", "-y", "--name", job_name],
-            check=False, env=os.environ,
-        )
-        raise
-
-    return job_name  # unreachable; satisfies type checker
+        else:
+            subprocess.run(
+                [sky_bin, "down", "-y", resource_name],
+                check=False,
+                env=os.environ,
+            )
 
 
 def _cleanup_failed_training(job_name: str, sky_bin: str) -> None:
-    """Safety-net: cancel managed job if the main task was killed before cleanup ran."""
+    """Safety-net cleanup for both managed and direct launch modes."""
     import subprocess
     import os
 
     if not job_name:
-        print("[cleanup] No job_name — nothing to cancel.")
+        print("[cleanup] No resource name — nothing to cleanup.")
         return
-    print(f"[cleanup] Cancelling job '{job_name}'.")
+
+    print(f"[cleanup] Attempting managed-job cancel for '{job_name}' (best effort).")
     subprocess.run(
         [sky_bin, "jobs", "cancel", "-y", "--name", job_name],
         check=False, env=os.environ,
+    )
+    print(f"[cleanup] Attempting cluster down for '{job_name}' (best effort).")
+    subprocess.run(
+        [sky_bin, "down", "-y", job_name],
+        check=False,
+        env=os.environ,
     )
 
 
@@ -288,8 +366,9 @@ def _cleanup_failed_training(job_name: str, sky_bin: str) -> None:
 with DAG(
     dag_id="training_pipeline_skypilot",
     description=(
-        "SkyPilot managed-jobs training pipeline (PythonOperator + subprocess). "
-        "Calls sky CLI directly from Airflow using /opt/skypilot-venv/bin/sky. "
+        "SkyPilot training pipeline (PythonOperator + subprocess). "
+        "Defaults to direct sky launch to avoid managed-jobs controller races; "
+        "managed-jobs mode can be re-enabled with SKY_USE_MANAGED_JOBS=true. "
         "Routes pytorch/ssm/bae → GPU spot-first, xgboost → CPU on RunPod."
     ),
     start_date=datetime(2026, 1, 1),
@@ -320,9 +399,13 @@ with DAG(
             "sky_timeout_seconds":       SKY_TIMEOUT_SECONDS,
             "sky_yaml_dir":              _SKY_YAML_DIR,
             "sky_bin":                   _SKY_BIN,
+            "use_managed_jobs":          "{{ 'true' if params.sky_use_managed_jobs else 'false' }}",
         },
         do_xcom_push=True,
         execution_timeout=timedelta(seconds=SKY_TIMEOUT_SECONDS + 600),
+        params={
+            "sky_use_managed_jobs": SKY_USE_MANAGED_JOBS,
+        },
     )
 
     # Safety-net: cancel the managed job if Airflow killed the main task before
