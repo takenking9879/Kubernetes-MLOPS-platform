@@ -87,15 +87,19 @@ export function GPUResourceSelector({ value, onChange, disabled }: Props) {
   const [selectResult, setSelectResult] = useState<GPUSelectResult | null>(null);
   const [runpodRegions, setRunpodRegions] = useState<RunPodRegionOption[]>([]);
   const [runpodAvailability, setRunpodAvailability] = useState<RunPodRegionAvailability[]>([]);
+  const [manualRunpodRegionOptions, setManualRunpodRegionOptions] = useState<Record<string, RunPodRegionOption[]>>({});
+  const [manualRunpodRegionLoading, setManualRunpodRegionLoading] = useState<Record<string, boolean>>({});
   const [checkingRegionAvailability, setCheckingRegionAvailability] = useState(false);
   const [loading, setLoading] = useState(false);
   const [runtimeHours, setRuntimeHours] = useState<number>(2);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const manualDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Derive mode from current value: manual when gpu_fallbacks is a non-empty list
   const [mode, setMode] = useState<'auto' | 'manual'>(() =>
     value.gpu_fallbacks && value.gpu_fallbacks.length > 0 ? 'manual' : 'auto',
   );
+  const fallbacks = value.gpu_fallbacks ?? [];
 
   const set = useCallback(
     (patch: Partial<ResourceConstraints>) => onChange({ ...value, ...patch }),
@@ -200,6 +204,76 @@ export function GPUResourceSelector({ value, onChange, disabled }: Props) {
     [set, value.preferred_regions],
   );
 
+  const parseAcceleratorGpuType = useCallback((accelerators: string) => {
+    const head = String(accelerators || '').split(':')[0] || '';
+    return head.trim();
+  }, []);
+
+  // Manual-mode region options: only show regions that are live-available for
+  // the selected GPU type in each RunPod fallback row.
+  useEffect(() => {
+    if (!open || mode !== 'manual' || runpodRegions.length === 0) return;
+
+    const regionIds = runpodRegions.map((r) => r.provider_region_id.toUpperCase());
+    const gpuTypesToQuery = Array.from(
+      new Set(
+        fallbacks
+          .filter((entry) => entry.infra.split('/')[0] === 'runpod')
+          .map((entry) => parseAcceleratorGpuType(entry.accelerators))
+          .filter((gpu) => gpu.length > 0),
+      ),
+    ).filter((gpuType) => {
+      if (manualRunpodRegionOptions[gpuType] !== undefined) return false;
+      return !manualRunpodRegionLoading[gpuType];
+    });
+
+    if (gpuTypesToQuery.length === 0) return;
+
+    if (manualDebounceRef.current) clearTimeout(manualDebounceRef.current);
+    manualDebounceRef.current = setTimeout(() => {
+      gpuTypesToQuery.forEach((gpuType) => {
+        setManualRunpodRegionLoading((prev) => ({ ...prev, [gpuType]: true }));
+
+        queryRunpodRegionAvailability({
+          gpu_types: [gpuType],
+          regions: regionIds,
+        })
+          .then((rows) => {
+            const available = new Set(
+              rows
+                .filter((row) => row.available)
+                .map((row) => row.provider_region_id.toUpperCase()),
+            );
+            const options = runpodRegions.filter((region) =>
+              available.has(region.provider_region_id.toUpperCase()),
+            );
+            setManualRunpodRegionOptions((prev) => ({
+              ...prev,
+              [gpuType]: options,
+            }));
+          })
+          .catch(() => {
+            setManualRunpodRegionOptions((prev) => ({ ...prev, [gpuType]: [] }));
+          })
+          .finally(() => {
+            setManualRunpodRegionLoading((prev) => ({ ...prev, [gpuType]: false }));
+          });
+      });
+    }, 350);
+
+    return () => {
+      if (manualDebounceRef.current) clearTimeout(manualDebounceRef.current);
+    };
+  }, [
+    open,
+    mode,
+    runpodRegions,
+    fallbacks,
+    parseAcceleratorGpuType,
+    manualRunpodRegionOptions,
+    manualRunpodRegionLoading,
+  ]);
+
   // ── Fallback list helpers ─────────────────────────────────────────────────
 
   const addFallback = useCallback(() => {
@@ -270,8 +344,6 @@ export function GPUResourceSelector({ value, onChange, disabled }: Props) {
     selectResult?.estimated_cost_ondemand != null
       ? selectResult.estimated_cost_ondemand * runtimeHours
       : null;
-
-  const fallbacks = value.gpu_fallbacks ?? [];
 
   return (
     <div className="rounded border border-slate-700 bg-slate-900/50">
@@ -656,8 +728,28 @@ export function GPUResourceSelector({ value, onChange, disabled }: Props) {
                 </p>
               )}
 
-              {fallbacks.map((entry, idx) => (
-                <div
+              {fallbacks.map((entry, idx) => {
+                const provider = entry.infra.split('/')[0];
+                const rowGpuType = parseAcceleratorGpuType(entry.accelerators);
+                const isLoadingRegions = rowGpuType
+                  ? (manualRunpodRegionLoading[rowGpuType] ?? false)
+                  : false;
+                const availableRegions = rowGpuType
+                  ? (manualRunpodRegionOptions[rowGpuType] ?? [])
+                  : [];
+                const currentRegionInfra = entry.infra.startsWith('runpod/') ? entry.infra : '';
+                const hasCurrent = currentRegionInfra
+                  ? availableRegions.some((r) => r.skypilot_infra === currentRegionInfra)
+                  : false;
+                const currentRegion = currentRegionInfra
+                  ? runpodRegions.find((r) => r.skypilot_infra === currentRegionInfra)
+                  : undefined;
+                const rowRunpodRegions = !hasCurrent && currentRegion
+                  ? [currentRegion, ...availableRegions]
+                  : availableRegions;
+
+                return (
+                  <div
                   key={idx}
                   className={`flex items-center gap-2 rounded border px-2 py-1.5 ${
                     idx === 0
@@ -677,7 +769,7 @@ export function GPUResourceSelector({ value, onChange, disabled }: Props) {
                   {/* Cloud / infra */}
                   <select
                     className="w-24 shrink-0 rounded bg-slate-800 px-1.5 py-1 text-xs text-slate-100 outline-none focus:ring-1 focus:ring-blue-500"
-                    value={entry.infra.split('/')[0]}
+                    value={provider}
                     onChange={(e) => {
                       const provider = e.target.value;
                       updateFallback(idx, { infra: provider });
@@ -688,7 +780,7 @@ export function GPUResourceSelector({ value, onChange, disabled }: Props) {
                     ))}
                   </select>
 
-                  {entry.infra.split('/')[0] === 'runpod' && (
+                  {provider === 'runpod' && (
                     <select
                       className="w-36 shrink-0 rounded bg-slate-800 px-1.5 py-1 text-xs text-slate-100 outline-none focus:ring-1 focus:ring-blue-500"
                       value={entry.infra.startsWith('runpod/') ? entry.infra : 'runpod'}
@@ -696,7 +788,13 @@ export function GPUResourceSelector({ value, onChange, disabled }: Props) {
                       title="RunPod region"
                     >
                       <option value="runpod">Any RunPod region</option>
-                      {runpodRegions.map((r) => (
+                      {isLoadingRegions && (
+                        <option value="" disabled>Checking live availability...</option>
+                      )}
+                      {!isLoadingRegions && rowGpuType && rowRunpodRegions.length === 0 && (
+                        <option value="" disabled>No regions currently available</option>
+                      )}
+                      {rowRunpodRegions.map((r) => (
                         <option key={r.provider_region_id} value={r.skypilot_infra}>
                           {r.provider_region_id}
                         </option>
@@ -758,8 +856,9 @@ export function GPUResourceSelector({ value, onChange, disabled }: Props) {
                   >
                     <Trash2 size={12} />
                   </button>
-                </div>
-              ))}
+                  </div>
+                );
+              })}
 
               <button
                 type="button"

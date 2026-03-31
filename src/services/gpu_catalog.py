@@ -346,6 +346,7 @@ class GPUCatalogService:
                         skypilot_infra=mapping.skypilot_infra,
                     )
                 )
+            offers = _dedupe_runpod_offers(offers)
             self._set_cache(cache_key, offers)
             return offers
         except Exception as exc:
@@ -595,6 +596,36 @@ def _f_none(v: Any) -> float | None:
         return None if math.isnan(x) else x
     except (TypeError, ValueError):
         return None
+
+
+def _dedupe_runpod_offers(offers: list[GPUOffer]) -> list[GPUOffer]:
+    """Keep a single best RunPod offer per canonical GPU type.
+
+    RunPod may return multiple raw GPU IDs that map to the same SkyPilot
+    accelerator name. For the pricing table we keep one row per gpu_type,
+    preferring: in-stock offers first, then lower effective price.
+    """
+    best_by_gpu: dict[str, GPUOffer] = {}
+    for offer in offers:
+        current = best_by_gpu.get(offer.gpu_type)
+        if current is None or _runpod_offer_rank(offer) < _runpod_offer_rank(current):
+            best_by_gpu[offer.gpu_type] = offer
+    return list(best_by_gpu.values())
+
+
+def _runpod_offer_rank(offer: GPUOffer) -> tuple[int, float, float, int]:
+    """Sort key for selecting the best representative RunPod offer."""
+    effective_price = (
+        float(offer.price_spot)
+        if offer.price_spot is not None and offer.price_spot > 0
+        else float(offer.price_on_demand)
+    )
+    return (
+        0 if offer.available_count > 0 else 1,
+        effective_price,
+        float(offer.price_on_demand),
+        -int(offer.available_count),
+    )
 
 
 def _infer_skypilot_id(display_name: str) -> str:
