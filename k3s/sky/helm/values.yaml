@@ -9,7 +9,7 @@
 #   # STEP 3 — replace s3://sky-workdir below with an actual bucket
 #   # STEP 4 — install:
 #   AUTH_STRING=$(htpasswd -nb skypilot <password>)
-#   helm upgrade --install skypilot skypilot/skypilot --version 0.12.0 \
+#   helm upgrade --install skypilot ./k3s/sky/helm/skypilot \
 #     --namespace skypilot --create-namespace \
 #     --set "ingress.authCredentials=${AUTH_STRING}" \
 #     -f k3s/sky/helm/values.yaml
@@ -27,14 +27,10 @@
 # values will be ignored. Check /tmp/sky-defaults.yaml from STEP 1 for the
 # correct key names. If needed, switch to apiService.command / apiService.args.
 apiService:
-  command:
-    - /app/docker-entrypoint.sh
-  args:
-    - sky
-    - api
-    - start
-    - "--host"
-    - "0.0.0.0"
+  # With the patched local chart, this toggles `--deploy` in `sky api start`.
+  # false => local-mode semantics (single API worker) while still binding
+  # host 0.0.0.0 inside Kubernetes.
+  useDeployMode: false
 
   # ── SkyPilot config ─────────────────────────────────────────────────────────
   # consolidation_mode: true → controller runs in-process inside this pod.

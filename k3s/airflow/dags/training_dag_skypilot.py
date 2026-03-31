@@ -65,7 +65,9 @@ def _run_sky_training(
 ) -> str:
     """Patch YAML → launch → poll → cancel-on-failure. Returns job_name (XCom).
 
-    MLFLOW_TRACKING_URI and AWS_* are inherited from os.environ (scheduler pod env-secret).
+    MLFLOW_TRACKING_URI is forwarded as a SkyPilot secret when present.
+    Sensitive values (AWS credentials, etc.) are forwarded via `sky jobs launch --secret`
+    so secret values are not written to the generated YAML file.
     """
     import json
     import os
@@ -77,6 +79,38 @@ def _run_sky_training(
     import yaml
 
     n_nodes = int(num_nodes)
+
+    # Sky jobs do not automatically inherit scheduler env vars into the remote
+    # training VM. Forward sensitive values via SkyPilot secrets.
+    aws_access_key_id = (os.environ.get("AWS_ACCESS_KEY_ID") or "").strip()
+    aws_secret_access_key = (os.environ.get("AWS_SECRET_ACCESS_KEY") or "").strip()
+    aws_session_token = (os.environ.get("AWS_SESSION_TOKEN") or "").strip()
+    grafana_api_key = (os.environ.get("GRAFANA_API_KEY") or "").strip()
+    mlflow_tracking_uri = (os.environ.get("MLFLOW_TRACKING_URI") or "").strip()
+    aws_region = (
+        os.environ.get("AWS_REGION")
+        or os.environ.get("AWS_DEFAULT_REGION")
+        or "us-east-2"
+    ).strip()
+    aws_s3_endpoint_url = (
+        os.environ.get("AWS_S3_ENDPOINT_URL")
+        or os.environ.get("AWS_ENDPOINT_URL")
+        or ""
+    ).strip()
+
+    if not aws_access_key_id or not aws_secret_access_key:
+        raise RuntimeError(
+            "Missing AWS credentials in Airflow scheduler environment. "
+            "Expected AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY from env-secret."
+        )
+
+    secret_env_keys = ["AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY"]
+    if aws_session_token:
+        secret_env_keys.append("AWS_SESSION_TOKEN")
+    if grafana_api_key:
+        secret_env_keys.append("GRAFANA_API_KEY")
+    if mlflow_tracking_uri:
+        secret_env_keys.append("MLFLOW_TRACKING_URI")
 
     rc: dict | None = None
     if resource_constraints_json and resource_constraints_json not in ("null", "{}"):
@@ -128,17 +162,34 @@ def _run_sky_training(
                 "gpu_fallbacks is empty; refusing static YAML fallback."
             )
 
-    # Bake per-run env vars into the YAML so sky launch receives them without --env flags
-    sky_conf.setdefault("envs", {}).update({
+    # Bake non-sensitive per-run env vars into YAML.
+    sky_envs = sky_conf.setdefault("envs", {})
+    sky_envs.update({
         "TRAIN_RUN_ID":        train_run_id,
         "PREPROCESS_RUN_ID":   preprocess_run_id,
         "MODEL_TYPE":          model_type,
         "PARAMS_S3_PATH":      params_s3_path,
         "PROCESSED_TABLE":     processed_table,
-        "MLFLOW_TRACKING_URI": os.environ.get("MLFLOW_TRACKING_URI", ""),
+        "AWS_REGION":          aws_region,
+        "AWS_DEFAULT_REGION":  aws_region,
+        "AWS_S3_ENDPOINT_URL": aws_s3_endpoint_url,
         "USE_DEEPSPEED":       use_deepspeed,
         "DEEPSPEED_STAGE":     deepspeed_stage,
     })
+
+    # Remove secret placeholders from template envs to avoid persisting secret keys
+    # with empty/default values in the generated YAML.
+    for secret_key in secret_env_keys:
+        sky_envs.pop(secret_key, None)
+
+    # Declare required secrets by name (values still passed via --secret CLI flags).
+    sky_secrets = sky_conf.get("secrets")
+    if not isinstance(sky_secrets, dict):
+        sky_secrets = {}
+        sky_conf["secrets"] = sky_secrets
+    for secret_key in secret_env_keys:
+        sky_secrets[secret_key] = None
+
     if n_nodes > 1:
         sky_conf["envs"]["NUM_WORKERS"] = str(n_nodes * 8)
 
@@ -152,9 +203,16 @@ def _run_sky_training(
     job_name = slug[:40]
 
     # ── Launch ────────────────────────────────────────────────────────────────
-    print(f"[sky-training] Launching job '{job_name}'")
+    launch_cmd = [sky_bin, "jobs", "launch", "-y", "--name", job_name, tmp]
+    for secret_key in secret_env_keys:
+        launch_cmd.extend(["--secret", secret_key])
+
+    print(
+        f"[sky-training] Launching job '{job_name}' with secrets: "
+        + ", ".join(secret_env_keys)
+    )
     subprocess.run(
-        [sky_bin, "jobs", "launch", "-y", "--name", job_name, tmp],
+        launch_cmd,
         check=True,
         env=os.environ,
     )

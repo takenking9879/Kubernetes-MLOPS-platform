@@ -55,6 +55,12 @@ extraEnv: |
         name: env-secret
         key: AWS_SECRET_ACCESS_KEY
   
+  - name: AWS_REGION
+    valueFrom:
+      secretKeyRef:
+        name: env-secret
+        key: AWS_REGION
+  
   - name: MLFLOW_TRACKING_URI
     valueFrom:
       secretKeyRef:
