@@ -6,7 +6,7 @@
 |--------|------|--------|-------------|
 | `preprocessing_pipeline` | `preprocessing_dag.py` | ACTIVE | Submit + poll SparkApplication; cleanup in finally |
 | `training_pipeline` | `training_dag.py` | ACTIVE | Submit + poll RayJob (KubeRay local); cleanup in finally |
-| `training_pipeline_skypilot` | `training_dag_skypilot.py` | ACTIVE | **Single-pod lifecycle**: one KubernetesPodOperator runs `sky_runner.py run-training` which does submit → poll → cancel-on-failure within the same pod (same SkyPilot local API server). Safety-net cleanup task on failure. Resources tunable via `SKY_SUBMIT_*` env vars. |
+| `training_pipeline_skypilot` | `training_dag_skypilot.py` | ACTIVE | **ExternalPythonOperator** using `/opt/skypilot-venv/bin/python` (skypilot==0.12.0). Calls `sky.*` directly from Airflow scheduler; connects to in-cluster SkyPilot API server via `SKYPILOT_API_SERVER_ENDPOINT`. Sky YAMLs read from `/opt/airflow/sky-yamls/current/k3s/sky/` (git-sync sidecar). Safety-net cleanup task on failure. |
 | `llm_training_pipeline` | `llm_training_dag.py` | ACTIVE | **Single-pod lifecycle**: one KubernetesPodOperator runs `sky_runner.py run-llm` (submit → poll → cancel-on-failure). SkyPilot LLM fine-tuning (TRL + LoRA + DeepSpeed ZeRO). |
 | `full_ml_pipeline` | `full_pipeline_dag.py` | ACTIVE | preprocessing_pipeline tasks → training_pipeline tasks (sequential chain) |
 | `ml_pipeline` | `ml_pipeline_dag.py` | ACTIVE | Flexible mode: preprocessing_only / training_only / full; UI-triggered |
@@ -49,9 +49,12 @@ Tasks:
 Routing table (kind, provider) → YAML: defined in `app/backend/services/job_builder.py` and `k3s/airflow/dags/sky_runner.py`.
 
 Sky runner runtime notes:
-- `k3s/sky/docker-entrypoint.sh` writes provider credentials for RunPod and Vast (`VAST_API_KEY` or `VASTAI_API_KEY`).
-- It also writes/merges `~/.sky/config.yaml` to enforce `jobs.controller.resources.disk_size` (default 30 GB, clamped to 40 GB for RunPod compatibility).
-- **Single-pod lifecycle** (`run-training`, `run-llm`): submit + poll run in the same pod, reusing one SkyPilot local API server. Legacy split-phase commands (`submit-training`, `poll-training`, `submit-llm`, `poll-llm`) are kept for debugging but no longer used by DAGs.
+- **SkyPilot client runs inside Airflow scheduler** via `ExternalPythonOperator` using `/opt/skypilot-venv/bin/python` (skypilot==0.12.0 isolated venv built in `k3s/airflow/Dockerfile`). No separate KubernetesPodOperator pod is needed.
+- **SkyPilot API server** runs via Helm chart using the **official SkyPilot image** with `consolidation_mode = true` — the jobs controller runs inside that same pod (no separate controller VM is provisioned). `sky.jobs.launch()` from the Airflow scheduler connects to it via `SKYPILOT_API_SERVER_ENDPOINT` env var (from env-secret).
+- **Sky YAMLs** are available at `/opt/airflow/dags/repo/k3s/sky/` — the DAG git-sync clones the full repo (not just the `subPath`), so no separate sidecar is needed. YAML updates in the repo propagate within the git-sync period — no image rebuild required.
+- **Worker VM** on RunPod uses `image_id` from the YAML (e.g. `runpod/pytorch:1.0.2-cu1281-torch280-ubuntu2404`). The setup/run scripts arrive from the `sky.Task` object built by the Airflow scheduler from the git-synced YAML.
+- `k3s/sky/sky_runner.py` and `k3s/sky/docker-entrypoint.sh` are kept for the `llm_training_pipeline` DAG which still uses KubernetesPodOperator (not yet migrated).
+- **Single-pod lifecycle** (`run-training`, `run-llm`): submit + poll run in the same pod. Legacy split-phase commands (`submit-training`, `poll-training`, `submit-llm`, `poll-llm`) are kept for debugging but no longer used by DAGs.
 - Managed jobs polling uses `sky.jobs.queue(version=2)` with `all_users=True`.
 - All provider-native (RunPod/Vast) YAMLs use a **probe-based venv pattern**: setup probes for the image Python with torch+CUDA, creates `/opt/ml-platform-runtime` via `${PYTHON_BIN} -m venv --system-site-packages` (inherits provider torch), writes the venv Python path to `<APP_HOME>/runtime_python.txt`, and installs deps via `${RUNTIME_PYTHON} -m pip`. Run reads the file and uses explicit binary paths (`"${PYTHON_BIN}"`, `"${RAY_BIN}"`, `"${VLLM_BIN}"`) — no PATH-dependent bare commands.
 - For GPU training YAMLs, DeepSpeed is installed only when `USE_DEEPSPEED=true`; default skips it. `job_builder.py` always overrides this env from `config.use_deepspeed` — the YAML default is never used at runtime. `LaunchWizardPage` sets `use_deepspeed=true, deepspeed_stage=3` for LLM jobs and `false/1` for tabular, matching the YAML defaults.

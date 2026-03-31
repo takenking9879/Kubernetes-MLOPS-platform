@@ -765,6 +765,8 @@ def run_training():
     params_s3_path    = _env("PARAMS_S3_PATH")
     num_nodes         = int(_env("NUM_NODES", "1"))
     mlflow_uri        = _env("MLFLOW_TRACKING_URI")
+    use_deepspeed     = _env("USE_DEEPSPEED", "false")
+    deepspeed_stage   = _env("DEEPSPEED_STAGE", "1")
     rc                = _rc()
     timeout           = int(_env("SKY_TIMEOUT_SECONDS", "7200"))
 
@@ -783,6 +785,8 @@ def run_training():
         "PARAMS_S3_PATH":      params_s3_path,
         "PROCESSED_TABLE":     processed_table,
         "MLFLOW_TRACKING_URI": mlflow_uri,
+        "USE_DEEPSPEED":       use_deepspeed,
+        "DEEPSPEED_STAGE":     deepspeed_stage,
     }
     if num_nodes > 1:
         envs["NUM_WORKERS"] = str(num_nodes * 8)

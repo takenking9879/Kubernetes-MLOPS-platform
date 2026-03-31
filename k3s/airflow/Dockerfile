@@ -15,6 +15,12 @@ RUN pip install --no-cache-dir -r /tmp/requirements.txt
 USER root
 RUN rm /tmp/requirements.txt
 
+# Isolated venv for SkyPilot — avoids protobuf/grpcio conflicts with Airflow.
+# sky.* calls connect to the in-cluster SkyPilot API server via
+# SKYPILOT_API_SERVER_ENDPOINT; no cloud SDK deps are pulled locally.
+RUN python -m venv /opt/skypilot-venv \
+    && /opt/skypilot-venv/bin/pip install --no-cache-dir skypilot==0.12.0
+
 # Return to airflow user at the end
 USER airflow
 

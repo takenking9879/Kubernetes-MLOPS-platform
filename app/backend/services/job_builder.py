@@ -183,6 +183,8 @@ class JobBuilder:
             "processed_table":      config.processed_table,
             "model_type":           config.model_type,
             "use_gpu":              config.use_gpu,
+            "use_deepspeed":        config.use_deepspeed,
+            "deepspeed_stage":      config.deepspeed_stage,
             "num_nodes":            config.num_nodes,
         }
         if is_llm:

@@ -456,7 +456,10 @@ async def launch_job(body: LaunchRequest) -> LaunchResponse:
                 )
             )
             if body.resource_constraints:
-                dag_conf["resource_constraints"] = body.resource_constraints.model_dump()
+                rc_dict = body.resource_constraints.model_dump()
+                if any_of:
+                    rc_dict["gpu_fallbacks"] = any_of
+                dag_conf["resource_constraints"] = rc_dict
             train_dag_id = "llm_training_pipeline"
         else:
             # Tabular: generate params_training.yaml → include train_params_s3_path in dag_conf
@@ -504,7 +507,10 @@ async def launch_job(body: LaunchRequest) -> LaunchResponse:
             )
             dag_conf["train_params_s3_path"] = train_params_s3_path
             if body.resource_constraints:
-                dag_conf["resource_constraints"] = body.resource_constraints.model_dump()
+                rc_dict = body.resource_constraints.model_dump()
+                if any_of:
+                    rc_dict["gpu_fallbacks"] = any_of
+                dag_conf["resource_constraints"] = rc_dict
             train_dag_id = "training_pipeline_skypilot"
 
         job_ids["training"] = _trigger_dag(train_dag_id, dag_conf)
@@ -524,7 +530,10 @@ async def launch_job(body: LaunchRequest) -> LaunchResponse:
         )
         _, serve_dag_conf = _builder.build_serving_job(s_cfg, multinode=multinode)
         if body.resource_constraints:
-            serve_dag_conf["resource_constraints"] = body.resource_constraints.model_dump()
+            rc_dict = body.resource_constraints.model_dump()
+            if any_of:
+                rc_dict["gpu_fallbacks"] = any_of
+            serve_dag_conf["resource_constraints"] = rc_dict
         serve_dag_id = rec.dag_id
         job_ids["serving"] = _trigger_dag(serve_dag_id, serve_dag_conf)
 

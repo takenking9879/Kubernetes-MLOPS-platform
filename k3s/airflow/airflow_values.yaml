@@ -60,3 +60,9 @@ extraEnv: |
       secretKeyRef:
         name: env-secret
         key: MLFLOW_TRACKING_URI
+        
+  - name: SKYPILOT_API_SERVER_ENDPOINT
+    valueFrom:
+      secretKeyRef:
+        name: env-secret
+        key: SKYPILOT_API_SERVER_ENDPOINT
