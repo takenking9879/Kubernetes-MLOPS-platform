@@ -50,6 +50,11 @@ _selector_svc = GPUSelectorService()
 _RUNPOD_REGIONS_TTL_SECONDS = 300
 _runpod_regions_cache: list[dict[str, Any]] = []
 _runpod_regions_cache_ts: float = 0.0
+_RUNPOD_AVAILABILITY_TTL_SECONDS = 20
+_runpod_availability_cache: dict[
+    tuple[tuple[str, ...], tuple[str, ...]],
+    tuple[float, list[dict[str, Any]]],
+] = {}
 
 # ── Static LLM catalog ────────────────────────────────────────────────────────
 _LLM_CATALOG: list[dict] = [
@@ -181,6 +186,101 @@ def _get_runpod_supported_regions() -> list[dict[str, Any]]:
         return _runpod_regions_cache
 
 
+def _build_runpod_availability_matrix_query(
+    region_ids: list[str],
+) -> tuple[str, dict[str, str]]:
+    """Build one GraphQL query that asks lowestPrice for all regions via aliases."""
+    alias_to_region: dict[str, str] = {}
+    region_blocks: list[str] = []
+    for idx, region_id in enumerate(region_ids):
+        safe_region_id = region_id.replace('"', "").strip()
+        alias = f"r{idx}"
+        alias_to_region[alias] = safe_region_id
+        region_blocks.append(
+            f"{alias}: lowestPrice(input: {{ "
+            "secureCloud: true, "
+            "gpuCount: 1, "
+            "minVcpuCount: 2, "
+            "minMemoryInGb: 8, "
+            "minDisk: 0, "
+            f"dataCenterId: \"{safe_region_id}\", "
+            "globalNetwork: false, "
+            "compliance: null "
+            "}) { stockStatus availableGpuCounts maxUnreservedGpuCount }"
+        )
+    query = "query { gpuTypes { id displayName " + " ".join(region_blocks) + " } }"
+    return query, alias_to_region
+
+
+def _aggregate_runpod_availability_rows(
+    gpu_rows: list[dict[str, Any]],
+    selected_gpu_types: set[str],
+    alias_to_region: dict[str, str],
+) -> list[dict[str, Any]]:
+    """Aggregate (gpu_type, region) availability rows from GraphQL matrix response."""
+    region_mapping: dict[str, Any] = {}
+    for region_id in alias_to_region.values():
+        mapping = normalize_provider_region("runpod", region_id)
+        if mapping.resolved:
+            region_mapping[region_id] = mapping
+
+    rows_by_key: dict[tuple[str, str], dict[str, Any]] = {}
+
+    for gpu in gpu_rows:
+        gpu_id = str((gpu or {}).get("id") or "")
+        display_name = str((gpu or {}).get("displayName") or gpu_id)
+        skypilot_gpu = _RUNPOD_TO_SKYPILOT.get(gpu_id) or _infer_skypilot_id(display_name)
+        gpu_type = normalize_gpu_type(skypilot_gpu or display_name)
+        if gpu_type not in selected_gpu_types:
+            continue
+
+        for alias, region_id in alias_to_region.items():
+            mapping = region_mapping.get(region_id)
+            if mapping is None:
+                continue
+
+            lowest = (gpu or {}).get(alias)
+            raw_counts = list((lowest or {}).get("availableGpuCounts") or []) if lowest else []
+            counts: list[int] = []
+            for value in raw_counts:
+                try:
+                    parsed = int(value)
+                except Exception:
+                    continue
+                if parsed >= 0:
+                    counts.append(parsed)
+
+            # Deduplicate/normalize count vectors from aliased responses.
+            counts = sorted(set(counts))
+            available = len(counts) > 0
+            max_available = int(max(counts)) if counts else 0
+
+            key = (gpu_type, region_id)
+            existing = rows_by_key.get(key)
+            if existing is None:
+                rows_by_key[key] = {
+                    "gpu_type": gpu_type,
+                    "provider": "runpod",
+                    "provider_region_id": region_id,
+                    "skypilot_region": mapping.skypilot_region,
+                    "skypilot_zone": mapping.skypilot_zone,
+                    "skypilot_infra": mapping.skypilot_infra,
+                    "available": available,
+                    "available_counts": counts,
+                    "max_available": max_available,
+                }
+                continue
+
+            merged_counts = sorted(set(existing.get("available_counts", []) + counts))
+            existing["available_counts"] = merged_counts
+            existing["available"] = bool(existing.get("available", False) or available)
+            existing["max_available"] = max(int(existing.get("max_available", 0)), max_available)
+
+    rows = list(rows_by_key.values())
+    rows.sort(key=lambda x: (x["gpu_type"], x["provider_region_id"]))
+    return rows
+
+
 # ── Endpoints ─────────────────────────────────────────────────────────────────
 
 
@@ -256,9 +356,14 @@ def get_runpod_region_availability(body: RunPodAvailabilityRequest) -> list[dict
         return []
 
     supported = {r["provider_region_id"].upper() for r in _get_runpod_supported_regions()}
-    region_ids = [r for r in region_ids if r in supported]
+    region_ids = sorted({r for r in region_ids if r in supported})
     if not region_ids:
         return []
+
+    cache_key = (tuple(sorted(set(gpu_types))), tuple(region_ids))
+    cached = _runpod_availability_cache.get(cache_key)
+    if cached and (time.time() - cached[0]) < _RUNPOD_AVAILABILITY_TTL_SECONDS:
+        return cached[1]
 
     api_key = os.getenv("RUNPOD_API_KEY", "")
     if not api_key:
@@ -270,57 +375,12 @@ def get_runpod_region_availability(body: RunPodAvailabilityRequest) -> list[dict
 
         runpod.api_key = api_key
         selected = {normalize_gpu_type(g) for g in gpu_types}
-        rows: list[dict[str, Any]] = []
+        query, alias_to_region = _build_runpod_availability_matrix_query(region_ids)
+        result = _gql.run_graphql_query(query)
+        gpu_rows = (result.get("data", {}) or {}).get("gpuTypes", []) or []
+        rows = _aggregate_runpod_availability_rows(gpu_rows, selected, alias_to_region)
 
-        for region_id in region_ids:
-            mapping = normalize_provider_region("runpod", region_id)
-            if not mapping.resolved:
-                continue
-
-            query = (
-                "query { gpuTypes { id displayName lowestPrice(input: { "
-                "secureCloud: true, "
-                "gpuCount: 1, "
-                "minVcpuCount: 2, "
-                "minMemoryInGb: 8, "
-                "minDisk: 0, "
-                f"dataCenterId: \"{region_id}\", "
-                "globalNetwork: false, "
-                "compliance: null "
-                "}) { stockStatus availableGpuCounts maxUnreservedGpuCount } } }"
-            )
-
-            result = _gql.run_graphql_query(query)
-            gpu_rows = (result.get("data", {}) or {}).get("gpuTypes", []) or []
-
-            for gpu in gpu_rows:
-                gpu_id = str((gpu or {}).get("id") or "")
-                display_name = str((gpu or {}).get("displayName") or gpu_id)
-                skypilot_gpu = _RUNPOD_TO_SKYPILOT.get(gpu_id) or _infer_skypilot_id(display_name)
-                gpu_type = normalize_gpu_type(skypilot_gpu or display_name)
-                if gpu_type not in selected:
-                    continue
-
-                lowest = (gpu or {}).get("lowestPrice")
-                counts = list((lowest or {}).get("availableGpuCounts") or []) if lowest else []
-                available = len(counts) > 0
-                max_available = int(max(counts)) if counts else 0
-
-                rows.append(
-                    {
-                        "gpu_type": gpu_type,
-                        "provider": "runpod",
-                        "provider_region_id": region_id,
-                        "skypilot_region": mapping.skypilot_region,
-                        "skypilot_zone": mapping.skypilot_zone,
-                        "skypilot_infra": mapping.skypilot_infra,
-                        "available": available,
-                        "available_counts": counts,
-                        "max_available": max_available,
-                    }
-                )
-
-        rows.sort(key=lambda x: (x["gpu_type"], x["provider_region_id"]))
+        _runpod_availability_cache[cache_key] = (time.time(), rows)
         return rows
     except Exception:
         return []

@@ -88,6 +88,7 @@ export function GPUResourceSelector({ value, onChange, disabled }: Props) {
   const [runpodRegions, setRunpodRegions] = useState<RunPodRegionOption[]>([]);
   const [runpodAvailability, setRunpodAvailability] = useState<RunPodRegionAvailability[]>([]);
   const [manualRunpodRegionOptions, setManualRunpodRegionOptions] = useState<Record<string, RunPodRegionOption[]>>({});
+  const [manualRunpodRegionFetchedAt, setManualRunpodRegionFetchedAt] = useState<Record<string, number>>({});
   const [manualRunpodRegionLoading, setManualRunpodRegionLoading] = useState<Record<string, boolean>>({});
   const [checkingRegionAvailability, setCheckingRegionAvailability] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -215,6 +216,8 @@ export function GPUResourceSelector({ value, onChange, disabled }: Props) {
     if (!open || mode !== 'manual' || runpodRegions.length === 0) return;
 
     const regionIds = runpodRegions.map((r) => r.provider_region_id.toUpperCase());
+    const now = Date.now();
+    const staleAfterMs = 20_000;
     const gpuTypesToQuery = Array.from(
       new Set(
         fallbacks
@@ -223,45 +226,92 @@ export function GPUResourceSelector({ value, onChange, disabled }: Props) {
           .filter((gpu) => gpu.length > 0),
       ),
     ).filter((gpuType) => {
-      if (manualRunpodRegionOptions[gpuType] !== undefined) return false;
+      const hasCached = manualRunpodRegionOptions[gpuType] !== undefined;
+      const lastFetchAt = manualRunpodRegionFetchedAt[gpuType] ?? 0;
+      const isFresh = hasCached && (now - lastFetchAt) < staleAfterMs;
+      if (isFresh) return false;
       return !manualRunpodRegionLoading[gpuType];
     });
 
     if (gpuTypesToQuery.length === 0) return;
 
+    let cancelled = false;
     if (manualDebounceRef.current) clearTimeout(manualDebounceRef.current);
     manualDebounceRef.current = setTimeout(() => {
-      gpuTypesToQuery.forEach((gpuType) => {
-        setManualRunpodRegionLoading((prev) => ({ ...prev, [gpuType]: true }));
-
-        queryRunpodRegionAvailability({
-          gpu_types: [gpuType],
-          regions: regionIds,
-        })
-          .then((rows) => {
-            const available = new Set(
-              rows
-                .filter((row) => row.available)
-                .map((row) => row.provider_region_id.toUpperCase()),
-            );
-            const options = runpodRegions.filter((region) =>
-              available.has(region.provider_region_id.toUpperCase()),
-            );
-            setManualRunpodRegionOptions((prev) => ({
-              ...prev,
-              [gpuType]: options,
-            }));
-          })
-          .catch(() => {
-            setManualRunpodRegionOptions((prev) => ({ ...prev, [gpuType]: [] }));
-          })
-          .finally(() => {
-            setManualRunpodRegionLoading((prev) => ({ ...prev, [gpuType]: false }));
-          });
+      setManualRunpodRegionLoading((prev) => {
+        const next = { ...prev };
+        gpuTypesToQuery.forEach((gpuType) => {
+          next[gpuType] = true;
+        });
+        return next;
       });
+
+      queryRunpodRegionAvailability({
+        gpu_types: gpuTypesToQuery,
+        regions: regionIds,
+      })
+        .then((rows) => {
+          if (cancelled) return;
+          const byGpuType: Record<string, Set<string>> = {};
+          rows
+            .filter((row) => row.available)
+            .forEach((row) => {
+              const gpuType = row.gpu_type;
+              if (!byGpuType[gpuType]) byGpuType[gpuType] = new Set<string>();
+              byGpuType[gpuType].add(row.provider_region_id.toUpperCase());
+            });
+
+          const fetchedAt = Date.now();
+          setManualRunpodRegionOptions((prev) => {
+            const next = { ...prev };
+            gpuTypesToQuery.forEach((gpuType) => {
+              const available = byGpuType[gpuType] ?? new Set<string>();
+              next[gpuType] = runpodRegions.filter((region) =>
+                available.has(region.provider_region_id.toUpperCase()),
+              );
+            });
+            return next;
+          });
+          setManualRunpodRegionFetchedAt((prev) => {
+            const next = { ...prev };
+            gpuTypesToQuery.forEach((gpuType) => {
+              next[gpuType] = fetchedAt;
+            });
+            return next;
+          });
+        })
+        .catch(() => {
+          if (cancelled) return;
+          const fetchedAt = Date.now();
+          setManualRunpodRegionOptions((prev) => {
+            const next = { ...prev };
+            gpuTypesToQuery.forEach((gpuType) => {
+              next[gpuType] = [];
+            });
+            return next;
+          });
+          setManualRunpodRegionFetchedAt((prev) => {
+            const next = { ...prev };
+            gpuTypesToQuery.forEach((gpuType) => {
+              next[gpuType] = fetchedAt;
+            });
+            return next;
+          });
+        })
+        .finally(() => {
+          if (cancelled) return;
+          setManualRunpodRegionLoading((prev) => {
+            const next = { ...prev };
+            gpuTypesToQuery.forEach((gpuType) => {
+              next[gpuType] = false;
+            });
+            return next;
+          });
+        });
     }, 350);
 
     return () => {
+      cancelled = true;
       if (manualDebounceRef.current) clearTimeout(manualDebounceRef.current);
     };
   }, [
@@ -271,6 +321,7 @@ export function GPUResourceSelector({ value, onChange, disabled }: Props) {
     fallbacks,
     parseAcceleratorGpuType,
     manualRunpodRegionOptions,
+    manualRunpodRegionFetchedAt,
     manualRunpodRegionLoading,
   ]);
 
