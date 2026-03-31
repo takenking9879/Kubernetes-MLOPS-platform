@@ -124,11 +124,11 @@ export function GPUResourceSelector({ value, onChange, disabled }: Props) {
   }, [open, mode]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
-    if (!open || mode !== 'auto') return;
+    if (!open) return;
     getRunpodSupportedRegions()
       .then(setRunpodRegions)
       .catch(() => setRunpodRegions([]));
-  }, [open, mode]);
+  }, [open]);
 
   // Debounced select call whenever constraints change (auto mode only)
   useEffect(() => {
@@ -677,13 +677,32 @@ export function GPUResourceSelector({ value, onChange, disabled }: Props) {
                   {/* Cloud / infra */}
                   <select
                     className="w-24 shrink-0 rounded bg-slate-800 px-1.5 py-1 text-xs text-slate-100 outline-none focus:ring-1 focus:ring-blue-500"
-                    value={entry.infra}
-                    onChange={(e) => updateFallback(idx, { infra: e.target.value })}
+                    value={entry.infra.split('/')[0]}
+                    onChange={(e) => {
+                      const provider = e.target.value;
+                      updateFallback(idx, { infra: provider });
+                    }}
                   >
                     {INFRA_OPTIONS.map(({ id, label }) => (
                       <option key={id} value={id}>{label}</option>
                     ))}
                   </select>
+
+                  {entry.infra.split('/')[0] === 'runpod' && (
+                    <select
+                      className="w-36 shrink-0 rounded bg-slate-800 px-1.5 py-1 text-xs text-slate-100 outline-none focus:ring-1 focus:ring-blue-500"
+                      value={entry.infra.startsWith('runpod/') ? entry.infra : 'runpod'}
+                      onChange={(e) => updateFallback(idx, { infra: e.target.value })}
+                      title="RunPod region"
+                    >
+                      <option value="runpod">Any RunPod region</option>
+                      {runpodRegions.map((r) => (
+                        <option key={r.provider_region_id} value={r.skypilot_infra}>
+                          {r.provider_region_id}
+                        </option>
+                      ))}
+                    </select>
+                  )}
 
                   {/* Accelerator spec */}
                   <input
