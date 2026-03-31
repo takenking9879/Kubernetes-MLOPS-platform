@@ -679,10 +679,28 @@ export async function queryRunpodRegionAvailability(payload: {
   gpu_types: string[];
   regions: string[];
 }): Promise<RunPodRegionAvailability[]> {
-  return _fetch<RunPodRegionAvailability[]>('/api/v2/gpu-resources/runpod/availability', {
-    method: 'POST',
-    body: JSON.stringify(payload),
-  });
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 25_000);
+  try {
+    const res = await fetch(`${API_BASE}/api/v2/gpu-resources/runpod/availability`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+      signal: controller.signal,
+    });
+    if (!res.ok) {
+      const body = await res.text();
+      throw new Error(`${res.status} ${res.statusText}: ${body}`);
+    }
+    return res.json() as Promise<RunPodRegionAvailability[]>;
+  } catch (err) {
+    if (err instanceof DOMException && err.name === 'AbortError') {
+      throw new Error('RunPod availability request timed out');
+    }
+    throw err;
+  } finally {
+    clearTimeout(timeoutId);
+  }
 }
 
 // ─── vLLM Serving API (Phase 6) ───────────────────────────────────────────────
