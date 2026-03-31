@@ -1,0 +1,123 @@
+# SkyPilot API Server — Helm values
+# Chart: skypilot/skypilot --version 0.12.0
+#
+# Deploy:
+#   helm repo add skypilot https://helm.skypilot.co && helm repo update
+#   # STEP 1 — verify schema matches (may differ from nightly):
+#   helm show values skypilot/skypilot --version 0.12.0 > /tmp/sky-defaults.yaml
+#   # STEP 2 — create credentials secret in skypilot namespace (see skypilot_steps.txt)
+#   # STEP 3 — replace s3://sky-workdir below with an actual bucket
+#   # STEP 4 — install:
+#   AUTH_STRING=$(htpasswd -nb skypilot <password>)
+#   helm upgrade --install skypilot skypilot/skypilot --version 0.12.0 \
+#     --namespace skypilot --create-namespace \
+#     --set "ingress.authCredentials=${AUTH_STRING}" \
+#     -f k3s/sky/helm/values.yaml
+#
+# After install:
+#   - Get service name/port: kubectl get svc -n skypilot
+#   - Add to .env: SKYPILOT_API_SERVER_ENDPOINT=http://skypilot:<password>@skypilot-api-server.skypilot.svc.cluster.local
+#   - Refresh env-secret: kubectl create secret generic env-secret -n airflow --from-env-file=.env --dry-run=client -o yaml | kubectl apply -f -
+
+# ── Image ─────────────────────────────────────────────────────────────────────
+# Custom image: python:3.11-slim + SkyPilot 0.12.0 + docker-entrypoint.sh.
+# The entrypoint writes RunPod/VastAI credential files then runs `exec "$@"`,
+# so Helm's args become the command after credential setup.
+# Fallback: berkeleyskypilot/skypilot:0.12.0 (official, no credential setup script)
+image:
+  repository: takenking9879/sky-runner
+  tag: "0.12.0"
+  pullPolicy: IfNotPresent
+
+# ── API server startup ────────────────────────────────────────────────────────
+# docker-entrypoint.sh writes provider credential files, then `exec "$@"`.
+# These args trigger: exec sky api start --host 0.0.0.0
+# NOTE: if the chart uses `command:` internally (overriding ENTRYPOINT), these
+# values will be ignored. Check /tmp/sky-defaults.yaml from STEP 1 for the
+# correct key names. If needed, switch to apiService.command / apiService.args.
+apiService:
+  command:
+    - /app/docker-entrypoint.sh
+  args:
+    - sky
+    - api
+    - start
+    - "--host"
+    - "0.0.0.0"
+
+  # ── SkyPilot config ─────────────────────────────────────────────────────────
+  # consolidation_mode: true → controller runs in-process inside this pod.
+  # No cloud controller VM is provisioned; no SSH-based polling.
+  # jobs.bucket → needed for workdir persistence across rolling updates.
+  # Replace s3://sky-workdir with an actual S3 bucket before deploying.
+  config: |
+    jobs:
+      controller:
+        consolidation_mode: true
+      bucket: s3://k8s-mlops-platform-bucket/sky-workdir
+
+  # ── Cloud credentials (injected via chart-native credential values below) ────
+  # Do NOT use envFrom here — the chart has dedicated values for each provider.
+  # See runpodCredentials / vastCredentials / awsCredentials sections below.
+
+  # ── Prometheus metrics endpoint ──────────────────────────────────────────────
+  # Exposes /api/metrics for the existing Prometheus in monitoring namespace.
+  # Do NOT set prometheus.enabled=true — this cluster has its own Prometheus.
+  metrics:
+    enabled: true
+
+  # ── Resources ────────────────────────────────────────────────────────────────
+  # SkyPilot docs: consolidation mode adds ~2 GB controller overhead.
+  resources:
+    requests:
+      cpu: "4000m"
+      memory: "8Gi"
+    limits:
+      cpu: "4000m"
+      memory: "8Gi"
+
+# ── Cloud credentials ─────────────────────────────────────────────────────────
+# Chart-native credential injection (correct approach).
+# Each provider needs a K8s secret created first, then referenced here.
+#
+# Create secrets (run from repo root, credentials loaded from .env):
+#   set -o allexport; source .env; set +o allexport
+#
+#   kubectl create secret generic runpod-credentials -n skypilot \
+#     --from-literal api_key="$RUNPOD_API_KEY"
+#
+#   kubectl create secret generic vastai-credentials -n skypilot \
+#     --from-literal api_key="${VASTAI_API_KEY:-$VAST_API_KEY}"
+#
+#   kubectl create secret generic aws-credentials -n skypilot \
+#     --from-literal aws_access_key_id="$AWS_ACCESS_KEY_ID" \
+#     --from-literal aws_secret_access_key="$AWS_SECRET_ACCESS_KEY" \
+#     --from-literal aws_default_region="${AWS_DEFAULT_REGION:-us-east-1}"
+
+runpodCredentials:
+  enabled: true
+  runpodSecretName: runpod-credentials
+
+vastCredentials:
+  enabled: true
+  vastSecretName: vastai-credentials
+
+awsCredentials:
+  enabled: true
+  awsSecretName: aws-credentials
+
+# ── Auth ──────────────────────────────────────────────────────────────────────
+# Set at deploy time via --set ingress.authCredentials="$(htpasswd -nb user pass)"
+# Leave empty here to avoid committing credentials.
+ingress:
+  authCredentials: "skypilot:$apr1$5IOIGWYc$uoJs4.tNBHCzevhaD.P2w1"
+  #path:
+ingress-nginx:
+  enabled: false  # this cluster already has nginx in ingress-nginx namespace
+# ── Don't deploy bundled observability stack ──────────────────────────────────
+# This cluster already has Prometheus in monitoring namespace + Grafana.
+# Scrape target for SkyPilot is added directly to prometheus-stack.yaml.
+prometheus:
+  enabled: false
+grafana:
+  enabled: false

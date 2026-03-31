@@ -141,6 +141,16 @@ data:
             regex: (.+)
             target_label: __metrics_path__
             replacement: /api/v1/nodes/${1}/proxy/metrics/cadvisor
+
+      # ===== SKYPILOT API SERVER METRICS =====
+      # Requires: apiService.metrics.enabled=true in k3s/sky/helm/values.yaml.
+      # Service name and port: verify with `kubectl get svc -n skypilot` after helm install.
+      # Metrics path: verify with `kubectl exec -n skypilot deployment/skypilot-api-server -- curl localhost:46580/api/metrics`
+      - job_name: 'skypilot-api-server'
+        static_configs:
+          - targets: ['skypilot-api-server.skypilot.svc.cluster.local:46580']
+        metrics_path: /api/metrics
+        scrape_interval: 30s
 ---
 apiVersion: v1
 kind: ServiceAccount

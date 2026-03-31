@@ -259,6 +259,7 @@ export function GPUPricingPanel({ onAddToFallback }: Props) {
             <tbody>
               {filtered.map((o, i) => {
                 const sv = savings(o.price_spot, o.price_on_demand);
+                // 0 = confirmed no stock (RunPod real-time); -1 = not tracked (AWS/unlimited)
                 const noStock = o.available_count === 0;
                 return (
                   <tr

@@ -9,3 +9,5 @@
 - Add new SkyPilot clouds to catalog subprocess → `_sky_catalog_query.py:VALID_CLOUDS`
 - Extend SkyPilot catalog TTL → `gpu_catalog.py:_sky_catalog_cache` TTL constant
 - Change `skypilot_supported` validation logic → `gpu_catalog.py:_sky_supported_names()` + provider query methods
+- Fix RunPod real-time availability logic (4-condition check) → `src/services/runpod_adapter.py:RunPodAdapter`
+- Fix `available_count` sentinel for AWS (not tracked → `-1`) → `gpu_catalog.py:_query_aws()` and `_static_aws_catalog()`

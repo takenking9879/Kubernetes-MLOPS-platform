@@ -27,6 +27,8 @@ from typing import Any
 
 from dotenv import load_dotenv
 
+from .runpod_adapter import RunPodAdapter
+
 # Load .env from project root (src/services/ → src/ → project root)
 # This is a no-op in K8s pods (env-secret injects vars directly).
 load_dotenv(Path(__file__).resolve().parents[2] / ".env")
@@ -281,8 +283,12 @@ class GPUCatalogService:
             # get_gpus() omits pricing; use GraphQL for full schema.
             from runpod.api import graphql as _gql  # type: ignore[import]
             result = _gql.run_graphql_query(
-                "{ gpuTypes { id displayName memoryInGb maxGpuCount "
-                "communityPrice securePrice communitySpotPrice secureSpotPrice } }"
+                "{ gpuTypes { id displayName memoryInGb "
+                "communityPrice securePrice communitySpotPrice secureSpotPrice "
+                "lowestPrice(input: { gpuCount: 1, secureCloud: true, "
+                "minVcpuCount: 2, minMemoryInGb: 8 }) { "
+                "stockStatus availableGpuCounts maxUnreservedGpuCount "
+                "uninterruptablePrice minimumBidPrice } } }"
             )
             gpus: list[dict[str, Any]] = (
                 result.get("data", {}).get("gpuTypes", []) or []
@@ -306,12 +312,11 @@ class GPUCatalogService:
                     gpu_type = display_name  # show native name when unsupported
 
                 vram = float(gpu.get("memoryInGb", 0))
-                on_demand = float(
-                    gpu.get("communityPrice") or gpu.get("securePrice") or 0.0
-                )
-                spot_raw = gpu.get("communitySpotPrice") or gpu.get("secureSpotPrice")
-                spot = float(spot_raw) if spot_raw else None
-                spot_available = bool(spot and spot > 0)
+                lowest_price = gpu.get("lowestPrice")
+
+                on_demand, spot = RunPodAdapter.extract_price(lowest_price, gpu)
+                available = RunPodAdapter.is_available(lowest_price, gpu_count=1)
+                count = RunPodAdapter.available_count(lowest_price)
 
                 offers.append(
                     GPUOffer(
@@ -323,8 +328,8 @@ class GPUCatalogService:
                         ram_gb=0,
                         price_on_demand=on_demand,
                         price_spot=spot,
-                        spot_available=spot_available,
-                        available_count=int(gpu.get("maxGpuCount", 1)),
+                        spot_available=available,
+                        available_count=count,
                         region="",  # RunPod API doesn't expose per-GPU datacenter
                         infiniband=gpu_id in _RUNPOD_INFINIBAND_IDS,
                         skypilot_supported=sky_supported,
@@ -477,7 +482,7 @@ class GPUCatalogService:
                             price_on_demand=on_demand,
                             price_spot=spot,
                             spot_available=bool(spot and spot > 0),
-                            available_count=0,
+                            available_count=-1,  # sentinel: AWS availability not tracked
                             region=region,
                             infiniband=_aws_has_efa(instance_type, "aws"),
                             skypilot_supported=True,  # AWS always from SkyPilot catalog
@@ -706,7 +711,7 @@ def _static_aws_catalog() -> list[GPUOffer]:
                 price_on_demand=od,
                 price_spot=spot,
                 spot_available=True,
-                available_count=0,
+                available_count=-1,  # sentinel: AWS availability not tracked
                 region="us-east-1",
                 infiniband=efa,
                 skypilot_supported=True,

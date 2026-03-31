@@ -598,7 +598,7 @@ export interface GPUOffer {
   price_on_demand: number;
   price_spot: number | null;
   spot_available: boolean;
-  available_count: number;
+  available_count: number;  // -1 = not tracked/unlimited (AWS); 0 = confirmed no stock (RunPod); >0 = units available
   region: string;
   infiniband: boolean;
   skypilot_supported: boolean;

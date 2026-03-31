@@ -1,4 +1,103 @@
 docker build -f k3s/sky/Dockerfile -t takenking9879/sky-runner:0.12.0 .
 
 
+All Airflow sky-runner KPO pods become lightweight HTTP clients via
+SKYPILOT_API_SERVER_ENDPOINT (added to env-secret). Zero code changes to DAGs or
+sky_runner.py -- the SkyPilot SDK picks up the env var automatically.
 
+
+PREREQUISITES
+-------------
+- kubectl configured for the target cluster
+- helm 3.x installed (helm version to verify)
+- apache2-utils installed for htpasswd (sudo apt install apache2-utils)
+- .env file in repo root with: AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY,
+  AWS_DEFAULT_REGION, RUNPOD_API_KEY, VASTAI_API_KEY, MLFLOW_TRACKING_URI
+- An S3 bucket to use for SkyPilot workdir persistence (e.g. s3://my-sky-workdir)
+
+
+helm repo add skypilot https://helm.skypilot.co/
+
+kubectl create namespace skypilot
+
+kubectl create secret generic runpod-credentials \
+  -n skypilot \
+  --from-literal=api_key=$(grep RUNPOD_API_KEY .env | cut -d '=' -f2)
+
+kubectl create secret generic vastai-credentials \
+  -n skypilot \
+  --from-literal=api_key=$(grep -E 'VASTAI_API_KEY|VAST_API_KEY' .env | head -n1 | cut -d '=' -f2)
+
+kubectl create secret generic aws-credentials \
+  -n skypilot \
+  --from-literal=aws_access_key_id=$(grep AWS_ACCESS_KEY_ID .env | cut -d '=' -f2) \
+  --from-literal=aws_secret_access_key=$(grep AWS_SECRET_ACCESS_KEY .env | cut -d '=' -f2) \
+  --from-literal=aws_default_region=$(grep AWS_DEFAULT_REGION .env | cut -d '=' -f2 || echo us-east-1)
+
+WEB_USERNAME=skypilot
+WEB_PASSWORD=skypilot
+AUTH_STRING=$(htpasswd -nb "$WEB_USERNAME" "$WEB_PASSWORD")
+AUTH_STRING=skypilot:$apr1$5IOIGWYc$uoJs4.tNBHCzevhaD.P2w1
+echo "Save this AUTH_STRING for helm install: $AUTH_STRING"
+# Also save WEB_PASSWORD -- you will need it for SKYPILOT_API_SERVER_ENDPOINT in Step 9.
+
+
+STEP 5: Install the SkyPilot Helm chart
+-----------------------------------------
+helm upgrade --install skypilot skypilot/skypilot --version 0.12.0 \
+  --namespace skypilot \
+  --create-namespace \
+  --set "ingress.authCredentials=${AUTH_STRING}" \
+  -f k3s/sky/helm/values.yaml
+
+helm install my-skypilot skypilot/skypilot --version 0.12.0 -n skypilot -f k3s/sky/helm/values.yaml
+
+# Monitor rollout (waits up to 5 min):
+kubectl rollout status deployment/skypilot-api-server -n skypilot --timeout=300s
+
+# If rollout fails, check pod events:
+kubectl describe pod -l app=skypilot-api-server -n skypilot
+
+
+STEP 6: Verify the API server started correctly
+------------------------------------------------
+kubectl get pods -n skypilot
+kubectl logs -n skypilot deployment/my-skypilot-api-server --tail=60
+
+# Expected log lines (from docker-entrypoint.sh):
+#   [entrypoint] RunPod credentials written to ~/.runpod/config.toml
+#   [entrypoint] VastAI credentials written to ~/.config/vastai/vast_api_key
+#   [entrypoint] SkyPilot jobs controller disk_size set to 30 GB
+# Then the sky api start output.
+
+# Health check via port-forward:
+kubectl port-forward svc/my-skypilot-api-server -n skypilot 46580:46580 &
+PF_PID=$!
+sleep 2
+curl -s http://localhost:46580/api/health
+kill $PF_PID
+# Expected: {"status":"ok"} or similar
+
+
+
+STEP 8: Verify consolidation mode is active (no cloud controller VM)
+----------------------------------------------------------------------
+kubectl exec -n skypilot deployment/my-skypilot-api-server -- \
+  sky status --all 2>&1 | grep -i controller || echo "No controller clusters (consolidation mode OK)"
+
+# Should show NO "jobs-controller-*" cloud cluster entries.
+# The controller runs in-process; no RunPod/AWS VM is provisioned for it.
+
+
+STEP 10: Update Prometheus scrape config for SkyPilot metrics
+--------------------------------------------------------------
+# prometheus-stack.yaml already has the skypilot-api-server scrape job added.
+# If the service name or port from Step 7 differs, update it first:
+#   grep -n skypilot k3s/monitoring/prometheus/prometheus-stack.yaml
+# Then apply:
+kubectl apply -f k3s/monitoring/prometheus/prometheus-stack.yaml
+kubectl rollout restart deployment/prometheus -n monitoring
+kubectl rollout status deployment/prometheus -n monitoring --timeout=60s
+
+# Wait ~30s then verify the target is UP:
+# Prometheus UI -> Status -> Targets -> "skypilot-api-server" should show State: UP
