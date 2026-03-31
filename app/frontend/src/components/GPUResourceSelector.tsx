@@ -235,7 +235,6 @@ export function GPUResourceSelector({ value, onChange, disabled }: Props) {
 
     if (gpuTypesToQuery.length === 0) return;
 
-    let cancelled = false;
     if (manualDebounceRef.current) clearTimeout(manualDebounceRef.current);
     manualDebounceRef.current = setTimeout(() => {
       setManualRunpodRegionLoading((prev) => {
@@ -251,7 +250,6 @@ export function GPUResourceSelector({ value, onChange, disabled }: Props) {
         regions: regionIds,
       })
         .then((rows) => {
-          if (cancelled) return;
           const byGpuType: Record<string, Set<string>> = {};
           rows
             .filter((row) => row.available)
@@ -281,7 +279,6 @@ export function GPUResourceSelector({ value, onChange, disabled }: Props) {
           });
         })
         .catch(() => {
-          if (cancelled) return;
           const fetchedAt = Date.now();
           setManualRunpodRegionOptions((prev) => {
             const next = { ...prev };
@@ -299,7 +296,6 @@ export function GPUResourceSelector({ value, onChange, disabled }: Props) {
           });
         })
         .finally(() => {
-          if (cancelled) return;
           setManualRunpodRegionLoading((prev) => {
             const next = { ...prev };
             gpuTypesToQuery.forEach((gpuType) => {
@@ -311,7 +307,6 @@ export function GPUResourceSelector({ value, onChange, disabled }: Props) {
     }, 350);
 
     return () => {
-      cancelled = true;
       if (manualDebounceRef.current) clearTimeout(manualDebounceRef.current);
     };
   }, [
