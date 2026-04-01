@@ -68,6 +68,7 @@ def _run_sky_training(
     model_type: str,
     params_s3_path: str,
     num_nodes: str,
+    num_gpus_per_node: str,
     use_deepspeed: str,
     deepspeed_stage: str,
     resource_constraints_json: str,
@@ -222,8 +223,25 @@ def _run_sky_training(
     for secret_key in secret_env_keys:
         sky_secrets[secret_key] = None
 
-    if n_nodes > 1:
-        sky_conf["envs"]["NUM_WORKERS"] = str(n_nodes * 8)
+    # Compute GPU-derived Ray parameters and inject into YAML envs.
+    # Primary source of truth: num_nodes (from dag_run.conf) × num_gpus_per_node (from resource_constraints).
+    # The run script in the YAML has a secondary fallback using SKYPILOT_* runtime vars.
+    n_gpus = int(num_gpus_per_node) if str(num_gpus_per_node).strip().isdigit() else 1
+    total_gpus = n_nodes * n_gpus
+    is_multi = n_nodes > 1
+
+    num_workers_training = total_gpus
+    num_workers_tune = n_gpus if is_multi else 1
+    max_concurrent_trials = n_nodes if is_multi else total_gpus
+
+    sky_envs["NUM_WORKERS"] = str(num_workers_training)
+    sky_envs["NUM_WORKERS_TUNE"] = str(num_workers_tune)
+    sky_envs["MAX_CONCURRENT_TRIALS"] = str(max_concurrent_trials)
+    print(
+        f"[sky-training] GPU resource plan: {n_nodes} node(s) × {n_gpus} GPU(s) = {total_gpus} total | "
+        f"training workers={num_workers_training} | "
+        f"tune workers_per_trial={num_workers_tune} | concurrent_trials={max_concurrent_trials}"
+    )
 
     tmp = tempfile.mktemp(suffix=".yaml")
     with open(tmp, "w") as fh:
@@ -408,6 +426,7 @@ with DAG(
             "model_type":                "{{ dag_run.conf.get('model_type', 'xgboost') }}",
             "params_s3_path":            "{{ dag_run.conf['train_params_s3_path'] }}",
             "num_nodes":                 "{{ dag_run.conf.get('num_nodes', 1) }}",
+            "num_gpus_per_node":         "{{ dag_run.conf.get('num_gpus_per_node', 1) }}",
             "use_deepspeed":             "{{ 'true' if dag_run.conf.get('use_deepspeed', False) else 'false' }}",
             "deepspeed_stage":           "{{ dag_run.conf.get('deepspeed_stage', 1) | string }}",
             "resource_constraints_json": "{{ (dag_run.conf.get('resource_constraints') or {}) | tojson }}",

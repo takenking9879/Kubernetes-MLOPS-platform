@@ -85,11 +85,14 @@ envs:
   GRAFANA_API_KEY: ""
 
   # ── Ray training parameters ──
-  NUM_WORKERS: "16"                 # 2 nodes × 8 GPUs
+  # These are fallback defaults. The Airflow DAG injects the correct values
+  # based on num_nodes × num_gpus_per_node before launching. The run script
+  # further overrides using SKYPILOT_NUM_NODES × SKYPILOT_NUM_GPUS_PER_NODE for direct launches.
+  NUM_WORKERS: "16"          # DAG injects: = NUM_NODES × GPUS_PER_NODE (all GPUs for DDP)
   CPUS_PER_WORKER: "6"
-  NUM_WORKERS_TUNE: "4"
+  NUM_WORKERS_TUNE: "8"      # DAG injects: = GPUS_PER_NODE (DDP within 1 node per trial)
   CPUS_PER_WORKER_TUNE: "6"
-  MAX_CONCURRENT_TRIALS: "1"
+  MAX_CONCURRENT_TRIALS: "2" # DAG injects: = NUM_NODES (1 trial per node)
   TUNE_MAX_TRAIN_ROWS: "500000"
   TUNE_MAX_VAL_ROWS: "200000"
   RAY_MATERIALIZE_DATASETS: "1"
@@ -153,6 +156,18 @@ run: |
       python3 /home/ray/app/repo/k3s/sky/write_grafana_config.py
       grafana-agent --config.file=/tmp/grafana-agent-config.yaml &
     fi
+
+    # ── GPU-aware fallback (primary values injected by Airflow DAG via envs) ──
+    # If the DAG already set NUM_WORKERS, NUM_WORKERS_TUNE, MAX_CONCURRENT_TRIALS,
+    # the ${VAR:-default} syntax keeps those values unchanged.
+    # For direct sky launches (bypassing the DAG), derives from SKYPILOT_* runtime vars.
+    GPUS_PER_NODE=${SKYPILOT_NUM_GPUS_PER_NODE:-8}
+    TOTAL_NODES=${SKYPILOT_NUM_NODES:-2}
+    TOTAL_GPUS=$(( TOTAL_NODES * GPUS_PER_NODE ))
+    export NUM_WORKERS=${NUM_WORKERS:-${TOTAL_GPUS}}
+    export NUM_WORKERS_TUNE=${NUM_WORKERS_TUNE:-${GPUS_PER_NODE}}
+    export MAX_CONCURRENT_TRIALS=${MAX_CONCURRENT_TRIALS:-${TOTAL_NODES}}
+    echo "[run] Ray params: NUM_WORKERS=${NUM_WORKERS} NUM_WORKERS_TUNE=${NUM_WORKERS_TUNE} MAX_CONCURRENT_TRIALS=${MAX_CONCURRENT_TRIALS} (nodes=${TOTAL_NODES} gpus_per_node=${GPUS_PER_NODE})"
 
     python3 /home/ray/app/repo/k3s/kuberay/main.py
 

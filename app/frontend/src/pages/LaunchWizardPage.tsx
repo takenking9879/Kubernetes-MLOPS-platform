@@ -293,6 +293,20 @@ export function LaunchWizardPage() {
   const isLlmPath = modelCategory === 'llm' || isServing;
   const isTabularPath = modelCategory === 'tabular' || modelCategory === 'upload';
 
+  const gpuSummary = (() => {
+    const gpusPerNode = constraints.num_gpus_per_node ?? 1;
+    const nodes = numNodes;
+    const totalGpus = nodes * gpusPerNode;
+    const isMulti = nodes > 1;
+    return {
+      totalGpus,
+      numWorkers: totalGpus,
+      numWorkersTune: isMulti ? gpusPerNode : 1,
+      maxConcurrentTrials: isMulti ? nodes : totalGpus,
+      mode: isMulti ? 'multi-node' : 'single-node',
+    };
+  })();
+
   const resolvedModelType =
     modelCategory === 'tabular' ? (framework === 'pytorch' ? pytorchModelType : 'xgboost')
     : modelCategory === 'llm'   ? 'llm'
@@ -1249,6 +1263,27 @@ export function LaunchWizardPage() {
                         : 'sky launch --retry-until-up'}
                     </dd>
                   </dl>
+
+                  {/* GPU Resource Plan */}
+                  <div className="rounded border border-slate-700 bg-slate-800/60 p-3">
+                    <span className="text-xs font-semibold text-slate-300">GPU Resource Plan</span>
+                    <p className="mt-1 text-xs text-slate-400">
+                      {numNodes} node{numNodes > 1 ? 's' : ''} × {constraints.num_gpus_per_node ?? 1} GPU{(constraints.num_gpus_per_node ?? 1) > 1 ? 's' : ''} = <span className="text-slate-200 font-medium">{gpuSummary.totalGpus} total GPU{gpuSummary.totalGpus > 1 ? 's' : ''}</span>
+                      {' '}({gpuSummary.mode})
+                    </p>
+                    <dl className="mt-2 grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
+                      <dt className="text-slate-500">Training workers</dt>
+                      <dd className="text-slate-200">{gpuSummary.numWorkers} <span className="text-slate-500">(1 GPU each, DDP)</span></dd>
+                      {tuneEnabled && (
+                        <>
+                          <dt className="text-slate-500">Concurrent trials</dt>
+                          <dd className="text-slate-200">{gpuSummary.maxConcurrentTrials}</dd>
+                          <dt className="text-slate-500">Workers / trial</dt>
+                          <dd className="text-slate-200">{gpuSummary.numWorkersTune} <span className="text-slate-500">(1 GPU each)</span></dd>
+                        </>
+                      )}
+                    </dl>
+                  </div>
                 </>
               ) : (
                 /* LLM path: orchestration recommendation */

@@ -76,7 +76,7 @@ class RunPodAdapter:
             return False
 
         counts = RunPodAdapter._extract_available_counts(lowest_price)
-        if counts:
+        if counts and gpu_count in counts:
             return True
 
         max_unreserved = RunPodAdapter._to_non_negative_int(
