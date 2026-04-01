@@ -124,6 +124,8 @@ class TuningConfig(BaseModel):
 class ModelConfig(BaseModel):
     experiment_name: str = "kuberay-attack-detection"
     registry_model_name: str = "attack-detection"
+    mlflow_tracking_uri: str = ""
+    mlflow_artifact_location: str = ""
     target: str = "attack"
     num_classes: int = Field(6, ge=2)
     seed: int = 42
@@ -313,6 +315,20 @@ def _generate_training_params_yaml(
 ) -> str:
     """Build params_training.yaml with lineage block and full training config."""
     mlflow_cfg = cfg.get("mlflow", {})
+    default_tracking_uri = (
+        (os.getenv("MLFLOW_TRACKING_URI") or "").strip()
+        or str(mlflow_cfg.get("tracking_uri", "")).strip()
+        or "http://my-mlflow"
+    )
+    default_artifact_location = (
+        str(mlflow_cfg.get("artifact_base", "")).strip()
+        or f"s3://{S3_BUCKET}/mlflow-artifacts/"
+    )
+    mlflow_tracking_uri = (req.model.mlflow_tracking_uri or "").strip() or default_tracking_uri
+    mlflow_artifact_location = (
+        (req.model.mlflow_artifact_location or "").strip()
+        or default_artifact_location
+    )
 
     tune_defaults = (
         _XGBOOST_TUNE_SETTINGS_DEFAULTS if req.framework == "xgboost"
@@ -365,11 +381,9 @@ def _generate_training_params_yaml(
                 "model_type": req.model.model_type,
                 "use_gpu": req.use_gpu,
                 "seed": req.model.seed,
-                "mlflow_tracking_uri": mlflow_cfg.get("tracking_uri", "http://my-mlflow"),
+                "mlflow_tracking_uri": mlflow_tracking_uri,
                 "mlflow_experiment_name": req.model.experiment_name,
-                "mlflow_artifact_location": mlflow_cfg.get(
-                    "artifact_base", f"s3://{S3_BUCKET}/mlflow-artifacts/"
-                ),
+                "mlflow_artifact_location": mlflow_artifact_location,
                 "mlflow_registry_model_name": req.model.registry_model_name,
             },
         },

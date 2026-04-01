@@ -151,6 +151,10 @@ export function LaunchWizardPage() {
   const [seed, setSeed] = useState(42);
   const [experimentName, setExperimentName] = useState('');
   const [registryName, setRegistryName] = useState('');
+  const [mlflowTrackingUri, setMlflowTrackingUri] = useState('');
+  const [mlflowArtifactLocation, setMlflowArtifactLocation] = useState(
+    's3://k8s-mlops-platform-bucket/mlflow-artifacts/',
+  );
 
   const [hyperparams, setHyperparams] = useState<Record<string, number | string | string[]>>(
     () => getDefaultsForTask('xgboost', 'classification'),
@@ -373,6 +377,8 @@ export function LaunchWizardPage() {
         model: {
           experiment_name:    experimentName || `launch_${framework}`,
           registry_model_name: registryName || framework,
+          mlflow_tracking_uri: mlflowTrackingUri,
+          mlflow_artifact_location: mlflowArtifactLocation,
           target,
           num_classes:        numClasses,
           seed,
@@ -749,6 +755,25 @@ export function LaunchWizardPage() {
                           className={INPUT_CLS}
                           value={seed}
                           onChange={e => setSeed(parseInt(e.target.value) || 42)}
+                        />
+                      </div>
+                      <div className="flex flex-col gap-1">
+                        <span className="text-[10px] text-slate-500">MLflow tracking URI</span>
+                        <input
+                          type="text"
+                          className={INPUT_CLS}
+                          value={mlflowTrackingUri}
+                          placeholder="Default: from Airflow MLFLOW_TRACKING_URI"
+                          onChange={e => setMlflowTrackingUri(e.target.value)}
+                        />
+                      </div>
+                      <div className="flex flex-col gap-1">
+                        <span className="text-[10px] text-slate-500">MLflow artifact location</span>
+                        <input
+                          type="text"
+                          className={INPUT_CLS}
+                          value={mlflowArtifactLocation}
+                          onChange={e => setMlflowArtifactLocation(e.target.value)}
                         />
                       </div>
                       <div className="flex flex-col gap-1">
@@ -1199,6 +1224,10 @@ export function LaunchWizardPage() {
                     <dd className="text-slate-200 capitalize">{taskType}</dd>
                     <dt className="text-slate-500">Target</dt>
                     <dd className="text-slate-200">{target || '—'}</dd>
+                    <dt className="text-slate-500">MLflow tracking URI</dt>
+                    <dd className="text-slate-200 break-all">{mlflowTrackingUri || 'default from Airflow env'}</dd>
+                    <dt className="text-slate-500">MLflow artifact location</dt>
+                    <dd className="text-slate-200 break-all">{mlflowArtifactLocation}</dd>
                     {taskType === 'classification' && (
                       <>
                         <dt className="text-slate-500">Num classes</dt>

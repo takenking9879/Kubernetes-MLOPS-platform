@@ -149,6 +149,8 @@ export interface TuningConfig {
 export interface ModelConfig {
   experiment_name?: string;
   registry_model_name?: string;
+  mlflow_tracking_uri?: string;
+  mlflow_artifact_location?: string;
   target?: string;
   num_classes?: number;
   seed?: number;

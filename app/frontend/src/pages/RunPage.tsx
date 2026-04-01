@@ -50,6 +50,8 @@ import {
 const DEFAULT_MODEL_CONFIG = {
   experiment_name: 'kuberay-attack-detection',
   registry_model_name: 'attack-detection',
+  mlflow_tracking_uri: '',
+  mlflow_artifact_location: 's3://k8s-mlops-platform-bucket/mlflow-artifacts/',
   target: 'attack',
   num_classes: 6,
   seed: 42,
@@ -415,6 +417,8 @@ function buildPreviewYaml(opts: {
     `  use_gpu: ${opts.useGpu}`,
     `  experiment_name: ${opts.modelConfig.experiment_name}`,
     `  registry_model_name: ${opts.modelConfig.registry_model_name}`,
+    `  mlflow_tracking_uri: ${opts.modelConfig.mlflow_tracking_uri || '(default from Airflow env)'}`,
+    `  mlflow_artifact_location: ${opts.modelConfig.mlflow_artifact_location}`,
     `  seed: ${opts.modelConfig.seed}`,
     '',
     'tuning:',
@@ -1070,6 +1074,25 @@ export function RunPage() {
                       className={INPUT_CLS}
                     />
                   </Field>
+                  <Field label="MLflow Tracking URI">
+                    <input
+                      value={modelConfig.mlflow_tracking_uri}
+                      onChange={(e) =>
+                        setModelConfig((m) => ({ ...m, mlflow_tracking_uri: e.target.value }))
+                      }
+                      placeholder="Default: from Airflow MLFLOW_TRACKING_URI"
+                      className={INPUT_CLS}
+                    />
+                  </Field>
+                  <Field label="MLflow Artifact Location">
+                    <input
+                      value={modelConfig.mlflow_artifact_location}
+                      onChange={(e) =>
+                        setModelConfig((m) => ({ ...m, mlflow_artifact_location: e.target.value }))
+                      }
+                      className={INPUT_CLS}
+                    />
+                  </Field>
                 </div>
               </div>
 
@@ -1366,6 +1389,8 @@ export function RunPage() {
                   ['Target', `${modelConfig.target} (${modelConfig.num_classes} classes)`],
                   ['Experiment', modelConfig.experiment_name],
                   ['Registry', modelConfig.registry_model_name],
+                  ['MLflow tracking URI', modelConfig.mlflow_tracking_uri || '(default from Airflow env)'],
+                  ['MLflow artifact location', modelConfig.mlflow_artifact_location],
                 ]}
               />
 

@@ -53,6 +53,33 @@ class KubeRayTraining(BaseUtils):
         super().__init__(logger, params_path)
         self.params_full = self.load_params()
         self.params = self.params_full['kuberay']['model']
+
+        # MLflow URI precedence:
+        #   1) MLFLOW_TRACKING_URI env (forwarded by Airflow/SkyPilot)
+        #   2) params_training.yaml kuberay.model.mlflow_tracking_uri
+        # This lets remote providers (RunPod/Vast/AWS) use public endpoints
+        # (e.g. ngrok) instead of in-cluster DNS names like my-mlflow.
+        env_mlflow_uri = (os.getenv("MLFLOW_TRACKING_URI") or "").strip()
+        params_mlflow_uri = (self.params.get("mlflow_tracking_uri") or "").strip()
+        self.mlflow_tracking_uri = env_mlflow_uri or params_mlflow_uri
+        if self.mlflow_tracking_uri:
+            self.params["mlflow_tracking_uri"] = self.mlflow_tracking_uri
+            self.params_full.setdefault("kuberay", {}).setdefault("model", {})[
+                "mlflow_tracking_uri"
+            ] = self.mlflow_tracking_uri
+            uri_source = "env" if env_mlflow_uri else "params.yaml"
+            parsed_uri = urlparse(self.mlflow_tracking_uri)
+            uri_host = parsed_uri.netloc or parsed_uri.path or "<unknown>"
+            self.logger.info(
+                "MLflow tracking URI resolved from %s: %s",
+                uri_source,
+                uri_host,
+            )
+        else:
+            self.logger.warning(
+                "MLflow tracking URI is empty; MLflow logging/callbacks may fail."
+            )
+
         self.schema = self._load_schema_features()
         self.output_dir = output_dir
 
@@ -494,7 +521,7 @@ class KubeRayTraining(BaseUtils):
                 if self.params.get("dsl_count_dim", True)
                 else int(self.params.get("input_dim", 14))
             )
-            mlflow_tracking_uri = self.params.get("mlflow_tracking_uri")
+            mlflow_tracking_uri = self.mlflow_tracking_uri
             mlflow_experiment_name = self.params.get("mlflow_experiment_name")
 
             # ── Resolve GPU flag early so both tuning and training honour it ──
@@ -646,7 +673,7 @@ class KubeRayTraining(BaseUtils):
                 estimated_cost = round(gpu_price * elapsed_hours, 4)
                 try:
                     import mlflow as _mlflow
-                    tracking_uri = self.params.get("mlflow_tracking_uri")
+                    tracking_uri = self.mlflow_tracking_uri
                     if tracking_uri:
                         _mlflow.set_tracking_uri(tracking_uri)
                     with _mlflow.start_run(run_id=mlflow_result["run_id"]):

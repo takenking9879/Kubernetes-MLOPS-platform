@@ -125,7 +125,8 @@ export function generateParamsYaml(input: ParamsYamlInput): string {
 
 /** Default AdvancedConfig matching k3s/params.yaml values */
 export const DEFAULT_ADVANCED_CONFIG: AdvancedConfig = {
-  mlflow_tracking_uri: 'http://my-mlflow',
+  // Empty means "use backend/Airflow default" (MLFLOW_TRACKING_URI env var).
+  mlflow_tracking_uri: '',
   mlflow_artifact_location: 's3://k8s-mlops-platform-bucket/mlflow-artifacts/',
   serving_alias: 'champion',
   canary: false,

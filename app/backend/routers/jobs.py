@@ -54,6 +54,7 @@ from routers.runs import (  # noqa: E402
     _airflow_request as _call_airflow,
     _fetch_preprocess_params,
     _build_lineage,
+    _load_static_config,
 )
 
 router = APIRouter(prefix="/api/v2/jobs", tags=["jobs"])
@@ -221,6 +222,25 @@ def _upload_training_params(
     return the s3:// path.  The DAG reads this via PARAMS_S3_PATH env var.
     """
     model_cfg = body.training.model_cfg or {}
+    static_cfg = _load_static_config() or {}
+    mlflow_cfg = static_cfg.get("mlflow", {})
+
+    default_tracking_uri = (
+        (os.getenv("MLFLOW_TRACKING_URI") or "").strip()
+        or str(mlflow_cfg.get("tracking_uri", "")).strip()
+        or "http://my-mlflow"
+    )
+    default_artifact_location = (
+        str(mlflow_cfg.get("artifact_base", "")).strip()
+        or f"s3://{_S3_BUCKET}/mlflow-artifacts/"
+    )
+
+    mlflow_tracking_uri = (str(model_cfg.get("mlflow_tracking_uri", "")) or "").strip() or default_tracking_uri
+    mlflow_artifact_location = (
+        (str(model_cfg.get("mlflow_artifact_location", "")) or "").strip()
+        or default_artifact_location
+    )
+
     processed_table = (
         (lineage or {}).get("processed_table")
         or body.training.processed_table
@@ -249,12 +269,12 @@ def _upload_training_params(
                 "input_dim": model_cfg.get("input_dim", 14),
                 "dsl_count_dim": True,
                 "seed": model_cfg.get("seed", 42),
-                "mlflow_tracking_uri": os.getenv("MLFLOW_TRACKING_URI", ""),
+                "mlflow_tracking_uri": mlflow_tracking_uri,
                 "mlflow_experiment_name": model_cfg.get(
                     "experiment_name",
                     f"launch_{body.model.model_type}",
                 ),
-                "mlflow_artifact_location": f"s3://{_S3_BUCKET}/mlflow-artifacts/",
+                "mlflow_artifact_location": mlflow_artifact_location,
                 "mlflow_registry_model_name": model_cfg.get(
                     "registry_model_name",
                     body.model.model_type,

@@ -93,6 +93,7 @@ def _run_sky_training(
     import subprocess
     import tempfile
     import time
+    from urllib.parse import urlparse
 
     import yaml
 
@@ -129,6 +130,19 @@ def _run_sky_training(
         secret_env_keys.append("GRAFANA_API_KEY")
     if mlflow_tracking_uri:
         secret_env_keys.append("MLFLOW_TRACKING_URI")
+
+    if mlflow_tracking_uri:
+        parsed_mlflow = urlparse(mlflow_tracking_uri)
+        mlflow_host = parsed_mlflow.netloc or parsed_mlflow.path or "<unknown>"
+        print(
+            "[sky-training] Airflow env MLFLOW_TRACKING_URI detected "
+            f"(host={mlflow_host}); forwarding via --secret."
+        )
+    else:
+        print(
+            "[sky-training] Airflow env MLFLOW_TRACKING_URI is empty; "
+            "remote job will use params_training.yaml fallback."
+        )
 
     rc: dict | None = None
     if resource_constraints_json and resource_constraints_json not in ("null", "{}"):
