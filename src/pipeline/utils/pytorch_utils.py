@@ -245,7 +245,11 @@ def train_func(config: Dict):
 
         # Classification: accumulate confusion matrix.  Regression: accumulate preds/targets.
         if task_type == "classification":
-            conf = torch.zeros((num_classes, num_classes), dtype=torch.int64)
+            conf = torch.zeros(
+                (num_classes, num_classes),
+                dtype=torch.int64,
+                device=next(model.parameters()).device,
+            )
             all_preds_list, all_targets_list = None, None
         else:
             conf = None
@@ -271,7 +275,7 @@ def train_func(config: Dict):
                     # Vectorized confusion matrix via bincount
                     indices = y * num_classes + y_pred
                     counts = torch.bincount(indices, minlength=num_classes * num_classes)
-                    conf += counts.reshape(num_classes, num_classes)
+                    conf += counts.reshape(num_classes, num_classes).to(conf.device)
                 else:
                     y_pred = preds.squeeze(-1)
                     all_preds_list.append(y_pred.cpu())

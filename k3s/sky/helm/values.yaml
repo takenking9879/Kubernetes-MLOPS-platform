@@ -31,7 +31,7 @@ apiService:
   # false => local-mode semantics (single API worker) while still binding
   # host 0.0.0.0 inside Kubernetes.
 
-  #useDeployMode: false
+  useDeployMode: false
 
   # Hotfix for SkyPilot managed-jobs race in consolidation mode.
   # Applies an in-container patch at API-server startup so it persists across

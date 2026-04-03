@@ -233,6 +233,9 @@ spec:
             - '--storage.tsdb.path=/prometheus'
             - '--storage.tsdb.retention.time=7d'
             - '--web.enable-lifecycle'
+            # Main-path ingestion endpoint for external SkyPilot VM shippers:
+            # POST /api/v1/write
+            - '--web.enable-remote-write-receiver'
             - '--web.console.libraries=/usr/share/prometheus/console_libraries'
             - '--web.console.templates=/usr/share/prometheus/consoles'
           ports:

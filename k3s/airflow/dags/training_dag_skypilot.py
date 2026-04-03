@@ -105,7 +105,12 @@ def _run_sky_training(
     aws_access_key_id = (os.environ.get("AWS_ACCESS_KEY_ID") or "").strip()
     aws_secret_access_key = (os.environ.get("AWS_SECRET_ACCESS_KEY") or "").strip()
     aws_session_token = (os.environ.get("AWS_SESSION_TOKEN") or "").strip()
+    grafana_remote_write_url = (os.environ.get("GRAFANA_REMOTE_WRITE_URL") or "").strip()
+    grafana_instance_id = (os.environ.get("GRAFANA_INSTANCE_ID") or "").strip()
     grafana_api_key = (os.environ.get("GRAFANA_API_KEY") or "").strip()
+    metrics_remote_write_url = (os.environ.get("METRICS_REMOTE_WRITE_URL") or "").strip()
+    metrics_remote_write_username = (os.environ.get("METRICS_REMOTE_WRITE_USERNAME") or "").strip()
+    metrics_remote_write_password = (os.environ.get("METRICS_REMOTE_WRITE_PASSWORD") or "").strip()
     mlflow_tracking_uri = (os.environ.get("MLFLOW_TRACKING_URI") or "").strip()
     aws_region = (
         os.environ.get("AWS_REGION")
@@ -127,6 +132,8 @@ def _run_sky_training(
     secret_env_keys = ["AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY"]
     if aws_session_token:
         secret_env_keys.append("AWS_SESSION_TOKEN")
+    if metrics_remote_write_password:
+        secret_env_keys.append("METRICS_REMOTE_WRITE_PASSWORD")
     if grafana_api_key:
         secret_env_keys.append("GRAFANA_API_KEY")
     if mlflow_tracking_uri:
@@ -159,6 +166,17 @@ def _run_sky_training(
         providers = rc.get("providers") or []
         if providers:
             provider = str(providers[0]).lower()
+
+    effective_metrics_remote_write_url = metrics_remote_write_url or grafana_remote_write_url
+    effective_metrics_remote_write_username = metrics_remote_write_username or grafana_instance_id
+    if effective_metrics_remote_write_url:
+        rw_host = urlparse(effective_metrics_remote_write_url).netloc or "<unknown>"
+        print(
+            "[sky-training] Outbound metrics shipping enabled "
+            f"(remote_write_host={rw_host}, provider={provider})."
+        )
+    else:
+        print("[sky-training] Outbound metrics shipping disabled (missing remote_write URL).")
 
     _yaml_map = {
         ("train",       "runpod"): "ray-gpu-training-runpod.yaml",
@@ -201,6 +219,13 @@ def _run_sky_training(
         "TRAIN_RUN_ID":        train_run_id,
         "PREPROCESS_RUN_ID":   preprocess_run_id,
         "MODEL_TYPE":          model_type,
+        "SKY_PROVIDER":        provider,
+        "METRICS_SOURCE":      "skypilot_vm",
+        "METRICS_REMOTE_WRITE_URL": effective_metrics_remote_write_url,
+        "METRICS_REMOTE_WRITE_USERNAME": effective_metrics_remote_write_username,
+        # Keep legacy aliases for templates still using Grafana Cloud names.
+        "GRAFANA_REMOTE_WRITE_URL": effective_metrics_remote_write_url,
+        "GRAFANA_INSTANCE_ID": effective_metrics_remote_write_username,
         "PARAMS_S3_PATH":      params_s3_path,
         "PROCESSED_TABLE":     processed_table,
         "AWS_REGION":          aws_region,
@@ -228,11 +253,20 @@ def _run_sky_training(
     # The run script in the YAML has a secondary fallback using SKYPILOT_* runtime vars.
     n_gpus = int(num_gpus_per_node) if str(num_gpus_per_node).strip().isdigit() else 1
     total_gpus = n_nodes * n_gpus
-    is_multi = n_nodes > 1
 
-    num_workers_training = total_gpus
-    num_workers_tune = n_gpus if is_multi else 1
-    max_concurrent_trials = n_nodes if is_multi else total_gpus
+    # Worker strategy:
+    # - single-node: workers = total GPUs
+    # - multi-node: workers = total nodes
+    # Keep training/tuning shape equal on fixed-size clusters.
+    if n_nodes > 1:
+        worker_count = n_nodes
+    else:
+        worker_count = total_gpus
+
+    num_workers_training = worker_count
+    # Tune trials use a single worker; parallelism is controlled by MAX_CONCURRENT_TRIALS.
+    num_workers_tune = 1
+    max_concurrent_trials = worker_count
 
     sky_envs["NUM_WORKERS"] = str(num_workers_training)
     sky_envs["NUM_WORKERS_TUNE"] = str(num_workers_tune)
@@ -242,10 +276,6 @@ def _run_sky_training(
         f"training workers={num_workers_training} | "
         f"tune workers_per_trial={num_workers_tune} | concurrent_trials={max_concurrent_trials}"
     )
-
-    tmp = tempfile.mktemp(suffix=".yaml")
-    with open(tmp, "w") as fh:
-        yaml.dump(sky_conf, fh, default_flow_style=False, allow_unicode=True)
 
     # ── Job name ──────────────────────────────────────────────────────────────
     # Keep managed job names unique per Airflow run attempt so cancel/recovery
@@ -276,6 +306,11 @@ def _run_sky_training(
 
     base = slug[:base_max_len].rstrip("-") or "sky"
     resource_name = f"{base}-{suffix}"
+    sky_envs["SKY_CLUSTER_NAME"] = resource_name
+
+    tmp = tempfile.mktemp(suffix=".yaml")
+    with open(tmp, "w") as fh:
+        yaml.dump(sky_conf, fh, default_flow_style=False, allow_unicode=True)
 
     if managed_mode:
         # ── Managed jobs mode (optional) ─────────────────────────────────────

@@ -29,9 +29,9 @@ Every SkyPilot GPU YAML (`ray-gpu-training.yaml`, `ray-gpu-multinode-aws.yaml`, 
 
 ---
 
-## Grafana Cloud remote_write (optional)
+## Outbound remote_write (main path)
 
-SkyPilot VMs run on external cloud IPs not reachable from the in-cluster Prometheus. To see GPU metrics in Grafana, use Grafana Cloud's remote_write endpoint (works over HTTPS from anywhere).
+SkyPilot VMs run on external cloud IPs not reachable from in-cluster scrape targets. The main path is outbound shipping from VM to a remote_write endpoint (Grafana Cloud or your own Prometheus receiver exposed via ingress).
 
 ### 1 — Create a free Grafana Cloud account
 
@@ -43,10 +43,14 @@ Add these in the Airflow UI under **Admin → Variables** (or as K8s secrets):
 
 | Key | Value |
 |-----|-------|
-| `GRAFANA_REMOTE_WRITE_URL` | `https://prometheus-prod-XX-prod-XX.grafana.net/api/prom/push` |
-| `GRAFANA_INSTANCE_ID` | Your numeric instance ID |
-| `GRAFANA_API_KEY` | A Grafana Cloud API key with `metrics:write` scope |
-| `SKY_CLUSTER_NAME` | (injected per-run by DAG from the generated cluster name) |
+| `METRICS_REMOTE_WRITE_URL` | Receiver URL (`https://.../api/prom/push` or `https://.../api/v1/write`) |
+| `METRICS_REMOTE_WRITE_USERNAME` | Username for basic auth (if required) |
+| `METRICS_REMOTE_WRITE_PASSWORD` | Password/token for basic auth (if required) |
+
+Legacy aliases are still accepted by `write_grafana_config.py`:
+- `GRAFANA_REMOTE_WRITE_URL`
+- `GRAFANA_INSTANCE_ID`
+- `GRAFANA_API_KEY`
 
 ### 3 — Airflow DAG injection
 
@@ -55,14 +59,14 @@ In `training_dag_skypilot.py`, add these to `task.update_envs()`:
 ```python
 task.update_envs({
     ...
-    "SKY_CLUSTER_NAME":         cluster_name,
-    "GRAFANA_REMOTE_WRITE_URL": Variable.get("GRAFANA_REMOTE_WRITE_URL", default_var=""),
-    "GRAFANA_INSTANCE_ID":      Variable.get("GRAFANA_INSTANCE_ID", default_var=""),
-    "GRAFANA_API_KEY":          Variable.get("GRAFANA_API_KEY", default_var=""),
+    "SKY_CLUSTER_NAME":               cluster_name,
+    "METRICS_REMOTE_WRITE_URL":       Variable.get("METRICS_REMOTE_WRITE_URL", default_var=""),
+    "METRICS_REMOTE_WRITE_USERNAME":  Variable.get("METRICS_REMOTE_WRITE_USERNAME", default_var=""),
+    "METRICS_REMOTE_WRITE_PASSWORD":  Variable.get("METRICS_REMOTE_WRITE_PASSWORD", default_var=""),
 })
 ```
 
-When `GRAFANA_REMOTE_WRITE_URL` is non-empty **and** `grafana-agent` binary is present (installed in `setup:` automatically), `write_grafana_config.py` generates `/tmp/grafana-agent-config.yaml` and grafana-agent ships metrics to Grafana Cloud.
+  When `METRICS_REMOTE_WRITE_URL` is non-empty and `grafana-agent` is present, `write_grafana_config.py` generates `/tmp/grafana-agent-config.yaml` and grafana-agent ships both training (`localhost:8002`) and GPU (`localhost:9400`) metrics.
 
 ### 4 — In-cluster Prometheus remote_write (for existing Ray/K8s metrics)
 

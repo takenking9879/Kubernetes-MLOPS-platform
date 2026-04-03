@@ -222,3 +222,7 @@ app/frontend/node_modules/
 runpod_API.txt
 
 k3s/sky/helm/skypilot/
+
+UI_code.txt
+UI_prompt.txt
+images/

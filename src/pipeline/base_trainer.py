@@ -127,9 +127,10 @@ class BaseTrainer(ABC):
     def _build_scaling_config(self) -> ray.train.ScalingConfig:
         gpu = self._resolve_gpu()
         cpus = int(os.getenv("CPUS_PER_WORKER", 2))
+        gpus_per_worker = int(os.getenv("GPUS_PER_WORKER", 1))
         resources: Dict[str, Any] = {"CPU": cpus}
         if gpu:
-            resources["GPU"] = 1
+            resources["GPU"] = max(gpus_per_worker, 1)
         return ray.train.ScalingConfig(
             num_workers=int(os.getenv("NUM_WORKERS", 2)),
             resources_per_worker=resources,

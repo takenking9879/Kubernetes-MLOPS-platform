@@ -81,6 +81,24 @@ ingress:
       path: /
       pathType: Prefix
 
+    # Prometheus remote_write receiver endpoint used by external SkyPilot VMs.
+    # Create htpasswd secret first:
+    # kubectl create secret generic prometheus-remote-write-auth -n monitoring \
+    #   --from-literal=auth='writer:$apr1$...'
+    - name: prometheus-remote-write
+      namespace: monitoring
+      subdomain: prom-write
+      serviceName: prometheus
+      servicePort: 9090
+      path: /api/v1/write
+      pathType: Exact
+      annotations:
+        nginx.ingress.kubernetes.io/auth-type: basic
+        nginx.ingress.kubernetes.io/auth-secret: prometheus-remote-write-auth
+        nginx.ingress.kubernetes.io/auth-realm: "Prometheus Remote Write"
+        nginx.ingress.kubernetes.io/limit-rps: "25"
+        nginx.ingress.kubernetes.io/proxy-body-size: "16m"
+
     # =============================
     # App (mismo subdominio, paths)
     # =============================

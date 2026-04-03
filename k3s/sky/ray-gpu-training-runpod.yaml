@@ -59,9 +59,16 @@ envs:
   AWS_DEFAULT_REGION: "us-east-1"
   AWS_S3_ENDPOINT_URL: ""
 
-  # ── GPU metrics (optional Grafana Cloud remote_write) ──
+  # ── Outbound metrics shipping (main path) ──
   GPU_PRICE_PER_HOUR: "0"
   SKY_CLUSTER_NAME: ""
+  SKY_PROVIDER: "runpod"
+  METRICS_SOURCE: "skypilot_vm"
+  METRICS_REMOTE_WRITE_URL: ""
+  METRICS_REMOTE_WRITE_USERNAME: ""
+  METRICS_REMOTE_WRITE_PASSWORD: ""
+
+  # Legacy aliases (still supported by write_grafana_config.py)
   GRAFANA_REMOTE_WRITE_URL: ""
   GRAFANA_INSTANCE_ID: ""
   GRAFANA_API_KEY: ""
@@ -70,11 +77,11 @@ envs:
   # These are fallback defaults. The Airflow DAG injects the correct values
   # based on num_nodes × num_gpus_per_node before launching. The run script
   # further overrides using SKYPILOT_NUM_GPUS_PER_NODE for direct sky launches.
-  NUM_WORKERS: "1"           # DAG injects: = GPUS_PER_NODE (all GPUs for DDP training)
+  NUM_WORKERS: "1"           # DAG injects: single-node workers = GPUs
   CPUS_PER_WORKER: "4"
-  NUM_WORKERS_TUNE: "1"      # DAG injects: = 1 (single-node, 1 GPU per trial)
+  NUM_WORKERS_TUNE: "1"      # DAG injects: 1 worker per tuning trial
   CPUS_PER_WORKER_TUNE: "4"
-  MAX_CONCURRENT_TRIALS: "1" # DAG injects: = GPUS_PER_NODE (1 trial per GPU)
+  MAX_CONCURRENT_TRIALS: "1" # DAG injects: same as workers
   TUNE_MAX_TRAIN_ROWS: "250000"
   TUNE_MAX_VAL_ROWS: "150000"
   RAY_MATERIALIZE_DATASETS: "1"
@@ -260,7 +267,8 @@ setup: |
 
   echo "Setup complete."
 
-  if [ -n "${GRAFANA_REMOTE_WRITE_URL:-}" ]; then
+  METRICS_RW_URL="${METRICS_REMOTE_WRITE_URL:-${GRAFANA_REMOTE_WRITE_URL:-}}"
+  if [ -n "${METRICS_RW_URL}" ]; then
     AGENT_BIN=/usr/local/bin/grafana-agent
     if [ ! -f "${AGENT_BIN}" ]; then
       AGENT_VER=v0.43.3 ARCH=amd64
@@ -301,10 +309,11 @@ run: |
   "${PYTHON_BIN}" /home/ray/app/repo/k3s/sky/gpu_exporter.py &
   echo "[run] GPU exporter started (PID=$!)"
 
-  if [ -n "${GRAFANA_REMOTE_WRITE_URL:-}" ] && command -v grafana-agent >/dev/null 2>&1; then
+  METRICS_RW_URL="${METRICS_REMOTE_WRITE_URL:-${GRAFANA_REMOTE_WRITE_URL:-}}"
+  if [ -n "${METRICS_RW_URL}" ] && command -v grafana-agent >/dev/null 2>&1; then
     "${PYTHON_BIN}" /home/ray/app/repo/k3s/sky/write_grafana_config.py
     grafana-agent --config.file=/tmp/grafana-agent-config.yaml &
-    echo "[run] Grafana Agent started → ${GRAFANA_REMOTE_WRITE_URL}"
+    echo "[run] Grafana Agent started → ${METRICS_RW_URL}"
   fi
 
   if [ "${SKYPILOT_NUM_GPUS_PER_NODE:-0}" -gt 0 ]; then
@@ -341,7 +350,32 @@ run: |
   GPUS=${SKYPILOT_NUM_GPUS_PER_NODE:-1}
   export NUM_WORKERS=${NUM_WORKERS:-${GPUS}}
   export NUM_WORKERS_TUNE=${NUM_WORKERS_TUNE:-1}
-  export MAX_CONCURRENT_TRIALS=${MAX_CONCURRENT_TRIALS:-${GPUS}}
-  echo "[run] Ray params: NUM_WORKERS=${NUM_WORKERS} NUM_WORKERS_TUNE=${NUM_WORKERS_TUNE} MAX_CONCURRENT_TRIALS=${MAX_CONCURRENT_TRIALS} (SKYPILOT_NUM_GPUS_PER_NODE=${SKYPILOT_NUM_GPUS_PER_NODE:-unset})"
+  export MAX_CONCURRENT_TRIALS=${MAX_CONCURRENT_TRIALS:-${NUM_WORKERS}}
+  export GPUS_PER_WORKER=${GPUS_PER_WORKER:-1}
+  export GPUS_PER_WORKER_TUNE=${GPUS_PER_WORKER_TUNE:-${GPUS_PER_WORKER}}
+
+  TOTAL_CPUS_NODE=$(nproc 2>/dev/null || getconf _NPROCESSORS_ONLN 2>/dev/null || echo 1)
+  _cpus_per_worker_uniform_with_leftover() {
+    local total_cpus="${1:-1}"
+    local workers="${2:-1}"
+    if [ "${workers}" -le 0 ]; then
+      workers=1
+    fi
+    local base=$(( total_cpus / workers ))
+    local rem=$(( total_cpus % workers ))
+    local out="${base}"
+    if [ "${rem}" -eq 0 ]; then
+      out=$(( base - 1 ))
+    fi
+    if [ "${out}" -lt 1 ]; then
+      out=1
+    fi
+    echo "${out}"
+  }
+
+  export CPUS_PER_WORKER=$(_cpus_per_worker_uniform_with_leftover "${TOTAL_CPUS_NODE}" "${NUM_WORKERS}")
+  export CPUS_PER_WORKER_TUNE=${CPUS_PER_WORKER}
+
+  echo "[run] Ray params: NUM_WORKERS=${NUM_WORKERS} NUM_WORKERS_TUNE=${NUM_WORKERS_TUNE} MAX_CONCURRENT_TRIALS=${MAX_CONCURRENT_TRIALS} GPUS_PER_WORKER=${GPUS_PER_WORKER} GPUS_PER_WORKER_TUNE=${GPUS_PER_WORKER_TUNE} CPUS_PER_WORKER=${CPUS_PER_WORKER} CPUS_PER_WORKER_TUNE=${CPUS_PER_WORKER_TUNE} (node_cpus=${TOTAL_CPUS_NODE} SKYPILOT_NUM_GPUS_PER_NODE=${SKYPILOT_NUM_GPUS_PER_NODE:-unset})"
 
   "${PYTHON_BIN}" /home/ray/app/repo/k3s/kuberay/main.py

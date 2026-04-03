@@ -35,7 +35,6 @@ NS_RAY="ray"
 NS_SPARK="spark"
 NS_MONITORING="monitoring"
 NS_APPS="apps"
-ENV_FILE=".env"
 
 # ============================================================
 # LOGGING
@@ -43,6 +42,7 @@ ENV_FILE=".env"
 sep() { echo; echo "============================================================"; echo; }
 info() { echo "👉 $*"; }
 ok() { echo "✅ $*"; }
+warn() { echo "⚠️  $*"; }
 
 # ============================================================
 # HELM REPOS
@@ -93,6 +93,24 @@ kubectl create secret generic aws-credentials \
   --from-literal=aws_access_key_id=$(grep AWS_ACCESS_KEY_ID .env | cut -d '=' -f2) \
   --from-literal=aws_secret_access_key=$(grep AWS_SECRET_ACCESS_KEY .env | cut -d '=' -f2) \
   --from-literal=aws_default_region=$(grep AWS_DEFAULT_REGION .env | cut -d '=' -f2 || echo us-east-1) || true
+
+# Ingress basic-auth secret for Prometheus remote_write receiver.
+# Requires METRICS_REMOTE_WRITE_USERNAME and METRICS_REMOTE_WRITE_PASSWORD in .env.
+METRICS_REMOTE_WRITE_USERNAME="$(grep -m1 '^METRICS_REMOTE_WRITE_USERNAME=' .env | cut -d '=' -f2- || true)"
+METRICS_REMOTE_WRITE_PASSWORD="$(grep -m1 '^METRICS_REMOTE_WRITE_PASSWORD=' .env | cut -d '=' -f2- || true)"
+if [[ -n "${METRICS_REMOTE_WRITE_USERNAME}" && -n "${METRICS_REMOTE_WRITE_PASSWORD}" ]]; then
+  if command -v openssl >/dev/null 2>&1; then
+    RW_HTPASSWD="${METRICS_REMOTE_WRITE_USERNAME}:$(openssl passwd -apr1 "${METRICS_REMOTE_WRITE_PASSWORD}")"
+    kubectl -n monitoring create secret generic prometheus-remote-write-auth \
+      --from-literal=auth="${RW_HTPASSWD}" \
+      --dry-run=client -o yaml | kubectl apply -f -
+    ok "Secret prometheus-remote-write-auth upserted in monitoring namespace"
+  else
+    warn "openssl is not installed; skipping prometheus-remote-write-auth creation"
+  fi
+else
+  warn "METRICS_REMOTE_WRITE_USERNAME/PASSWORD missing in .env; skipping prometheus-remote-write-auth"
+fi
 ok "Namespaces and secrets ready"
 
 # ============================================================

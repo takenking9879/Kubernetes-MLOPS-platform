@@ -88,11 +88,11 @@ envs:
   # These are fallback defaults. The Airflow DAG injects the correct values
   # based on num_nodes × num_gpus_per_node before launching. The run script
   # further overrides using SKYPILOT_NUM_NODES × SKYPILOT_NUM_GPUS_PER_NODE for direct launches.
-  NUM_WORKERS: "16"          # DAG injects: = NUM_NODES × GPUS_PER_NODE (all GPUs for DDP)
+  NUM_WORKERS: "2"           # DAG injects: multi-node workers = nodes
   CPUS_PER_WORKER: "6"
-  NUM_WORKERS_TUNE: "8"      # DAG injects: = GPUS_PER_NODE (DDP within 1 node per trial)
+  NUM_WORKERS_TUNE: "1"      # DAG injects: 1 worker per tuning trial
   CPUS_PER_WORKER_TUNE: "6"
-  MAX_CONCURRENT_TRIALS: "2" # DAG injects: = NUM_NODES (1 trial per node)
+  MAX_CONCURRENT_TRIALS: "2" # DAG injects: same as workers
   TUNE_MAX_TRAIN_ROWS: "500000"
   TUNE_MAX_VAL_ROWS: "200000"
   RAY_MATERIALIZE_DATASETS: "1"
@@ -164,10 +164,37 @@ run: |
     GPUS_PER_NODE=${SKYPILOT_NUM_GPUS_PER_NODE:-8}
     TOTAL_NODES=${SKYPILOT_NUM_NODES:-2}
     TOTAL_GPUS=$(( TOTAL_NODES * GPUS_PER_NODE ))
-    export NUM_WORKERS=${NUM_WORKERS:-${TOTAL_GPUS}}
-    export NUM_WORKERS_TUNE=${NUM_WORKERS_TUNE:-${GPUS_PER_NODE}}
-    export MAX_CONCURRENT_TRIALS=${MAX_CONCURRENT_TRIALS:-${TOTAL_NODES}}
-    echo "[run] Ray params: NUM_WORKERS=${NUM_WORKERS} NUM_WORKERS_TUNE=${NUM_WORKERS_TUNE} MAX_CONCURRENT_TRIALS=${MAX_CONCURRENT_TRIALS} (nodes=${TOTAL_NODES} gpus_per_node=${GPUS_PER_NODE})"
+    export NUM_WORKERS=${NUM_WORKERS:-${TOTAL_NODES}}
+    export NUM_WORKERS_TUNE=${NUM_WORKERS_TUNE:-1}
+    export MAX_CONCURRENT_TRIALS=${MAX_CONCURRENT_TRIALS:-${NUM_WORKERS}}
+    export GPUS_PER_WORKER=${GPUS_PER_WORKER:-${GPUS_PER_NODE}}
+    export GPUS_PER_WORKER_TUNE=${GPUS_PER_WORKER_TUNE:-${GPUS_PER_WORKER}}
+
+    TOTAL_CPUS_NODE=$(nproc 2>/dev/null || getconf _NPROCESSORS_ONLN 2>/dev/null || echo 1)
+    _cpus_per_worker_uniform_with_leftover() {
+      local total_cpus="${1:-1}"
+      local workers="${2:-1}"
+      if [ "${workers}" -le 0 ]; then
+        workers=1
+      fi
+      local base=$(( total_cpus / workers ))
+      local rem=$(( total_cpus % workers ))
+      local out="${base}"
+      if [ "${rem}" -eq 0 ]; then
+        out=$(( base - 1 ))
+      fi
+      if [ "${out}" -lt 1 ]; then
+        out=1
+      fi
+      echo "${out}"
+    }
+
+    # In multi-node mode with workers=nodes, keep one worker per node.
+    TRAIN_WORKERS_PER_NODE=1
+    export CPUS_PER_WORKER=$(_cpus_per_worker_uniform_with_leftover "${TOTAL_CPUS_NODE}" "${TRAIN_WORKERS_PER_NODE}")
+    export CPUS_PER_WORKER_TUNE=${CPUS_PER_WORKER}
+
+    echo "[run] Ray params: NUM_WORKERS=${NUM_WORKERS} NUM_WORKERS_TUNE=${NUM_WORKERS_TUNE} MAX_CONCURRENT_TRIALS=${MAX_CONCURRENT_TRIALS} GPUS_PER_WORKER=${GPUS_PER_WORKER} GPUS_PER_WORKER_TUNE=${GPUS_PER_WORKER_TUNE} CPUS_PER_WORKER=${CPUS_PER_WORKER} CPUS_PER_WORKER_TUNE=${CPUS_PER_WORKER_TUNE} (node_cpus=${TOTAL_CPUS_NODE} nodes=${TOTAL_NODES} gpus_per_node=${GPUS_PER_NODE})"
 
     python3 /home/ray/app/repo/k3s/kuberay/main.py
 

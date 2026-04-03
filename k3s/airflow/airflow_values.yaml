@@ -72,3 +72,21 @@ extraEnv: |
       secretKeyRef:
         name: env-secret
         key: SKYPILOT_API_SERVER_ENDPOINT
+  
+  - name: METRICS_REMOTE_WRITE_URL
+    valueFrom:
+      secretKeyRef:
+        name: env-secret
+        key: METRICS_REMOTE_WRITE_URL
+
+  - name: METRICS_REMOTE_WRITE_USERNAME
+    valueFrom:
+      secretKeyRef:
+        name: env-secret
+        key: METRICS_REMOTE_WRITE_USERNAME
+
+  - name: METRICS_REMOTE_WRITE_PASSWORD
+    valueFrom:
+      secretKeyRef:
+        name: env-secret
+        key: METRICS_REMOTE_WRITE_PASSWORD

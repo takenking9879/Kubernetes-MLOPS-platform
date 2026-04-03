@@ -1,59 +1,132 @@
-"""Write /tmp/grafana-agent-config.yaml from env vars.
+"""Generate /tmp/grafana-agent-config.yaml for outbound metrics shipping.
 
 Called from SkyPilot run blocks before starting grafana-agent:
 
-    python3 k3s/sky/write_grafana_config.py
-    grafana-agent --config.file=/tmp/grafana-agent-config.yaml &
+  python3 k3s/sky/write_grafana_config.py
+  grafana-agent --config.file=/tmp/grafana-agent-config.yaml &
 
-Required env vars:
-    GRAFANA_REMOTE_WRITE_URL  — Grafana Cloud remote_write endpoint
-    GRAFANA_INSTANCE_ID       — Grafana Cloud instance / user ID
-    GRAFANA_API_KEY           — Grafana Cloud API key (used as password)
+Preferred env vars:
+  METRICS_REMOTE_WRITE_URL
+  METRICS_REMOTE_WRITE_USERNAME
+  METRICS_REMOTE_WRITE_PASSWORD
 
-Optional env vars:
-    SKY_CLUSTER_NAME          — cluster label on exported metrics
-    USE_SPOT                  — is_spot label ("true" / "false")
-    GPU_EXPORTER_PORT         — port the gpu_exporter.py listens on (default 9400)
+Legacy aliases (still supported):
+  GRAFANA_REMOTE_WRITE_URL
+  GRAFANA_INSTANCE_ID
+  GRAFANA_API_KEY
+
+Optional labels/envs:
+  SKY_CLUSTER_NAME
+  SKY_PROVIDER
+  TRAIN_RUN_ID
+  PREPROCESS_RUN_ID
+  MODEL_TYPE
+  METRICS_SOURCE
+  USE_SPOT
+  PROMETHEUS_PORT     (default 8002)
+  GPU_EXPORTER_PORT   (default 9400)
 """
 from __future__ import annotations
 
 import os
 import sys
 
-url = os.getenv("GRAFANA_REMOTE_WRITE_URL", "")
-instance_id = os.getenv("GRAFANA_INSTANCE_ID", "")
-api_key = os.getenv("GRAFANA_API_KEY", "")
-cluster = os.getenv("SKY_CLUSTER_NAME", "unknown")
-is_spot = os.getenv("USE_SPOT", "false")
-exporter_port = os.getenv("GPU_EXPORTER_PORT", "9400")
+import yaml
+
+
+def _env(primary: str, legacy: str) -> str:
+    return (os.getenv(primary) or os.getenv(legacy) or "").strip()
+
+
+url = _env("METRICS_REMOTE_WRITE_URL", "GRAFANA_REMOTE_WRITE_URL")
+username = _env("METRICS_REMOTE_WRITE_USERNAME", "GRAFANA_INSTANCE_ID")
+password = _env("METRICS_REMOTE_WRITE_PASSWORD", "GRAFANA_API_KEY")
+
+cluster = os.getenv("SKY_CLUSTER_NAME", "unknown").strip()
+provider = os.getenv("SKY_PROVIDER", "unknown").strip()
+train_run_id = os.getenv("TRAIN_RUN_ID", "").strip()
+preprocess_run_id = os.getenv("PREPROCESS_RUN_ID", "").strip()
+model_type = os.getenv("MODEL_TYPE", "unknown").strip()
+metrics_source = os.getenv("METRICS_SOURCE", "skypilot_vm").strip()
+is_spot = os.getenv("USE_SPOT", "false").strip()
+
+training_exporter_port = os.getenv("PROMETHEUS_PORT", "8002").strip()
+gpu_exporter_port = os.getenv("GPU_EXPORTER_PORT", "9400").strip()
 
 if not url:
-    print("[write_grafana_config] GRAFANA_REMOTE_WRITE_URL is empty — skipping", flush=True)
+    print("[write_grafana_config] remote_write URL is empty - skipping", flush=True)
     sys.exit(0)
 
-config = f"""\
-metrics:
-  global:
-    scrape_interval: 15s
-    remote_write:
-      - url: {url}
-        basic_auth:
-          username: {instance_id}
-          password: {api_key}
-  configs:
-    - name: gpu
-      scrape_configs:
-        - job_name: skypilot-gpu
-          static_configs:
-            - targets:
-                - "localhost:{exporter_port}"
-              labels:
-                cluster: {cluster}
-                is_spot: {is_spot}
-"""
+remote_write = {"url": url}
+if username and password:
+    remote_write["basic_auth"] = {
+        "username": username,
+        "password": password,
+    }
+elif username or password:
+    print(
+        "[write_grafana_config] partial remote_write auth config detected "
+        "(missing username or password) - sending without basic_auth",
+        flush=True,
+    )
+
+shared_labels = {
+    "cluster_name": cluster,
+    "provider": provider,
+    "run_id": train_run_id,
+    "preprocess_run_id": preprocess_run_id,
+    "model_type": model_type,
+    "source": metrics_source,
+    "is_spot": is_spot,
+}
+shared_labels = {k: v for k, v in shared_labels.items() if v}
+
+config = {
+    "metrics": {
+        "global": {
+            "scrape_interval": "15s",
+            "remote_write": [remote_write],
+        },
+        "configs": [
+            {
+                "name": "training-and-gpu",
+                "scrape_configs": [
+                    {
+                        "job_name": "skypilot-training",
+                        "static_configs": [
+                            {
+                                "targets": [f"localhost:{training_exporter_port}"],
+                                "labels": {
+                                    **shared_labels,
+                                    "stream": "training",
+                                },
+                            }
+                        ],
+                    },
+                    {
+                        "job_name": "skypilot-gpu",
+                        "static_configs": [
+                            {
+                                "targets": [f"localhost:{gpu_exporter_port}"],
+                                "labels": {
+                                    **shared_labels,
+                                    "stream": "gpu",
+                                },
+                            }
+                        ],
+                    },
+                ],
+            }
+        ],
+    }
+}
 
 out = "/tmp/grafana-agent-config.yaml"
-with open(out, "w") as fh:
-    fh.write(config)
+with open(out, "w", encoding="utf-8") as fh:
+    yaml.safe_dump(config, fh, sort_keys=False)
 
-print(f"[write_grafana_config] wrote {out}  (cluster={cluster}  url={url})", flush=True)
+print(
+    f"[write_grafana_config] wrote {out} "
+    f"(cluster={cluster} provider={provider} url={url})",
+    flush=True,
+)

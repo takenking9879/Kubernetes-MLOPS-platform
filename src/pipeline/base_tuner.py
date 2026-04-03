@@ -148,6 +148,7 @@ class BaseTuner(ABC):
 
         num_workers = int(os.getenv("NUM_WORKERS_TUNE", os.getenv("NUM_WORKERS", 2)))
         cpus_per_worker = int(os.getenv("CPUS_PER_WORKER_TUNE", os.getenv("CPUS_PER_WORKER", 1)))
+        gpus_per_worker = int(os.getenv("GPUS_PER_WORKER_TUNE", os.getenv("GPUS_PER_WORKER", 1)))
 
         # GPU detection: same pattern as BaseTrainer._resolve_gpu()
         use_gpu_env = os.getenv("USE_GPU", "auto").lower()
@@ -164,7 +165,7 @@ class BaseTuner(ABC):
 
         resources_per_worker: Dict[str, Any] = {"CPU": cpus_per_worker}
         if gpu_available:
-            resources_per_worker["GPU"] = 1
+            resources_per_worker["GPU"] = max(gpus_per_worker, 1)
 
         scaling_config = ScalingConfig(
             num_workers=num_workers,
