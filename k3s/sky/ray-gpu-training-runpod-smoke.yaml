@@ -15,7 +15,7 @@ num_nodes: 1
 
 resources:
   image_id: runpod/pytorch:1.0.2-cu1281-torch280-ubuntu2404
-  any_of:
+  ordered:
     - infra: runpod/CA/CA-MTL-1
       accelerators: A40:1
       use_spot: true

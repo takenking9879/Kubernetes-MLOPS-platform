@@ -21,7 +21,7 @@ num_nodes: 1
 
 resources:
   image_id: docker:takenking9879/ray-cluster-gpu:e1
-  any_of:
+  ordered:
     # Spot-first: Vast.ai spot tends to be cheapest
     - cloud: vast
       accelerators: RTX4090:1

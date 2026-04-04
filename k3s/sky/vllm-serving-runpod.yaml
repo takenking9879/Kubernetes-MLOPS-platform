@@ -25,7 +25,7 @@ resources:
   # RunPod PyTorch template — torch 2.8.0 (cu12.8.1) pre-installed.
   # DO NOT reinstall torch/CUDA at runtime.
   image_id: runpod/pytorch:1.0.2-cu1281-torch280-ubuntu2404
-  any_of:
+  ordered:
     - cloud: runpod
       accelerators: A100:1
       use_spot: false

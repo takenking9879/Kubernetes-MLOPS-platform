@@ -33,7 +33,7 @@ resources:
   # Image: k3s/kuberay/gpu/Dockerfile.e1
   # Contains: Ray 2.53.0, PyTorch 2.10 (cu128), XGBoost, MLflow, boto3 via uv
   image_id: runpod/pytorch:1.0.2-cu1281-torch280-ubuntu2404
-  any_of:
+  ordered:
     - infra: runpod/CA/CA-MTL-1
       accelerators: A40:1
       use_spot: true

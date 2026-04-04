@@ -94,7 +94,7 @@ def _yaml_path(kind: str, rc: dict | None) -> str:
 # ─── Task loading with optional dynamic resource selection ────────────────────
 
 def _load_task(yaml_path: str, run_id: str, rc: dict | None, prefer_spot: bool = True):
-    """Load a SkyPilot Task from yaml_path, optionally replacing any_of with a
+    """Load a SkyPilot Task from yaml_path, optionally replacing resources with an
     dynamically ranked spot-first list from the GPU catalog, or with an explicit
     user-defined fallback list from rc['gpu_fallbacks'].
 
@@ -112,8 +112,10 @@ def _load_task(yaml_path: str, run_id: str, rc: dict | None, prefer_spot: bool =
         try:
             with open(yaml_path) as fh:
                 sky_conf = _yaml.safe_load(fh)
-            sky_conf.setdefault("resources", {})["any_of"] = gpu_fallbacks
-            sky_conf["resources"].pop("infra", None)
+            resources_cfg = sky_conf.setdefault("resources", {})
+            resources_cfg["ordered"] = gpu_fallbacks
+            resources_cfg.pop("any_of", None)
+            resources_cfg.pop("infra", None)
             tmp = f"/tmp/sky_task_{run_id}_fallback.yaml"
             with open(tmp, "w") as fh:
                 _yaml.dump(sky_conf, fh, default_flow_style=False, allow_unicode=True)
@@ -154,15 +156,17 @@ def _load_task(yaml_path: str, run_id: str, rc: dict | None, prefer_spot: bool =
 
         with open(yaml_path) as fh:
             sky_conf = _yaml.safe_load(fh)
-        sky_conf.setdefault("resources", {})["any_of"] = result.any_of
-        sky_conf["resources"].pop("infra", None)
+        resources_cfg = sky_conf.setdefault("resources", {})
+        resources_cfg["ordered"] = result.any_of
+        resources_cfg.pop("any_of", None)
+        resources_cfg.pop("infra", None)
 
         tmp = f"/tmp/sky_task_{run_id}.yaml"
         with open(tmp, "w") as fh:
             _yaml.dump(sky_conf, fh, default_flow_style=False, allow_unicode=True)
 
         print(
-            f"Dynamic any_of: {len(result.any_of)} entries "
+            f"Dynamic ordered: {len(result.any_of)} entries "
             f"({result.spot_entries} spot, {result.ondemand_entries} on-demand)"
         )
         return sky.Task.from_yaml(tmp)

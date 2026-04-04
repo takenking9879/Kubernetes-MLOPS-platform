@@ -73,6 +73,95 @@ apiService:
       "                                        'sdk.api_start): %s', e)\n",
       'recovery_strategy.skip_nested_api_start',
     )
+
+    patch(
+      '/usr/local/lib/python3.10/site-packages/sky/jobs/recovery_strategy.py',
+      "                                request_id = await asyncio.to_thread(\n"
+      "                                    sdk.launch,\n",
+      "                                launch_timeout_seconds = int(\n"
+      "                                    os.environ.get(\n"
+      "                                        'SKY_JOBS_LAUNCH_TIMEOUT_SECONDS',\n"
+      "                                        '900'))\n"
+      "                                request_id = await asyncio.wait_for(\n"
+      "                                    asyncio.to_thread(\n"
+      "                                        sdk.launch,\n",
+      'recovery_strategy.launch_timeout_start',
+    )
+
+    patch(
+      '/usr/local/lib/python3.10/site-packages/sky/jobs/recovery_strategy.py',
+      "                                    _is_launched_by_jobs_controller=True,\n"
+      "                                )\n",
+      "                                    _is_launched_by_jobs_controller=True,\n"
+      "                                    ),\n"
+      "                                    timeout=launch_timeout_seconds,\n"
+      "                                )\n",
+      'recovery_strategy.launch_timeout_end',
+    )
+
+    patch(
+      '/usr/local/lib/python3.10/site-packages/sky/jobs/recovery_strategy.py',
+      "                                await asyncio.to_thread(\n"
+      "                                    sdk.stream_and_get,\n"
+      "                                    request_id,\n"
+      "                                )\n",
+      "                                await asyncio.wait_for(\n"
+      "                                    asyncio.to_thread(\n"
+      "                                        sdk.stream_and_get,\n"
+      "                                        request_id,\n"
+      "                                    ),\n"
+      "                                    timeout=launch_timeout_seconds,\n"
+      "                                )\n",
+      'recovery_strategy.stream_and_get_timeout',
+    )
+
+    patch(
+      '/usr/local/lib/python3.10/site-packages/sky/jobs/scheduler.py',
+      "    activate_python_env_cmd = (f'{constants.ACTIVATE_SKY_REMOTE_PYTHON_ENV};')\n"
+      "    run_controller_cmd = (f'{sys.executable} -u -m'\n"
+      "                          f'sky.jobs.controller {controller_uuid}')\n",
+      "    activate_python_env_cmd = (\n"
+      "        f'({constants.ACTIVATE_SKY_REMOTE_PYTHON_ENV}) >/dev/null 2>&1 || true;')\n"
+      "    run_controller_cmd = (f'exec {sys.executable} -u -m'\n"
+      "                          f'sky.jobs.controller {controller_uuid}')\n",
+      'scheduler.controller_launch_exec_and_activate_guard',
+    )
+
+    patch(
+      '/usr/local/lib/python3.10/site-packages/sky/jobs/utils.py',
+      "        if record.started_at is not None:\n"
+      "            if process.create_time() != record.started_at:\n"
+      "                if not quiet:\n"
+      "                    logger.debug(f'Controller process {record.pid} has started '\n"
+      "                                 f'at {record.started_at} but process has '\n"
+      "                                 f'started at {process.create_time()}')\n"
+      "                return False\n",
+      "        if record.started_at is not None:\n"
+      "            create_time_drift = abs(process.create_time() - record.started_at)\n"
+      "            # Controller launch may go through a short-lived shell wrapper.\n"
+      "            # A small drift should not mark a live controller as dead.\n"
+      "            if create_time_drift > 15:\n"
+      "                if not quiet:\n"
+      "                    logger.debug(\n"
+      "                        f'Controller process {record.pid} started at '\n"
+      "                        f'{record.started_at} but process has started at '\n"
+      "                        f'{process.create_time()} (drift={create_time_drift}s)')\n"
+      "                return False\n",
+      'jobs_utils.controller_liveness_create_time_tolerance',
+    )
+
+    patch(
+      '/usr/local/lib/python3.10/site-packages/sky/provision/runpod/instance.py',
+      "                internal_ip=instance_info['internal_ip'],\n"
+      "                external_ip=instance_info['external_ip'],\n"
+      "                ssh_port=instance_info['ssh_port'],\n",
+      "                internal_ip=instance_info.get('internal_ip',\n"
+      "                                             instance_info.get('external_ip')),\n"
+      "                external_ip=instance_info.get('external_ip',\n"
+      "                                             instance_info.get('internal_ip')),\n"
+      "                ssh_port=instance_info.get('ssh_port', 22),\n",
+      'runpod.instance_cluster_info_ip_fallback',
+    )
     PY
 
   # ── SkyPilot config ─────────────────────────────────────────────────────────

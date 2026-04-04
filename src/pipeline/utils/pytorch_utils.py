@@ -120,6 +120,7 @@ def train_func(config: Dict):
 
     task_type = config.get("task_type", "classification")
     task_config = get_task_config(task_type)
+    num_classes = int(config.get("num_classes", 6))
 
     model_type = config.get("model_type", "mlp")
     model = get_model(model_type, {
@@ -257,7 +258,6 @@ def train_func(config: Dict):
             prefetch_batches=max(2, cpus_per_worker // 2),  # Async prefetch
         )
         val_loss, val_batches = 0.0, 0
-        num_classes = int(config.get("num_classes", 2))
 
         # Classification: accumulate confusion matrix.  Regression: accumulate preds/targets.
         if task_type == "classification":

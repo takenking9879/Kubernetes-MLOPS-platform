@@ -27,7 +27,7 @@ name: vllm-serving
 num_nodes: 1
 
 resources:
-  any_of:
+  ordered:
     # On-demand only — no spot for serving
     - cloud: runpod
       accelerators: A100:1

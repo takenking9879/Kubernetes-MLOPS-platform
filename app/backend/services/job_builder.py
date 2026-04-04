@@ -148,10 +148,12 @@ class JobBuilder:
 
         sky_conf = self._load_base_yaml(base_yaml_path)
 
-        # Inject dynamic any_of if provided
+        # Inject dynamic ordered list if provided
         if config.any_of:
-            sky_conf.setdefault("resources", {})["any_of"] = config.any_of
-            sky_conf["resources"].pop("infra", None)
+            resources_cfg = sky_conf.setdefault("resources", {})
+            resources_cfg["ordered"] = config.any_of
+            resources_cfg.pop("any_of", None)
+            resources_cfg.pop("infra", None)
 
         # Inject num_nodes for multi-node
         if is_multinode:
@@ -226,8 +228,10 @@ class JobBuilder:
         sky_conf = self._load_base_yaml(base_yaml_path)
 
         if config.any_of:
-            sky_conf.setdefault("resources", {})["any_of"] = config.any_of
-            sky_conf["resources"].pop("infra", None)
+            resources_cfg = sky_conf.setdefault("resources", {})
+            resources_cfg["ordered"] = config.any_of
+            resources_cfg.pop("any_of", None)
+            resources_cfg.pop("infra", None)
 
         if multinode and config.num_nodes > 1:
             sky_conf["num_nodes"] = config.num_nodes
@@ -291,5 +295,7 @@ class JobBuilder:
 
         sky_conf = self._load_base_yaml(base)
         if any_of:
-            sky_conf.setdefault("resources", {})["any_of"] = any_of
+            resources_cfg = sky_conf.setdefault("resources", {})
+            resources_cfg["ordered"] = any_of
+            resources_cfg.pop("any_of", None)
         return _yaml.dump(sky_conf, default_flow_style=False, allow_unicode=True)

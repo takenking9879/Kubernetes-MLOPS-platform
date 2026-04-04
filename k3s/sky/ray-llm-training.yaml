@@ -32,7 +32,7 @@ name: ray-llm-training
 num_nodes: 1
 
 resources:
-  any_of:
+  ordered:
     # Spot-first — A100-80GB: ideal VRAM for 8B models with LoRA
     - cloud: runpod
       accelerators: A100-80GB:1

@@ -31,7 +31,7 @@ num_nodes: 2
 resources:
   # Custom image — all deps baked in (torch 2.10.0 cu128, ray 2.53.0, deepspeed 0.18.8, xgboost).
   image_id: docker:takenking9879/ray-train:2.53.0
-  any_of:
+  ordered:
     # Spot-first — EFA-capable (InfiniBand equivalent on AWS)
     - cloud: aws
       instance_type: p4d.24xlarge    # 8×A100-40GB, 400 Gbps EFA

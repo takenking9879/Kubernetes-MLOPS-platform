@@ -26,7 +26,7 @@ resources:
   # Vast.ai PyTorch template — torch 2.10.0 (cu13.0) pre-installed.
   # DO NOT reinstall torch/CUDA at runtime.
   image_id: vastai/pytorch:2.10.0-cu130-cuda-13.1-mini-py311-2026-03-19
-  any_of:
+  ordered:
     - cloud: vast
       accelerators: A100-80GB:1
       use_spot: true

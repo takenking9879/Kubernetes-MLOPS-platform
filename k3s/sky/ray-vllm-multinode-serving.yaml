@@ -27,7 +27,7 @@ num_nodes: 2   # overridden by JobBuilder from serving config
 resources:
   # Custom image — all deps baked in (torch 2.10.0 cu128, ray 2.53.0, vllm 0.18.0).
   image_id: docker:takenking9879/ray-llm:2.53.0
-  any_of:
+  ordered:
     # Prefer NVLink-capable nodes for multi-GPU tensor parallelism
     - cloud: runpod
       accelerators: A100:8
