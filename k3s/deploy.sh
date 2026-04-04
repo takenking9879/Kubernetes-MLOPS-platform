@@ -16,6 +16,7 @@ ENABLE_MONITORING=true
 ENABLE_AIRFLOW=true
 ENABLE_SKYPILOT=true
 ENABLE_INGRESS=true
+ENABLE_CERT_MANAGER=true
 
 # ============================================================
 # TIMEOUTS
@@ -355,6 +356,39 @@ deploy_airflow() {
   ok "Airflow deployed"
 }
 
+deploy_cert_manager() {
+  sep
+  info "Deploying cert-manager"
+
+  # Check that LETSENCRYPT_EMAIL is set — required for the ClusterIssuer.
+  LETSENCRYPT_EMAIL="$(grep -m1 '^LETSENCRYPT_EMAIL=' .env | cut -d '=' -f2- || true)"
+  if [[ -z "${LETSENCRYPT_EMAIL}" ]]; then
+    warn "LETSENCRYPT_EMAIL is not set in .env — skipping cert-manager deploy"
+    warn "Add LETSENCRYPT_EMAIL=you@example.com to .env and re-run with ENABLE_CERT_MANAGER=true"
+    return 0
+  fi
+
+  helm repo add jetstack https://charts.jetstack.io --force-update
+  helm upgrade --install cert-manager jetstack/cert-manager \
+    --namespace cert-manager \
+    --create-namespace \
+    --version v1.17.2 \
+    --set crds.enabled=true
+
+  info "Waiting for cert-manager webhooks to be ready"
+  kubectl wait deployment/cert-manager-webhook \
+    -n cert-manager \
+    --for=condition=Available \
+    --timeout=120s
+
+  info "Applying Let's Encrypt ClusterIssuer"
+  # Substitute the email from .env before applying.
+  LETSENCRYPT_EMAIL="${LETSENCRYPT_EMAIL}" \
+    envsubst < k3s/cert-manager/clusterissuer.yaml | kubectl apply -f -
+
+  ok "cert-manager deployed and ClusterIssuer ready"
+}
+
 deploy_ingress() {
   sep
   info "Deploying Ingress NGINX controller"
@@ -425,6 +459,9 @@ ok "Parallel workloads completed"
 
 if [ "${ENABLE_MONITORING}" = true ]; then
   deploy_monitoring
+fi
+if [ "${ENABLE_CERT_MANAGER}" = true ]; then
+  deploy_cert_manager
 fi
 if [ "${ENABLE_INGRESS}" = true ]; then
   deploy_ingress

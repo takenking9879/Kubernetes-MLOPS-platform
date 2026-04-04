@@ -5,6 +5,9 @@
 {{- $ingressVals := (.Values.ingress | default dict) }}
 {{- $localVals := (index $ingressVals "local" | default dict) }}
 {{- $localHost := (index $localVals "host" | default "") }}
+{{- $tlsVals := (index $ingressVals "tls" | default dict) }}
+{{- $tlsEnabled := (index $tlsVals "enabled" | default false) }}
+{{- $tlsIssuer := (index $tlsVals "issuer" | default "letsencrypt-prod") }}
 
 {{- range $i, $resource := .Values.ingress.resources }}
 {{- if gt $i 0 }}
@@ -34,11 +37,23 @@ metadata:
   namespace: {{ $resource.namespace }}
   annotations:
     kubernetes.io/ingress.class: {{ $class }}
+{{- if $tlsEnabled }}
+    cert-manager.io/cluster-issuer: {{ $tlsIssuer | quote }}
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+{{- end }}
 {{- with $resource.annotations }}
 {{ toYaml . | indent 4 }}
 {{- end }}
 spec:
   ingressClassName: {{ $class }}
+{{- if $tlsEnabled }}
+  tls:
+    - hosts:
+{{- range $hosts }}
+        - {{ . | quote }}
+{{- end }}
+      secretName: {{ $resource.name }}-tls
+{{- end }}
   rules:
 {{- range $hosts }}
     - host: {{ . | quote }}
