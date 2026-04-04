@@ -317,6 +317,11 @@ run: |
     echo "[run] Grafana Agent started → ${METRICS_RW_URL}"
   fi
 
+  # Pin all Ray sub-processes (PlacementGroupCleaner, etc.) to the training
+  # cluster on 6379 so they don't auto-discover SkyPilot's internal Ray (6380).
+  # Export BEFORE `ray start` so worker processes inherit this value.
+  export RAY_ADDRESS="127.0.0.1:6379"
+
   if [ "${SKYPILOT_NUM_GPUS_PER_NODE:-0}" -gt 0 ]; then
     "${RAY_BIN}" start --head \
       --port=6379 \
@@ -344,11 +349,6 @@ run: |
 
   sleep 5
 
-  # Pin all Ray sub-processes (PlacementGroupCleaner, etc.) to the training
-  # cluster on 6379 so they don't accidentally auto-discover SkyPilot's
-  # internal Ray instance on 6380.
-  export RAY_ADDRESS="127.0.0.1:6379"
-
   # ── GPU-aware fallback (primary values injected by Airflow DAG via envs) ──
   # If the DAG already set NUM_WORKERS, NUM_WORKERS_TUNE, MAX_CONCURRENT_TRIALS,
   # the ${VAR:-default} syntax keeps those values unchanged.
@@ -360,28 +360,32 @@ run: |
   export GPUS_PER_WORKER=${GPUS_PER_WORKER:-1}
   export GPUS_PER_WORKER_TUNE=${GPUS_PER_WORKER_TUNE:-${GPUS_PER_WORKER}}
 
-  # Cgroup-aware CPU detection.  nproc/getconf return 1 inside RunPod
-  # containers because they read the number of *configured* CPUs, not the
-  # cgroup quota.  Try cgroup v2 first, then v1, then fall back.
+  # CPU detection priority:
+  #   1) Ray cluster resources (authoritative for scheduler placement)
+  #   2) nproc fallback
   _detect_node_cpus() {
-    local cgv2=/sys/fs/cgroup/cpu.max
-    if [ -r "${cgv2}" ]; then
-      local quota period
-      read -r quota period < "${cgv2}"
-      if [ "${quota}" != "max" ] && [ "${period:-0}" -gt 0 ] 2>/dev/null; then
-        echo $(( (quota + period - 1) / period )); return
-      fi
+    local ray_cpus
+    ray_cpus="$("${PYTHON_BIN}" -c '
+  import os
+  try:
+    import ray
+    ray.init(address=os.getenv("RAY_ADDRESS", "127.0.0.1:6379"), ignore_reinit_error=True, log_to_driver=False)
+    cpu = int(ray.cluster_resources().get("CPU", 0))
+    print(cpu if cpu > 0 else "")
+  except Exception:
+    print("")
+  finally:
+    try:
+      import ray
+      if ray.is_initialized():
+        ray.shutdown()
+    except Exception:
+      pass
+  ' 2>/dev/null || true)"
+    if [ -n "${ray_cpus}" ] && [ "${ray_cpus}" -gt 0 ] 2>/dev/null; then
+      echo "${ray_cpus}"; return
     fi
-    local cq=/sys/fs/cgroup/cpu/cfs_quota_us
-    local cp=/sys/fs/cgroup/cpu/cfs_period_us
-    if [ -r "${cq}" ] && [ -r "${cp}" ]; then
-      local q p
-      q=$(cat "${cq}") p=$(cat "${cp}")
-      if [ "${q:-0}" -gt 0 ] && [ "${p:-0}" -gt 0 ] 2>/dev/null; then
-        echo $(( (q + p - 1) / p )); return
-      fi
-    fi
-    nproc 2>/dev/null || getconf _NPROCESSORS_ONLN 2>/dev/null || echo 1
+    nproc 2>/dev/null || echo 1
   }
   TOTAL_CPUS_NODE=$(_detect_node_cpus)
   _cpus_per_worker_uniform_with_leftover() {

@@ -746,10 +746,13 @@ def _resolve_params_path() -> str:
 
 
 def main():
+    ray_address = os.getenv("RAY_ADDRESS", "127.0.0.1:6379").strip() or "127.0.0.1:6379"
+    # Ensure all child processes resolve the same Ray cluster endpoint.
+    os.environ["RAY_ADDRESS"] = ray_address
+
     if not ray.is_initialized():
-        # Port 6379: the Ray cluster started by ~/sky_templates/ray/start_cluster.
-        # "auto" would connect to SkyPilot's internal Ray on port 6380 instead.
-        ray.init(address="localhost:6379", ignore_reinit_error=True)
+        # Never use "auto": SkyPilot also runs an internal Ray instance on 6380.
+        ray.init(address=ray_address, ignore_reinit_error=True)
 
     ctx = ray.data.DataContext.get_current()
     ctx.enable_rich_progress_bars = True
