@@ -57,21 +57,35 @@ if not url:
     print("[write_grafana_config] remote_write URL is empty - skipping", flush=True)
     sys.exit(0)
 
-# DNS pre-check: fail fast with a clear message instead of letting Grafana
-# Agent silently retry every 15 s.  Non-blocking — we still write the config
-# file so Agent starts; the warning tells ops to fix METRICS_REMOTE_WRITE_URL.
+# Reachability pre-check: fail fast with a clear message instead of letting
+# Grafana Agent silently retry every 15 s. Non-blocking — we still write the
+# config file so Agent starts; the warning tells ops to fix
+# METRICS_REMOTE_WRITE_URL.
 import socket as _socket
 import urllib.parse as _urlparse
 _parsed = _urlparse.urlparse(url)
-try:
-    _socket.getaddrinfo(_parsed.hostname, _parsed.port or 80, timeout=3)
-except (_socket.gaierror, OSError) as _dns_err:
+_host = _parsed.hostname
+_scheme = (_parsed.scheme or "http").lower()
+_default_port = 443 if _scheme == "https" else 80
+_port = _parsed.port or _default_port
+
+if not _host:
     print(
-        f"[write_grafana_config] WARNING: remote_write URL unreachable: {_dns_err}. "
-        f"Metrics will NOT be shipped. Update METRICS_REMOTE_WRITE_URL in .env "
-        f"to a publicly accessible host (e.g. ngrok tunnel for local Pushgateway).",
+        "[write_grafana_config] WARNING: METRICS_REMOTE_WRITE_URL has no hostname. "
+        "Metrics will NOT be shipped until this URL is fixed.",
         flush=True,
     )
+else:
+    try:
+        with _socket.create_connection((_host, _port), timeout=3):
+            pass
+    except (_socket.gaierror, OSError, ValueError) as _dns_err:
+        print(
+            f"[write_grafana_config] WARNING: remote_write URL unreachable: {_dns_err}. "
+            f"Metrics will NOT be shipped. Update METRICS_REMOTE_WRITE_URL in .env "
+            f"to a publicly accessible host (e.g. ngrok tunnel for local Pushgateway).",
+            flush=True,
+        )
 
 remote_write = {"url": url}
 if username and password:
