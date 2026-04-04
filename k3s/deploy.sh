@@ -16,7 +16,7 @@ ENABLE_MONITORING=true
 ENABLE_AIRFLOW=true
 ENABLE_SKYPILOT=true
 ENABLE_INGRESS=true
-ENABLE_CERT_MANAGER=true
+ENABLE_CERT_MANAGER=false
 
 # ============================================================
 # TIMEOUTS

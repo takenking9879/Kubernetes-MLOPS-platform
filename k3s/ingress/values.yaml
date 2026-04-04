@@ -6,11 +6,11 @@ ingress:
   # mode:
   # - local: optimized for localhost / local clusters
   # - cloud: uses domain + subdomain (e.g. airflow.mycompany.ai)
-  mode: cloud
+  mode: local
 
-  # Cloud mode domain. Example: takenking9879.me
-  # Local mode can also use "localhost" to produce subdomains like airflow.localhost.
-  domain: takenking9879.me
+  # Local mode uses `domain` to build hosts like airflow.localhost.
+  # Keep localhost for everything except the explicit public hosts below.
+  domain: localhost
 
   # Local mode settings
   local:
@@ -27,7 +27,7 @@ ingress:
   # Set enabled=true after cert-manager is installed and the ClusterIssuer is applied.
   # Each ingress gets a secret named "<resource.name>-tls" managed by cert-manager.
   tls:
-    enabled: true
+    enabled: false
     issuer: letsencrypt-prod
 
   # When true, the chart will create any namespaces referenced by `resources[].namespace`.
