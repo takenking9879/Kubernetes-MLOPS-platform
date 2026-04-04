@@ -122,6 +122,47 @@ class BaseTuner(ABC):
         """Key in ``tune_settings`` used for ``max_t``, e.g. ``"max_epochs"`` or ``"num_boost_round"``."""
 
     # ──────────────────────────────────────────────
+    # Helpers
+    # ──────────────────────────────────────────────
+
+    @staticmethod
+    def _build_search_space(base: Dict[str, Any], override: Optional[Dict[str, Any]]) -> Dict[str, Any]:
+        """Merge class-default search space with user overrides from params_training.yaml.
+
+        ``override`` uses the same JSON-serialisable format sent by the frontend
+        (SearchSpaceEntry in hyperparams.ts):
+          {"type": "choice",     "options": [64, 128, 256]}
+          {"type": "loguniform", "min": 1e-5, "max": 0.1}
+          {"type": "uniform",    "min": 0.0,  "max": 1.0}
+          {"type": "randint",    "min": 1,    "max": 100}
+          {"type": "fixed",      "value": 256}
+
+        Only keys that already exist in ``base`` can be overridden; unknown keys
+        are silently ignored to prevent injecting unsupported parameters.
+        """
+        if not override:
+            return base
+        from ray import tune
+        result = dict(base)
+        for key, entry in override.items():
+            if key not in result:
+                continue  # only override existing params, never add new ones
+            t = entry.get("type")
+            if t == "choice":
+                opts = entry.get("options", [])
+                if opts:
+                    result[key] = tune.choice(opts)
+            elif t == "loguniform":
+                result[key] = tune.loguniform(float(entry["min"]), float(entry["max"]))
+            elif t == "uniform":
+                result[key] = tune.uniform(float(entry["min"]), float(entry["max"]))
+            elif t == "randint":
+                result[key] = tune.randint(int(entry["min"]), int(entry["max"]))
+            elif t == "fixed":
+                result[key] = tune.choice([entry["value"]])
+        return result
+
+    # ──────────────────────────────────────────────
     # Concrete lifecycle – shared across frameworks
     # ──────────────────────────────────────────────
 
@@ -143,6 +184,8 @@ class BaseTuner(ABC):
         mlflow_experiment_name: Optional[str] = None,
         extra_callbacks: Optional[List[object]] = None,
         number_of_trials: Optional[int] = None,
+        tune_settings_override: Optional[Dict[str, Any]] = None,
+        search_space_override: Optional[Dict[str, Any]] = None,
     ) -> Dict[str, Any]:
         """Run hyperparameter search. Returns ``best.config``."""
 
@@ -174,15 +217,21 @@ class BaseTuner(ABC):
         )
 
         # --- Hyperparameter search space ---
-        param_space = {self.params_key: self.search_space}
+        # Merges class-level defaults with any per-run overrides from
+        # params_training.yaml → hyperparams.search_space (sent from the UI).
+        param_space = {self.params_key: self._build_search_space(self.search_space, search_space_override)}
 
         # --- ASHA scheduler ---
+        # tune_settings_override comes from params_training.yaml → hyperparams.tuning
+        # (written by the backend from RunRequest.tune_settings).  Merging here
+        # makes max_epochs/num_boost_round/grace_period user-configurable per run.
+        effective_tune_settings = {**self.tune_settings, **(tune_settings_override or {})}
         asha = ASHAScheduler(
             metric=self.tune_metric,
             mode=self.tune_mode,
-            max_t=self.tune_settings[self._get_asha_max_t_key()],
-            grace_period=self.tune_settings["grace_period"],
-            reduction_factor=self.tune_settings["reduction_factor"],
+            max_t=effective_tune_settings[self._get_asha_max_t_key()],
+            grace_period=effective_tune_settings["grace_period"],
+            reduction_factor=effective_tune_settings["reduction_factor"],
         )
 
         enable_rcs = os.getenv("ENABLE_RESOURCE_CHANGING_SCHEDULER", "false").lower() in ("1", "true", "yes")

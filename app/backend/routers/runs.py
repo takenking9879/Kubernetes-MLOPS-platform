@@ -166,6 +166,7 @@ class RunRequest(BaseModel):
     sample_fraction_for_tuning: float = Field(0.2, ge=0.01, le=1.0)
     hyperparams: dict[str, Any] = {}
     tune_settings: dict[str, Any] = {}
+    search_space: dict[str, Any] = {}  # per-run Ray Tune search space overrides (UI Override mode)
 
     @model_validator(mode="after")
     def validate_hyperparams(self) -> "RunRequest":
@@ -339,6 +340,8 @@ def _generate_training_params_yaml(
     hyperparams_block: dict[str, Any] = {req.framework: req.hyperparams}
     if req.tuning.enabled:
         hyperparams_block["tuning"] = resolved_tune_settings
+        if req.search_space:
+            hyperparams_block["search_space"] = req.search_space
 
     params: dict[str, Any] = {
         "run_metadata": {

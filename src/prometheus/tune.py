@@ -2,7 +2,14 @@
 
 from __future__ import annotations
 
+import os
 from typing import Any, Dict, Optional
+
+try:
+    from prometheus_client import push_to_gateway, REGISTRY as _DEFAULT_REGISTRY
+    _PUSH_AVAILABLE = True
+except ImportError:  # pragma: no cover
+    _PUSH_AVAILABLE = False
 
 from .metrics import (
     TUNE_TRIALS,
@@ -43,6 +50,24 @@ class PrometheusTuneCallback(_TuneCallback):
         self._best = state.get("_best", None)
         self._counts = dict(state.get("_counts", {"running": 0, "succeeded": 0, "failed": 0}))
 
+    def _push(self) -> None:
+        """Immediately push driver-side metrics to the Pushgateway.
+
+        Bypasses the Grafana Agent 15 s scrape interval so Grafana dashboards
+        update within ~1 s of each trial completing or erroring.
+        Set the METRICS_PUSHGATEWAY_URL env var to <host>:<port> (no path).
+        No-ops silently if the env var is unset or push_to_gateway unavailable.
+        """
+        if not _PUSH_AVAILABLE:
+            return
+        gw = os.getenv("METRICS_PUSHGATEWAY_URL", "").strip()
+        if not gw:
+            return
+        try:
+            push_to_gateway(gw, job=f"tune_{self.framework}", registry=_DEFAULT_REGISTRY)
+        except Exception:
+            pass  # best-effort — never block the training loop
+
     def _publish_counts(self) -> None:
         TUNE_TRIALS_BY_STATUS.labels(framework=self.framework, status="running").set(self._counts["running"])
         TUNE_TRIALS_BY_STATUS.labels(framework=self.framework, status="succeeded").set(
@@ -81,6 +106,7 @@ class PrometheusTuneCallback(_TuneCallback):
         if improved:
             self._best = val
             TUNE_BEST_METRIC.labels(framework=self.framework, metric=self.metric_name).set(val)
+            self._push()
 
     def on_trial_complete(self, iteration: int, trials: Any, trial: Any, **info: Any) -> None:
         try:
@@ -90,6 +116,7 @@ class PrometheusTuneCallback(_TuneCallback):
         self._counts["running"] = max(0, self._counts["running"] - 1)
         self._counts["succeeded"] += 1
         self._publish_counts()
+        self._push()
 
     def on_trial_error(self, iteration: int, trials: Any, trial: Any, **info: Any) -> None:
         try:
@@ -99,3 +126,4 @@ class PrometheusTuneCallback(_TuneCallback):
         self._counts["running"] = max(0, self._counts["running"] - 1)
         self._counts["failed"] += 1
         self._publish_counts()
+        self._push()

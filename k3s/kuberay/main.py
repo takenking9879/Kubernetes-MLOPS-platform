@@ -515,7 +515,7 @@ class KubeRayTraining(BaseUtils):
             self.logger.info(f"Starting training pipeline with Iceberg table: {table_identifier}")
             self.logger.info(f"Starting training using framework: {framework}")
 
-            num_classes = int(self.params.get("num_classes", 2))
+            num_classes = int(self.params.get("num_classes", 6))
             input_dim = (
                 self.input_dim
                 if self.params.get("dsl_count_dim", True)
@@ -555,6 +555,14 @@ class KubeRayTraining(BaseUtils):
                     mode=tuner.tune_mode,
                 )
 
+                # Read user-supplied tuning settings and search space from
+                # params_training.yaml (written by the backend from RunRequest).
+                # These override the class-level constants so operators can
+                # control ASHA budget and search ranges without rebuilding the image.
+                _hyperparams_block = self.params_full.get("hyperparams", {})
+                tune_settings_override = _hyperparams_block.get("tuning", {})
+                search_space_override = _hyperparams_block.get("search_space", {})
+
                 best_config = tuner.tune_model(
                     table_identifier=table_identifier,
                     catalog_config=catalog_config,
@@ -571,6 +579,8 @@ class KubeRayTraining(BaseUtils):
                     mlflow_experiment_name=mlflow_experiment_name,
                     extra_callbacks=[prom_tune_cb],
                     number_of_trials=self.params_full.get('execution', {}).get('tuning', {}).get('number_of_trials'),
+                    tune_settings_override=tune_settings_override,
+                    search_space_override=search_space_override,
                 )
 
                 best_params = best_config.get(tuner.params_key)

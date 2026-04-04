@@ -195,6 +195,9 @@ export interface RunRequest {
   sample_fraction_for_tuning?: number;
   hyperparams?: Record<string, unknown>;
   tune_settings?: Record<string, unknown>;
+  /** Per-run search space overrides sent when Override mode is active in the UI.
+   *  Shape matches the SearchSpaceEntry union in hyperparams.ts serialised to JSON. */
+  search_space?: Record<string, { type: string; options?: number[]; min?: number; max?: number; value?: unknown }>;
 }
 
 // ─── Training config types (GET /api/v2/config) ───────────────────────────────

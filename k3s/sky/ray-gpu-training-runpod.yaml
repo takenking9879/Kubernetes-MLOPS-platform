@@ -64,9 +64,10 @@ envs:
   SKY_CLUSTER_NAME: ""
   SKY_PROVIDER: "runpod"
   METRICS_SOURCE: "skypilot_vm"
-  METRICS_REMOTE_WRITE_URL: ""
+  METRICS_REMOTE_WRITE_URL: ""       # Grafana Agent remote_write (pull path, 15 s interval)
   METRICS_REMOTE_WRITE_USERNAME: ""
   METRICS_REMOTE_WRITE_PASSWORD: ""
+  METRICS_PUSHGATEWAY_URL: ""        # Direct push after each trial (<host>:<port>, no path)
 
   # Legacy aliases (still supported by write_grafana_config.py)
   GRAFANA_REMOTE_WRITE_URL: ""
@@ -343,6 +344,11 @@ run: |
 
   sleep 5
 
+  # Pin all Ray sub-processes (PlacementGroupCleaner, etc.) to the training
+  # cluster on 6379 so they don't accidentally auto-discover SkyPilot's
+  # internal Ray instance on 6380.
+  export RAY_ADDRESS="127.0.0.1:6379"
+
   # ── GPU-aware fallback (primary values injected by Airflow DAG via envs) ──
   # If the DAG already set NUM_WORKERS, NUM_WORKERS_TUNE, MAX_CONCURRENT_TRIALS,
   # the ${VAR:-default} syntax keeps those values unchanged.
@@ -354,7 +360,30 @@ run: |
   export GPUS_PER_WORKER=${GPUS_PER_WORKER:-1}
   export GPUS_PER_WORKER_TUNE=${GPUS_PER_WORKER_TUNE:-${GPUS_PER_WORKER}}
 
-  TOTAL_CPUS_NODE=$(nproc 2>/dev/null || getconf _NPROCESSORS_ONLN 2>/dev/null || echo 1)
+  # Cgroup-aware CPU detection.  nproc/getconf return 1 inside RunPod
+  # containers because they read the number of *configured* CPUs, not the
+  # cgroup quota.  Try cgroup v2 first, then v1, then fall back.
+  _detect_node_cpus() {
+    local cgv2=/sys/fs/cgroup/cpu.max
+    if [ -r "${cgv2}" ]; then
+      local quota period
+      read -r quota period < "${cgv2}"
+      if [ "${quota}" != "max" ] && [ "${period:-0}" -gt 0 ] 2>/dev/null; then
+        echo $(( (quota + period - 1) / period )); return
+      fi
+    fi
+    local cq=/sys/fs/cgroup/cpu/cfs_quota_us
+    local cp=/sys/fs/cgroup/cpu/cfs_period_us
+    if [ -r "${cq}" ] && [ -r "${cp}" ]; then
+      local q p
+      q=$(cat "${cq}") p=$(cat "${cp}")
+      if [ "${q:-0}" -gt 0 ] && [ "${p:-0}" -gt 0 ] 2>/dev/null; then
+        echo $(( (q + p - 1) / p )); return
+      fi
+    fi
+    nproc 2>/dev/null || getconf _NPROCESSORS_ONLN 2>/dev/null || echo 1
+  }
+  TOTAL_CPUS_NODE=$(_detect_node_cpus)
   _cpus_per_worker_uniform_with_leftover() {
     local total_cpus="${1:-1}"
     local workers="${2:-1}"

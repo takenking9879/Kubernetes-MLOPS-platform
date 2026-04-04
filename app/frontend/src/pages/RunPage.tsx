@@ -270,8 +270,8 @@ function SearchSpaceRow({
 }: {
   paramKey: string;
   entry: SearchSpaceEntry;
-  override?: { min: number; max: number };
-  onOverrideChange?: (key: string, field: 'min' | 'max', val: number) => void;
+  override?: { min?: number; max?: number; options?: number[] };
+  onOverrideChange?: (key: string, field: 'min' | 'max' | 'options', val: number | number[]) => void;
   overrideMode: boolean;
 }) {
   const renderRange = () => {
@@ -280,6 +280,24 @@ function SearchSpaceRow({
       return <ReadOnlyBadge>fixed: {v}</ReadOnlyBadge>;
     }
     if (entry.type === 'choice') {
+      if (overrideMode) {
+        const currentOptions = override?.options ?? (entry.options as number[]);
+        return (
+          <input
+            type="text"
+            className="w-44 rounded bg-slate-800 px-1.5 py-0.5 text-xs text-slate-100 outline-none focus:ring-1 focus:ring-blue-500"
+            value={currentOptions.join(', ')}
+            placeholder="64, 128, 256"
+            onChange={(e) => {
+              const opts = e.target.value
+                .split(',')
+                .map((v) => Number(v.trim()))
+                .filter((n) => !isNaN(n) && n > 0);
+              onOverrideChange?.(paramKey, 'options', opts);
+            }}
+          />
+        );
+      }
       return <ReadOnlyBadge>choice: [{entry.options.join(', ')}]</ReadOnlyBadge>;
     }
     if (overrideMode) {
@@ -490,7 +508,7 @@ export function RunPage() {
   // ── Search space (UI override mode) ──────────────────────────────────────
   const [tuneMode, setTuneMode] = useState<TuneMode>('predefined');
   const [searchSpaceOverrides, setSearchSpaceOverrides] = useState<
-    Record<string, { min: number; max: number }>
+    Record<string, { min?: number; max?: number; options?: number[] }>
   >({});
 
   // ── Tuning ────────────────────────────────────────────────────────────────
@@ -726,6 +744,26 @@ export function RunPage() {
     const errors = validateForm();
     if (errors.length > 0) return;
     try {
+      // Build search_space payload when override mode is active.
+      // Only include params that the user actually changed (non-empty overrides).
+      const searchSpacePayload: Record<string, unknown> = {};
+      if (tuningEnabled && tuneMode === 'override') {
+        const baseSpace = getSearchSpace(framework);
+        for (const [key, entry] of Object.entries(baseSpace)) {
+          const ov = searchSpaceOverrides[key];
+          if (!ov) continue;
+          if (entry.type === 'choice' && ov.options && ov.options.length > 0) {
+            searchSpacePayload[key] = { type: 'choice', options: ov.options };
+          } else if (entry.type !== 'choice' && (ov.min !== undefined || ov.max !== undefined)) {
+            searchSpacePayload[key] = {
+              type: entry.type,
+              min: ov.min ?? (entry as { min: number }).min,
+              max: ov.max ?? (entry as { max: number }).max,
+            };
+          }
+        }
+      }
+
       const result = await submitRun({
         preprocess_run_id: selectedPreprocessRunId,
         framework,
@@ -741,6 +779,7 @@ export function RunPage() {
         sample_fraction_for_tuning: sampleFraction,
         hyperparams: tuningEnabled ? {} : hyperparams,
         tune_settings: tuningEnabled ? tuneSettings : {},
+        search_space: Object.keys(searchSpacePayload).length > 0 ? searchSpacePayload : undefined,
       });
       setSubmitResult(result);
       setRunStatus('queued');
@@ -768,10 +807,14 @@ export function RunPage() {
   const updateTuneSetting = (key: string, val: number) =>
     setTuneSettings((prev) => ({ ...prev, [key]: val }));
 
-  const updateSearchSpaceOverride = (key: string, field: 'min' | 'max', val: number) =>
+  const updateSearchSpaceOverride = (
+    key: string,
+    field: 'min' | 'max' | 'options',
+    val: number | number[],
+  ) =>
     setSearchSpaceOverrides((prev) => ({
       ...prev,
-      [key]: { ...(prev[key] ?? { min: 0, max: 1 }), [field]: val },
+      [key]: { ...prev[key], [field]: val },
     }));
 
   const stateColor = (state: string) =>
@@ -1301,8 +1344,7 @@ export function RunPage() {
                     </div>
                     {tuneMode === 'override' && (
                       <p className="text-xs italic text-slate-500">
-                        UI preview only — backend reads from{' '}
-                        <code className="rounded bg-slate-800 px-1">src/schemas/model/</code>
+                        Override mode — changes are sent to the backend and applied per run.
                       </p>
                     )}
                     <div className="space-y-0.5 rounded border border-slate-800 bg-slate-950 px-3 py-2">

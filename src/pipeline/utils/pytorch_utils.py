@@ -215,12 +215,28 @@ def train_func(config: Dict):
             # Separate target from features dynamically
             if task_type == "classification":
                 y = batch.pop(target).long()
+                # One-time label range validation — runs on CPU before the backward pass
+                # to give a clear error instead of a cryptic CUDA device-side assertion.
+                if epoch == 0 and train_batches == 0:
+                    y_min, y_max = int(y.min().item()), int(y.max().item())
+                    print(
+                        f"[pytorch_utils] Label range: min={y_min}, max={y_max}, "
+                        f"num_classes={num_classes} (expected [0, {num_classes}))",
+                        flush=True,
+                    )
+                    if y_min < 0 or y_max >= num_classes:
+                        raise ValueError(
+                            f"Label out of range [0, {num_classes}): "
+                            f"got min={y_min}, max={y_max}. "
+                            f"Set num_classes >= {y_max + 1} in params_training.yaml "
+                            f"(kuberay.model.num_classes)."
+                        )
             else:
                 y = batch.pop(target).float()
             if feature_cols is None:
                 feature_cols = sorted(batch.keys())
             X = torch.stack([batch[c] for c in feature_cols], dim=1)
-            
+
             preds = model(X)
             loss = loss_fn(preds, y)
             if use_deepspeed:
