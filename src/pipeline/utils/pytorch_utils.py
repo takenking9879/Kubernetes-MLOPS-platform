@@ -5,6 +5,7 @@ import os
 import json
 import logging
 import tempfile
+import subprocess
 import ray
 import ray.train
 from ray.train import Checkpoint
@@ -151,11 +152,12 @@ def train_func(config: Dict):
             model_parameters=model.parameters(),
             config=ds_config,
         )
-        device = get_accelerator().device_name(model.local_rank)
+        device = torch.device(get_accelerator().device_name(model.local_rank))
         print(f"[pytorch_utils] DeepSpeed ZeRO stage 1 enabled, device={device}")
     else:
         model = ray.train.torch.prepare_model(model)
         optimizer = torch.optim.Adam(model.parameters(), lr=lr, weight_decay=weight_decay)
+        device = next(model.parameters()).device
     # ─────────────────────────────────────────────────────────────────────────────
 
     # Log actual CPU configuration for debugging
@@ -163,6 +165,44 @@ def train_func(config: Dict):
     if world_rank == 0:
         print(f"[pytorch_utils] Worker using {cpus_per_worker} CPU thread(s) | "
               f"torch.get_num_threads()={torch.get_num_threads()}")
+
+    gpu_debug = os.getenv("RAY_GPU_DEBUG", "1").lower() in ("1", "true", "yes")
+    if gpu_debug and world_rank in (0, None):
+        try:
+            ray_gpu_ids = ray.get_gpu_ids()
+        except Exception:
+            ray_gpu_ids = []
+        cuda_visible_devices = os.getenv("CUDA_VISIBLE_DEVICES", "<unset>")
+        print(
+            "[pytorch_utils][GPU_DEBUG] "
+            f"world_rank={world_rank}, device={device}, "
+            f"torch.cuda.is_available={torch.cuda.is_available()}, "
+            f"torch.cuda.device_count={torch.cuda.device_count()}, "
+            f"ray.get_gpu_ids={ray_gpu_ids}, "
+            f"CUDA_VISIBLE_DEVICES={cuda_visible_devices}",
+            flush=True,
+        )
+        if torch.cuda.is_available():
+            try:
+                cur = torch.cuda.current_device()
+                print(
+                    "[pytorch_utils][GPU_DEBUG] "
+                    f"current_device={cur}, name={torch.cuda.get_device_name(cur)}",
+                    flush=True,
+                )
+            except Exception as e:
+                print(f"[pytorch_utils][GPU_DEBUG] cuda current_device check failed: {e}", flush=True)
+            try:
+                out = subprocess.run(
+                    ["nvidia-smi", "--query-gpu=index,name,utilization.gpu,memory.used,memory.total", "--format=csv,noheader,nounits"],
+                    capture_output=True,
+                    text=True,
+                    check=False,
+                )
+                if out.returncode == 0 and out.stdout.strip():
+                    print(f"[pytorch_utils][GPU_DEBUG] nvidia-smi: {out.stdout.strip()}", flush=True)
+            except Exception as e:
+                print(f"[pytorch_utils][GPU_DEBUG] nvidia-smi unavailable: {e}", flush=True)
 
     # Check if we're in tuning mode (passed explicitly via config)
     is_tuning = config.get("is_tuning", False)
@@ -201,6 +241,8 @@ def train_func(config: Dict):
 
     start_time = time.perf_counter()
     feature_cols = config.get("feature_columns")
+    logged_first_train_batch = False
+    logged_first_val_batch = False
     for epoch in range(max_epochs):
         epoch_start = time.perf_counter()
         model.train()
@@ -237,6 +279,17 @@ def train_func(config: Dict):
             if feature_cols is None:
                 feature_cols = sorted(batch.keys())
             X = torch.stack([batch[c] for c in feature_cols], dim=1)
+
+            X = X.to(device, non_blocking=True)
+            y = y.to(device, non_blocking=True)
+            if gpu_debug and not logged_first_train_batch and world_rank in (0, None):
+                print(
+                    "[pytorch_utils][GPU_DEBUG] first_train_batch "
+                    f"X.device={X.device}, y.device={y.device}, "
+                    f"model.device={next(model.parameters()).device}",
+                    flush=True,
+                )
+                logged_first_train_batch = True
 
             preds = model(X)
             loss = loss_fn(preds, y)
@@ -280,6 +333,17 @@ def train_func(config: Dict):
                 if feature_cols is None:
                     feature_cols = sorted(batch.keys())
                 X = torch.stack([batch[c] for c in feature_cols], dim=1)
+
+                X = X.to(device, non_blocking=True)
+                y = y.to(device, non_blocking=True)
+                if gpu_debug and not logged_first_val_batch and world_rank in (0, None):
+                    print(
+                        "[pytorch_utils][GPU_DEBUG] first_val_batch "
+                        f"X.device={X.device}, y.device={y.device}, "
+                        f"model.device={next(model.parameters()).device}",
+                        flush=True,
+                    )
+                    logged_first_val_batch = True
 
                 preds = model(X)
                 loss = loss_fn(preds, y)

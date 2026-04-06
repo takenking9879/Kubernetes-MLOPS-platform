@@ -36,6 +36,14 @@ apiService:
   # Hotfix for SkyPilot managed-jobs race in consolidation mode.
   # Applies an in-container patch at API-server startup so it persists across
   # pod restarts without manual kubectl exec edits.
+  #
+  # Runtime tuning knobs exposed by patches below (override via pod env if needed):
+  #   SKY_JOBS_LAUNCH_TIMEOUT_SECONDS          default 600
+  #   SKY_JOBS_LAUNCH_RETRY_INIT_GAP_SECONDS  default 20
+  #   SKY_JOBS_LAUNCH_RETRY_MAX_GAP_SECONDS   default 64
+  #   SKY_JOBS_LAUNCH_RETRY_MULTIPLIER        default 1.3
+  #   SKY_SETUP_INTERNAL_MAX_RETRY            default 6
+  #   SKY_SETUP_INTERNAL_RETRY_SLEEP_SECONDS  default 10
   preDeployHook: |-
     echo "Pre-deploy hook"
     python3 - <<'PY'
@@ -81,7 +89,7 @@ apiService:
       "                                launch_timeout_seconds = int(\n"
       "                                    os.environ.get(\n"
       "                                        'SKY_JOBS_LAUNCH_TIMEOUT_SECONDS',\n"
-      "                                        '900'))\n"
+      "                                        '600'))\n"
       "                                request_id = await asyncio.wait_for(\n"
       "                                    asyncio.to_thread(\n"
       "                                        sdk.launch,\n",
@@ -113,6 +121,37 @@ apiService:
       "                                    timeout=launch_timeout_seconds,\n"
       "                                )\n",
       'recovery_strategy.stream_and_get_timeout',
+    )
+
+    patch(
+      '/usr/local/lib/python3.10/site-packages/sky/jobs/recovery_strategy.py',
+      "    RETRY_INIT_GAP_SECONDS = 60\n",
+      "    RETRY_INIT_GAP_SECONDS = float(\n"
+      "        os.environ.get('SKY_JOBS_LAUNCH_RETRY_INIT_GAP_SECONDS',\n"
+      "                       '20'))\n"
+      "    RETRY_MAX_GAP_SECONDS = float(\n"
+      "        os.environ.get('SKY_JOBS_LAUNCH_RETRY_MAX_GAP_SECONDS',\n"
+      "                       '64'))\n"
+      "    RETRY_MULTIPLIER = float(\n"
+      "        os.environ.get('SKY_JOBS_LAUNCH_RETRY_MULTIPLIER',\n"
+      "                       '1.3'))\n",
+      'recovery_strategy.retry_backoff_env_defaults',
+    )
+
+    patch(
+      '/usr/local/lib/python3.10/site-packages/sky/jobs/recovery_strategy.py',
+      "        backoff = common_utils.Backoff(self.RETRY_INIT_GAP_SECONDS)\n",
+      "        retry_init_gap_seconds = max(1.0,\n"
+      "                                     self.RETRY_INIT_GAP_SECONDS)\n"
+      "        retry_max_gap_seconds = max(retry_init_gap_seconds,\n"
+      "                                   self.RETRY_MAX_GAP_SECONDS)\n"
+      "        retry_max_backoff_factor = (retry_max_gap_seconds /\n"
+      "                                    retry_init_gap_seconds)\n"
+      "        backoff = common_utils.Backoff(\n"
+      "            initial_backoff=retry_init_gap_seconds,\n"
+      "            max_backoff_factor=retry_max_backoff_factor,\n"
+      "            multiplier=self.RETRY_MULTIPLIER)\n",
+      'recovery_strategy.retry_backoff_constructor',
     )
 
     patch(
@@ -161,6 +200,29 @@ apiService:
       "                                             instance_info.get('internal_ip')),\n"
       "                ssh_port=instance_info.get('ssh_port', 22),\n",
       'runpod.instance_cluster_info_ip_fallback',
+    )
+
+    patch(
+      '/usr/local/lib/python3.10/site-packages/sky/provision/instance_setup.py',
+      "_MAX_RETRY = 6\n",
+      "_MAX_RETRY = int(os.environ.get('SKY_SETUP_INTERNAL_MAX_RETRY', '6'))\n"
+      "_SETUP_INTERNAL_RETRY_SLEEP_SECONDS = float(\n"
+      "    os.environ.get('SKY_SETUP_INTERNAL_RETRY_SLEEP_SECONDS', '10'))\n",
+      'instance_setup.internal_retry_env_defaults',
+    )
+
+    patch(
+      '/usr/local/lib/python3.10/site-packages/sky/provision/instance_setup.py',
+      "                logger.info('Network connection issue during setup, this is '\n"
+      "                            'likely due to the reboot of the instance. '\n"
+      "                            'Retrying setup in 10 seconds.')\n"
+      "                time.sleep(10)\n",
+      "                logger.info('Network connection issue during setup, this is '\n"
+      "                            'likely due to the reboot of the instance. '\n"
+      "                            'Retrying setup in '\n"
+      "                            f'{_SETUP_INTERNAL_RETRY_SLEEP_SECONDS:.1f} seconds.')\n"
+      "                time.sleep(_SETUP_INTERNAL_RETRY_SLEEP_SECONDS)\n",
+      'instance_setup.internal_retry_sleep_env',
     )
     PY
 

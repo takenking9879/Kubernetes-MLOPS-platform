@@ -14,7 +14,7 @@ For sub-module detail see:
 | `src/serve/` | `runtime.py`, `config.py`, `registry.py`, `adapters.py`, `router.py`, `pipeline_loader.py` | Ray Serve inference |
 | `src/converters/` | `spark_kafka_helper.py`, `raw_to_features.py` | Event → feature dict |
 | `src/services/` | `gpu_catalog.py`, `gpu_selector.py`, `_sky_catalog_query.py` | GPU catalog + SkyPilot selection |
-| `src/pipeline/` | `base_trainer.py`, `base_tuner.py`, `train/pytorch.py`, `train/xgboost.py` | Ray Train distributed training |
+| `src/pipeline/` | `base_trainer.py`, `base_tuner.py`, `train/pytorch.py`, `train/xgboost.py` | Ray Train distributed training (PyTorch worker loop now enforces explicit tensor→model device placement and supports GPU diagnostics via `RAY_GPU_DEBUG`) |
 | `src/models/` | `bae.py`, `ssm.py`, `pytorch.py`, `xgboost.py` | Model wrappers (BAE/SSM unused) |
 | `src/schemas/` | `spark/schemas.py`, `model/pytorch_params.py`, `model/xgboost_params.py` | Data + hyperparameter schemas |
 | `src/iceberg/` | `metadata_query_utils.py` | Resolve artifact_set_id → pipeline_hash via Iceberg |

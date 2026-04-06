@@ -284,14 +284,35 @@ run: |
 
   export PYTHONPATH=/home/ray/app/repo:/home/ray/app/repo/src
 
+  GPU_EXPORTER_PID=""
+  GRAFANA_AGENT_PID=""
+  cleanup_background() {
+    # Ensure background telemetry processes never keep the Sky task alive.
+    set +e
+    if [ -n "${GRAFANA_AGENT_PID}" ] && kill -0 "${GRAFANA_AGENT_PID}" 2>/dev/null; then
+      kill "${GRAFANA_AGENT_PID}" 2>/dev/null || true
+      wait "${GRAFANA_AGENT_PID}" 2>/dev/null || true
+    fi
+    if [ -n "${GPU_EXPORTER_PID}" ] && kill -0 "${GPU_EXPORTER_PID}" 2>/dev/null; then
+      kill "${GPU_EXPORTER_PID}" 2>/dev/null || true
+      wait "${GPU_EXPORTER_PID}" 2>/dev/null || true
+    fi
+    if [ -n "${RAY_BIN:-}" ] && [ -x "${RAY_BIN}" ]; then
+      "${RAY_BIN}" stop --force >/dev/null 2>&1 || true
+    fi
+  }
+  trap cleanup_background EXIT INT TERM
+
   "${PYTHON_BIN}" /home/ray/app/repo/k3s/sky/gpu_exporter.py &
-  echo "[run] GPU exporter started (PID=$!)"
+  GPU_EXPORTER_PID=$!
+  echo "[run] GPU exporter started (PID=${GPU_EXPORTER_PID})"
 
   METRICS_RW_URL="${METRICS_REMOTE_WRITE_URL:-${GRAFANA_REMOTE_WRITE_URL:-}}"
   if [ -n "${METRICS_RW_URL}" ] && command -v grafana-agent >/dev/null 2>&1; then
     "${PYTHON_BIN}" /home/ray/app/repo/k3s/sky/write_grafana_config.py
     grafana-agent --config.file=/tmp/grafana-agent-config.yaml &
-    echo "[run] Grafana Agent started → ${METRICS_RW_URL}"
+    GRAFANA_AGENT_PID=$!
+    echo "[run] Grafana Agent started → ${METRICS_RW_URL} (PID=${GRAFANA_AGENT_PID})"
   fi
 
   if [ "${SKYPILOT_NUM_GPUS_PER_NODE:-0}" -gt 0 ]; then

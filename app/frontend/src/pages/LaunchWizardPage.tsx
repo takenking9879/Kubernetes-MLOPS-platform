@@ -68,6 +68,8 @@ import {
   getTuneSettingsDefaults,
   getParamMetaForTask,
   getTuneSettingsMeta,
+  getSearchSpace,
+  getFinalTrainMeta,
   type TaskType,
 } from '../types/hyperparams';
 import { GPUResourceSelector } from '../components/GPUResourceSelector';
@@ -173,6 +175,11 @@ export function LaunchWizardPage() {
   const [tuneSettings, setTuneSettings] = useState<Record<string, number>>(
     () => getTuneSettingsDefaults('xgboost'),
   );
+  const [searchSpaceOverrides, setSearchSpaceOverrides] = useState<
+    Record<string, { min?: number; max?: number; options?: number[] }>
+  >({});
+  const [finalTrainOverrides, setFinalTrainOverrides] = useState<Record<string, number>>({});
+  const [showFinalTrainOverrides, setShowFinalTrainOverrides] = useState(false);
   const [showHyperparams, setShowHyperparams] = useState(false);
 
   const [tabularResult, setTabularResult] = useState<TrainingRunResult | null>(null);
@@ -184,6 +191,8 @@ export function LaunchWizardPage() {
   useEffect(() => {
     setHyperparams(getDefaultsForTask(framework, taskType));
     setTuneSettings(getTuneSettingsDefaults(framework));
+    setSearchSpaceOverrides({});
+    setFinalTrainOverrides({});
   }, [framework, taskType]);
 
   // Load preprocess run IDs when category is tabular
@@ -559,8 +568,30 @@ export function LaunchWizardPage() {
         },
         tuning: { enabled: tuneEnabled, number_of_trials: numTrials },
         sample_fraction_for_tuning: sampleFraction,
-        hyperparams: tuneEnabled ? {} : hyperparams,
+        hyperparams: tuneEnabled ? finalTrainOverrides : hyperparams,
         tune_settings: tuneEnabled ? tuneSettings : {},
+        search_space: tuneEnabled ? (() => {
+          const baseSpace = getSearchSpace(framework);
+          const resolved: Record<string, { type: string; options?: number[]; min?: number; max?: number; value?: unknown }> = {};
+          for (const [k, entry] of Object.entries(baseSpace)) {
+            const ov = searchSpaceOverrides[k];
+            type SSVal = { type: string; options?: number[]; min?: number; max?: number; value?: unknown };
+            if (!ov) {
+              resolved[k] = entry as SSVal;
+            } else if (entry.type === 'choice' && ov.options && ov.options.length > 0) {
+              resolved[k] = { type: 'choice', options: ov.options };
+            } else if (entry.type !== 'choice' && (ov.min !== undefined || ov.max !== undefined)) {
+              resolved[k] = {
+                type: entry.type,
+                min: ov.min ?? (entry as { min: number }).min,
+                max: ov.max ?? (entry as { max: number }).max,
+              };
+            } else {
+              resolved[k] = entry as SSVal;
+            }
+          }
+          return resolved;
+        })() : undefined,
       });
       setTabularResult(result);
     } catch (err) {
@@ -1000,45 +1031,182 @@ export function LaunchWizardPage() {
                         </div>
 
                         {tuneEnabled ? (
-                          /* Tuning config */
-                          <div className="grid grid-cols-2 gap-3">
-                            <div className="flex flex-col gap-1">
-                              <span className="text-[10px] text-slate-500">Trials</span>
-                              <input
-                                type="number"
-                                className={INPUT_CLS}
-                                value={numTrials}
-                                min={1}
-                                onChange={e => setNumTrials(parseInt(e.target.value) || 1)}
-                              />
-                            </div>
-                            <div className="flex flex-col gap-1">
-                              <span className="text-[10px] text-slate-500">Sample fraction</span>
-                              <input
-                                type="number"
-                                className={INPUT_CLS}
-                                value={sampleFraction}
-                                min={0.01}
-                                max={1}
-                                step={0.01}
-                                onChange={e => setSampleFraction(parseFloat(e.target.value) || 0.2)}
-                              />
-                            </div>
-                            {Object.entries(tuneSettingsMeta).map(([k, meta]) => (
-                              <div key={k} className="flex flex-col gap-1">
-                                <span className="text-[10px] text-slate-500">{k}</span>
-                                <input
-                                  type="number"
-                                  className={INPUT_CLS}
-                                  value={tuneSettings[k] ?? (meta.defaultValue as number)}
-                                  min={meta.min}
-                                  step={meta.step ?? 1}
-                                  onChange={e => setTuneSettings(prev => ({
-                                    ...prev, [k]: parseFloat(e.target.value) || 0,
-                                  }))}
-                                />
+                          <div className="flex flex-col gap-4">
+
+                            {/* ── A: Search Space ──────────────────────────── */}
+                            <div className="flex flex-col gap-2">
+                              <span className={LABEL_CLS}>Search Space</span>
+                              <div className="flex flex-col gap-2">
+                                {Object.entries(getSearchSpace(framework)).map(([k, entry]) => {
+                                  if (entry.type === 'fixed') {
+                                    return (
+                                      <div key={k} className="flex items-center justify-between">
+                                        <span className="text-[10px] text-slate-500">{k}</span>
+                                        <span className="text-[10px] text-slate-400 bg-slate-800 rounded px-2 py-0.5">
+                                          {Array.isArray(entry.value) ? entry.value.join(', ') : String(entry.value)}
+                                        </span>
+                                      </div>
+                                    );
+                                  }
+                                  if (entry.type === 'choice') {
+                                    const ov = searchSpaceOverrides[k];
+                                    const options = ov?.options ?? (entry.options as (number | string)[]);
+                                    const hasFinalOverride = k in finalTrainOverrides;
+                                    return (
+                                      <div key={k} className="flex flex-col gap-1">
+                                        <div className="flex items-center gap-1.5">
+                                          <span className="text-[10px] text-slate-500">{k}</span>
+                                          {hasFinalOverride && (
+                                            <span className="text-[9px] bg-amber-900/50 text-amber-400 rounded px-1.5 py-px">override</span>
+                                          )}
+                                        </div>
+                                        <input
+                                          type="text"
+                                          className={INPUT_CLS}
+                                          value={options.join(', ')}
+                                          onChange={e => {
+                                            const opts = e.target.value
+                                              .split(',')
+                                              .map(s => parseFloat(s.trim()))
+                                              .filter(n => !isNaN(n));
+                                            setSearchSpaceOverrides(prev => ({ ...prev, [k]: { options: opts } }));
+                                          }}
+                                        />
+                                      </div>
+                                    );
+                                  }
+                                  // randint | uniform | loguniform
+                                  const ov = searchSpaceOverrides[k];
+                                  const rangeEntry = entry as { type: string; min: number; max: number };
+                                  const hasFinalOverride = k in finalTrainOverrides;
+                                  return (
+                                    <div key={k} className="flex flex-col gap-1">
+                                      <div className="flex items-center gap-1.5">
+                                        <span className="text-[10px] text-slate-500">{k}</span>
+                                        <span className="text-[9px] text-slate-600">{entry.type}</span>
+                                        {hasFinalOverride && (
+                                          <span className="text-[9px] bg-amber-900/50 text-amber-400 rounded px-1.5 py-px">override</span>
+                                        )}
+                                      </div>
+                                      <div className="grid grid-cols-2 gap-2">
+                                        <div className="flex flex-col gap-0.5">
+                                          <span className="text-[9px] text-slate-600">Min</span>
+                                          <input
+                                            type="number"
+                                            className={INPUT_CLS}
+                                            value={ov?.min ?? rangeEntry.min}
+                                            step="any"
+                                            onChange={e => setSearchSpaceOverrides(prev => ({
+                                              ...prev,
+                                              [k]: { ...prev[k], min: parseFloat(e.target.value) },
+                                            }))}
+                                          />
+                                        </div>
+                                        <div className="flex flex-col gap-0.5">
+                                          <span className="text-[9px] text-slate-600">Max</span>
+                                          <input
+                                            type="number"
+                                            className={INPUT_CLS}
+                                            value={ov?.max ?? rangeEntry.max}
+                                            step="any"
+                                            onChange={e => setSearchSpaceOverrides(prev => ({
+                                              ...prev,
+                                              [k]: { ...prev[k], max: parseFloat(e.target.value) },
+                                            }))}
+                                          />
+                                        </div>
+                                      </div>
+                                    </div>
+                                  );
+                                })}
                               </div>
-                            ))}
+                            </div>
+
+                            {/* ── B: Scheduler ─────────────────────────────── */}
+                            <div className="flex flex-col gap-2">
+                              <span className={LABEL_CLS}>Scheduler</span>
+                              <div className="grid grid-cols-2 gap-3">
+                                <div className="flex flex-col gap-1">
+                                  <span className="text-[10px] text-slate-500">Trials</span>
+                                  <input
+                                    type="number"
+                                    className={INPUT_CLS}
+                                    value={numTrials}
+                                    min={1}
+                                    onChange={e => setNumTrials(parseInt(e.target.value) || 1)}
+                                  />
+                                </div>
+                                <div className="flex flex-col gap-1">
+                                  <span className="text-[10px] text-slate-500">Sample fraction</span>
+                                  <input
+                                    type="number"
+                                    className={INPUT_CLS}
+                                    value={sampleFraction}
+                                    min={0.01}
+                                    max={1}
+                                    step={0.01}
+                                    onChange={e => setSampleFraction(parseFloat(e.target.value) || 0.2)}
+                                  />
+                                </div>
+                                {Object.entries(tuneSettingsMeta).map(([k, meta]) => (
+                                  <div key={k} className="flex flex-col gap-1">
+                                    <span className="text-[10px] text-slate-500">{k}</span>
+                                    <input
+                                      type="number"
+                                      className={INPUT_CLS}
+                                      value={tuneSettings[k] ?? (meta.defaultValue as number)}
+                                      min={meta.min}
+                                      step={meta.step ?? 1}
+                                      onChange={e => setTuneSettings(prev => ({
+                                        ...prev, [k]: parseFloat(e.target.value) || 0,
+                                      }))}
+                                    />
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+
+                            {/* ── C: Final Training Overrides (collapsible) ── */}
+                            <div className="flex flex-col gap-2">
+                              <button
+                                type="button"
+                                className="flex items-center justify-between w-full"
+                                onClick={() => setShowFinalTrainOverrides(v => !v)}
+                              >
+                                <div className="flex items-center gap-2">
+                                  <span className={LABEL_CLS}>Final Training Overrides</span>
+                                  <span className="text-[9px] text-slate-600">optional — leave blank to use tuned value</span>
+                                </div>
+                                <span className="text-[10px] text-slate-500">{showFinalTrainOverrides ? '▲' : '▼'}</span>
+                              </button>
+                              {showFinalTrainOverrides && (
+                                <div className="grid grid-cols-2 gap-2">
+                                  {Object.entries(getFinalTrainMeta(framework)).map(([k, meta]) => (
+                                    <div key={k} className="flex flex-col gap-1">
+                                      <span className="text-[10px] text-slate-500">{k}</span>
+                                      <input
+                                        type="number"
+                                        className={INPUT_CLS}
+                                        placeholder={String(meta.defaultValue)}
+                                        value={finalTrainOverrides[k] ?? ''}
+                                        min={meta.min}
+                                        step={meta.step ?? 1}
+                                        onChange={e => {
+                                          const v = e.target.value;
+                                          setFinalTrainOverrides(prev => {
+                                            if (v === '') {
+                                              const { [k]: _removed, ...rest } = prev;
+                                              return rest;
+                                            }
+                                            return { ...prev, [k]: parseFloat(v) };
+                                          });
+                                        }}
+                                      />
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
                           </div>
                         ) : (
                           /* Fixed hyperparams */

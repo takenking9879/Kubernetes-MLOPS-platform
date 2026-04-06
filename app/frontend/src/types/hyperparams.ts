@@ -131,6 +131,20 @@ export const PYTORCH_TUNE_SETTINGS_META: Record<string, ParamMeta> = {
   reduction_factor: { type: 'number', defaultValue: 2,  min: 2, step: 1 },
 };
 
+// Keys the user can override for the final training run (post-tuning)
+export const PYTORCH_FINAL_TRAIN_META: Record<string, ParamMeta> = {
+  batch_size: PYTORCH_PARAM_META.batch_size!,
+  max_epochs: PYTORCH_PARAM_META.max_epochs!,
+};
+
+export const XGBOOST_FINAL_TRAIN_META: Record<string, ParamMeta> = {
+  num_boost_round: XGBOOST_PARAM_META.num_boost_round!,
+};
+
+export function getFinalTrainMeta(framework: 'xgboost' | 'pytorch') {
+  return framework === 'xgboost' ? XGBOOST_FINAL_TRAIN_META : PYTORCH_FINAL_TRAIN_META;
+}
+
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 export function getDefaults(framework: 'xgboost' | 'pytorch') {

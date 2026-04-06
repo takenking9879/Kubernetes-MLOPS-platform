@@ -436,6 +436,10 @@ class KubeRayTraining(BaseUtils):
                 cpu_available = float(available_resources.get("CPU", 0.0))
                 cpu_used = max(cpu_total - cpu_available, 0.0)
 
+                gpu_total = float(cluster_resources.get("GPU", 0.0))
+                gpu_available = float(available_resources.get("GPU", 0.0))
+                gpu_used = max(gpu_total - gpu_available, 0.0)
+
                 mem_total = float(cluster_resources.get("memory", 0.0))
                 mem_available = float(available_resources.get("memory", 0.0))
                 mem_used = max(mem_total - mem_available, 0.0)
@@ -447,12 +451,27 @@ class KubeRayTraining(BaseUtils):
                 def _fmt_gib(value: float) -> str:
                     return f"{(value / (1024 ** 3)):.2f} GiB"
 
+                acc_lines = []
+                for key, total_val in cluster_resources.items():
+                    if not str(key).startswith("accelerator_type:"):
+                        continue
+                    total = float(total_val)
+                    avail = float(available_resources.get(key, 0.0))
+                    used = max(total - avail, 0.0)
+                    acc_lines.append(f"{key:14}: {used:.2f} / {total:.2f}")
+
+                acc_block = "\n".join(acc_lines) if acc_lines else ""
+                if acc_block:
+                    acc_block = f"\n{acc_block}"
+
                 pretty_log = f"""
                 [RAY CLUSTER RESOURCES]
                 ────────────────────────────────
                 CPU           : {cpu_used:.2f} / {cpu_total:.2f}
+                GPU           : {gpu_used:.2f} / {gpu_total:.2f}
                 Memory        : {_fmt_gib(mem_used)} / {_fmt_gib(mem_total)}
                 Object Store  : {_fmt_gib(obj_used)} / {_fmt_gib(obj_total)}
+                {acc_block}
                 ────────────────────────────────
                 """.strip()
                 self.logger.info(pretty_log)
@@ -750,21 +769,29 @@ def main():
     # Ensure all child processes resolve the same Ray cluster endpoint.
     os.environ["RAY_ADDRESS"] = ray_address
 
-    if not ray.is_initialized():
-        # Never use "auto": SkyPilot also runs an internal Ray instance on 6380.
-        ray.init(address=ray_address, ignore_reinit_error=True)
+    try:
+        if not ray.is_initialized():
+            # Never use "auto": SkyPilot also runs an internal Ray instance on 6380.
+            ray.init(address=ray_address, ignore_reinit_error=True)
 
-    ctx = ray.data.DataContext.get_current()
-    ctx.enable_rich_progress_bars = True
-    ctx.use_ray_tqdm = False
+        ctx = ray.data.DataContext.get_current()
+        ctx.enable_rich_progress_bars = True
+        ctx.use_ray_tqdm = False
 
-    output_dir = os.getenv("OUTPUT_DIR", "s3://k8s-mlops-platform-bucket/v1/models")
+        output_dir = os.getenv("OUTPUT_DIR", "s3://k8s-mlops-platform-bucket/v1/models")
 
-    model = KubeRayTraining(
-        params_path=_resolve_params_path(),
-        output_dir=output_dir
-    )
-    model.train()
+        model = KubeRayTraining(
+            params_path=_resolve_params_path(),
+            output_dir=output_dir
+        )
+        model.train()
+    finally:
+        if ray.is_initialized():
+            try:
+                ray.shutdown()
+                print("[kuberay-main] Ray shutdown complete.", flush=True)
+            except Exception as shutdown_error:  # pragma: no cover
+                print(f"[kuberay-main] Ray shutdown failed: {shutdown_error}", flush=True)
 
 
 if __name__ == "__main__":

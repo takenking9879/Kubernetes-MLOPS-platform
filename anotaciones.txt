@@ -69,5 +69,5 @@ https://docs.skypilot.co/en/latest/examples/models/kimi-k2.html
 # Exponer puertos
 kubectl port-forward svc/my-mlflow 5000:80 -n ray
 ngrok http 5000
-kubectl port-forward svc/prometheus 9090:9090 -n ray
+kubectl port-forward svc/prometheus 9090:9090 -n monitoring
 ngrok http --url https://metrics.ngrok-free.dev 9090
