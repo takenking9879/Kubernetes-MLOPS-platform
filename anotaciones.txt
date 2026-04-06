@@ -58,28 +58,16 @@ Muy importante para multi-node:
 https://docs.skypilot.co/en/latest/examples/models/kimi-k2.html
 
 
-Checar si el ultimo patch es relamente,
-creo que borre el anterior xd pero lo pongo abajo, pero veamos primero si usando el helm
-común con el patch que realmente solucionó el problema jala o si es necesario que tanto
-de lo que se hizo
+#Lista por hacer
+- Checar que skypilot ya pueda lanzar jobs uno tras otro sin que se maten entre si los procesos
+- checar que las metricas custom lleguen al dashboard de grafana (ver que no se quede infinito por el agente el script)
+- Checar que no hay warnings de ray
+- Alojamiento de recursos optimo con 6 CPUs
+- Empezar con el serving de tabular (No hay serving tabular en la UI actualmente por alguna razón)
 
-patch(
-      '/usr/local/lib/python3.10/site-packages/sky/jobs/recovery_strategy.py',
-      "                                await asyncio.to_thread(sdk.api_start)\n"
-      "                                logger.info('API server started.')\n",
-      "                                # Hotfix: avoid starting a nested local API\n"
-      "                                # server from managed-jobs controllers.\n"
-      "                                # Reuse and validate the existing API server\n"
-      "                                # endpoint configured for this process.\n"
-      "                                try:\n"
-      "                                    await asyncio.to_thread(sdk.api_info)\n"
-      "                                    logger.debug(\n"
-      "                                        'Using existing SkyPilot API server '\n"
-      "                                        'endpoint in recovery flow')\n"
-      "                                except Exception as e:\n"
-      "                                    logger.warning(\n"
-      "                                        'API health check failed during '\n"
-      "                                        'recovery (continuing without '\n"
-      "                                        'sdk.api_start): %s', e)\n",
-      'recovery_strategy.skip_nested_api_start',
-    )
+
+# Exponer puertos
+kubectl port-forward svc/my-mlflow 5000:80 -n ray
+ngrok http 5000
+kubectl port-forward svc/prometheus 9090:9090 -n ray
+ngrok http --url https://metrics.ngrok-free.dev 9090

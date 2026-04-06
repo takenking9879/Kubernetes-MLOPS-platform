@@ -42,6 +42,11 @@ import {
   uploadArchitecture,
   listPreprocessRunIds,
   getPreprocessParams,
+  listTrainingRunIds,
+  uploadRawSchema,
+  submitServingConfig,
+  triggerServingDeploy,
+  getServingDeployStatus,
   type LaunchRequest,
   type LaunchResponse,
   type OrchestratorRecommendation,
@@ -51,7 +56,13 @@ import {
   type ResourceConstraints,
   type PreprocessRunId,
   type TrainingRunResult,
+  type TrainingRunId,
+  type SchemaUploadSingleResult,
+  type ServingConfigResult,
+  type ServingDeployResult,
 } from '../api/platformClient';
+import { generateRawYamlV2, type RawFieldEntry } from '../lib/schemaYaml';
+import { RawYamlEditor } from '../components/schema/RawYamlEditor';
 import {
   getDefaultsForTask,
   getTuneSettingsDefaults,
@@ -126,10 +137,7 @@ export function LaunchWizardPage() {
   const isServing  = jobType === 'serving' || jobType === 'both';
   const isTraining = jobType === 'training' || jobType === 'both';
 
-  // Auto-lock to LLM when serving is selected
-  useEffect(() => {
-    if (isServing) setModelCategory('llm');
-  }, [jobType]); // eslint-disable-line react-hooks/exhaustive-deps
+  // (no auto-lock: tabular + serving is valid — deploys in-cluster Ray Serve)
 
   // ── Tabular training state ───────────────────────────────────────────────
   const [preprocessRunIds, setPreprocessRunIds] = useState<PreprocessRunId[]>([]);
@@ -232,6 +240,37 @@ export function LaunchWizardPage() {
   const [llmAdapterS3, setLlmAdapterS3] = useState('');
   const [maxModelLen, setMaxModelLen] = useState('4096');
 
+  // ── Tabular serving state ────────────────────────────────────────────────
+  const [tabServTrainRunIds, setTabServTrainRunIds] = useState<TrainingRunId[]>([]);
+  const [tabServRunIdsLoading, setTabServRunIdsLoading] = useState(false);
+  const [tabServTrainRunId, setTabServTrainRunId] = useState('');
+  const [tabServDataset, setTabServDataset] = useState('');
+  const [tabServMode, setTabServMode] = useState<'ray_only' | 'kafka'>('ray_only');
+
+  const [tabServRawFields, setTabServRawFields] = useState<RawFieldEntry[]>([]);
+  const [tabServRawGroups, setTabServRawGroups] = useState<Record<string, string>>({ properties: 'properties' });
+  const [tabServIdField, setTabServIdField] = useState('');
+  const [tabServSavingSchema, setTabServSavingSchema] = useState(false);
+  const [tabServSchemaResult, setTabServSchemaResult] = useState<SchemaUploadSingleResult | null>(null);
+  const [tabServSchemaError, setTabServSchemaError] = useState('');
+  const [tabServRawSchemaS3, setTabServRawSchemaS3] = useState('');
+
+  const [tabServAlias, setTabServAlias] = useState('champion');
+  const [tabServCanary, setTabServCanary] = useState(false);
+  const [tabServCanaryAlias, setTabServCanaryAlias] = useState('challenger');
+  const [tabServCanaryProb, setTabServCanaryProb] = useState(0.1);
+  const [tabServInitReplicas, setTabServInitReplicas] = useState(0);
+  const [tabServWebhookUrl, setTabServWebhookUrl] = useState('');
+  const [tabServWebhookPath, setTabServWebhookPath] = useState('/infer/webhook');
+  const [tabServWebhookMaxAge, setTabServWebhookMaxAge] = useState(300);
+
+  const [tabServSubmitResult, setTabServSubmitResult] = useState<ServingConfigResult | null>(null);
+  const [tabServSubmitError, setTabServSubmitError] = useState('');
+  const [tabServDeployResult, setTabServDeployResult] = useState<ServingDeployResult | null>(null);
+  const [tabServDeployState, setTabServDeployState] = useState('');
+  const [tabServDeployError, setTabServDeployError] = useState('');
+  const tabServDeployPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
   // ── Upload custom model state ────────────────────────────────────────────
   const [uploadFile, setUploadFile] = useState<File | null>(null);
   const [uploadName, setUploadName] = useState('');
@@ -283,6 +322,13 @@ export function LaunchWizardPage() {
       .catch(() => setAvailableDatasets([]));
   }, []);
 
+  // ── Cleanup poll refs on unmount ──────────────────────────────────────────
+  useEffect(() => {
+    return () => {
+      if (tabServDeployPollRef.current) clearInterval(tabServDeployPollRef.current);
+    };
+  }, []);
+
   useEffect(() => {
     const firstModel = llmCatalog[0];
     if (firstModel && !llmModel) setLlmModel(firstModel.model_id);
@@ -290,8 +336,9 @@ export function LaunchWizardPage() {
 
   // ── Derived ──────────────────────────────────────────────────────────────
   const selectedLLM = llmCatalog.find(m => m.model_id === llmModel);
-  const isLlmPath = modelCategory === 'llm' || isServing;
-  const isTabularPath = modelCategory === 'tabular' || modelCategory === 'upload';
+  const isTabularServingPath = modelCategory === 'tabular' && isServing;
+  const isLlmPath = modelCategory === 'llm' && !isTabularServingPath;
+  const isTabularPath = (modelCategory === 'tabular' || modelCategory === 'upload') && !isTabularServingPath;
 
   const gpuSummary = (() => {
     const gpusPerNode = constraints.num_gpus_per_node ?? 1;
@@ -311,6 +358,117 @@ export function LaunchWizardPage() {
     modelCategory === 'tabular' ? (framework === 'pytorch' ? pytorchModelType : 'xgboost')
     : modelCategory === 'llm'   ? 'llm'
     : 'user_uploaded';
+
+  // ── Tabular serving: load training run IDs ──────────────────────────────
+  const loadTabServTrainRunIds = useCallback(async () => {
+    if (!isTabularServingPath) return;
+    setTabServRunIdsLoading(true);
+    try {
+      const res = await listTrainingRunIds();
+      setTabServTrainRunIds(res.runs ?? []);
+      if (!tabServTrainRunId && res.runs?.[0]) {
+        setTabServTrainRunId(res.runs[0].train_run_id);
+      }
+    } catch { /* ignore */ } finally {
+      setTabServRunIdsLoading(false);
+    }
+  }, [isTabularServingPath]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => { loadTabServTrainRunIds(); }, [loadTabServTrainRunIds]);
+
+  // Resolve dataset from selected training run ID
+  useEffect(() => {
+    if (!tabServTrainRunId) { setTabServDataset(''); return; }
+    const entry = tabServTrainRunIds.find(r => r.train_run_id === tabServTrainRunId);
+    if (entry?.dataset) { setTabServDataset(entry.dataset); return; }
+    const m = tabServTrainRunId.match(/^train-(.+)-[0-9a-f]{6}-\d{8}T\d{6}Z-[0-9a-f]{6}$/);
+    setTabServDataset(m?.[1] ?? '');
+  }, [tabServTrainRunId, tabServTrainRunIds]);
+
+  // Reset schema save state when fields/dataset change
+  useEffect(() => {
+    setTabServSchemaResult(null);
+    setTabServSchemaError('');
+    setTabServRawSchemaS3('');
+  }, [tabServDataset, tabServRawFields, tabServRawGroups, tabServIdField]);
+
+  // ── Tabular serving raw.yaml content ────────────────────────────────────
+  const tabServRawYamlContent = tabServRawFields.length > 0
+    ? generateRawYamlV2({
+        dataset: tabServDataset,
+        dslName: '', dslVersion: '', processedTableName: '', generatedFrom: '',
+        allColumns: [], rawFields: tabServRawFields, rawGroups: tabServRawGroups,
+        idField: tabServIdField, fullFields: [], preprocessedFields: [],
+        rawTopLevel: [], propertiesFields: [], fullColumns: [], preprocessedColumns: [],
+        targetColumn: '', idColumn: '', typeOverrides: {},
+      })
+    : '# Add fields to generate raw.yaml';
+
+  // ── Tabular serving handlers ─────────────────────────────────────────────
+  const handleTabServSaveSchema = async () => {
+    if (!tabServDataset) return;
+    setTabServSavingSchema(true);
+    setTabServSchemaError('');
+    setTabServSchemaResult(null);
+    setTabServRawSchemaS3('');
+    try {
+      const result = await uploadRawSchema(tabServDataset, tabServRawYamlContent);
+      setTabServSchemaResult(result);
+      setTabServRawSchemaS3(result.s3_path);
+    } catch (e) {
+      setTabServSchemaError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setTabServSavingSchema(false);
+    }
+  };
+
+  const handleTabServSubmit = async () => {
+    setTabServSubmitError('');
+    setTabServSubmitResult(null);
+    try {
+      const result = await submitServingConfig({
+        train_run_id: tabServTrainRunId,
+        serving_mode: tabServMode,
+        ...(tabServMode === 'kafka' ? { raw_schema_s3_path: tabServRawSchemaS3 } : {}),
+        alias: tabServAlias,
+        canary: tabServCanary,
+        canary_alias: tabServCanaryAlias,
+        canary_probability: tabServCanaryProb,
+        initial_replicas: tabServInitReplicas,
+        webhook_public_base_url: tabServWebhookUrl,
+        webhook_path: tabServWebhookPath,
+        webhook_max_timestamp_age_seconds: tabServWebhookMaxAge,
+      });
+      setTabServSubmitResult(result);
+    } catch (e) {
+      setTabServSubmitError(e instanceof Error ? e.message : String(e));
+    }
+  };
+
+  const handleTabServDeploy = async () => {
+    if (!tabServSubmitResult) return;
+    setTabServDeployError('');
+    setTabServDeployResult(null);
+    setTabServDeployState('queued');
+    if (tabServDeployPollRef.current) clearInterval(tabServDeployPollRef.current);
+    try {
+      const result = await triggerServingDeploy(tabServSubmitResult.serve_run_id);
+      setTabServDeployResult(result);
+      tabServDeployPollRef.current = setInterval(() => {
+        void getServingDeployStatus(tabServSubmitResult.serve_run_id, result.dag_run_id)
+          .then(s => {
+            setTabServDeployState(s.state);
+            if (['success', 'failed', 'upstream_failed'].includes(s.state.toLowerCase())) {
+              if (tabServDeployPollRef.current) clearInterval(tabServDeployPollRef.current);
+            }
+          })
+          .catch(() => { /* keep polling */ });
+      }, 15_000);
+    } catch (e) {
+      setTabServDeployError(e instanceof Error ? e.message : String(e));
+      setTabServDeployState('');
+    }
+  };
 
   // ── Step 3: fetch recommendation (LLM path only) ─────────────────────────
   const fetchRecommendation = useCallback(async () => {
@@ -481,6 +639,12 @@ export function LaunchWizardPage() {
     setLaunchResult(null);
     setLaunchError('');
     setRecommendation(null);
+    setTabServSubmitResult(null);
+    setTabServSubmitError('');
+    setTabServDeployResult(null);
+    setTabServDeployState('');
+    setTabServDeployError('');
+    if (tabServDeployPollRef.current) clearInterval(tabServDeployPollRef.current);
     setStep(0);
   };
 
@@ -567,20 +731,10 @@ export function LaunchWizardPage() {
               {/* Model category */}
               <div className="flex flex-col gap-1.5">
                 <span className={LABEL_CLS}>Model category</span>
-                {isServing ? (
-                  <div className="flex flex-col gap-1">
-                    <label className="flex items-center gap-2">
-                      <input type="radio" checked readOnly className="accent-blue-500" />
-                      <span className="text-xs text-slate-300">LLM (fine-tune / serve)</span>
-                    </label>
-                    <p className="text-[10px] text-slate-500 italic ml-4">
-                      Serving deploys LLMs via vLLM — tabular serving uses the in-cluster Serving tab.
-                    </p>
-                  </div>
-                ) : (
-                  <div className="flex flex-col gap-1.5">
-                    {MODEL_CATEGORIES.map(({ id, label }) => (
-                      <label key={id} className="flex cursor-pointer items-center gap-2">
+                <div className="flex flex-col gap-1.5">
+                  {MODEL_CATEGORIES.map(({ id, label }) => (
+                    <div key={id} className="flex flex-col gap-0.5">
+                      <label className="flex cursor-pointer items-center gap-2">
                         <input
                           type="radio"
                           name="modelCategory"
@@ -591,9 +745,14 @@ export function LaunchWizardPage() {
                         />
                         <span className="text-xs text-slate-300">{label}</span>
                       </label>
-                    ))}
-                  </div>
-                )}
+                      {id === 'tabular' && modelCategory === 'tabular' && isServing && (
+                        <p className="ml-5 text-[10px] text-slate-500 italic">
+                          In-cluster Ray Serve deployment — no external GPU required.
+                        </p>
+                      )}
+                    </div>
+                  ))}
+                </div>
               </div>
 
               {/* ── Tabular config ──────────────────────────────────────────── */}
@@ -933,6 +1092,177 @@ export function LaunchWizardPage() {
                 </div>
               )}
 
+              {/* ── Tabular serving config ──────────────────────────────────── */}
+              {isTabularServingPath && (
+                <div className="flex flex-col gap-4">
+
+                  {/* Section A: Training run */}
+                  <div className="flex flex-col gap-2 rounded border border-slate-700/60 p-3">
+                    <span className={LABEL_CLS}>Training run</span>
+                    <div className="flex gap-1">
+                      <select
+                        className={SELECT_CLS}
+                        value={tabServTrainRunId}
+                        onChange={e => setTabServTrainRunId(e.target.value)}
+                        disabled={tabServRunIdsLoading}
+                      >
+                        <option value="">{tabServRunIdsLoading ? '— loading… —' : '— select run —'}</option>
+                        {tabServTrainRunIds.map(r => (
+                          <option key={r.train_run_id} value={r.train_run_id}>
+                            {r.train_run_id}{r.dataset ? ` · ${r.dataset}` : ''}
+                          </option>
+                        ))}
+                      </select>
+                      <button
+                        type="button"
+                        onClick={() => void loadTabServTrainRunIds()}
+                        disabled={tabServRunIdsLoading}
+                        className="rounded bg-slate-700 px-2 py-1 text-xs text-slate-300 hover:bg-slate-600 disabled:opacity-40"
+                        title="Refresh"
+                      >
+                        <RefreshCw size={12} className={tabServRunIdsLoading ? 'animate-spin' : ''} />
+                      </button>
+                    </div>
+                    {tabServTrainRunId && (
+                      <div className="grid grid-cols-[80px_1fr] gap-x-2 gap-y-0.5 text-[11px]">
+                        <span className="text-slate-500">Dataset</span>
+                        <span className="font-mono text-slate-200">{tabServDataset || '—'}</span>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Section B: Serving mode */}
+                  <div className="flex flex-col gap-2 rounded border border-slate-700/60 p-3">
+                    <span className={LABEL_CLS}>Serving mode</span>
+                    <div className="flex gap-2">
+                      {(['ray_only', 'kafka'] as const).map(mode => (
+                        <button
+                          key={mode}
+                          type="button"
+                          onClick={() => setTabServMode(mode)}
+                          className={tabServMode === mode ? BTN_TOGGLE_ON : BTN_TOGGLE_OFF}
+                        >
+                          {mode === 'ray_only' ? 'Ray Only' : 'Kafka'}
+                        </button>
+                      ))}
+                    </div>
+                    <p className="text-[10px] text-slate-500">
+                      {tabServMode === 'ray_only'
+                        ? 'Promotes model to @champion and patches the RayService. No Kafka connector.'
+                        : 'Promotes model, patches RayService, and deploys a Spark Kafka streaming connector.'}
+                    </p>
+                  </div>
+
+                  {/* Section C: Kafka schema (only in kafka mode) */}
+                  {tabServMode === 'kafka' && (
+                    <div className="flex flex-col gap-2 rounded border border-slate-700/60 p-3">
+                      <span className={LABEL_CLS}>Kafka input schema (raw.yaml)</span>
+                      <p className="text-[10px] text-slate-500">
+                        Define the Kafka message schema for dataset{' '}
+                        <span className="font-mono text-slate-300">{tabServDataset || '(dataset)'}</span>.
+                      </p>
+                      <RawYamlEditor
+                        fields={tabServRawFields}
+                        groups={tabServRawGroups}
+                        idField={tabServIdField}
+                        onChange={(fields, groups, idField) => {
+                          setTabServRawFields(fields);
+                          setTabServRawGroups(groups);
+                          setTabServIdField(idField);
+                        }}
+                        dataset={tabServDataset}
+                      />
+                      <div className="flex items-center gap-3 pt-1">
+                        <button
+                          type="button"
+                          onClick={() => void handleTabServSaveSchema()}
+                          disabled={tabServSavingSchema || tabServRawFields.length === 0 || !tabServIdField || !tabServDataset}
+                          className={`rounded bg-blue-600 px-3 py-1 text-xs font-medium text-white hover:bg-blue-500 disabled:opacity-40`}
+                        >
+                          {tabServSavingSchema ? 'Saving…' : 'Save raw.yaml to S3'}
+                        </button>
+                        {tabServSchemaResult && (
+                          <span className="rounded-full bg-green-900/50 px-2 py-0.5 text-[10px] text-green-400">
+                            ✓ Saved as v{tabServSchemaResult.version}
+                          </span>
+                        )}
+                        {tabServRawSchemaS3 && (
+                          <span className="max-w-[260px] truncate font-mono text-[10px] text-slate-500" title={tabServRawSchemaS3}>
+                            {tabServRawSchemaS3}
+                          </span>
+                        )}
+                      </div>
+                      {tabServSchemaError && <p className="text-xs text-red-400">{tabServSchemaError}</p>}
+                    </div>
+                  )}
+
+                  {/* Section D: Serving config */}
+                  <div className="flex flex-col gap-3 rounded border border-slate-700/60 p-3">
+                    <span className={LABEL_CLS}>Serving config</span>
+
+                    {/* Alias */}
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="flex flex-col gap-1">
+                        <span className="text-[10px] text-slate-500">Model alias</span>
+                        <input
+                          type="text"
+                          className={INPUT_CLS}
+                          value={tabServAlias}
+                          placeholder="champion"
+                          onChange={e => setTabServAlias(e.target.value)}
+                        />
+                      </div>
+                    </div>
+
+                    {/* Canary */}
+                    <div className="flex flex-col gap-2">
+                      <div className="flex items-center gap-3">
+                        <span className="text-[10px] text-slate-500">Canary deployment</span>
+                        <div className="flex gap-1.5">
+                          <button type="button" onClick={() => setTabServCanary(true)} className={tabServCanary ? BTN_TOGGLE_ON : BTN_TOGGLE_OFF}>Enabled</button>
+                          <button type="button" onClick={() => setTabServCanary(false)} className={!tabServCanary ? BTN_TOGGLE_ON : BTN_TOGGLE_OFF}>Disabled</button>
+                        </div>
+                      </div>
+                      {tabServCanary && (
+                        <div className="grid grid-cols-3 gap-3">
+                          <div className="flex flex-col gap-1">
+                            <span className="text-[10px] text-slate-500">Canary alias</span>
+                            <input type="text" className={INPUT_CLS} value={tabServCanaryAlias} placeholder="challenger" onChange={e => setTabServCanaryAlias(e.target.value)} />
+                          </div>
+                          <div className="flex flex-col gap-1">
+                            <span className="text-[10px] text-slate-500">Probability (0–1)</span>
+                            <input type="number" className={INPUT_CLS} min={0} max={1} step={0.01} value={tabServCanaryProb} onChange={e => setTabServCanaryProb(parseFloat(e.target.value) || 0)} />
+                          </div>
+                          <div className="flex flex-col gap-1">
+                            <span className="text-[10px] text-slate-500">Initial replicas</span>
+                            <input type="number" className={INPUT_CLS} min={0} value={tabServInitReplicas} onChange={e => setTabServInitReplicas(parseInt(e.target.value) || 0)} />
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Webhook */}
+                    <div className="flex flex-col gap-2">
+                      <span className="text-[10px] text-slate-500">Webhook (MLflow alias-change hot reloads)</span>
+                      <div className="grid grid-cols-2 gap-3">
+                        <div className="flex flex-col gap-1">
+                          <span className="text-[10px] text-slate-500">Public base URL</span>
+                          <input type="text" className={INPUT_CLS} value={tabServWebhookUrl} placeholder="http://model-serving-serve-svc.ray.svc.cluster.local:8000" onChange={e => setTabServWebhookUrl(e.target.value)} />
+                        </div>
+                        <div className="flex flex-col gap-1">
+                          <span className="text-[10px] text-slate-500">Webhook path</span>
+                          <input type="text" className={INPUT_CLS} value={tabServWebhookPath} placeholder="/infer/webhook" onChange={e => setTabServWebhookPath(e.target.value)} />
+                        </div>
+                        <div className="flex flex-col gap-1">
+                          <span className="text-[10px] text-slate-500">Max timestamp age (s)</span>
+                          <input type="number" className={INPUT_CLS} min={1} value={tabServWebhookMaxAge} onChange={e => setTabServWebhookMaxAge(parseInt(e.target.value) || 300)} />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
               {/* ── LLM config ──────────────────────────────────────────────── */}
               {modelCategory === 'llm' && (
                 <div className="grid grid-cols-2 gap-4">
@@ -1136,9 +1466,23 @@ export function LaunchWizardPage() {
           ══════════════════════════════════════════════════════════════════ */}
           {step === 1 && (
             <div className="flex flex-col gap-5 rounded border border-slate-700 bg-slate-900/50 p-5">
-              <GPUResourceSelector value={constraints} onChange={setConstraints} />
+              {isTabularServingPath ? (
+                <div className="rounded border border-slate-700 bg-slate-800/40 px-4 py-4 flex flex-col gap-2">
+                  <span className="text-xs font-semibold text-slate-300">In-cluster deployment</span>
+                  <p className="text-xs text-slate-400">
+                    Tabular serving deploys to the existing in-cluster KubeRay RayService via the{' '}
+                    <span className="font-mono text-slate-300">serving_pipeline</span> Airflow DAG.
+                    No external GPU resources are provisioned.
+                  </p>
+                  <p className="text-[10px] text-slate-500">
+                    The model is promoted to the specified MLflow alias and the RayService config is patched automatically.
+                  </p>
+                </div>
+              ) : (
+                <GPUResourceSelector value={constraints} onChange={setConstraints} />
+              )}
 
-              {isTabularPath && (
+              {!isTabularServingPath && isTabularPath && (
                 <div className="flex flex-col gap-1.5 rounded border border-slate-700/60 p-3">
                   <span className={LABEL_CLS}>SkyPilot launch mode</span>
                   <div className="flex flex-wrap gap-1.5">
@@ -1163,48 +1507,50 @@ export function LaunchWizardPage() {
                 </div>
               )}
 
-              {/* Serving note */}
-              {isServing && !isTraining && (
+              {/* Serving note (LLM only) */}
+              {!isTabularServingPath && isServing && !isTraining && (
                 <div className="rounded border border-amber-700/40 bg-amber-900/10 px-3 py-2 text-[10px] text-amber-400">
                   Serving clusters are persistent — on-demand is recommended over spot.
                 </div>
               )}
 
-              {/* Nodes + InfiniBand */}
-              <div className="grid grid-cols-2 gap-4">
-                <div className="flex flex-col gap-1.5">
-                  <span className={LABEL_CLS}>Nodes</span>
-                  <div className="flex gap-2">
-                    {[1, 2, 4, 8].map(n => (
-                      <button
-                        key={n}
-                        type="button"
-                        onClick={() => setNumNodes(n)}
-                        className={`rounded px-2.5 py-0.5 text-xs font-medium transition-colors ${
-                          numNodes === n ? 'bg-blue-700 text-white' : 'bg-slate-700 text-slate-400 hover:bg-slate-600'
-                        }`}
-                      >
-                        {n === 1 ? 'Single' : `${n}×`}
-                      </button>
-                    ))}
+              {/* Nodes + InfiniBand (SkyPilot jobs only) */}
+              {!isTabularServingPath && (
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="flex flex-col gap-1.5">
+                    <span className={LABEL_CLS}>Nodes</span>
+                    <div className="flex gap-2">
+                      {[1, 2, 4, 8].map(n => (
+                        <button
+                          key={n}
+                          type="button"
+                          onClick={() => setNumNodes(n)}
+                          className={`rounded px-2.5 py-0.5 text-xs font-medium transition-colors ${
+                            numNodes === n ? 'bg-blue-700 text-white' : 'bg-slate-700 text-slate-400 hover:bg-slate-600'
+                          }`}
+                        >
+                          {n === 1 ? 'Single' : `${n}×`}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="flex flex-col gap-1.5">
+                    <span className={LABEL_CLS}>Network</span>
+                    <label className="flex cursor-pointer items-center gap-2 text-xs text-slate-300">
+                      <input
+                        type="checkbox"
+                        checked={useInfiniband}
+                        onChange={e => setUseInfiniband(e.target.checked)}
+                        className="accent-blue-500"
+                      />
+                      Require InfiniBand / EFA
+                      {numNodes > 1 && (
+                        <span className="text-amber-400 text-[10px]">(recommended for multi-node)</span>
+                      )}
+                    </label>
                   </div>
                 </div>
-                <div className="flex flex-col gap-1.5">
-                  <span className={LABEL_CLS}>Network</span>
-                  <label className="flex cursor-pointer items-center gap-2 text-xs text-slate-300">
-                    <input
-                      type="checkbox"
-                      checked={useInfiniband}
-                      onChange={e => setUseInfiniband(e.target.checked)}
-                      className="accent-blue-500"
-                    />
-                    Require InfiniBand / EFA
-                    {numNodes > 1 && (
-                      <span className="text-amber-400 text-[10px]">(recommended for multi-node)</span>
-                    )}
-                  </label>
-                </div>
-              </div>
+              )}
 
               <div className="flex justify-between pt-2">
                 <button type="button" className={BTN_SECONDARY} onClick={() => setStep(0)}>Back</button>
@@ -1219,8 +1565,88 @@ export function LaunchWizardPage() {
           {step === 2 && (
             <div className="flex flex-col gap-5 rounded border border-slate-700 bg-slate-900/50 p-5">
 
-              {isTabularPath ? (
-                /* Tabular: config summary — no dry_run */
+              {isTabularServingPath ? (
+                /* Tabular serving: config summary cards */
+                <>
+                  <span className="text-sm font-semibold text-slate-200">Serving Configuration Summary</span>
+
+                  {/* Training Run card */}
+                  <div className="rounded border border-slate-700 bg-slate-800/40 px-4 py-3">
+                    <div className="mb-2 flex items-center justify-between">
+                      <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">Training Run</span>
+                      <button onClick={() => setStep(0)} className="text-[10px] text-blue-400 hover:text-blue-300">Edit</button>
+                    </div>
+                    <div className="grid grid-cols-[120px_1fr] gap-x-3 gap-y-1">
+                      {[['Train run ID', tabServTrainRunId], ['Dataset', tabServDataset], ['Mode', tabServMode]].map(([k, v]) => (
+                        <div key={k} className="contents">
+                          <span className="text-[11px] text-slate-500">{k}</span>
+                          <span className="break-all font-mono text-[11px] text-slate-200">{v || '—'}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Kafka Schema card */}
+                  {tabServMode === 'kafka' && (
+                    <div className="rounded border border-slate-700 bg-slate-800/40 px-4 py-3">
+                      <div className="mb-2 flex items-center justify-between">
+                        <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">Kafka Schema</span>
+                        <button onClick={() => setStep(0)} className="text-[10px] text-blue-400 hover:text-blue-300">Edit</button>
+                      </div>
+                      <div className="grid grid-cols-[120px_1fr] gap-x-3 gap-y-1">
+                        {[
+                          ['Fields', String(tabServRawFields.length)],
+                          ['id_field', tabServIdField],
+                          ['Schema version', tabServSchemaResult ? `v${tabServSchemaResult.version}` : '—'],
+                          ['S3 path', tabServRawSchemaS3],
+                        ].map(([k, v]) => (
+                          <div key={k} className="contents">
+                            <span className="text-[11px] text-slate-500">{k}</span>
+                            <span className="break-all font-mono text-[11px] text-slate-200">{v || '—'}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Serving Config card */}
+                  <div className="rounded border border-slate-700 bg-slate-800/40 px-4 py-3">
+                    <div className="mb-2 flex items-center justify-between">
+                      <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">Serving Config</span>
+                      <button onClick={() => setStep(0)} className="text-[10px] text-blue-400 hover:text-blue-300">Edit</button>
+                    </div>
+                    <div className="grid grid-cols-[120px_1fr] gap-x-3 gap-y-1">
+                      {[
+                        ['Alias', tabServAlias],
+                        ['Canary', tabServCanary ? `Yes (${tabServCanaryAlias}, p=${tabServCanaryProb})` : 'No'],
+                        ['Webhook path', tabServWebhookPath || '—'],
+                        ['Max timestamp age', `${tabServWebhookMaxAge}s`],
+                      ].map(([k, v]) => (
+                        <div key={k} className="contents">
+                          <span className="text-[11px] text-slate-500">{k}</span>
+                          <span className="break-all font-mono text-[11px] text-slate-200">{v || '—'}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Validation */}
+                  {!tabServTrainRunId ? (
+                    <div className="rounded border border-amber-800/40 bg-amber-900/10 px-3 py-2">
+                      <p className="text-xs text-amber-400">Select a training run before launching.</p>
+                    </div>
+                  ) : tabServMode === 'kafka' && !tabServRawSchemaS3 ? (
+                    <div className="rounded border border-amber-800/40 bg-amber-900/10 px-3 py-2">
+                      <p className="text-xs text-amber-400">Save raw.yaml to S3 before launching (Kafka mode).</p>
+                    </div>
+                  ) : (
+                    <div className="rounded border border-green-800/30 bg-green-900/10 px-3 py-2">
+                      <p className="text-xs text-green-400">✓ Configuration valid — ready to launch.</p>
+                    </div>
+                  )}
+                </>
+              ) : isTabularPath ? (
+                /* Tabular training: config summary — no dry_run */
                 <>
                   <span className="text-sm font-semibold text-slate-200">Configuration Summary</span>
                   <dl className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-xs">
@@ -1345,7 +1771,10 @@ export function LaunchWizardPage() {
                 <button
                   type="button"
                   className={BTN_PRIMARY}
-                  disabled={isLlmPath && !recommendation}
+                  disabled={
+                    (isLlmPath && !recommendation) ||
+                    (isTabularServingPath && (!tabServTrainRunId || (tabServMode === 'kafka' && !tabServRawSchemaS3)))
+                  }
                   onClick={() => setStep(3)}
                 >
                   Next: Launch
@@ -1360,6 +1789,7 @@ export function LaunchWizardPage() {
           {step === 3 && (
             <div className="flex flex-col gap-5 rounded border border-slate-700 bg-slate-900/50 p-5">
               {/* Summary */}
+              {!isTabularServingPath && (
               <div className="flex flex-col gap-2">
                 <span className="text-sm font-semibold text-slate-200">Launch Summary</span>
                 <dl className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
@@ -1401,8 +1831,96 @@ export function LaunchWizardPage() {
                   )}
                 </dl>
               </div>
+              )}
 
-              {/* ── Tabular launch ── */}
+              {/* ── Tabular serving launch ── */}
+              {isTabularServingPath && (
+                <div className="flex flex-col gap-3">
+                  {tabServSubmitResult ? (
+                    <div className="flex flex-col gap-3 rounded border border-green-700 bg-green-950/20 p-4">
+                      <div className="flex items-center gap-2 text-sm font-semibold text-green-400">
+                        <CheckCircle2 size={16} />Serving config saved
+                      </div>
+                      <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1.5 text-xs">
+                        <dt className="text-slate-400">Serve run ID</dt>
+                        <dd className="break-all font-mono text-slate-200">{tabServSubmitResult.serve_run_id}</dd>
+                        <dt className="text-slate-400">Mode</dt>
+                        <dd className="text-slate-200">{tabServSubmitResult.serving_mode}</dd>
+                        <dt className="text-slate-400">Dataset</dt>
+                        <dd className="text-slate-200">{tabServSubmitResult.dataset}</dd>
+                        <dt className="text-slate-400">Params S3 path</dt>
+                        <dd className="break-all font-mono text-slate-200">{tabServSubmitResult.params_s3_path}</dd>
+                      </dl>
+
+                      {!tabServDeployResult ? (
+                        <div className="flex flex-col gap-2 border-t border-slate-700 pt-3">
+                          {tabServDeployError && <p className="text-xs text-red-400">{tabServDeployError}</p>}
+                          <button
+                            type="button"
+                            onClick={() => void handleTabServDeploy()}
+                            className="rounded bg-green-700 py-2 text-sm font-semibold text-white hover:bg-green-600"
+                          >
+                            Deploy Now
+                          </button>
+                          <p className="text-center text-[10px] text-slate-500">
+                            Triggers: MLflow promotion → Ray Serve patch
+                            {tabServSubmitResult.serving_mode === 'kafka' ? ' → Spark Kafka connector' : ''}
+                          </p>
+                        </div>
+                      ) : (
+                        <div className="rounded border border-slate-700 bg-slate-800/40 px-3 py-2">
+                          <p className="text-xs font-medium text-slate-300 mb-1">Deployment triggered</p>
+                          <div className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-xs">
+                            <span className="text-slate-500">DAG run ID</span>
+                            <span className="break-all font-mono text-slate-200">{tabServDeployResult.dag_run_id}</span>
+                            <span className="text-slate-500">State</span>
+                            <span className={`font-mono ${
+                              tabServDeployState === 'success' ? 'text-green-400'
+                              : tabServDeployState === 'failed' || tabServDeployState === 'upstream_failed' ? 'text-red-400'
+                              : 'text-amber-400'
+                            }`}>
+                              {tabServDeployState || 'queued'}
+                            </span>
+                          </div>
+                        </div>
+                      )}
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setTabServSubmitResult(null);
+                          setTabServDeployResult(null);
+                          setTabServDeployState('');
+                          setTabServDeployError('');
+                          if (tabServDeployPollRef.current) clearInterval(tabServDeployPollRef.current);
+                        }}
+                        className="rounded bg-slate-700 px-3 py-1 text-xs text-slate-300 hover:bg-slate-600"
+                      >
+                        New Serving Config
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="flex flex-col gap-2">
+                      {tabServSubmitError && (
+                        <div className="rounded border border-red-800/40 bg-red-900/20 px-3 py-2">
+                          <p className="text-xs text-red-400">{tabServSubmitError}</p>
+                        </div>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => void handleTabServSubmit()}
+                        disabled={!tabServTrainRunId}
+                        className="flex items-center justify-center gap-2 rounded bg-blue-600 px-6 py-2 text-sm font-bold text-white hover:bg-blue-500 transition-colors disabled:opacity-40"
+                      >
+                        <Rocket size={14} />
+                        Save Serving Config
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* ── Tabular training launch ── */}
               {isTabularPath && !tabularResult && (
                 <button
                   type="button"
@@ -1483,11 +2001,11 @@ export function LaunchWizardPage() {
                   type="button"
                   className={BTN_SECONDARY}
                   onClick={() => {
-                    if (tabularResult || launchResult) resetForNewJob();
+                    if (tabularResult || launchResult || tabServDeployResult) resetForNewJob();
                     else setStep(2);
                   }}
                 >
-                  {tabularResult || launchResult ? 'New Job' : 'Back'}
+                  {tabularResult || launchResult || tabServDeployResult ? 'New Job' : 'Back'}
                 </button>
               </div>
             </div>
