@@ -37,6 +37,7 @@ AIRFLOW_PORT = os.getenv("AIRFLOW_PORT", "8080")
 AIRFLOW_USER = os.getenv("AIRFLOW_USER", "admin")
 AIRFLOW_PASSWORD = os.getenv("AIRFLOW_PASSWORD", "admin")
 SERVING_DAG_ID = "serving_pipeline"
+TABULAR_SKY_SERVING_DAG_ID = "tabular_serving_skypilot_pipeline"
 
 RAY_SERVICE_NAME = os.getenv("RAY_SERVICE_NAME", "model-serving")
 RAY_SERVICE_NAMESPACE = os.getenv("RAY_SERVICE_NAMESPACE", "ray")
@@ -131,6 +132,12 @@ class ServingConfigRequest(BaseModel):
     webhook_public_base_url: str = ""
     webhook_path: str = "/infer/webhook"
     webhook_max_timestamp_age_seconds: int = Field(300, ge=1)
+    # SkyPilot out-cluster serving
+    deployment_target: Literal["in_cluster", "skypilot"] = "in_cluster"
+    min_replicas: int = Field(1, ge=0)
+    max_replicas: int = Field(3, ge=1)
+    target_qps_per_replica: int = Field(10, ge=1)
+    resource_constraints: Optional[dict] = None
 
     @model_validator(mode="after")
     def validate_kafka_requires_schema(self) -> "ServingConfigRequest":
@@ -230,6 +237,7 @@ async def submit_serving_config(request: ServingConfigRequest):
             "webhook_public_base_url": request.webhook_public_base_url,
             "webhook_path": request.webhook_path,
             "webhook_max_timestamp_age_seconds": request.webhook_max_timestamp_age_seconds,
+            "deployment_target": request.deployment_target,
         },
         "canary": {
             "alias": request.canary_alias,
@@ -242,6 +250,15 @@ async def submit_serving_config(request: ServingConfigRequest):
     if request.serving_mode == "kafka":
         params["kafka_inference"] = {
             "raw_schema_s3_path": request.raw_schema_s3_path,
+        }
+
+    # skypilot_serving block is only written when deployment_target == "skypilot"
+    if request.deployment_target == "skypilot":
+        params["skypilot_serving"] = {
+            "min_replicas": request.min_replicas,
+            "max_replicas": request.max_replicas,
+            "target_qps_per_replica": request.target_qps_per_replica,
+            "resource_constraints": request.resource_constraints,
         }
 
     params_yaml_str = _yaml.dump(params, default_flow_style=False, allow_unicode=True)
@@ -260,6 +277,7 @@ async def submit_serving_config(request: ServingConfigRequest):
         "train_run_id": request.train_run_id,
         "serving_mode": request.serving_mode,
         "registry_model_name": registry_model_name,
+        "deployment_target": request.deployment_target,
     }
 
 
@@ -293,6 +311,9 @@ async def deploy_serving_config(serve_run_id: str):
     kafka_block = serving_params.get("kafka_inference", {})
     params_s3_key = f"runs/serving/{serve_run_id}/params_serving.yaml"
 
+    deployment_target = serving_block.get("deployment_target", "in_cluster")
+    skypilot_block = serving_params.get("skypilot_serving", {})
+
     dag_conf: dict[str, Any] = {
         "serve_run_id": serve_run_id,
         "train_run_id": lineage.get("train_run_id", ""),
@@ -305,10 +326,22 @@ async def deploy_serving_config(serve_run_id: str):
         "raw_schema_s3_path": kafka_block.get("raw_schema_s3_path"),
     }
 
+    if deployment_target == "skypilot":
+        active_dag_id = TABULAR_SKY_SERVING_DAG_ID
+        dag_conf.update({
+            "alias": serving_block.get("alias", "champion"),
+            "min_replicas": skypilot_block.get("min_replicas", 1),
+            "max_replicas": skypilot_block.get("max_replicas", 3),
+            "target_qps_per_replica": skypilot_block.get("target_qps_per_replica", 10),
+            "resource_constraints": skypilot_block.get("resource_constraints"),
+        })
+    else:
+        active_dag_id = SERVING_DAG_ID
+
     try:
         status, data = _airflow_request(
             "POST",
-            f"api/v2/dags/{SERVING_DAG_ID}/dagRuns",
+            f"api/v2/dags/{active_dag_id}/dagRuns",
             body={
                 "logical_date": datetime.now(timezone.utc).isoformat(),
                 "conf": dag_conf,
@@ -325,18 +358,26 @@ async def deploy_serving_config(serve_run_id: str):
     except Exception as exc:
         raise HTTPException(
             status_code=502,
-            detail=f"Failed to trigger serving_pipeline DAG: {exc}",
+            detail=f"Failed to trigger {active_dag_id} DAG: {exc}",
         ) from exc
 
-    return {"dag_run_id": dag_run_id, "serve_run_id": serve_run_id}
+    return {"dag_run_id": dag_run_id, "serve_run_id": serve_run_id, "dag_id": active_dag_id}
 
 
 @router.get("/{serve_run_id}/deploy/{dag_run_id}/status")
-async def serving_deploy_status(serve_run_id: str, dag_run_id: str):
-    """Poll Airflow state for a serving deploy DAG run."""
+async def serving_deploy_status(
+    serve_run_id: str,
+    dag_run_id: str,
+    dag_id: Optional[str] = None,
+):
+    """Poll Airflow state for a serving deploy DAG run.
+
+    dag_id query param allows polling non-default DAGs (e.g. tabular_serving_skypilot_pipeline).
+    """
+    target_dag = dag_id or SERVING_DAG_ID
     try:
         status, data = _airflow_request(
-            "GET", f"api/v2/dags/{SERVING_DAG_ID}/dagRuns/{dag_run_id}"
+            "GET", f"api/v2/dags/{target_dag}/dagRuns/{dag_run_id}"
         )
         if status >= 400:
             raise HTTPException(

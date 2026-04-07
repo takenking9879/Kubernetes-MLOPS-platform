@@ -132,6 +132,7 @@ class ServingConfigIn(BaseModel):
     tensor_parallel_size: int = 1
     pipeline_parallel_size: int = 1
     num_nodes: int = 1
+    replicas: int = 1
 
 
 class LaunchRequest(BaseModel):
@@ -566,6 +567,7 @@ async def launch_job(body: LaunchRequest) -> LaunchResponse:
             tensor_parallel_size=body.serving.tensor_parallel_size,
             pipeline_parallel_size=body.serving.pipeline_parallel_size,
             num_nodes=body.serving.num_nodes,
+            replicas=body.serving.replicas,
             any_of=any_of,
         )
         _, serve_dag_conf = _builder.build_serving_job(s_cfg, multinode=multinode)

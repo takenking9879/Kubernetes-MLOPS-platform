@@ -63,7 +63,9 @@ https://docs.skypilot.co/en/latest/examples/models/kimi-k2.html
 - checar que las metricas custom lleguen al dashboard de grafana (ver que no se quede infinito por el agente el script)
 - Checar que no hay warnings de ray
 - Alojamiento de recursos optimo con 6 CPUs
-- Empezar con el serving de tabular (No hay serving tabular en la UI actualmente por alguna razón)
+- Empezar con el serving de tabular (Ahora el serving tabular mantiene lo de training y no tiene caso)
+- Pasar el serving a modo GPU igual como el training
+- Checar que se use la GPU realmente
 
 
 # Exponer puertos
@@ -71,3 +73,6 @@ kubectl port-forward svc/my-mlflow 5000:80 -n ray
 ngrok http 5000
 kubectl port-forward svc/prometheus 9090:9090 -n monitoring
 ngrok http --url https://metrics.ngrok-free.dev 9090
+
+~/sky_templates/ray/start_cluster
+stop_cluster #Podria ser clave para parar el job

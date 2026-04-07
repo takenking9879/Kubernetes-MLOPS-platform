@@ -52,11 +52,19 @@ Use this file to navigate to the right code area. Read overview.md first.
 → See: `context/src/`
 
 ### "Change serving config / deployment flow"
-→ `app/backend/routers/serving_configs.py` (API)
-→ `k3s/airflow/dags/serving_dag.py` (DAG: MLflow promote → patch RayService)
-→ `k3s/kuberay/serving/rayservice-model-serving.yaml` (K8s RayService manifest)
+→ `app/backend/routers/serving_configs.py` (API — handles both in-cluster and SkyPilot paths)
+→ `k3s/airflow/dags/serving_dag.py` (in-cluster: MLflow promote → patch RayService)
+→ `k3s/kuberay/serving/rayservice-model-serving.yaml` (K8s RayService manifest — in-cluster)
 → `src/serve/config.py` (ServingConfig loading)
 → See: `context/k3s/`
+
+### "Change tabular SkyPilot out-cluster serving"
+→ `app/backend/routers/serving_configs.py` — `deployment_target='skypilot'` branch in `deploy_serving_config`
+→ `k3s/airflow/dags/tabular_serving_skypilot_dag.py` — DAG: launch-tabular-serve → wait-for-endpoint → register-endpoint
+→ `k3s/sky/tabular-serving-single.yaml` — sky serve YAML (single-node replica, Ray Serve)
+→ `k3s/sky/tabular-serving-multinode.yaml` — sky serve YAML (multi-node replica, Kimi-K2 Ray pattern)
+→ `k3s/sky/sky_runner.py` — `launch_tabular_serve()`, `wait_tabular_serve()` (uses `sky.serve.up()` + `sky.serve.status()`)
+→ Frontend: `LaunchWizardPage.tsx` — tabServDeployTarget toggle, replica policy fields, endpoint polling
 
 ### "Add a new model architecture (custom PyTorch)"
 → `app/backend/routers/model_architectures.py` (upload + AST validation)

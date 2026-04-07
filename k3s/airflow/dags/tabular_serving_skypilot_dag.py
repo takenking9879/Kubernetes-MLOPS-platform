@@ -1,26 +1,25 @@
-"""Ray+vLLM Multi-Node Serving Pipeline DAG (Kimi-K2 pattern).
+"""Tabular SkyPilot sky serve Pipeline DAG.
+
+Deploys a tabular model (xgboost / sklearn / pytorch) as a managed sky serve
+service with auto-scaling replicas via SkyPilot.  Each replica runs Ray Serve
+as the HTTP serving framework.
+
+Single-node replica: tabular-serving-single.yaml
+Multi-node replica:  tabular-serving-multinode.yaml  (Kimi-K2 pattern adapted)
 
 SkyPilot has a dependency conflict with apache-airflow (protobuf, grpcio).
 All sky.* calls are delegated to the takenking9879/sky-runner:0.12.0 pod.
 
-Deploys a managed multi-node SkyServe service via sky.serve.up().
-Head node starts Ray + vllm serve with --pipeline-parallel-size=num_nodes.
-Workers join the Ray cluster and idle; Ray routes work internally.
-
-Use this for models that don't fit on a single node.
-For single-node, use vllm_serving_pipeline instead.
-
 dag_run.conf keys:
-    serve_run_id          : str   — unique serving run ID
-    llm_model_id          : str   — HuggingFace model ID
-    hf_token              : str   — HuggingFace token (optional)
-    llm_adapter_s3        : str   — s3://bucket/path/adapter/ (optional LoRA)
-    vllm_port             : int   — serving port (default 8081)
-    max_model_len         : int   — max context length (default 32768)
-    tensor_parallel_size  : int   — GPUs per node (default 8)
-    pipeline_parallel_size: int   — number of nodes (default 2)
-    replicas              : int   — number of SkyServe replicas (default 1)
-    resource_constraints  : dict|None — optional GPUSelectorService constraints
+    serve_run_id            : str      — unique serving run ID
+    registry_model_name     : str      — MLflow registered model name
+    alias                   : str      — model alias (default "champion")
+    serve_port              : int      — HTTP port for the serve endpoint (default 8000)
+    num_nodes               : int      — nodes per replica (1=single, >1=multi-node Ray)
+    min_replicas            : int      — minimum replica count (default 1)
+    max_replicas            : int      — maximum replica count (default 3)
+    target_qps_per_replica  : int      — QPS target for autoscaling (default 10)
+    resource_constraints    : dict|None — optional GPUSelectorService constraints
 
 Endpoint written to:
     s3://{S3_BUCKET}/runs/serving/{serve_run_id}/endpoint.json
@@ -42,10 +41,12 @@ from kubernetes.client import models as k8s
 
 _SKY_IMAGE  = os.getenv("SKY_RUNNER_IMAGE", "takenking9879/sky-runner:0.12.0")
 _AIRFLOW_NS = os.getenv("AIRFLOW_NAMESPACE", "airflow")
-VLLM_HEALTH_TIMEOUT_SECONDS = int(os.getenv("VLLM_MULTI_HEALTH_TIMEOUT_SECONDS", "900"))
+TABULAR_SERVE_HEALTH_TIMEOUT_SECONDS = int(
+    os.getenv("TABULAR_SERVE_HEALTH_TIMEOUT_SECONDS", "600")
+)
 S3_BUCKET = os.getenv("S3_BUCKET", "k8s-mlops-platform-bucket")
 
-# ─── Shared pod helpers ────────────────────────────────────────────────────────
+# ─── Shared pod helpers ───────────────────────────────────────────────────────
 
 def _aws_env_from() -> list:
     # Injects AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, RUNPOD_API_KEY,
@@ -56,10 +57,10 @@ def _aws_env_from() -> list:
 # ─── DAG definition ───────────────────────────────────────────────────────────
 
 with DAG(
-    dag_id="ray_vllm_serving_pipeline",
+    dag_id="tabular_serving_skypilot_pipeline",
     description=(
-        "Multi-node Ray+vLLM serving cluster — Kimi-K2 pattern (KubernetesPodOperator). "
-        "On-demand only. Tensor + pipeline parallelism. "
+        "Tabular model sky serve pipeline — SkyPilot managed replicas with Ray Serve. "
+        "Single-node or multi-node (Kimi-K2 pattern). "
         "Registers endpoint URL to S3 when healthy."
     ),
     start_date=datetime(2026, 1, 1),
@@ -69,32 +70,34 @@ with DAG(
         "retries": 1,
         "retry_delay": timedelta(minutes=5),
     },
-    tags=["mlops", "llm", "vllm", "ray", "multinode", "serving", "skypilot"],
+    tags=["mlops", "tabular", "ray", "serving", "skypilot", "sky-serve"],
 ) as dag:
 
     launch_task = KubernetesPodOperator(
-        task_id="launch_cluster",
-        name="sky-launch-ray-vllm",
+        task_id="launch_tabular_serve",
+        name="sky-launch-tabular-serve",
         namespace=_AIRFLOW_NS,
         image=_SKY_IMAGE,
         image_pull_policy="IfNotPresent",
-        arguments=["python", "/app/sky_runner.py", "launch-ray-vllm"],
+        arguments=["python", "/app/sky_runner.py", "launch-tabular-serve"],
         env_vars={
             "SERVE_RUN_ID":               "{{ dag_run.conf['serve_run_id'] }}",
-            "HF_MODEL_ID":                "{{ dag_run.conf['llm_model_id'] }}",
-            "HF_TOKEN":                   "{{ dag_run.conf.get('hf_token', '') }}",
-            "LLM_ADAPTER_S3":             "{{ dag_run.conf.get('llm_adapter_s3', '') }}",
-            "VLLM_PORT":                  "{{ dag_run.conf.get('vllm_port', 8081) }}",
-            "MAX_MODEL_LEN":              "{{ dag_run.conf.get('max_model_len', 32768) }}",
-            "TENSOR_PARALLEL_SIZE":       "{{ dag_run.conf.get('tensor_parallel_size', 8) }}",
-            "PIPELINE_PARALLEL_SIZE":     "{{ dag_run.conf.get('pipeline_parallel_size', 2) }}",
-            "REPLICAS":                   "{{ dag_run.conf.get('replicas', 1) }}",
+            "REGISTRY_MODEL_NAME":        "{{ dag_run.conf['registry_model_name'] }}",
+            "MODEL_ALIAS":                "{{ dag_run.conf.get('alias', 'champion') }}",
+            "SERVE_PORT":                 "{{ dag_run.conf.get('serve_port', 8000) }}",
+            "NUM_NODES":                  "{{ dag_run.conf.get('num_nodes', 1) }}",
+            "MIN_REPLICAS":               "{{ dag_run.conf.get('min_replicas', 1) }}",
+            "MAX_REPLICAS":               "{{ dag_run.conf.get('max_replicas', 3) }}",
+            "TARGET_QPS_PER_REPLICA":     "{{ dag_run.conf.get('target_qps_per_replica', 10) }}",
             "RESOURCE_CONSTRAINTS_JSON":  "{{ (dag_run.conf.get('resource_constraints') or {}) | tojson }}",
+            "S3_BUCKET":                  S3_BUCKET,
         },
         env_from=_aws_env_from(),
         do_xcom_push=True,
         get_logs=True,
         is_delete_operator_pod=True,
+        # sky.serve.up() can take a while to provision replicas
+        execution_timeout=timedelta(seconds=TABULAR_SERVE_HEALTH_TIMEOUT_SECONDS + 300),
         container_resources=k8s.V1ResourceRequirements(
             requests={"cpu": "250m", "memory": "512Mi"},
             limits={"cpu": "500m", "memory": "1Gi"},
@@ -103,20 +106,20 @@ with DAG(
 
     wait_task = KubernetesPodOperator(
         task_id="wait_for_endpoint",
-        name="sky-wait-ray-vllm",
+        name="sky-wait-tabular-serve",
         namespace=_AIRFLOW_NS,
         image=_SKY_IMAGE,
         image_pull_policy="IfNotPresent",
-        arguments=["python", "/app/sky_runner.py", "wait-ray-vllm"],
+        arguments=["python", "/app/sky_runner.py", "wait-tabular-serve"],
         env_vars={
-            "SERVICE_INFO_JSON":           "{{ ti.xcom_pull(task_ids='launch_cluster', key='return_value') | tojson }}",
-            "VLLM_HEALTH_TIMEOUT_SECONDS": str(VLLM_HEALTH_TIMEOUT_SECONDS),
+            "SERVICE_INFO_JSON": "{{ ti.xcom_pull(task_ids='launch_tabular_serve', key='return_value') | tojson }}",
+            "TABULAR_SERVE_HEALTH_TIMEOUT_SECONDS": str(TABULAR_SERVE_HEALTH_TIMEOUT_SECONDS),
         },
         env_from=_aws_env_from(),
         do_xcom_push=True,
         get_logs=True,
         is_delete_operator_pod=True,
-        execution_timeout=timedelta(seconds=VLLM_HEALTH_TIMEOUT_SECONDS + 120),
+        execution_timeout=timedelta(seconds=TABULAR_SERVE_HEALTH_TIMEOUT_SECONDS + 120),
         container_resources=k8s.V1ResourceRequirements(
             requests={"cpu": "100m", "memory": "256Mi"},
             limits={"cpu": "250m", "memory": "512Mi"},
@@ -125,7 +128,7 @@ with DAG(
 
     register_task = KubernetesPodOperator(
         task_id="register_endpoint",
-        name="sky-register-ray-vllm-endpoint",
+        name="sky-register-tabular-serve-endpoint",
         namespace=_AIRFLOW_NS,
         image=_SKY_IMAGE,
         image_pull_policy="IfNotPresent",
@@ -133,10 +136,8 @@ with DAG(
         env_vars={
             "ENDPOINT_URL":  "{{ ti.xcom_pull(task_ids='wait_for_endpoint', key='return_value') }}",
             "SERVE_RUN_ID":  "{{ dag_run.conf['serve_run_id'] }}",
-            "HF_MODEL_ID":   "{{ dag_run.conf['llm_model_id'] }}",
-            # service_name extracted from launch task xcom for the payload
-            "SERVICE_NAME":  "{{ (ti.xcom_pull(task_ids='launch_cluster', key='return_value') or {}).get('service_name', '') }}",
-            "ORCHESTRATION": "ray_vllm_multinode",
+            "HF_MODEL_ID":   "",   # not applicable for tabular — kept for register_endpoint compat
+            "ORCHESTRATION": "tabular_serving_skypilot",
             "S3_BUCKET":     S3_BUCKET,
         },
         env_from=_aws_env_from(),

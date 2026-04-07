@@ -47,6 +47,7 @@ import {
   submitServingConfig,
   triggerServingDeploy,
   getServingDeployStatus,
+  getVllmEndpoint,
   type LaunchRequest,
   type LaunchResponse,
   type OrchestratorRecommendation,
@@ -248,6 +249,7 @@ export function LaunchWizardPage() {
   const [maxSteps, setMaxSteps] = useState('500');
   const [llmAdapterS3, setLlmAdapterS3] = useState('');
   const [maxModelLen, setMaxModelLen] = useState('4096');
+  const [servingReplicas, setServingReplicas] = useState(1);
 
   // ── Tabular serving state ────────────────────────────────────────────────
   const [tabServTrainRunIds, setTabServTrainRunIds] = useState<TrainingRunId[]>([]);
@@ -272,6 +274,13 @@ export function LaunchWizardPage() {
   const [tabServWebhookUrl, setTabServWebhookUrl] = useState('');
   const [tabServWebhookPath, setTabServWebhookPath] = useState('/infer/webhook');
   const [tabServWebhookMaxAge, setTabServWebhookMaxAge] = useState(300);
+
+  const [tabServDeployTarget, setTabServDeployTarget] = useState<'in_cluster' | 'skypilot'>('in_cluster');
+  const [tabServMinReplicas, setTabServMinReplicas] = useState(1);
+  const [tabServMaxReplicas, setTabServMaxReplicas] = useState(3);
+  const [tabServQps, setTabServQps] = useState(10);
+  const [tabServEndpoint, setTabServEndpoint] = useState<string | null>(null);
+  const tabServEndpointPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const [tabServSubmitResult, setTabServSubmitResult] = useState<ServingConfigResult | null>(null);
   const [tabServSubmitError, setTabServSubmitError] = useState('');
@@ -335,6 +344,7 @@ export function LaunchWizardPage() {
   useEffect(() => {
     return () => {
       if (tabServDeployPollRef.current) clearInterval(tabServDeployPollRef.current);
+      if (tabServEndpointPollRef.current) clearInterval(tabServEndpointPollRef.current);
     };
   }, []);
 
@@ -447,6 +457,17 @@ export function LaunchWizardPage() {
         webhook_public_base_url: tabServWebhookUrl,
         webhook_path: tabServWebhookPath,
         webhook_max_timestamp_age_seconds: tabServWebhookMaxAge,
+        deployment_target: tabServDeployTarget,
+        ...(tabServDeployTarget === 'skypilot' ? {
+          min_replicas: tabServMinReplicas,
+          max_replicas: tabServMaxReplicas,
+          target_qps_per_replica: tabServQps,
+          resource_constraints: {
+            ...constraints,
+            num_nodes: numNodes,
+            job_type: 'tabular',
+          },
+        } : {}),
       });
       setTabServSubmitResult(result);
     } catch (e) {
@@ -459,7 +480,9 @@ export function LaunchWizardPage() {
     setTabServDeployError('');
     setTabServDeployResult(null);
     setTabServDeployState('queued');
+    setTabServEndpoint(null);
     if (tabServDeployPollRef.current) clearInterval(tabServDeployPollRef.current);
+    if (tabServEndpointPollRef.current) clearInterval(tabServEndpointPollRef.current);
     try {
       const result = await triggerServingDeploy(tabServSubmitResult.serve_run_id);
       setTabServDeployResult(result);
@@ -473,6 +496,19 @@ export function LaunchWizardPage() {
           })
           .catch(() => { /* keep polling */ });
       }, 15_000);
+      // For SkyPilot path, also poll endpoint until healthy
+      if (tabServDeployTarget === 'skypilot') {
+        tabServEndpointPollRef.current = setInterval(() => {
+          void getVllmEndpoint(tabServSubmitResult.serve_run_id)
+            .then(ep => {
+              if (ep.status === 'healthy' && ep.endpoint_url) {
+                setTabServEndpoint(ep.endpoint_url);
+                if (tabServEndpointPollRef.current) clearInterval(tabServEndpointPollRef.current);
+              }
+            })
+            .catch(() => { /* keep polling */ });
+        }, 20_000);
+      }
     } catch (e) {
       setTabServDeployError(e instanceof Error ? e.message : String(e));
       setTabServDeployState('');
@@ -508,12 +544,13 @@ export function LaunchWizardPage() {
           deepspeed_stage: useDeepspeed ? 3 : 1,
         },
         serving: {
-          hf_token:             hfToken,
-          llm_adapter_s3:       llmAdapterS3,
-          max_model_len:        parseInt(maxModelLen) || 4096,
-          num_nodes:            numNodes,
-          tensor_parallel_size: constraints.num_gpus_per_node ?? 1,
+          hf_token:               hfToken,
+          llm_adapter_s3:         llmAdapterS3,
+          max_model_len:          parseInt(maxModelLen) || 4096,
+          num_nodes:              numNodes,
+          tensor_parallel_size:   constraints.num_gpus_per_node ?? 1,
           pipeline_parallel_size: numNodes,
+          replicas:               servingReplicas,
         },
         dry_run: true,
       };
@@ -528,7 +565,7 @@ export function LaunchWizardPage() {
   }, [
     isTabularPath, jobType, resolvedModelType, llmModel, uploadedArchS3, selectedLLM,
     constraints, numNodes, useInfiniband, datasetS3, hfToken, maxSteps,
-    llmAdapterS3, maxModelLen,
+    llmAdapterS3, maxModelLen, servingReplicas,
   ]);
 
   useEffect(() => {
@@ -628,12 +665,13 @@ export function LaunchWizardPage() {
           deepspeed_stage: useDeepspeed ? 3 : 1,
         },
         serving: {
-          hf_token:             hfToken,
-          llm_adapter_s3:       llmAdapterS3,
-          max_model_len:        parseInt(maxModelLen) || 4096,
-          num_nodes:            numNodes,
-          tensor_parallel_size: constraints.num_gpus_per_node ?? 1,
+          hf_token:               hfToken,
+          llm_adapter_s3:         llmAdapterS3,
+          max_model_len:          parseInt(maxModelLen) || 4096,
+          num_nodes:              numNodes,
+          tensor_parallel_size:   constraints.num_gpus_per_node ?? 1,
           pipeline_parallel_size: numNodes,
+          replicas:               servingReplicas,
         },
         dry_run: false,
       };
@@ -675,7 +713,9 @@ export function LaunchWizardPage() {
     setTabServDeployResult(null);
     setTabServDeployState('');
     setTabServDeployError('');
+    setTabServEndpoint(null);
     if (tabServDeployPollRef.current) clearInterval(tabServDeployPollRef.current);
+    if (tabServEndpointPollRef.current) clearInterval(tabServEndpointPollRef.current);
     setStep(0);
   };
 
@@ -787,7 +827,7 @@ export function LaunchWizardPage() {
               </div>
 
               {/* ── Tabular config ──────────────────────────────────────────── */}
-              {modelCategory === 'tabular' && (
+              {modelCategory === 'tabular' && isTraining && (
                 <div className="flex flex-col gap-4">
 
                   {/* Section A: Preprocessing run */}
@@ -1364,6 +1404,66 @@ export function LaunchWizardPage() {
                     </div>
                   )}
 
+                  {/* Section C: Deployment target */}
+                  <div className="flex flex-col gap-2 rounded border border-slate-700/60 p-3">
+                    <span className={LABEL_CLS}>Deployment target</span>
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setTabServDeployTarget('in_cluster')}
+                        className={tabServDeployTarget === 'in_cluster' ? BTN_TOGGLE_ON : BTN_TOGGLE_OFF}
+                      >
+                        In-Cluster (KubeRay)
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setTabServDeployTarget('skypilot')}
+                        className={tabServDeployTarget === 'skypilot' ? BTN_TOGGLE_ON : BTN_TOGGLE_OFF}
+                      >
+                        Out-Cluster (SkyPilot sky serve)
+                      </button>
+                    </div>
+                    <p className="text-[10px] text-slate-500">
+                      {tabServDeployTarget === 'in_cluster'
+                        ? 'Patches existing KubeRay RayService on k3s via serving_pipeline DAG. No external GPU provisioned.'
+                        : 'Provisions a SkyPilot sky serve service on external VMs with auto-scaled replicas and Ray Serve.'}
+                    </p>
+                    {tabServDeployTarget === 'skypilot' && (
+                      <div className="grid grid-cols-3 gap-3 mt-1">
+                        <div className="flex flex-col gap-1">
+                          <span className="text-[10px] text-slate-500">Min replicas</span>
+                          <input
+                            type="number"
+                            className={INPUT_CLS}
+                            min={0}
+                            value={tabServMinReplicas}
+                            onChange={e => setTabServMinReplicas(parseInt(e.target.value) || 1)}
+                          />
+                        </div>
+                        <div className="flex flex-col gap-1">
+                          <span className="text-[10px] text-slate-500">Max replicas</span>
+                          <input
+                            type="number"
+                            className={INPUT_CLS}
+                            min={1}
+                            value={tabServMaxReplicas}
+                            onChange={e => setTabServMaxReplicas(parseInt(e.target.value) || 3)}
+                          />
+                        </div>
+                        <div className="flex flex-col gap-1">
+                          <span className="text-[10px] text-slate-500">Target QPS / replica</span>
+                          <input
+                            type="number"
+                            className={INPUT_CLS}
+                            min={1}
+                            value={tabServQps}
+                            onChange={e => setTabServQps(parseInt(e.target.value) || 10)}
+                          />
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
                   {/* Section D: Serving config */}
                   <div className="flex flex-col gap-3 rounded border border-slate-700/60 p-3">
                     <span className={LABEL_CLS}>Serving config</span>
@@ -1538,6 +1638,20 @@ export function LaunchWizardPage() {
                           onChange={e => setMaxModelLen(e.target.value)}
                         />
                       </div>
+                      <div className="flex flex-col gap-1.5">
+                        <span className={LABEL_CLS}>Replicas</span>
+                        <input
+                          type="number"
+                          className={INPUT_CLS}
+                          value={servingReplicas}
+                          min={1}
+                          max={10}
+                          onChange={e => setServingReplicas(Math.max(1, parseInt(e.target.value) || 1))}
+                        />
+                        <span className="text-[10px] text-slate-500">
+                          SkyServe replicas — each replica = {numNodes}-node Ray cluster
+                        </span>
+                      </div>
                     </>
                   )}
                 </div>
@@ -1634,7 +1748,40 @@ export function LaunchWizardPage() {
           ══════════════════════════════════════════════════════════════════ */}
           {step === 1 && (
             <div className="flex flex-col gap-5 rounded border border-slate-700 bg-slate-900/50 p-5">
-              {isTabularServingPath ? (
+              {isTabularServingPath && tabServDeployTarget === 'skypilot' ? (
+                <>
+                  <GPUResourceSelector value={constraints} onChange={setConstraints} />
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="flex flex-col gap-1.5">
+                      <span className={LABEL_CLS}>Nodes per replica</span>
+                      <div className="flex gap-2">
+                        {[1, 2, 4].map(n => (
+                          <button
+                            key={n}
+                            type="button"
+                            onClick={() => setNumNodes(n)}
+                            className={`rounded px-2.5 py-0.5 text-xs font-medium transition-colors ${
+                              numNodes === n ? 'bg-blue-700 text-white' : 'bg-slate-700 text-slate-400 hover:bg-slate-600'
+                            }`}
+                          >
+                            {n === 1 ? 'Single' : `${n}×`}
+                          </button>
+                        ))}
+                      </div>
+                      {numNodes > 1 && (
+                        <p className="text-[10px] text-slate-500">
+                          Each sky serve replica spawns a {numNodes}-node Ray cluster (head + {numNodes - 1} worker{numNodes > 2 ? 's' : ''}).
+                        </p>
+                      )}
+                    </div>
+                    <div className="rounded border border-amber-700/40 bg-amber-900/10 px-3 py-2 self-start">
+                      <p className="text-[10px] text-amber-400">
+                        Serving — on-demand recommended. SkyServe handles replica restarts on spot preemption.
+                      </p>
+                    </div>
+                  </div>
+                </>
+              ) : isTabularServingPath ? (
                 <div className="rounded border border-slate-700 bg-slate-800/40 px-4 py-4 flex flex-col gap-2">
                   <span className="text-xs font-semibold text-slate-300">In-cluster deployment</span>
                   <p className="text-xs text-slate-400">
@@ -1682,7 +1829,7 @@ export function LaunchWizardPage() {
                 </div>
               )}
 
-              {/* Nodes + InfiniBand (SkyPilot jobs only) */}
+              {/* Nodes + InfiniBand (SkyPilot jobs only — excluded for tabular serving which has its own selector above) */}
               {!isTabularServingPath && (
                 <div className="grid grid-cols-2 gap-4">
                   <div className="flex flex-col gap-1.5">
@@ -1745,7 +1892,17 @@ export function LaunchWizardPage() {
                       <button onClick={() => setStep(0)} className="text-[10px] text-blue-400 hover:text-blue-300">Edit</button>
                     </div>
                     <div className="grid grid-cols-[120px_1fr] gap-x-3 gap-y-1">
-                      {[['Train run ID', tabServTrainRunId], ['Dataset', tabServDataset], ['Mode', tabServMode]].map(([k, v]) => (
+                      {([
+                        ['Train run ID', tabServTrainRunId],
+                        ['Dataset', tabServDataset],
+                        ['Mode', tabServMode],
+                        ['Deployment', tabServDeployTarget === 'in_cluster' ? 'In-Cluster (KubeRay)' : 'Out-Cluster (SkyPilot sky serve)'],
+                        ...(tabServDeployTarget === 'skypilot' ? [
+                          ['Replicas', `${tabServMinReplicas}–${tabServMaxReplicas} (QPS target: ${tabServQps})`],
+                          ['Nodes/replica', String(numNodes)],
+                          ['Providers', (constraints.providers ?? ['runpod']).join(', ')],
+                        ] : []),
+                      ] as [string, string][]).map(([k, v]) => (
                         <div key={k} className="contents">
                           <span className="text-[11px] text-slate-500">{k}</span>
                           <span className="break-all font-mono text-[11px] text-slate-200">{v || '—'}</span>
@@ -2031,8 +2188,9 @@ export function LaunchWizardPage() {
                             Deploy Now
                           </button>
                           <p className="text-center text-[10px] text-slate-500">
-                            Triggers: MLflow promotion → Ray Serve patch
-                            {tabServSubmitResult.serving_mode === 'kafka' ? ' → Spark Kafka connector' : ''}
+                            {tabServSubmitResult.deployment_target === 'skypilot'
+                              ? 'Triggers: tabular_serving_skypilot_pipeline DAG → sky serve up → endpoint registered'
+                              : `Triggers: MLflow promotion → Ray Serve patch${tabServSubmitResult.serving_mode === 'kafka' ? ' → Spark Kafka connector' : ''}`}
                           </p>
                         </div>
                       ) : (
@@ -2049,6 +2207,14 @@ export function LaunchWizardPage() {
                             }`}>
                               {tabServDeployState || 'queued'}
                             </span>
+                            {tabServDeployTarget === 'skypilot' && (
+                              <>
+                                <span className="text-slate-500">Endpoint</span>
+                                <span className={`font-mono ${tabServEndpoint ? 'text-green-400' : 'text-amber-400'}`}>
+                                  {tabServEndpoint ?? 'provisioning…'}
+                                </span>
+                              </>
+                            )}
                           </div>
                         </div>
                       )}
@@ -2060,7 +2226,9 @@ export function LaunchWizardPage() {
                           setTabServDeployResult(null);
                           setTabServDeployState('');
                           setTabServDeployError('');
+                          setTabServEndpoint(null);
                           if (tabServDeployPollRef.current) clearInterval(tabServDeployPollRef.current);
+                          if (tabServEndpointPollRef.current) clearInterval(tabServEndpointPollRef.current);
                         }}
                         className="rounded bg-slate-700 px-3 py-1 text-xs text-slate-300 hover:bg-slate-600"
                       >

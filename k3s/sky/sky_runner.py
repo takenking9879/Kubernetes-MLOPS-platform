@@ -13,11 +13,13 @@ Commands:
                         tear down SkyPilot jobs controller when safe
     submit-llm          Launch managed LLM fine-tuning job; pushes job_name (str)
     poll-llm            Poll managed LLM job until terminal state
-    launch-vllm         Provision persistent single-node vLLM cluster; pushes cluster_info (dict)
-    wait-vllm           Poll /health until ready; pushes endpoint_url (str)
-    launch-ray-vllm     Provision persistent multi-node Ray+vLLM cluster; pushes cluster_info (dict)
-    wait-ray-vllm       Poll /health until ready (multi-node); pushes endpoint_url (str)
-    register-endpoint   Write endpoint URL to S3 (shared by both serving types)
+    launch-vllm             Provision persistent single-node vLLM cluster; pushes cluster_info (dict)
+    wait-vllm               Poll /health until ready; pushes endpoint_url (str)
+    launch-ray-vllm         Provision persistent multi-node Ray+vLLM cluster; pushes cluster_info (dict)
+    wait-ray-vllm           Poll /health until ready (multi-node); pushes endpoint_url (str)
+    launch-tabular-serve    Deploy sky serve service for tabular model; pushes service_info (dict)
+    wait-tabular-serve      Poll sky.serve.status() until READY; pushes endpoint_url (str)
+    register-endpoint       Write endpoint URL to S3 (shared by all serving types)
 """
 
 from __future__ import annotations
@@ -74,9 +76,15 @@ _YAML_MAP: dict[tuple[str, str], str] = {
     ("llm",        "runpod"): "ray-llm-training-runpod.yaml",
     ("llm",        "vast"):   "ray-llm-training-vast.yaml",
     ("llm",        "aws"):    "ray-llm-training-aws.yaml",
-    ("vllm",       "runpod"): "vllm-serving-runpod.yaml",
-    ("vllm",       "vast"):   "vllm-serving-vast.yaml",
-    ("vllm_multi", "aws"):    "ray-vllm-multinode-serving.yaml",
+    ("vllm",             "runpod"): "vllm-serving-runpod.yaml",
+    ("vllm",             "vast"):   "vllm-serving-vast.yaml",
+    ("vllm_multi",       "aws"):    "ray-vllm-multinode-serving.yaml",
+    ("tabular_serve",    "runpod"): "tabular-serving-single.yaml",
+    ("tabular_serve",    "vast"):   "tabular-serving-single.yaml",
+    ("tabular_serve",    "aws"):    "tabular-serving-single.yaml",
+    ("tabular_serve_multi", "runpod"): "tabular-serving-multinode.yaml",
+    ("tabular_serve_multi", "vast"):   "tabular-serving-multinode.yaml",
+    ("tabular_serve_multi", "aws"):    "tabular-serving-multinode.yaml",
 }
 
 
@@ -684,7 +692,7 @@ def wait_vllm():
 
 
 def launch_ray_vllm():
-    """Multi-node Ray+vLLM cluster (Kimi-K2 pattern)."""
+    """Multi-node Ray+vLLM serving via SkyServe (Kimi-K2 pattern)."""
     import sky
     import yaml as _yaml
 
@@ -696,20 +704,19 @@ def launch_ray_vllm():
     max_model_len     = int(_env("MAX_MODEL_LEN", "32768"))
     tensor_parallel   = int(_env("TENSOR_PARALLEL_SIZE", "8"))
     pipeline_parallel = int(_env("PIPELINE_PARALLEL_SIZE", "2"))
+    replicas          = int(_env("REPLICAS", "1"))
     rc                = _rc()
 
-    cluster_name = _k8s_name(serve_run_id, "rvllm", max_len=32)
+    service_name = _k8s_name(serve_run_id, "rvllm", max_len=32)
     yaml_path    = _yaml_path("vllm_multi", rc)
-    print(f"Using Ray+vLLM YAML: {yaml_path}  ({pipeline_parallel} nodes)")
+    print(f"Using Ray+vLLM YAML: {yaml_path}  ({pipeline_parallel} nodes × {replicas} replicas)")
 
-    # Load base YAML and override num_nodes from pipeline_parallel_size
-    base_task = _load_task(yaml_path, serve_run_id, rc, prefer_spot=False)
-
-    # Re-open the (possibly rewritten) YAML to set num_nodes
+    # Load base YAML and override num_nodes + service.replicas
     tmp_src = f"/tmp/sky_ray_vllm_base_{serve_run_id}.yaml"
     with open(yaml_path) as fh:
         sky_conf = _yaml.safe_load(fh)
     sky_conf["num_nodes"] = pipeline_parallel
+    sky_conf.setdefault("service", {})["replicas"] = replicas
     with open(tmp_src, "w") as fh:
         _yaml.dump(sky_conf, fh, default_flow_style=False, allow_unicode=True)
     task = sky.Task.from_yaml(tmp_src)
@@ -725,51 +732,54 @@ def launch_ray_vllm():
         "PIPELINE_PARALLEL_SIZE": str(pipeline_parallel),
     })
 
-    sky.stream_and_get(
-        sky.launch(task, cluster_name=cluster_name, retry_until_up=True, detach_run=True)
-    )
-    print(f"Ray+vLLM cluster launched: {cluster_name} ({pipeline_parallel} nodes)")
-
-    head_ip = _get_head_ip(cluster_name)
-    print(f"Head IP: {head_ip or '(not yet available)'}")
-    _xcom_push({"cluster_name": cluster_name, "head_ip": head_ip or "", "vllm_port": vllm_port})
+    sky.stream_and_get(sky.serve.up(task, service_name=service_name))
+    print(f"Ray+vLLM service launched: {service_name} ({pipeline_parallel} nodes × {replicas} replicas)")
+    _xcom_push({"service_name": service_name, "vllm_port": vllm_port})
 
 
 def wait_ray_vllm():
-    """Poll /health for the multi-node Ray+vLLM cluster (longer startup)."""
-    import requests as _req
+    """Poll sky.serve.status() until the Ray+vLLM service is READY."""
+    import sky
 
-    info         = json.loads(_env("CLUSTER_INFO_JSON") or "{}")
-    cluster_name = info.get("cluster_name", "")
-    head_ip      = info.get("head_ip", "")
-    vllm_port    = int(info.get("vllm_port") or _env("VLLM_PORT", "8081"))
+    info         = json.loads(_env("SERVICE_INFO_JSON") or "{}")
+    service_name = info.get("service_name", "")
     timeout      = int(_env("VLLM_HEALTH_TIMEOUT_SECONDS", "900"))
-    interval     = 20   # multi-node startup takes longer
+    interval     = 30   # multi-node startup takes longer
 
-    if not head_ip and cluster_name:
-        head_ip = _get_head_ip(cluster_name) or ""
-    if not head_ip:
-        raise RuntimeError(f"Cannot determine head IP for cluster '{cluster_name}'.")
+    if not service_name:
+        raise RuntimeError("SERVICE_INFO_JSON must contain 'service_name'")
 
-    endpoint   = f"http://{head_ip}:{vllm_port}"
-    health_url = f"{endpoint}/health"
-    print(f"Polling Ray+vLLM health: {health_url} (timeout={timeout}s)")
+    print(f"Polling sky serve status for Ray+vLLM service '{service_name}' (timeout={timeout}s)")
 
     elapsed = 0
     while elapsed < timeout:
         try:
-            r = _req.get(health_url, timeout=5)
-            if r.status_code == 200:
-                print(f"Ray+vLLM endpoint healthy after {elapsed}s: {endpoint}")
-                _xcom_push(endpoint)
-                return
-        except Exception:
-            pass
+            statuses = sky.get(sky.serve.status(service_names=[service_name]))
+            if statuses:
+                svc = statuses[0]
+                if isinstance(svc, dict):
+                    endpoint   = svc.get("endpoint_url") or svc.get("endpoint", "")
+                    status_val = str(svc.get("status", "")).upper()
+                else:
+                    endpoint   = getattr(svc, "endpoint_url", None) or getattr(svc, "endpoint", "")
+                    status_val = str(getattr(svc, "status", "")).upper()
+                if "READY" in status_val and endpoint:
+                    print(f"Ray+vLLM service healthy after {elapsed}s: {endpoint}")
+                    _xcom_push(endpoint)
+                    return
+                if "FAILED" in status_val:
+                    raise RuntimeError(f"Service '{service_name}' entered FAILED state.")
+                print(f"[{elapsed}s] Status={status_val}, endpoint={endpoint or '—'}")
+        except RuntimeError:
+            raise
+        except Exception as exc:
+            print(f"[{elapsed}s] status check error: {exc}")
         time.sleep(interval)
         elapsed += interval
-        print(f"[{elapsed}s] Ray+vLLM not ready yet...")
 
-    raise RuntimeError(f"Ray+vLLM endpoint '{health_url}' not healthy after {timeout}s.")
+    raise RuntimeError(
+        f"Ray+vLLM service '{service_name}' not READY after {timeout}s."
+    )
 
 
 def run_training():
@@ -955,16 +965,125 @@ def run_llm():
         raise
 
 
+def launch_tabular_serve():
+    """Deploy a SkyPilot sky serve service for tabular model inference.
+
+    Uses sky.serve.up() (managed service) — NOT sky.launch() (persistent cluster).
+    Single-node: tabular-serving-single.yaml
+    Multi-node:  tabular-serving-multinode.yaml (Kimi-K2 pattern adapted for tabular)
+    """
+    import sky
+    import yaml as _yaml
+
+    serve_run_id   = _env("SERVE_RUN_ID")
+    registry_model = _env("REGISTRY_MODEL_NAME")
+    alias          = _env("MODEL_ALIAS", "champion")
+    serve_port     = int(_env("SERVE_PORT", "8000"))
+    min_replicas   = int(_env("MIN_REPLICAS", "1"))
+    max_replicas   = int(_env("MAX_REPLICAS", "3"))
+    target_qps     = int(_env("TARGET_QPS_PER_REPLICA", "10"))
+    num_nodes      = int(_env("NUM_NODES", "1"))
+    rc             = _rc()
+
+    kind = "tabular_serve_multi" if num_nodes > 1 else "tabular_serve"
+    yaml_path = _yaml_path(kind, rc)
+    print(f"Using tabular serve YAML: {yaml_path}  (num_nodes={num_nodes})")
+
+    with open(yaml_path) as fh:
+        sky_conf = _yaml.safe_load(fh)
+
+    # Inject replica policy
+    sky_conf.setdefault("service", {}).setdefault("replica_policy", {}).update({
+        "min_replicas": min_replicas,
+        "max_replicas": max_replicas,
+        "target_qps_per_replica": target_qps,
+    })
+    if num_nodes > 1:
+        sky_conf["num_nodes"] = num_nodes
+
+    # Inject explicit resource constraints when provided
+    if rc:
+        gpu_fallbacks = rc.get("gpu_fallbacks") or rc.get("ordered")
+        if gpu_fallbacks and isinstance(gpu_fallbacks, list):
+            sky_conf.setdefault("resources", {})["ordered"] = gpu_fallbacks
+            sky_conf["resources"].pop("any_of", None)
+
+    tmp = f"/tmp/sky_tabular_serve_{serve_run_id}.yaml"
+    with open(tmp, "w") as fh:
+        _yaml.dump(sky_conf, fh, default_flow_style=False, allow_unicode=True)
+
+    task = sky.Task.from_yaml(tmp)
+    task.update_envs({
+        "SERVE_RUN_ID":        serve_run_id,
+        "REGISTRY_MODEL_NAME": registry_model,
+        "MODEL_ALIAS":         alias,
+        "SERVE_PORT":          str(serve_port),
+    })
+
+    service_name = _k8s_name(serve_run_id, "tabserv", max_len=32)
+    print(f"Launching sky serve service: {service_name}")
+    sky.stream_and_get(sky.serve.up(task, service_name=service_name))
+    print(f"Tabular serve service launched: {service_name}")
+    _xcom_push({"service_name": service_name, "serve_port": serve_port})
+
+
+def wait_tabular_serve():
+    """Poll sky.serve.status() until the service is READY and return the endpoint URL."""
+    import sky
+
+    info         = json.loads(_env("SERVICE_INFO_JSON") or "{}")
+    service_name = info.get("service_name", "")
+    serve_port   = int(info.get("serve_port") or _env("SERVE_PORT", "8000"))
+    timeout      = int(_env("TABULAR_SERVE_HEALTH_TIMEOUT_SECONDS", "600"))
+    interval     = 20
+
+    if not service_name:
+        raise RuntimeError("SERVICE_INFO_JSON must contain 'service_name'")
+
+    print(f"Polling sky serve status for service '{service_name}' (timeout={timeout}s)")
+
+    elapsed = 0
+    while elapsed < timeout:
+        try:
+            statuses = sky.get(sky.serve.status(service_names=[service_name]))
+            if statuses:
+                svc = statuses[0]
+                if isinstance(svc, dict):
+                    endpoint  = svc.get("endpoint_url") or svc.get("endpoint", "")
+                    status_val = str(svc.get("status", "")).upper()
+                else:
+                    endpoint  = getattr(svc, "endpoint_url", None) or getattr(svc, "endpoint", "")
+                    status_val = str(getattr(svc, "status", "")).upper()
+                if "READY" in status_val and endpoint:
+                    print(f"Tabular serve healthy after {elapsed}s: {endpoint}")
+                    _xcom_push(endpoint)
+                    return
+                if "FAILED" in status_val:
+                    raise RuntimeError(f"Service '{service_name}' entered FAILED state.")
+                print(f"[{elapsed}s] Status={status_val}, endpoint={endpoint or '—'}")
+        except RuntimeError:
+            raise
+        except Exception as exc:
+            print(f"[{elapsed}s] status check error: {exc}")
+        time.sleep(interval)
+        elapsed += interval
+
+    raise RuntimeError(
+        f"Tabular serve service '{service_name}' not READY after {timeout}s."
+    )
+
+
 def register_endpoint():
     import boto3
     from datetime import datetime
 
-    endpoint_url = _env("ENDPOINT_URL")
-    serve_run_id = _env("SERVE_RUN_ID")
-    model_id     = _env("HF_MODEL_ID")
-    cluster_name = _env("CLUSTER_NAME", "")
+    endpoint_url  = _env("ENDPOINT_URL")
+    serve_run_id  = _env("SERVE_RUN_ID")
+    model_id      = _env("HF_MODEL_ID")
+    # SERVICE_NAME (sky.serve pattern) with fallback to CLUSTER_NAME (sky.launch pattern)
+    service_name  = _env("SERVICE_NAME", "") or _env("CLUSTER_NAME", "")
     orchestration = _env("ORCHESTRATION", "vllm_single_node")
-    bucket       = _env("S3_BUCKET", "k8s-mlops-platform-bucket")
+    bucket        = _env("S3_BUCKET", "k8s-mlops-platform-bucket")
 
     s3 = boto3.client(
         "s3",
@@ -980,8 +1099,8 @@ def register_endpoint():
         "orchestration": orchestration,
         "registered_at": datetime.utcnow().isoformat() + "Z",
     }
-    if cluster_name:
-        payload["cluster_name"] = cluster_name
+    if service_name:
+        payload["service_name"] = service_name
     s3.put_object(
         Bucket=bucket,
         Key=key,
@@ -1006,8 +1125,11 @@ _COMMANDS = {
     # ── vLLM serving (persistent cluster — split-phase is intentional here) ───
     "launch-vllm":       launch_vllm,
     "wait-vllm":         wait_vllm,
-    "launch-ray-vllm":   launch_ray_vllm,
-    "wait-ray-vllm":     wait_ray_vllm,
+    "launch-ray-vllm":       launch_ray_vllm,
+    "wait-ray-vllm":         wait_ray_vllm,
+    # ── Tabular sky serve (sky.serve.up — managed replicas) ───────────────────
+    "launch-tabular-serve":  launch_tabular_serve,
+    "wait-tabular-serve":    wait_tabular_serve,
     "register-endpoint": register_endpoint,
 }
 

@@ -58,6 +58,20 @@ class TrainingJobConfig:
 
 
 @dataclass
+class TabularServingJobConfig:
+    """All parameters needed to build a tabular sky serve job."""
+    serve_run_id: str = ""
+    registry_model_name: str = ""
+    alias: str = "champion"
+    serve_port: int = 8000
+    num_nodes: int = 1
+    min_replicas: int = 1
+    max_replicas: int = 3
+    target_qps_per_replica: int = 10
+    any_of: list[dict] = field(default_factory=list)
+
+
+@dataclass
 class ServingJobConfig:
     """All parameters needed to build a vLLM serving SkyPilot job."""
     serve_run_id: str = ""                     # generated if empty
@@ -69,6 +83,7 @@ class ServingJobConfig:
     tensor_parallel_size: int = 1
     pipeline_parallel_size: int = 1
     num_nodes: int = 1
+    replicas: int = 1
 
     # GPU resource constraints
     any_of: list[dict] = field(default_factory=list)
@@ -97,6 +112,10 @@ _SKY_LLM_AWS_YAML    = _SKY_DIR / "ray-llm-training-aws.yaml"
 _SKY_VLLM_RUNPOD_YAML = _SKY_DIR / "vllm-serving-runpod.yaml"
 _SKY_VLLM_VAST_YAML   = _SKY_DIR / "vllm-serving-vast.yaml"
 _SKY_VLLM_MULTI_YAML  = _SKY_DIR / "ray-vllm-multinode-serving.yaml"
+
+# Tabular serving — SkyPilot sky serve (single-node and multi-node Ray)
+_SKY_TABULAR_SERVE_SINGLE_YAML = _SKY_DIR / "tabular-serving-single.yaml"
+_SKY_TABULAR_SERVE_MULTI_YAML  = _SKY_DIR / "tabular-serving-multinode.yaml"
 
 
 def _provider_from_any_of(any_of: list[dict]) -> str:
@@ -211,7 +230,54 @@ class JobBuilder:
 
         return "", dag_conf
 
-    # ── Serving ───────────────────────────────────────────────────────────────
+    # ── Tabular serving (sky serve) ───────────────────────────────────────────
+
+    def build_tabular_serving_job(self, config: TabularServingJobConfig) -> tuple[str, dict]:
+        """Returns (yaml_tmp_path, dag_conf) for a tabular sky serve job."""
+        if not config.serve_run_id:
+            config.serve_run_id = f"serve-tabular-{uuid.uuid4().hex[:8]}"
+
+        base_yaml_path = (
+            _SKY_TABULAR_SERVE_MULTI_YAML if config.num_nodes > 1
+            else _SKY_TABULAR_SERVE_SINGLE_YAML
+        )
+        sky_conf = self._load_base_yaml(base_yaml_path)
+
+        # Inject replica policy
+        sky_conf.setdefault("service", {}).setdefault("replica_policy", {}).update({
+            "min_replicas": config.min_replicas,
+            "max_replicas": config.max_replicas,
+            "target_qps_per_replica": config.target_qps_per_replica,
+        })
+        if config.num_nodes > 1:
+            sky_conf["num_nodes"] = config.num_nodes
+        if config.any_of:
+            resources_cfg = sky_conf.setdefault("resources", {})
+            resources_cfg["ordered"] = config.any_of
+            resources_cfg.pop("any_of", None)
+
+        sky_conf.setdefault("envs", {}).update({
+            "SERVE_RUN_ID":         config.serve_run_id,
+            "REGISTRY_MODEL_NAME":  config.registry_model_name,
+            "MODEL_ALIAS":          config.alias,
+            "SERVE_PORT":           str(config.serve_port),
+        })
+
+        dag_conf: dict[str, Any] = {
+            "serve_run_id":           config.serve_run_id,
+            "registry_model_name":    config.registry_model_name,
+            "alias":                  config.alias,
+            "serve_port":             config.serve_port,
+            "num_nodes":              config.num_nodes,
+            "min_replicas":           config.min_replicas,
+            "max_replicas":           config.max_replicas,
+            "target_qps_per_replica": config.target_qps_per_replica,
+        }
+        if config.any_of:
+            dag_conf["resource_constraints"] = {"ordered": config.any_of}
+        return "", dag_conf
+
+    # ── vLLM Serving ──────────────────────────────────────────────────────────
 
     def build_serving_job(self, config: ServingJobConfig, multinode: bool = False) -> tuple[str, dict]:
         """
@@ -235,6 +301,8 @@ class JobBuilder:
 
         if multinode and config.num_nodes > 1:
             sky_conf["num_nodes"] = config.num_nodes
+        if multinode:
+            sky_conf.setdefault("service", {})["replicas"] = config.replicas
 
         sky_conf.setdefault("envs", {}).update({
             "HF_MODEL_ID":              config.llm_model_id,
@@ -247,14 +315,15 @@ class JobBuilder:
         })
 
         dag_conf: dict[str, Any] = {
-            "serve_run_id":         config.serve_run_id,
-            "llm_model_id":         config.llm_model_id,
-            "hf_token":             config.hf_token,
-            "llm_adapter_s3":       config.llm_adapter_s3,
-            "vllm_port":            config.vllm_port,
-            "max_model_len":        config.max_model_len,
-            "tensor_parallel_size": config.tensor_parallel_size,
+            "serve_run_id":           config.serve_run_id,
+            "llm_model_id":           config.llm_model_id,
+            "hf_token":               config.hf_token,
+            "llm_adapter_s3":         config.llm_adapter_s3,
+            "vllm_port":              config.vllm_port,
+            "max_model_len":          config.max_model_len,
+            "tensor_parallel_size":   config.tensor_parallel_size,
             "pipeline_parallel_size": config.pipeline_parallel_size,
+            "replicas":               config.replicas,
         }
         return "", dag_conf
 

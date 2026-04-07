@@ -9,12 +9,12 @@
 #
 # For single-node models, use vllm-serving.yaml instead (simpler, cheaper).
 #
-# On-demand only — serving clusters need uptime (no spot preemption tolerance).
+# On-demand only — serving replicas need uptime (no spot preemption tolerance).
 #
-# Triggered by ray_vllm_serving_pipeline Airflow DAG via sky.launch().
+# Triggered by ray_vllm_serving_pipeline Airflow DAG via sky.serve.up().
 #
 # Test with an ungated model:
-#   sky launch k3s/sky/ray-vllm-multinode-serving.yaml \
+#   sky serve up k3s/sky/ray-vllm-multinode-serving.yaml \
 #     --env HF_MODEL_ID=Qwen/Qwen2.5-7B \
 #     --env TENSOR_PARALLEL_SIZE=1 \
 #     --env PIPELINE_PARALLEL_SIZE=2 \
@@ -23,6 +23,17 @@
 name: ray-vllm-multinode-serving
 
 num_nodes: 2   # overridden by JobBuilder from serving config
+
+service:
+  replicas: 1  # overridden by sky_runner.py via YAML injection
+  readiness_probe:
+    path: /v1/chat/completions
+    post_data:
+      model: $HF_MODEL_ID
+      messages:
+        - role: user
+          content: "Hello! What is your name?"
+      max_tokens: 1
 
 resources:
   # Custom image — all deps baked in (torch 2.10.0 cu128, ray 2.53.0, vllm 0.18.0).
@@ -51,9 +62,6 @@ resources:
       use_spot: false
   disk_size: 200
   network_tier: best   # prefer EFA/InfiniBand when available
-
-# Safety net: auto-terminate if idle for 60 min.
-idle_minutes_to_autostop: 60
 
 envs:
   # ── Model ──

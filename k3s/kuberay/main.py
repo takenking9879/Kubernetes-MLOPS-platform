@@ -14,6 +14,8 @@ import pickle
 import subprocess
 import yaml
 import time
+import json
+from datetime import datetime, timezone
 from pyiceberg.catalog import load_catalog
 from pyiceberg.expressions import GreaterThanOrEqual, LessThanOrEqual, And
 from urllib.parse import urlparse
@@ -45,6 +47,14 @@ _FRAMEWORK_DEFAULTS: Dict[str, tuple] = {
     "pytorch": (PYTORCH_PARAMS, "pytorch_params"),
     "xgboost": (XGBOOST_PARAMS, "xgboost_params"),
 }
+
+
+def _sanitize_s3_segment(value: str, fallback: str = "unknown") -> str:
+    """Lowercase + replace chars unsafe for S3 key segments with '_'."""
+    if not value:
+        return fallback
+    sanitized = re.sub(r"[^a-z0-9_\-]", "_", value.lower())
+    return sanitized.strip("_") or fallback
 
 
 class KubeRayTraining(BaseUtils):
@@ -231,7 +241,12 @@ class KubeRayTraining(BaseUtils):
             raise
 
     def _save_model(self, result, framework):
-        """Extract the trained model from checkpoint and save to S3 as .pkl."""
+        """Extract the trained model from checkpoint and save to S3 as .pkl.
+
+        S3 layout:
+            v1/models/{registry_model_name}/{train_run_id}/model_{model_type}.pkl
+            v1/models/{registry_model_name}/{train_run_id}/model_metadata.json
+        """
         self.logger.info(f"Exportando modelo final de {framework} a S3...")
         try:
             checkpoint = result.checkpoint
@@ -264,11 +279,40 @@ class KubeRayTraining(BaseUtils):
 
             parsed_out = urlparse(self.output_dir)
             bucket_out = parsed_out.netloc
-            prefix_out = parsed_out.path.lstrip('/')
-            s3_key_out = os.path.join(prefix_out, f"model_{framework}.pkl")
+            base_prefix = parsed_out.path.lstrip("/")
 
-            self.s3.put_object(Bucket=bucket_out, Key=s3_key_out, Body=payload)
-            self.logger.info(f"Modelo exportado correctamente a s3://{bucket_out}/{s3_key_out}")
+            registry_name = _sanitize_s3_segment(
+                self.params.get("mlflow_registry_model_name", ""), fallback=framework
+            )
+            train_run_id = (
+                self.params_full.get("run_metadata", {}).get("train_run_id", "")
+                or datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+            )
+            model_type = _sanitize_s3_segment(
+                self.params.get("model_type", ""), fallback=framework
+            )
+
+            run_prefix = f"{base_prefix}/{registry_name}/{train_run_id}"
+            pkl_key = f"{run_prefix}/model_{model_type}.pkl"
+            meta_key = f"{run_prefix}/model_metadata.json"
+
+            self.s3.put_object(Bucket=bucket_out, Key=pkl_key, Body=payload)
+            self.logger.info(f"Modelo exportado correctamente a s3://{bucket_out}/{pkl_key}")
+
+            metadata = {
+                "registry_model_name": self.params.get("mlflow_registry_model_name", ""),
+                "train_run_id": train_run_id,
+                "model_type": self.params.get("model_type", framework),
+                "framework": framework,
+                "saved_at": datetime.now(timezone.utc).isoformat(),
+                "s3_path": f"s3://{bucket_out}/{pkl_key}",
+            }
+            self.s3.put_object(
+                Bucket=bucket_out, Key=meta_key,
+                Body=json.dumps(metadata, indent=2).encode(),
+                ContentType="application/json",
+            )
+            self.logger.info(f"Metadata guardada en s3://{bucket_out}/{meta_key}")
 
         except Exception as e:
             self.logger.error(f"Error en el export del modelo (S3 direct): {str(e)}", exc_info=True)

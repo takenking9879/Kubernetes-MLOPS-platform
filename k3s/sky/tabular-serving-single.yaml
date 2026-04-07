@@ -1,0 +1,145 @@
+# k3s/sky/tabular-serving-single.yaml
+#
+# SkyPilot sky serve for tabular model (xgboost / sklearn / pytorch) — single node per replica.
+# SkyServe manages replica lifecycle, auto-scaling, and health checks.
+# Each replica runs Ray Serve as the HTTP serving framework.
+#
+# CPU-only — no GPU needed for tabular inference.
+# On-demand only — spot preemption would cause endpoint downtime.
+#
+# Usage (manual test):
+#   sky serve up k3s/sky/tabular-serving-single.yaml \
+#     --env SERVE_RUN_ID=test-001 \
+#     --env REGISTRY_MODEL_NAME=my_xgb_model \
+#     --yes
+#
+# Tear down:
+#   sky serve down tabular-serving-single
+#
+# Triggered by tabular_serving_skypilot_pipeline Airflow DAG.
+
+name: tabular-serving-single
+
+service:
+  readiness_probe: /health
+  replica_policy:
+    min_replicas: 1        # overridden by DAG via job_builder
+    max_replicas: 3
+    target_qps_per_replica: 10
+
+resources:
+  ports: 8000
+  ordered:
+    - cloud: runpod
+      cpus: 4+
+      memory: 8+
+      use_spot: false
+    - cloud: vast
+      cpus: 4+
+      memory: 8+
+      use_spot: false
+    - cloud: aws
+      instance_type: m5.xlarge
+      use_spot: false
+    - cloud: aws
+      instance_type: m5.large
+      use_spot: false
+
+envs:
+  SERVE_RUN_ID: ""
+  S3_BUCKET: "k8s-mlops-platform-bucket"
+  AWS_ACCESS_KEY_ID: ""
+  AWS_SECRET_ACCESS_KEY: ""
+  AWS_DEFAULT_REGION: "us-east-1"
+  MLFLOW_TRACKING_URI: ""
+  SERVE_PORT: "8000"
+  REGISTRY_MODEL_NAME: ""
+  MODEL_ALIAS: "champion"
+
+setup: |
+  set -euo pipefail
+  pip install --quiet \
+    "ray[serve]>=2.40" \
+    mlflow>=2.10 \
+    xgboost>=1.7 \
+    scikit-learn>=1.3 \
+    boto3>=1.34 \
+    pyyaml \
+    starlette \
+    uvicorn
+
+run: |
+  set -euo pipefail
+  python - <<'PY'
+  import os, json, time, boto3, yaml, ray
+  from ray import serve
+  from starlette.requests import Request
+  from starlette.responses import JSONResponse
+  import mlflow
+
+  S3_BUCKET   = os.environ["S3_BUCKET"]
+  SERVE_ID    = os.environ["SERVE_RUN_ID"]
+  MLFLOW_URI  = os.environ.get("MLFLOW_TRACKING_URI", "")
+  SERVE_PORT  = int(os.environ.get("SERVE_PORT", "8000"))
+  REG_MODEL   = os.environ.get("REGISTRY_MODEL_NAME", "")
+  ALIAS       = os.environ.get("MODEL_ALIAS", "champion")
+
+  # Fall back to params_serving.yaml on S3 when env vars are not injected
+  if not REG_MODEL:
+      s3 = boto3.client(
+          "s3",
+          aws_access_key_id=os.environ.get("AWS_ACCESS_KEY_ID") or None,
+          aws_secret_access_key=os.environ.get("AWS_SECRET_ACCESS_KEY") or None,
+          region_name=os.environ.get("AWS_DEFAULT_REGION", "us-east-1"),
+      )
+      obj = s3.get_object(
+          Bucket=S3_BUCKET,
+          Key=f"runs/serving/{SERVE_ID}/params_serving.yaml",
+      )
+      params = yaml.safe_load(obj["Body"].read())
+      serving = params.get("serving", {})
+      REG_MODEL = serving.get("registry_model_name", "")
+      ALIAS     = serving.get("alias", ALIAS)
+
+  if not REG_MODEL:
+      raise RuntimeError("REGISTRY_MODEL_NAME not set and not found in params_serving.yaml")
+
+  if MLFLOW_URI:
+      mlflow.set_tracking_uri(MLFLOW_URI)
+
+  print(f"Loading model: models:/{REG_MODEL}@{ALIAS}")
+  model = mlflow.pyfunc.load_model(f"models:/{REG_MODEL}@{ALIAS}")
+  print("Model loaded successfully")
+
+  ray.init(ignore_reinit_error=True)
+  serve.start(http_options={"host": "0.0.0.0", "port": SERVE_PORT})
+
+  @serve.deployment(num_replicas=1)
+  class TabularApp:
+      def __init__(self):
+          self._model = model
+
+      async def __call__(self, request: Request):
+          path = request.url.path
+          if path == "/health":
+              return JSONResponse({"status": "healthy"})
+          try:
+              body = await request.json()
+          except Exception:
+              return JSONResponse({"error": "invalid JSON"}, status_code=400)
+          if "data" not in body:
+              return JSONResponse(
+                  {"error": 'expected {"data": [[f1, f2, ...], ...]}'},
+                  status_code=400,
+              )
+          import numpy as np
+          preds = self._model.predict(np.array(body["data"]))
+          return JSONResponse({"predictions": preds.tolist()})
+
+  serve.run(TabularApp.bind(), route_prefix="/")
+  print(f"Tabular serve running on port {SERVE_PORT} — models:/{REG_MODEL}@{ALIAS}")
+
+  # Block forever so SkyServe replica stays alive
+  while True:
+      time.sleep(60)
+  PY

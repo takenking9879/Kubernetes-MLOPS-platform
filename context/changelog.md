@@ -1,3 +1,14 @@
+## 2026-04-06 — Tabular SkyPilot out-cluster serving
+- **Issue fix**: tabular training params (target column, num classes, framework, hyperparams) were shown in serving-only mode. Fixed by guarding the section with `isTraining` in `LaunchWizardPage.tsx`.
+- **SkyPilot sky serve support for tabular models**: `deployment_target` toggle in the wizard (in-cluster KubeRay vs out-cluster SkyPilot). SkyPilot path uses `sky.serve.up()` + managed replicas with auto-scaling.
+- **New YAMLs**: `k3s/sky/tabular-serving-single.yaml` (single-node Ray Serve per replica), `k3s/sky/tabular-serving-multinode.yaml` (head + workers per replica, Kimi-K2 pattern adapted for tabular).
+- **New sky_runner.py commands**: `launch-tabular-serve` (sky.serve.up()), `wait-tabular-serve` (polls sky.serve.status() until READY). `_YAML_MAP` extended with `tabular_serve` and `tabular_serve_multi` entries.
+- **New DAG**: `tabular_serving_skypilot_pipeline` — launch-tabular-serve → wait-for-endpoint → register-endpoint.
+- **Backend**: `serving_configs.py` branches on `deployment_target`; SkyPilot path triggers `tabular_serving_skypilot_pipeline` with replica policy + resource constraints. `serving_deploy_status` endpoint accepts optional `dag_id` query param.
+- **Frontend** (`LaunchWizardPage.tsx`): deployment target toggle in Step 0, GPU selector + nodes/replica in Step 2 for SkyPilot path, endpoint polling via existing `getVllmEndpoint()`.
+- **Types**: `ServingConfigRequest` + `ServingConfigResult` updated in `platformClient.ts`. `TabularServingJobConfig` + `build_tabular_serving_job()` added to `job_builder.py`. `select_tabular_serving_orchestration()` added to `orchestration_selector.py`.
+- Updated context: `context/overview.md`, `context/routing_global.md`, `context/changelog.md`.
+
 ## 2026-03-29 — SkyPilot tabular setup hardening (FAILED_SETUP mitigation)
 - Reduced setup fragility for provider-native tabular training jobs (`ray-gpu-training-runpod.yaml`, `ray-gpu-training-vast.yaml`): `requirements_tabular_runtime.txt` no longer forces DeepSpeed in the default path; DeepSpeed is now installed only when `USE_DEEPSPEED=true`.
 - Improved managed-job failure observability in `k3s/sky/sky_runner.py`: when a job reaches FAILED/CANCELLED, raised errors now include queue diagnostics such as `failure_reason`, `failure_type`, and `cluster_name` when available.

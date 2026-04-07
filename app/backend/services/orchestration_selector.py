@@ -38,6 +38,7 @@ _TRAINING_DAG = "training_pipeline_skypilot"
 _LLM_TRAINING_DAG = "llm_training_pipeline"
 _VLLM_SERVING_DAG = "vllm_serving_pipeline"
 _RAY_VLLM_SERVING_DAG = "ray_vllm_serving_pipeline"
+_TABULAR_SERVING_DAG = "tabular_serving_skypilot_pipeline"
 
 # ── SkyPilot YAML templates (display labels — actual file chosen by provider) ─
 
@@ -45,6 +46,8 @@ _SKY_YAML_GPU = "k3s/sky/ray-gpu-training-{runpod|vast}.yaml"
 _SKY_YAML_LLM = "k3s/sky/ray-llm-training-{runpod|vast|aws}.yaml"
 _SKY_YAML_VLLM_SINGLE = "k3s/sky/vllm-serving-{runpod|vast}.yaml"
 _SKY_YAML_VLLM_MULTI = "k3s/sky/ray-vllm-multinode-serving.yaml"
+_SKY_YAML_TABULAR_SINGLE = "k3s/sky/tabular-serving-single.yaml"
+_SKY_YAML_TABULAR_MULTI = "k3s/sky/tabular-serving-multinode.yaml"
 
 
 # ── Training orchestration ────────────────────────────────────────────────────
@@ -141,6 +144,35 @@ def select_serving_orchestration(
             "across nodes."
         ),
         warnings=warnings,
+    )
+
+
+# ── Tabular serving orchestration ────────────────────────────────────────────
+
+def select_tabular_serving_orchestration(num_nodes: int = 1) -> OrchestratorRecommendation:
+    """Return the recommended orchestration for SkyPilot tabular serving.
+
+    Single-node: sky serve + Ray Serve, one node per replica.
+    Multi-node: sky serve + Ray cluster (head + workers) per replica (Kimi K2 adapted).
+    """
+    if num_nodes > 1:
+        return OrchestratorRecommendation(
+            orchestration="tabular_serving_multinode",
+            dag_id=_TABULAR_SERVING_DAG,
+            sky_yaml_template=_SKY_YAML_TABULAR_MULTI,
+            reason=(
+                f"Multi-node ({num_nodes} nodes per replica): Ray cluster via SkyPilot sky serve. "
+                "Head node loads model + serves via Ray Serve; workers join Ray cluster."
+            ),
+        )
+    return OrchestratorRecommendation(
+        orchestration="tabular_serving_single",
+        dag_id=_TABULAR_SERVING_DAG,
+        sky_yaml_template=_SKY_YAML_TABULAR_SINGLE,
+        reason=(
+            "Single-node SkyPilot sky serve with Ray Serve. "
+            "SkyServe manages replica lifecycle, health checks, and auto-scaling."
+        ),
     )
 
 

@@ -271,6 +271,12 @@ export interface ServingConfigRequest {
   webhook_public_base_url?: string;
   webhook_path?: string;
   webhook_max_timestamp_age_seconds?: number;
+  // SkyPilot out-cluster serving
+  deployment_target?: 'in_cluster' | 'skypilot';
+  min_replicas?: number;
+  max_replicas?: number;
+  target_qps_per_replica?: number;
+  resource_constraints?: ResourceConstraints;
 }
 
 export interface ServingConfigResult {
@@ -280,6 +286,7 @@ export interface ServingConfigResult {
   train_run_id: string;
   serving_mode: 'ray_only' | 'kafka';
   registry_model_name: string;
+  deployment_target?: 'in_cluster' | 'skypilot';
 }
 
 export interface ServingDeployResult {
@@ -832,6 +839,7 @@ export interface ServingConfigIn {
   tensor_parallel_size?: number;
   pipeline_parallel_size?: number;
   num_nodes?: number;
+  replicas?: number;
 }
 
 export interface LaunchRequest {

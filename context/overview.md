@@ -50,14 +50,15 @@ A SaaS MLOps orchestrator for multi-cloud GPU compute. Users upload datasets, bu
 | full_ml_pipeline | API | Spark → KubeRay (sequential) |
 | ml_pipeline | API/UI | Flexible mode (preprocess only / train only / both) |
 | vllm_serving_pipeline | API | SkyPilot multi-node Ray+vLLM serving |
-| serving_pipeline | API | MLflow promote → patch RayService → optional Kafka |
+| tabular_serving_skypilot_pipeline | API | SkyPilot sky serve tabular model — single/multi-node Ray Serve |
+| serving_pipeline | API | MLflow promote → patch RayService → optional Kafka (in-cluster) |
 | model_promotion_workflow | Manual/auto | MLflow alias management |
 
 ## Data Stores
 
 | Store | Contents |
 |-------|----------|
-| S3 | Raw parquets, DSL YAMLs, params_*.yaml, model architectures, schemas |
+| S3 | Raw parquets, DSL YAMLs, params_*.yaml, model architectures, schemas; trained models at `v1/models/{registry_name}/{train_run_id}/model_{type}.pkl` + `model_metadata.json` sidecar |
 | Apache Iceberg | Raw/processed feature tables, preprocessing_artifacts metadata |
 | MLflow Registry | Trained models + aliases (champion/challenger) |
 | K8s / Airflow | Orchestration state, SparkApplication/RayJob CRDs |
