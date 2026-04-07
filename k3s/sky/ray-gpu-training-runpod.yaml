@@ -307,35 +307,63 @@ run: |
 
   export PYTHONPATH=/home/ray/app/repo:/home/ray/app/repo/src
 
+  LOG_DIR="/tmp/skypilot-logs"
+  mkdir -p "${LOG_DIR}"
+  GPU_EXPORTER_LOG="${LOG_DIR}/gpu_exporter.log"
+  GRAFANA_AGENT_LOG="${LOG_DIR}/grafana-agent.log"
+
   GPU_EXPORTER_PID=""
   GRAFANA_AGENT_PID=""
+  _terminate_pid() {
+    local pid="${1:-}"
+    local label="${2:-process}"
+    if [ -z "${pid}" ] || ! kill -0 "${pid}" 2>/dev/null; then
+      return 0
+    fi
+
+    kill "${pid}" 2>/dev/null || true
+    for _ in $(seq 1 10); do
+      if ! kill -0 "${pid}" 2>/dev/null; then
+        break
+      fi
+      sleep 1
+    done
+
+    if kill -0 "${pid}" 2>/dev/null; then
+      echo "[run] ${label} still alive after SIGTERM; sending SIGKILL (PID=${pid})"
+      kill -9 "${pid}" 2>/dev/null || true
+    fi
+    wait "${pid}" 2>/dev/null || true
+  }
+
   cleanup_background() {
     # Ensure background telemetry processes never keep the Sky task alive.
     set +e
-    if [ -n "${GRAFANA_AGENT_PID}" ] && kill -0 "${GRAFANA_AGENT_PID}" 2>/dev/null; then
-      kill "${GRAFANA_AGENT_PID}" 2>/dev/null || true
-      wait "${GRAFANA_AGENT_PID}" 2>/dev/null || true
-    fi
-    if [ -n "${GPU_EXPORTER_PID}" ] && kill -0 "${GPU_EXPORTER_PID}" 2>/dev/null; then
-      kill "${GPU_EXPORTER_PID}" 2>/dev/null || true
-      wait "${GPU_EXPORTER_PID}" 2>/dev/null || true
-    fi
+    _terminate_pid "${GRAFANA_AGENT_PID}" "grafana-agent"
+    _terminate_pid "${GPU_EXPORTER_PID}" "gpu-exporter"
+
     if [ -n "${RAY_BIN:-}" ] && [ -x "${RAY_BIN}" ]; then
-      "${RAY_BIN}" stop --force >/dev/null 2>&1 || true
+      if command -v timeout >/dev/null 2>&1; then
+        timeout 30s "${RAY_BIN}" stop --force >/dev/null 2>&1 || true
+      else
+        "${RAY_BIN}" stop --force >/dev/null 2>&1 || true
+      fi
     fi
   }
   trap cleanup_background EXIT INT TERM
 
-  "${PYTHON_BIN}" /home/ray/app/repo/k3s/sky/gpu_exporter.py &
+  "${PYTHON_BIN}" /home/ray/app/repo/k3s/sky/gpu_exporter.py \
+    >"${GPU_EXPORTER_LOG}" 2>&1 &
   GPU_EXPORTER_PID=$!
-  echo "[run] GPU exporter started (PID=${GPU_EXPORTER_PID})"
+  echo "[run] GPU exporter started (PID=${GPU_EXPORTER_PID}, log=${GPU_EXPORTER_LOG})"
 
   METRICS_RW_URL="${METRICS_REMOTE_WRITE_URL:-${GRAFANA_REMOTE_WRITE_URL:-}}"
   if [ -n "${METRICS_RW_URL}" ] && command -v grafana-agent >/dev/null 2>&1; then
     "${PYTHON_BIN}" /home/ray/app/repo/k3s/sky/write_grafana_config.py
-    grafana-agent --config.file=/tmp/grafana-agent-config.yaml &
+    grafana-agent --config.file=/tmp/grafana-agent-config.yaml \
+      >"${GRAFANA_AGENT_LOG}" 2>&1 &
     GRAFANA_AGENT_PID=$!
-    echo "[run] Grafana Agent started → ${METRICS_RW_URL} (PID=${GRAFANA_AGENT_PID})"
+    echo "[run] Grafana Agent started → ${METRICS_RW_URL} (PID=${GRAFANA_AGENT_PID}, log=${GRAFANA_AGENT_LOG})"
   fi
 
   # Pin all Ray sub-processes (PlacementGroupCleaner, etc.) to the training
