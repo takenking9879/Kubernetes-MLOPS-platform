@@ -144,13 +144,21 @@ data:
 
       # ===== SKYPILOT API SERVER METRICS =====
       # Requires: apiService.metrics.enabled=true in k3s/sky/helm/values.yaml.
-      # Service name and port: verify with `kubectl get svc -n skypilot` after helm install.
-      # Metrics path: verify with `kubectl exec -n skypilot deployment/skypilot-api-server -- curl localhost:46580/api/metrics`
+      # This repo deploys SkyPilot with release name `my-skypilot`, which creates:
+      #   my-skypilot-api-service.skypilot.svc.cluster.local
       - job_name: 'skypilot-api-server'
         static_configs:
-          - targets: ['skypilot-api-server.skypilot.svc.cluster.local:46580']
-        metrics_path: /api/metrics
+          - targets: ['my-skypilot-api-service.skypilot.svc.cluster.local:9090']
+        metrics_path: /metrics
         scrape_interval: 30s
+
+      # ===== SKYPILOT API SERVER GPU METRICS =====
+      - job_name: 'skypilot-api-server-gpu-metrics'
+        static_configs:
+          - targets: ['my-skypilot-api-service.skypilot.svc.cluster.local:9090']
+        metrics_path: /gpu-metrics
+        scrape_interval: 15s
+        scrape_timeout: 10s
 ---
 apiVersion: v1
 kind: ServiceAccount

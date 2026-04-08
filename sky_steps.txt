@@ -44,16 +44,18 @@ echo "Save this AUTH_STRING for helm install: $AUTH_STRING"
 
 STEP 5: Install the SkyPilot Helm chart
 -----------------------------------------
-helm upgrade --install skypilot skypilot/skypilot --version 0.12.0 \
+helm upgrade --install my-skypilot skypilot/skypilot --version 0.12.0 \
   --namespace skypilot \
   --create-namespace \
   --set "ingress.authCredentials=${AUTH_STRING}" \
   -f k3s/sky/helm/values.yaml
 
 helm install my-skypilot skypilot/skypilot --version 0.12.0 -n skypilot -f k3s/sky/helm/values.yaml
+helm uninstall my-skypilot -n skypilot
+kubectl delete pod -n skypilot
 
 # Monitor rollout (waits up to 5 min):
-kubectl rollout status deployment/skypilot-api-server -n skypilot --timeout=300s
+kubectl rollout status deployment/my-skypilot-api-server -n skypilot --timeout=300s
 
 # If rollout fails, check pod events:
 kubectl describe pod -l app=skypilot-api-server -n skypilot

@@ -41,7 +41,7 @@ spec:
 
       # Keep the job alive briefly after finishing so Prometheus can scrape final metrics.
       PROMETHEUS_GRACE_SECONDS: "10"
-      REPORT_FREQUENCY: "4" # Report every N epochs to Prometheus/Grafana (This could add some overhead)
+      REPORT_FREQUENCY: "1" # Report every epoch to keep Epoch Duration continuity in Grafana
 
   rayClusterSpec:
     rayVersion: "2.53.0"

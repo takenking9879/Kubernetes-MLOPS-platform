@@ -590,8 +590,8 @@ data:
           "type": "timeseries",
           "targets": [
             {
-              "expr": "train_epoch_duration_last_seconds{framework=~\"$framework\"}",
-              "legendFormat": "Last duration",
+              "expr": "max by (framework) (max_over_time(train_epoch_duration_last_seconds{framework=~\"$framework\"}[10m]))",
+              "legendFormat": "{{framework}}",
               "refId": "A"
             }
           ]
@@ -881,7 +881,7 @@ data:
             "multi": false,
             "name": "framework",
             "options": [],
-            "query": "label_values(train_loss{split=\"val\"}, framework)",
+            "query": "label_values(train_current_epoch, framework)",
             "refresh": 1,
             "regex": "",
             "skipUrlSync": false,

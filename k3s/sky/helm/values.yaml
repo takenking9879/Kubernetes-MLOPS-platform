@@ -184,10 +184,13 @@ apiService:
   # See runpodCredentials / vastCredentials / awsCredentials sections below.
 
   # ── Prometheus metrics endpoint ──────────────────────────────────────────────
-  # Exposes /api/metrics for the existing Prometheus in monitoring namespace.
+  # Exposes SkyPilot metrics endpoints for the existing Prometheus in monitoring:
+  #   /metrics
+  #   /gpu-metrics
   # Do NOT set prometheus.enabled=true — this cluster has its own Prometheus.
   metrics:
     enabled: true
+    port: 9090
 
   # ── Resources ────────────────────────────────────────────────────────────────
   # SkyPilot docs: consolidation mode adds ~2 GB controller overhead.

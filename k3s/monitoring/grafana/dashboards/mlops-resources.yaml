@@ -55,12 +55,12 @@ data:
           },
           "gridPos": { "h": 6, "w": 8, "x": 0, "y": 1 },
           "id": 2,
-          "title": "Cluster CPU Utilization %",
+          "title": "Cluster GPU Utilization %",
           "type": "gauge",
           "targets": [
             {
-              "expr": "100 * sum(rate(container_cpu_usage_seconds_total{namespace=~\"$namespace\"}[2m])) / sum(kube_pod_container_resource_limits{namespace=~\"$namespace\", resource=\"cpu\"})",
-              "legendFormat": "CPU %"
+              "expr": "avg(skypilot_gpu_utilization_pct{cluster=~\"$sky_cluster\"})",
+              "legendFormat": "GPU %"
             }
           ]
         },
@@ -125,7 +125,7 @@ data:
           "gridPos": { "h": 1, "w": 24, "x": 0, "y": 7 },
           "id": 10,
           "panels": [],
-          "title": "Ray Cluster — CPU",
+          "title": "SkyPilot GPU Workers",
           "type": "row"
         },
         {
@@ -134,17 +134,19 @@ data:
             "defaults": {
               "color": { "mode": "palette-classic" },
               "custom": { "fillOpacity": 10, "lineWidth": 2, "showPoints": "never" },
-              "unit": "short"
+              "unit": "percent",
+              "min": 0,
+              "max": 100
             }
           },
           "gridPos": { "h": 8, "w": 12, "x": 0, "y": 8 },
           "id": 11,
-          "title": "CPU Usage (cores)",
+          "title": "GPU Utilization % by Device",
           "type": "timeseries",
           "targets": [
             {
-              "expr": "sum by (pod) (rate(container_cpu_usage_seconds_total{namespace=~\"$namespace\", pod=~\"$ray_pod\"}[2m]))",
-              "legendFormat": "{{ pod }}"
+              "expr": "skypilot_gpu_utilization_pct{cluster=~\"$sky_cluster\"}",
+              "legendFormat": "{{ cluster }} gpu{{ gpu }} (spot={{ is_spot }})"
             }
           ]
         },
@@ -168,13 +170,13 @@ data:
           },
           "gridPos": { "h": 8, "w": 12, "x": 12, "y": 8 },
           "id": 12,
-          "title": "CPU Utilization % (usage / limit)",
+          "title": "GPU Memory Utilization %",
           "type": "bargauge",
           "options": { "orientation": "horizontal" },
           "targets": [
             {
-              "expr": "100 * sum by (pod) (rate(container_cpu_usage_seconds_total{namespace=~\"$namespace\", pod=~\"$ray_pod\"}[2m])) / sum by (pod) (kube_pod_container_resource_limits{namespace=~\"$namespace\", pod=~\"$ray_pod\", resource=\"cpu\"})",
-              "legendFormat": "{{ pod }}"
+              "expr": "100 * skypilot_gpu_memory_used_mb{cluster=~\"$sky_cluster\"} / skypilot_gpu_memory_total_mb{cluster=~\"$sky_cluster\"}",
+              "legendFormat": "{{ cluster }} gpu{{ gpu }}"
             }
           ]
         },
@@ -184,21 +186,21 @@ data:
             "defaults": {
               "color": { "mode": "palette-classic" },
               "custom": { "fillOpacity": 10, "lineWidth": 2, "showPoints": "never" },
-              "unit": "short"
+              "unit": "decmbytes"
             }
           },
           "gridPos": { "h": 8, "w": 24, "x": 0, "y": 16 },
           "id": 13,
-          "title": "CPU Request vs Actual",
+          "title": "GPU Memory Used vs Total (MB)",
           "type": "timeseries",
           "targets": [
             {
-              "expr": "sum by (pod) (kube_pod_container_resource_requests{namespace=~\"$namespace\", pod=~\"$ray_pod\", resource=\"cpu\"})",
-              "legendFormat": "{{ pod }} request"
+              "expr": "skypilot_gpu_memory_used_mb{cluster=~\"$sky_cluster\"}",
+              "legendFormat": "{{ cluster }} gpu{{ gpu }} used"
             },
             {
-              "expr": "sum by (pod) (rate(container_cpu_usage_seconds_total{namespace=~\"$namespace\", pod=~\"$ray_pod\"}[2m]))",
-              "legendFormat": "{{ pod }} actual"
+              "expr": "skypilot_gpu_memory_total_mb{cluster=~\"$sky_cluster\"}",
+              "legendFormat": "{{ cluster }} gpu{{ gpu }} total"
             }
           ]
         },
@@ -290,50 +292,54 @@ data:
           "gridPos": { "h": 1, "w": 24, "x": 0, "y": 41 },
           "id": 50,
           "panels": [],
-          "title": "Other Services — Requested Resources",
+          "title": "SkyPilot GPU Fleet",
           "type": "row"
         },
         {
           "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
-          "description": "CPU cores (Actual Usage or Requests) by non-Ray pods.",
+          "description": "Average GPU utilization split by spot/on-demand workers.",
           "fieldConfig": {
             "defaults": {
               "color": { "mode": "palette-classic" },
-              "unit": "short",
+              "unit": "percent",
               "min": 0
             }
           },
           "gridPos": { "h": 8, "w": 12, "x": 0, "y": 42 },
           "id": 51,
-          "title": "CPU $metric_type — Other Pods",
+          "title": "Spot vs On-Demand GPU Utilization %",
           "type": "bargauge",
           "options": { "orientation": "horizontal", "reduceOptions": { "calcs": ["lastNotNull"] } },
           "targets": [
             {
-              "expr": "${metric_type:csv} == \"Usage\" ? sum by (pod) (rate(container_cpu_usage_seconds_total{namespace=~\"$namespace\", pod!~\".*(?:head|worker|submitter).*\"}[2m])) : sum by (pod) (kube_pod_container_resource_requests{namespace=~\"$namespace\", pod!~\".*(?:head|worker|submitter).*\", resource=\"cpu\"})",
-              "legendFormat": "{{ pod }}"
+              "expr": "avg(skypilot_gpu_utilization_pct{cluster=~\"$sky_cluster\", is_spot=\"true\"})",
+              "legendFormat": "spot"
+            },
+            {
+              "expr": "avg(skypilot_gpu_utilization_pct{cluster=~\"$sky_cluster\", is_spot=\"false\"})",
+              "legendFormat": "on-demand"
             }
           ]
         },
         {
           "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
-          "description": "Memory (Actual Usage or Requests) by non-Ray pods.",
+          "description": "Total GPU memory in use by SkyPilot cluster.",
           "fieldConfig": {
             "defaults": {
               "color": { "mode": "palette-classic" },
-              "unit": "bytes",
+              "unit": "decmbytes",
               "min": 0
             }
           },
           "gridPos": { "h": 8, "w": 12, "x": 12, "y": 42 },
           "id": 52,
-          "title": "Memory $metric_type — Other Pods",
+          "title": "GPU Memory Used by Cluster (MB)",
           "type": "bargauge",
           "options": { "orientation": "horizontal", "reduceOptions": { "calcs": ["lastNotNull"] } },
           "targets": [
             {
-              "expr": "${metric_type:csv} == \"Usage\" ? sum by (pod) (container_memory_working_set_bytes{namespace=~\"$namespace\", pod!~\".*(?:head|worker|submitter).*\"}) : sum by (pod) (kube_pod_container_resource_requests{namespace=~\"$namespace\", pod!~\".*(?:head|worker|submitter).*\", resource=\"memory\"})",
-              "legendFormat": "{{ pod }}"
+              "expr": "sum by (cluster) (skypilot_gpu_memory_used_mb{cluster=~\"$sky_cluster\"})",
+              "legendFormat": "{{ cluster }}"
             }
           ]
         },
@@ -482,6 +488,25 @@ data:
             "type": "query"
           },
           {
+            "allValue": ".*",
+            "current": {
+              "selected": false,
+              "text": "All",
+              "value": "$__all"
+            },
+            "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+            "definition": "label_values(skypilot_gpu_utilization_pct, cluster)",
+            "hide": 0,
+            "includeAll": true,
+            "multi": true,
+            "name": "sky_cluster",
+            "label": "SkyPilot Cluster",
+            "query": "label_values(skypilot_gpu_utilization_pct, cluster)",
+            "refresh": 2,
+            "sort": 1,
+            "type": "query"
+          },
+          {
             "current": {},
             "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
             "definition": "label_values(kube_pod_info{namespace=~\"$namespace\"}, node)",
@@ -493,22 +518,6 @@ data:
             "refresh": 2,
             "sort": 1,
             "type": "query"
-          },
-          {
-            "current": { "selected": true, "text": "Usage", "value": "Usage" },
-            "description": "Toggle between Actual Usage and Requested Resources for non-Ray services.",
-            "hide": 0,
-            "includeAll": false,
-            "label": "Metric Type",
-            "multi": false,
-            "name": "metric_type",
-            "options": [
-              { "selected": true, "text": "Usage", "value": "Usage" },
-              { "selected": false, "text": "Requested", "value": "Requested" }
-            ],
-            "query": "Usage,Requested",
-            "skipUrl": false,
-            "type": "custom"
           }
         ]
       },
@@ -517,7 +526,5 @@ data:
       "timezone": "browser",
       "title": "MLOps Worker Resources",
       "uid": "mlops-worker-resources",
-      "version": 2
+      "version": 3
     }
-
-        {
