@@ -59,7 +59,7 @@ data:
           "type": "gauge",
           "targets": [
             {
-              "expr": "avg(skypilot_gpu_utilization_pct{cluster=~\"$sky_cluster\"})",
+              "expr": "avg(skypilot_gpu_utilization_pct{cluster=~\"$sky_cluster\"}) or vector(0)",
               "legendFormat": "GPU %"
             }
           ]
@@ -84,12 +84,12 @@ data:
           },
           "gridPos": { "h": 6, "w": 8, "x": 8, "y": 1 },
           "id": 3,
-          "title": "Cluster Memory Utilization %",
+          "title": "Cluster CPU Utilization %",
           "type": "gauge",
           "targets": [
             {
-              "expr": "100 * sum(container_memory_working_set_bytes{namespace=~\"$namespace\"}) / sum(kube_pod_container_resource_limits{namespace=~\"$namespace\", resource=\"memory\"})",
-              "legendFormat": "Memory %"
+              "expr": "100 * (1 - avg(rate(node_cpu_seconds_total{mode=\"idle\"}[5m])))",
+              "legendFormat": "CPU %"
             }
           ]
         },
@@ -102,21 +102,23 @@ data:
                 "mode": "absolute",
                 "steps": [
                   { "color": "green", "value": null },
-                  { "color": "yellow", "value": 1 },
-                  { "color": "red", "value": 3 }
+                  { "color": "yellow", "value": 70 },
+                  { "color": "red", "value": 90 }
                 ]
               },
-              "unit": "short"
+              "unit": "percent",
+              "min": 0,
+              "max": 100
             }
           },
           "gridPos": { "h": 6, "w": 8, "x": 16, "y": 1 },
           "id": 4,
-          "title": "Ray Pod Restarts (last 15m)",
-          "type": "stat",
+          "title": "Cluster Memory Utilization %",
+          "type": "gauge",
           "targets": [
             {
-              "expr": "sum by (pod) (increase(kube_pod_container_status_restarts_total{namespace=~\"$namespace\", pod=~\"$ray_pod\"}[15m]))",
-              "legendFormat": "{{ pod }}"
+              "expr": "100 * (1 - (sum(node_memory_MemAvailable_bytes) / sum(node_memory_MemTotal_bytes)))",
+              "legendFormat": "Memory %"
             }
           ]
         },
@@ -175,7 +177,7 @@ data:
           "options": { "orientation": "horizontal" },
           "targets": [
             {
-              "expr": "100 * skypilot_gpu_memory_used_mb{cluster=~\"$sky_cluster\"} / skypilot_gpu_memory_total_mb{cluster=~\"$sky_cluster\"}",
+              "expr": "(100 * skypilot_gpu_memory_used_mb{cluster=~\"$sky_cluster\"} / skypilot_gpu_memory_total_mb{cluster=~\"$sky_cluster\"}) or vector(0)",
               "legendFormat": "{{ cluster }} gpu{{ gpu }}"
             }
           ]
@@ -207,89 +209,6 @@ data:
         {
           "collapsed": false,
           "gridPos": { "h": 1, "w": 24, "x": 0, "y": 24 },
-          "id": 20,
-          "panels": [],
-          "title": "Ray Cluster — Memory",
-          "type": "row"
-        },
-        {
-          "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
-          "fieldConfig": {
-            "defaults": {
-              "color": { "mode": "palette-classic" },
-              "custom": { "fillOpacity": 10, "lineWidth": 2, "showPoints": "never" },
-              "unit": "bytes"
-            }
-          },
-          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 25 },
-          "id": 21,
-          "title": "Memory Working Set",
-          "type": "timeseries",
-          "targets": [
-            {
-              "expr": "sum by (pod) (container_memory_working_set_bytes{namespace=~\"$namespace\", pod=~\"$ray_pod\"})",
-              "legendFormat": "{{ pod }}"
-            }
-          ]
-        },
-        {
-          "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
-          "fieldConfig": {
-            "defaults": {
-              "color": { "mode": "palette-classic" },
-              "custom": { "fillOpacity": 10, "lineWidth": 2, "showPoints": "never" },
-              "unit": "bytes"
-            }
-          },
-          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 25 },
-          "id": 22,
-          "title": "Memory vs Limit",
-          "type": "timeseries",
-          "targets": [
-            {
-              "expr": "sum by (pod) (container_memory_working_set_bytes{namespace=~\"$namespace\", pod=~\"$ray_pod\"})",
-              "legendFormat": "{{ pod }} working set"
-            },
-            {
-              "expr": "sum by (pod) (kube_pod_container_resource_requests{namespace=~\"$namespace\", pod=~\"$ray_pod\", resource=\"memory\"})",
-              "legendFormat": "{{ pod }} request"
-            },
-            {
-              "expr": "sum by (pod) (kube_pod_container_resource_limits{namespace=~\"$namespace\", pod=~\"$ray_pod\", resource=\"memory\"})",
-              "legendFormat": "{{ pod }} limit"
-            }
-          ]
-        },
-        {
-          "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
-          "fieldConfig": {
-            "defaults": {
-              "color": { "mode": "thresholds" },
-              "thresholds": {
-                "mode": "absolute",
-                "steps": [
-                  { "color": "green", "value": null },
-                  { "color": "yellow", "value": 1 },
-                  { "color": "red", "value": 3 }
-                ]
-              },
-              "unit": "short"
-            }
-          },
-          "gridPos": { "h": 8, "w": 24, "x": 0, "y": 33 },
-          "id": 23,
-          "title": "OOM Kills — Ray Pods (restarts in last 5m)",
-          "type": "timeseries",
-          "targets": [
-            {
-              "expr": "increase(kube_pod_container_status_restarts_total{namespace=~\"$namespace\", pod=~\"$ray_pod\"}[5m])",
-              "legendFormat": "{{ pod }}"
-            }
-          ]
-        },
-        {
-          "collapsed": false,
-          "gridPos": { "h": 1, "w": 24, "x": 0, "y": 41 },
           "id": 50,
           "panels": [],
           "title": "SkyPilot GPU Fleet",
@@ -305,7 +224,7 @@ data:
               "min": 0
             }
           },
-          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 42 },
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 25 },
           "id": 51,
           "title": "Spot vs On-Demand GPU Utilization %",
           "type": "bargauge",
@@ -331,7 +250,7 @@ data:
               "min": 0
             }
           },
-          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 42 },
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 25 },
           "id": 52,
           "title": "GPU Memory Used by Cluster (MB)",
           "type": "bargauge",
@@ -342,112 +261,10 @@ data:
               "legendFormat": "{{ cluster }}"
             }
           ]
-        },
-        {
-          "collapsed": false,
-          "gridPos": { "h": 1, "w": 24, "x": 0, "y": 50 },
-          "id": 30,
-          "panels": [],
-          "title": "Ray Object Store (requires Ray metrics exporter on head :8080)",
-          "type": "row"
-        },
-        {
-          "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
-          "fieldConfig": {
-            "defaults": {
-              "color": { "mode": "palette-classic" },
-              "custom": { "fillOpacity": 10, "lineWidth": 2, "showPoints": "never" },
-              "unit": "bytes"
-            }
-          },
-          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 51 },
-          "id": 31,
-          "title": "Ray Object Store Memory",
-          "description": "Requires Ray's built-in Prometheus exporter enabled on the head node (ray_object_store_memory metric).",
-          "type": "timeseries",
-          "targets": [
-            {
-              "expr": "ray_object_store_memory{namespace=~\"$namespace\"}",
-              "legendFormat": "{{ pod }}"
-            }
-          ]
-        },
-        {
-          "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
-          "fieldConfig": {
-            "defaults": {
-              "color": { "mode": "palette-classic" },
-              "custom": { "fillOpacity": 10, "lineWidth": 2, "showPoints": "never" },
-              "unit": "short"
-            }
-          },
-          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 51 },
-          "id": 32,
-          "title": "Ray Spilled Objects",
-          "description": "Requires Ray's built-in Prometheus exporter. Shows objects spilled to disk when object store is full.",
-          "type": "timeseries",
-          "targets": [
-            {
-              "expr": "ray_object_store_num_spilled_objects{namespace=~\"$namespace\"}",
-              "legendFormat": "{{ pod }}"
-            }
-          ]
-        },
-        {
-          "collapsed": false,
-          "gridPos": { "h": 1, "w": 24, "x": 0, "y": 59 },
-          "id": 40,
-          "panels": [],
-          "title": "Disk & Network",
-          "type": "row"
-        },
-        {
-          "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
-          "fieldConfig": {
-            "defaults": {
-              "color": { "mode": "palette-classic" },
-              "custom": { "fillOpacity": 10, "lineWidth": 2, "showPoints": "never" },
-              "unit": "percentunit"
-            }
-          },
-          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 60 },
-          "id": 41,
-          "title": "Node I/O Wait",
-          "type": "timeseries",
-          "targets": [
-            {
-              "expr": "rate(node_cpu_seconds_total{mode=\"iowait\", instance=~\"$node\"}[2m])",
-              "legendFormat": "{{ instance }}"
-            }
-          ]
-        },
-        {
-          "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
-          "fieldConfig": {
-            "defaults": {
-              "color": { "mode": "palette-classic" },
-              "custom": { "fillOpacity": 10, "lineWidth": 2, "showPoints": "never" },
-              "unit": "Bps"
-            }
-          },
-          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 60 },
-          "id": 42,
-          "title": "Network I/O — Ray Pods",
-          "type": "timeseries",
-          "targets": [
-            {
-              "expr": "sum by (pod) (rate(container_network_receive_bytes_total{namespace=~\"$namespace\", pod=~\"$ray_pod\"}[2m]))",
-              "legendFormat": "{{ pod }} rx"
-            },
-            {
-              "expr": "sum by (pod) (rate(container_network_transmit_bytes_total{namespace=~\"$namespace\", pod=~\"$ray_pod\"}[2m]))",
-              "legendFormat": "{{ pod }} tx"
-            }
-          ]
         }
       ],
       "schemaVersion": 39,
-      "tags": ["mlops", "resources", "ray"],
+      "tags": ["mlops", "resources", "skypilot", "gpu"],
       "templating": {
         "list": [
           {
@@ -457,35 +274,6 @@ data:
             "name": "DS_PROMETHEUS",
             "query": "prometheus",
             "type": "datasource"
-          },
-          {
-            "current": {},
-            "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
-            "definition": "label_values(kube_pod_info, namespace)",
-            "hide": 0,
-            "includeAll": true,
-            "multi": true,
-            "name": "namespace",
-            "query": "label_values(kube_pod_info, namespace)",
-            "refresh": 2,
-            "regex": "^(ray|spark|serving|apps)$",
-            "sort": 1,
-            "type": "query"
-          },
-          {
-            "current": {},
-            "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
-            "definition": "label_values(kube_pod_info{namespace=~\"$namespace\"}, pod)",
-            "hide": 0,
-            "includeAll": true,
-            "multi": true,
-            "name": "ray_pod",
-            "label": "Ray Pod",
-            "query": "label_values(kube_pod_info{namespace=~\"$namespace\"}, pod)",
-            "refresh": 2,
-            "regex": ".*(?:head|worker|submitter).*",
-            "sort": 1,
-            "type": "query"
           },
           {
             "allValue": ".*",
@@ -505,19 +293,6 @@ data:
             "refresh": 2,
             "sort": 1,
             "type": "query"
-          },
-          {
-            "current": {},
-            "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
-            "definition": "label_values(kube_pod_info{namespace=~\"$namespace\"}, node)",
-            "hide": 0,
-            "includeAll": true,
-            "multi": true,
-            "name": "node",
-            "query": "label_values(kube_pod_info{namespace=~\"$namespace\"}, node)",
-            "refresh": 2,
-            "sort": 1,
-            "type": "query"
           }
         ]
       },
@@ -526,5 +301,5 @@ data:
       "timezone": "browser",
       "title": "MLOps Worker Resources",
       "uid": "mlops-worker-resources",
-      "version": 3
+      "version": 4
     }

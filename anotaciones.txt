@@ -59,13 +59,14 @@ https://docs.skypilot.co/en/latest/examples/models/kimi-k2.html
 
 
 #Lista por hacer
-- Checar que skypilot ya pueda lanzar jobs uno tras otro sin que se maten entre si los procesos
+- Checar que skypilot ya pueda lanzar jobs uno tras otro sin que se maten entre si los procesos (COMPLETADO)
 - checar que las metricas custom lleguen al dashboard de grafana (ver que no se quede infinito por el agente el script)
-- Checar que no hay warnings de ray
+- Checar que no hay warnings de ray (COMPLETADO)
 - Alojamiento de recursos optimo con 6 CPUs
 - Empezar con el serving de tabular (Ahora el serving tabular mantiene lo de training y no tiene caso)
-- Pasar el serving a modo GPU igual como el training
+- Pasar el serving a modo GPU igual como el training (EN VERIFICACIÓN)
 - Checar que se use la GPU realmente
+- Añadir DCGM para NVLink y probar multi-node GPU setups
 
 
 # Exponer puertos
