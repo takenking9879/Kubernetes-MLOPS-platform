@@ -461,3 +461,46 @@ run: |
   echo "[run] Ray params: NUM_WORKERS=${NUM_WORKERS} NUM_WORKERS_TUNE=${NUM_WORKERS_TUNE} MAX_CONCURRENT_TRIALS=${MAX_CONCURRENT_TRIALS} GPUS_PER_WORKER=${GPUS_PER_WORKER} GPUS_PER_WORKER_TUNE=${GPUS_PER_WORKER_TUNE} CPUS_PER_WORKER=${CPUS_PER_WORKER} CPUS_PER_WORKER_TUNE=${CPUS_PER_WORKER_TUNE} (node_cpus=${TOTAL_CPUS_NODE} SKYPILOT_NUM_GPUS_PER_NODE=${SKYPILOT_NUM_GPUS_PER_NODE:-unset})"
 
   "${PYTHON_BIN}" /home/ray/app/repo/k3s/kuberay/main.py
+
+  echo "=============================="
+  echo "===== MAIN.PY TERMINATED ====="
+  date
+  echo "=============================="
+
+  # Espera un poco para ver qué queda vivo
+  sleep 2
+
+  echo ""
+  echo "=== TOP PROCESSES (CPU) ==="
+  ps -eo pid,ppid,cmd,%mem,%cpu --sort=-%cpu | head -n 30
+
+  echo ""
+  echo "=== PROCESS TREE (IMPORTANT) ==="
+  pstree -ap 2>/dev/null | head -n 100 || echo "pstree not available"
+
+  echo ""
+  echo "=== RAY PROCESSES ==="
+  ps -eo pid,ppid,cmd | grep -E "raylet|gcs_server|plasma|ray::" | grep -v grep || echo "No Ray processes"
+
+  echo ""
+  echo "=== GRAFANA AGENT ==="
+  ps -eo pid,ppid,cmd | grep grafana-agent | grep -v grep || echo "No grafana-agent"
+
+  echo ""
+  echo "=== GPU EXPORTER ==="
+  ps -eo pid,ppid,cmd | grep gpu_exporter | grep -v grep || echo "No gpu exporter"
+
+  echo ""
+  echo "=== PYTHON PROCESSES ==="
+  ps -eo pid,ppid,cmd | grep python | grep -v grep
+
+  echo ""
+  echo "=== OPEN FILES (CURRENT SHELL) ==="
+  lsof -p $$ 2>/dev/null | head -n 50 || echo "lsof not available"
+
+  echo ""
+  echo "=== NETWORK PORTS ==="
+  ss -tulpn 2>/dev/null | head -n 50 || echo "ss not available"
+
+  echo ""
+  echo "=== DONE DEBUG ==="
