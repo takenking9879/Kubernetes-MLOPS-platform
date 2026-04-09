@@ -342,13 +342,17 @@ run: |
     _terminate_pid "${GRAFANA_AGENT_PID}" "grafana-agent"
     _terminate_pid "${GPU_EXPORTER_PID}" "gpu-exporter"
 
-    if [ -n "${RAY_BIN:-}" ] && [ -x "${RAY_BIN}" ]; then
-      if command -v timeout >/dev/null 2>&1; then
-        timeout 30s "${RAY_BIN}" stop --force >/dev/null 2>&1 || true
-      else
-        "${RAY_BIN}" stop --force >/dev/null 2>&1 || true
-      fi
-    fi
+    # Stop ONLY the training Ray cluster (port 6379) using pkill with the port
+    # as discriminator — the approach recommended by SkyPilot's own template
+    # sky_templates/ray/stop_ray_cluster.sh.
+    # DO NOT use `ray stop [--force]`: it kills ALL Ray on the host, including
+    # SkyPilot's internal cluster (port 6380), which prevents the job actor
+    # from reporting SUCCEEDED and leaves the managed job stuck in RUNNING.
+    echo "[run] Stopping training Ray cluster (port 6379)..."
+    pkill -SIGTERM -f "ray.*[=:]6379" 2>/dev/null || true
+    sleep 5
+    pkill -SIGKILL -f "ray.*[=:]6379" 2>/dev/null || true
+    echo "[run] Training Ray cluster stopped."
   }
   trap cleanup_background EXIT INT TERM
 
