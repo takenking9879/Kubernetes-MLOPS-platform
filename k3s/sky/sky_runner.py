@@ -1110,6 +1110,60 @@ def register_endpoint():
     print(f"Endpoint registered: {endpoint_url} → s3://{bucket}/{key}")
 
 
+def update_tabular_serve():
+    """Rolling-update an existing SkyPilot sky serve service to pick up a new champion model.
+
+    Calls sky.serve.update() with the same YAML used at launch.  New replicas
+    restart and app.py loads mlflow.pyfunc via MODEL_ALIAS (default "champion"),
+    picking up whatever version is currently aliased @champion in MLflow.
+    Zero-downtime — SkyServe keeps old replicas serving until new ones are READY.
+    """
+    import sky
+    import yaml as _yaml
+
+    service_name   = _env("SERVICE_NAME")
+    registry_model = _env("REGISTRY_MODEL_NAME")
+    alias          = _env("MODEL_ALIAS", "champion")
+    serve_port     = int(_env("SERVE_PORT", "8000"))
+    num_nodes      = int(_env("NUM_NODES", "1"))
+    rc             = _rc()
+
+    if not service_name:
+        raise RuntimeError("SERVICE_NAME env var is required for update-tabular-serve")
+
+    kind = "tabular_serve_multi" if num_nodes > 1 else "tabular_serve"
+    yaml_path = _yaml_path(kind, rc)
+    print(f"Updating sky serve service '{service_name}' using YAML: {yaml_path}  (num_nodes={num_nodes})")
+
+    with open(yaml_path) as fh:
+        sky_conf = _yaml.safe_load(fh)
+
+    if num_nodes > 1:
+        sky_conf["num_nodes"] = num_nodes
+
+    if rc:
+        gpu_fallbacks = rc.get("gpu_fallbacks") or rc.get("ordered")
+        if gpu_fallbacks and isinstance(gpu_fallbacks, list):
+            sky_conf.setdefault("resources", {})["ordered"] = gpu_fallbacks
+            sky_conf["resources"].pop("any_of", None)
+
+    tmp = f"/tmp/sky_tabular_update_{service_name}.yaml"
+    with open(tmp, "w") as fh:
+        _yaml.dump(sky_conf, fh, default_flow_style=False, allow_unicode=True)
+
+    task = sky.Task.from_yaml(tmp)
+    task.update_envs({
+        "REGISTRY_MODEL_NAME": registry_model,
+        "MODEL_ALIAS":         alias,
+        "SERVE_PORT":          str(serve_port),
+    })
+
+    print(f"Triggering rolling update for service '{service_name}' → models:/{registry_model}@{alias}")
+    sky.stream_and_get(sky.serve.update(task, service_name=service_name))
+    print(f"Rolling update complete: '{service_name}'")
+    _xcom_push({"service_name": service_name, "status": "updated"})
+
+
 # ─── Entry point ──────────────────────────────────────────────────────────────
 
 _COMMANDS = {
@@ -1130,6 +1184,7 @@ _COMMANDS = {
     # ── Tabular sky serve (sky.serve.up — managed replicas) ───────────────────
     "launch-tabular-serve":  launch_tabular_serve,
     "wait-tabular-serve":    wait_tabular_serve,
+    "update-tabular-serve":  update_tabular_serve,
     "register-endpoint": register_endpoint,
 }
 

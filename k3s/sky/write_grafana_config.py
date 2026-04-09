@@ -20,6 +20,7 @@ Optional labels/envs:
   SKY_PROVIDER
   TRAIN_RUN_ID
   PREPROCESS_RUN_ID
+  SERVE_RUN_ID
   MODEL_TYPE
   METRICS_SOURCE
   USE_SPOT
@@ -46,6 +47,7 @@ cluster = os.getenv("SKY_CLUSTER_NAME", "unknown").strip()
 provider = os.getenv("SKY_PROVIDER", "unknown").strip()
 train_run_id = os.getenv("TRAIN_RUN_ID", "").strip()
 preprocess_run_id = os.getenv("PREPROCESS_RUN_ID", "").strip()
+serve_run_id = os.getenv("SERVE_RUN_ID", "").strip()
 model_type = os.getenv("MODEL_TYPE", "unknown").strip()
 metrics_source = os.getenv("METRICS_SOURCE", "skypilot_vm").strip()
 is_spot = os.getenv("USE_SPOT", "false").strip()
@@ -105,6 +107,7 @@ shared_labels = {
     "provider": provider,
     "run_id": train_run_id,
     "preprocess_run_id": preprocess_run_id,
+    "serve_run_id": serve_run_id,
     "model_type": model_type,
     "source": metrics_source,
     "is_spot": is_spot,

@@ -6,8 +6,8 @@
 #   The CLIs are for interactive setup (aws configure, runpod config), not K8s pods.
 #
 # Build from REPO ROOT:
-#   docker build -f k3s/sky/Dockerfile -t takenking9879/sky-runner:0.12.0 .
-#   docker push takenking9879/sky-runner:0.12.0
+#   docker build -f k3s/sky/Dockerfile -t takenking9879/sky-runner:0.13.0 .
+#   docker push takenking9879/sky-runner:0.13.0
 #
 # Cloud credentials flow (all from env-secret, no extra secrets needed):
 #   AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY → boto3 reads natively

@@ -39,7 +39,7 @@ from kubernetes.client import models as k8s
 
 # ─── Constants ────────────────────────────────────────────────────────────────
 
-_SKY_IMAGE  = os.getenv("SKY_RUNNER_IMAGE", "takenking9879/sky-runner:0.12.0")
+_SKY_IMAGE  = os.getenv("SKY_RUNNER_IMAGE", "takenking9879/sky-runner:0.13.0")
 _AIRFLOW_NS = os.getenv("AIRFLOW_NAMESPACE", "airflow")
 TABULAR_SERVE_HEALTH_TIMEOUT_SECONDS = int(
     os.getenv("TABULAR_SERVE_HEALTH_TIMEOUT_SECONDS", "600")

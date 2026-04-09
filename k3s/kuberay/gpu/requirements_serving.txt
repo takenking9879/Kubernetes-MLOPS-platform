@@ -1,25 +1,26 @@
 # =========================
-# Runtime deps for tabular training on provider-native templates
+# Runtime deps for tabular serving on provider-native GPU templates
 # (RunPod / Vast.ai — torch is PRE-INSTALLED in provider base image, DO NOT add torch here)
-# Used by: ray-gpu-training-runpod.yaml, ray-gpu-training-vast.yaml
+# Used by: tabular-serving-single.yaml, tabular-serving-multinode.yaml
+#
+# Subset of requirements_tabular_runtime.txt:
+#   - ray[serve] only (no data/train/tune — faster setup, not needed for inference)
+#   - No kubernetes (unused)
+#   - No deepspeed (training-only, never needed for serving)
+#   - Adds starlette + uvicorn (Ray Serve HTTP layer)
 # =========================
 
-# Ray (full training stack)
 packaging==25.0
-ray[data,train,tune,serve]==2.53.0
+ray[serve]==2.53.0
 
 # =========================
 # Core ML / Data
 # =========================
-# RunPod/Vast provider templates currently expose Python 3.10 in /root/miniconda3.
-# Keep a Python-conditional pin so setup works on both 3.10 and 3.11+.
 numpy==2.2.6; python_version < "3.11"
 numpy==2.3.3; python_version >= "3.11"
 pandas==2.3.3
 pyarrow==22.0.0
 scikit-learn==1.8.0
-matplotlib==3.10.0
-pyiceberg==0.10.0
 
 # =========================
 # Gradient Boosting
@@ -27,21 +28,16 @@ pyiceberg==0.10.0
 xgboost==3.1.3
 
 # =========================
-# Distributed Training (optional)
-# =========================
-# DeepSpeed is installed conditionally in SkyPilot setup only when
-# USE_DEEPSPEED=true. Keep it out of the default tabular runtime path to
-# avoid setup failures on provider-native images.
-
-# =========================
 # Experiment Tracking
 # =========================
 mlflow==3.7.0
 
 # =========================
-# Cloud / Config
+# Cloud / Config / HTTP
 # =========================
 boto3==1.42.28
 python-dotenv==1.2.1
 PyYAML==6.0.3
 prometheus-client==0.24.1
+starlette
+uvicorn

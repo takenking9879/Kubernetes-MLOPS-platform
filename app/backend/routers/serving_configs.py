@@ -6,6 +6,7 @@ Endpoints:
   GET  /api/v2/serving-configs/{id}/params                  — fetch params_serving.yaml for a run
   POST /api/v2/serving-configs/{id}/deploy                  — trigger serving_pipeline Airflow DAG
   GET  /api/v2/serving-configs/{id}/deploy/{dag_run_id}/status — poll DAG run state
+  POST /api/v2/serving-configs/{id}/update-champion         — rolling sky serve update to sync @champion (SkyPilot only)
 
 Serving modes:
   ray_only — deploys Ray Serve with MLflow promotion only; raw.yaml not required
@@ -38,6 +39,7 @@ AIRFLOW_USER = os.getenv("AIRFLOW_USER", "admin")
 AIRFLOW_PASSWORD = os.getenv("AIRFLOW_PASSWORD", "admin")
 SERVING_DAG_ID = "serving_pipeline"
 TABULAR_SKY_SERVING_DAG_ID = "tabular_serving_skypilot_pipeline"
+TABULAR_SKY_CHAMPION_SYNC_DAG_ID = "tabular_serve_champion_sync"
 
 RAY_SERVICE_NAME = os.getenv("RAY_SERVICE_NAME", "model-serving")
 RAY_SERVICE_NAMESPACE = os.getenv("RAY_SERVICE_NAMESPACE", "ray")
@@ -398,6 +400,87 @@ async def serving_deploy_status(
         "state": data.get("state", "unknown"),
         "start_date": data.get("start_date"),
         "end_date": data.get("end_date"),
+    }
+
+
+# ─── Champion sync endpoint (SkyPilot rolling update) ────────────────────────
+
+
+class UpdateChampionRequest(BaseModel):
+    alias: str = "champion"
+    num_nodes: int = Field(1, ge=1)
+    resource_constraints: Optional[dict] = None
+
+
+@router.post("/{serve_run_id}/update-champion", status_code=202)
+async def update_champion(serve_run_id: str, request: UpdateChampionRequest):
+    """Trigger a rolling sky serve update so replicas pick up the current MLflow @champion.
+
+    Reads params_serving.yaml from S3 to resolve registry_model_name, then
+    triggers the tabular_serve_champion_sync DAG which calls
+    `sky_runner.py update-tabular-serve`.  Zero-downtime — SkyServe keeps old
+    replicas serving until new ones are READY.
+
+    Only applicable when deployment_target == "skypilot".
+    """
+    s3 = _s3_client()
+    serving_params = _fetch_serving_params(serve_run_id, s3, S3_BUCKET)
+
+    serving_block = serving_params.get("serving", {})
+    deployment_target = serving_block.get("deployment_target", "in_cluster")
+    if deployment_target != "skypilot":
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                f"serve_run_id '{serve_run_id}' has deployment_target='{deployment_target}'. "
+                "update-champion is only applicable to SkyPilot deployments."
+            ),
+        )
+
+    registry_model_name = serving_block.get("registry_model_name", "")
+    if not registry_model_name:
+        raise HTTPException(
+            status_code=400,
+            detail="params_serving.yaml is missing 'serving.registry_model_name'.",
+        )
+
+    dag_conf: dict[str, Any] = {
+        "serve_run_id":         serve_run_id,
+        "registry_model_name":  registry_model_name,
+        "alias":                request.alias,
+        "num_nodes":            request.num_nodes,
+    }
+    if request.resource_constraints:
+        dag_conf["resource_constraints"] = request.resource_constraints
+
+    try:
+        status, data = _airflow_request(
+            "POST",
+            f"api/v2/dags/{TABULAR_SKY_CHAMPION_SYNC_DAG_ID}/dagRuns",
+            body={
+                "logical_date": datetime.now(timezone.utc).isoformat(),
+                "conf": dag_conf,
+            },
+        )
+        if status >= 400:
+            raise HTTPException(
+                status_code=502,
+                detail=f"Airflow returned {status}: {data}",
+            )
+        dag_run_id = data.get("dag_run_id", "")
+    except HTTPException:
+        raise
+    except Exception as exc:
+        raise HTTPException(
+            status_code=502,
+            detail=f"Failed to trigger {TABULAR_SKY_CHAMPION_SYNC_DAG_ID} DAG: {exc}",
+        ) from exc
+
+    return {
+        "dag_run_id":   dag_run_id,
+        "serve_run_id": serve_run_id,
+        "dag_id":       TABULAR_SKY_CHAMPION_SYNC_DAG_ID,
+        "alias":        request.alias,
     }
 
 
