@@ -19,6 +19,7 @@ import {
   listDatasets,
   listPreprocessRunIds,
   submitRun,
+  type RunRequest,
   type DatasetInfo,
   type ModelTypeConfig,
   type PreprocessRunId,
@@ -28,6 +29,9 @@ import {
   type TrainingRunResult,
 } from '../api/platformClient';
 import { GPUResourceSelector } from '../components/GPUResourceSelector';
+import { ChipInput } from '../components/forms/ChipInput';
+import { NumericInput } from '../components/forms/NumericInput';
+import { parseFiniteNumber, parseStringChip, stringifyNumberValue } from '../lib/formValues';
 import {
   TASK_INFO,
   XGBOOST_DEFAULTS,
@@ -217,19 +221,31 @@ function ParamInput({
   paramKey: string;
   meta: {
     type: string;
-    defaultValue: unknown;
+    onOverrideChange?: (key: string, field: 'min' | 'max' | 'options', val: number | number[] | undefined) => void;
     options?: string[];
     min?: number;
     max?: number;
     step?: number;
   };
-  value: number | string | string[];
-  onChange?: (key: string, val: number | string | string[]) => void;
+  value: number | string | Array<number | string>;
+  onChange?: (key: string, val: number | string | Array<number | string>) => void;
   readOnly?: boolean;
 }) {
   if (readOnly || meta.type === 'array') {
-    const display = Array.isArray(value) ? value.join(', ') : String(value);
-    return <ReadOnlyBadge>{display}</ReadOnlyBadge>;
+    if (readOnly) {
+      const display = Array.isArray(value) ? value.join(', ') : String(value);
+      return <ReadOnlyBadge>{display}</ReadOnlyBadge>;
+    }
+
+    return (
+      <ChipInput
+        value={Array.isArray(value) ? (value as Array<string | number>) : []}
+        onChange={(next) => onChange?.(paramKey, next)}
+        parseItem={(raw) => parseStringChip(raw)}
+        formatItem={(item) => String(item)}
+        placeholder="Type a value and press Enter"
+      />
+    );
   }
   if (meta.type === 'string' && meta.options) {
     return (
@@ -247,14 +263,13 @@ function ParamInput({
     );
   }
   return (
-    <input
-      type="number"
+    <NumericInput
       className={INPUT_CLS}
-      value={value as number}
+      value={stringifyNumberValue(value as number | string | null | undefined)}
       min={meta.min}
       max={meta.max}
       step={meta.step ?? 'any'}
-      onChange={(e) => onChange?.(paramKey, parseFloat(e.target.value) || 0)}
+      onChange={(next) => onChange?.(paramKey, next)}
     />
   );
 }
@@ -271,7 +286,7 @@ function SearchSpaceRow({
   paramKey: string;
   entry: SearchSpaceEntry;
   override?: { min?: number; max?: number; options?: number[] };
-  onOverrideChange?: (key: string, field: 'min' | 'max' | 'options', val: number | number[]) => void;
+  onOverrideChange?: (key: string, field: 'min' | 'max' | 'options', val: number | number[] | undefined) => void;
   overrideMode: boolean;
 }) {
   const renderRange = () => {
@@ -283,18 +298,16 @@ function SearchSpaceRow({
       if (overrideMode) {
         const currentOptions = override?.options ?? (entry.options as number[]);
         return (
-          <input
-            type="text"
-            className="w-44 rounded bg-slate-800 px-1.5 py-0.5 text-xs text-slate-100 outline-none focus:ring-1 focus:ring-blue-500"
-            value={currentOptions.join(', ')}
-            placeholder="64, 128, 256"
-            onChange={(e) => {
-              const opts = e.target.value
-                .split(',')
-                .map((v) => Number(v.trim()))
-                .filter((n) => !isNaN(n) && n > 0);
-              onOverrideChange?.(paramKey, 'options', opts);
+          <ChipInput
+            value={currentOptions}
+            onChange={(opts) => onOverrideChange?.(paramKey, 'options', opts)}
+            parseItem={(raw) => {
+              const parsed = parseFiniteNumber(raw);
+              return parsed === null ? null : parsed;
             }}
+            formatItem={(item) => String(item)}
+            placeholder="64, 128, 256"
+            className="w-44"
           />
         );
       }
@@ -303,20 +316,24 @@ function SearchSpaceRow({
     if (overrideMode) {
       return (
         <div className="flex items-center gap-1">
-          <input
-            type="number"
+          <NumericInput
             className="w-20 rounded bg-slate-800 px-1.5 py-0.5 text-xs text-slate-100 outline-none focus:ring-1 focus:ring-blue-500"
-            value={override?.min ?? entry.min}
+            value={stringifyNumberValue(override?.min ?? entry.min)}
             step="any"
-            onChange={(e) => onOverrideChange?.(paramKey, 'min', parseFloat(e.target.value))}
+            onChange={(next) => {
+              const parsed = parseFiniteNumber(next);
+              onOverrideChange?.(paramKey, 'min', next === '' ? undefined : parsed ?? undefined);
+            }}
           />
           <span className="text-xs text-slate-500">–</span>
-          <input
-            type="number"
+          <NumericInput
             className="w-20 rounded bg-slate-800 px-1.5 py-0.5 text-xs text-slate-100 outline-none focus:ring-1 focus:ring-blue-500"
-            value={override?.max ?? entry.max}
+            value={stringifyNumberValue(override?.max ?? entry.max)}
             step="any"
-            onChange={(e) => onOverrideChange?.(paramKey, 'max', parseFloat(e.target.value))}
+            onChange={(next) => {
+              const parsed = parseFiniteNumber(next);
+              onOverrideChange?.(paramKey, 'max', next === '' ? undefined : parsed ?? undefined);
+            }}
           />
         </div>
       );
@@ -417,8 +434,8 @@ function buildPreviewYaml(opts: {
   numberOfTrials: number;
   sampleFraction: number;
   modelConfig: typeof DEFAULT_MODEL_CONFIG;
-  hyperparams: Record<string, number | string | string[]>;
-  tuneSettings: Record<string, number>;
+  hyperparams: Record<string, number | string | Array<number | string>>;
+  tuneSettings: Record<string, number | ''>;
 }): string {
   const lines: string[] = [
     '# params_training.yaml preview',
@@ -496,7 +513,7 @@ export function RunPage() {
   const [modelConfig, setModelConfig] = useState({ ...DEFAULT_MODEL_CONFIG });
 
   // ── Hyperparams ───────────────────────────────────────────────────────────
-  const [hyperparams, setHyperparams] = useState<Record<string, number | string | string[]>>(
+  const [hyperparams, setHyperparams] = useState<Record<string, number | string | Array<number | string>>>(
     () => ({ ...XGBOOST_DEFAULTS }),
   );
 
@@ -746,7 +763,7 @@ export function RunPage() {
     try {
       // Build search_space payload when override mode is active.
       // Only include params that the user actually changed (non-empty overrides).
-      const searchSpacePayload: Record<string, unknown> = {};
+      const searchSpacePayload: NonNullable<RunRequest['search_space']> = {};
       if (tuningEnabled && tuneMode === 'override') {
         const baseSpace = getSearchSpace(framework);
         for (const [key, entry] of Object.entries(baseSpace)) {
@@ -801,7 +818,7 @@ export function RunPage() {
 
   const fullValidationErrors = validateForm();
 
-  const updateHyperparam = (key: string, val: number | string | string[]) =>
+  const updateHyperparam = (key: string, val: number | string | Array<number | string>) =>
     setHyperparams((prev) => ({ ...prev, [key]: val }));
 
   const updateTuneSetting = (key: string, val: number) =>
@@ -810,7 +827,7 @@ export function RunPage() {
   const updateSearchSpaceOverride = (
     key: string,
     field: 'min' | 'max' | 'options',
-    val: number | number[],
+    val: number | number[] | undefined,
   ) =>
     setSearchSpaceOverrides((prev) => ({
       ...prev,

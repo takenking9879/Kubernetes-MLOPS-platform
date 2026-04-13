@@ -33,6 +33,8 @@ import {
   type RawFieldEntry,
 } from '../lib/schemaYaml';
 import { RawYamlEditor } from '../components/schema/RawYamlEditor';
+import { NumericInput } from '../components/forms/NumericInput';
+import { parseFiniteNumber, parseInteger } from '../lib/formValues';
 
 // ─── Style tokens ─────────────────────────────────────────────────────────────
 
@@ -282,11 +284,11 @@ export function ServingPage() {
   const [alias, setAlias] = useState('champion');
   const [canary, setCanary] = useState(false);
   const [canaryAlias, setCanaryAlias] = useState('challenger');
-  const [canaryProbability, setCanaryProbability] = useState(0.1);
-  const [initialReplicas, setInitialReplicas] = useState(0);
+  const [canaryProbability, setCanaryProbability] = useState('0.1');
+  const [initialReplicas, setInitialReplicas] = useState('0');
   const [webhookPublicBaseUrl, setWebhookPublicBaseUrl] = useState('');
   const [webhookPath, setWebhookPath] = useState('/infer/webhook');
-  const [webhookMaxTimestampAgeSeconds, setWebhookMaxTimestampAgeSeconds] = useState(300);
+  const [webhookMaxTimestampAgeSeconds, setWebhookMaxTimestampAgeSeconds] = useState('300');
 
   // ── Step 4 / Submission ───────────────────────────────────────────────────
   const [submitResult, setSubmitResult] = useState<ServingConfigResult | null>(null);
@@ -307,8 +309,8 @@ export function ServingPage() {
   const [selectedLlmModel, setSelectedLlmModel] = useState('');
   const [hfToken, setHfToken] = useState('');
   const [llmAdapterS3, setLlmAdapterS3] = useState('');
-  const [vllmPort, setVllmPort] = useState(8000);
-  const [maxModelLen, setMaxModelLen] = useState(4096);
+  const [vllmPort, setVllmPort] = useState('8000');
+  const [maxModelLen, setMaxModelLen] = useState('4096');
   const [llmDeployResult, setLlmDeployResult] = useState<VllmDeployResult | null>(null);
   const [llmDeployError, setLlmDeployError] = useState('');
   const [llmDeploying, setLlmDeploying] = useState(false);
@@ -344,7 +346,7 @@ export function ServingPage() {
       return;
     }
     const m = selectedTrainRunId.match(/^train-(.+)-[0-9a-f]{6}-\d{8}T\d{6}Z-[0-9a-f]{6}$/);
-    setResolvedDataset(m ? m[1] : '');
+    setResolvedDataset(m?.[1] ?? '');
   }, [selectedTrainRunId, trainingRunIds]);
 
   // Reset schema save state when dataset or raw fields change
@@ -382,7 +384,7 @@ export function ServingPage() {
     if (servingType !== 'llm' || llmCatalog.length > 0) return;
     setLlmCatalogLoading(true);
     getLLMCatalog()
-      .then((c) => { setLlmCatalog(c); if (c.length > 0) setSelectedLlmModel(c[0].model_id); })
+      .then((c) => { setLlmCatalog(c); if (c.length > 0) setSelectedLlmModel(c[0]?.model_id ?? ''); })
       .catch(() => setLlmCatalog([]))
       .finally(() => setLlmCatalogLoading(false));
   }, [servingType, llmCatalog.length]);
@@ -434,7 +436,8 @@ export function ServingPage() {
       case 3: {
         const e: string[] = [];
         if (!alias.trim()) e.push('Alias is required');
-        if (canary && (canaryProbability < 0 || canaryProbability > 1))
+        const canaryProb = parseFiniteNumber(canaryProbability);
+        if (canary && (canaryProb === null || canaryProb < 0 || canaryProb > 1))
           e.push('Canary probability must be between 0 and 1');
         return e;
       }
@@ -522,11 +525,11 @@ export function ServingPage() {
         alias,
         canary,
         canary_alias: canaryAlias,
-        canary_probability: canaryProbability,
-        initial_replicas: initialReplicas,
+        canary_probability: parseFiniteNumber(canaryProbability) ?? 0.1,
+        initial_replicas: parseInteger(initialReplicas) ?? 0,
         webhook_public_base_url: webhookPublicBaseUrl,
         webhook_path: webhookPath,
-        webhook_max_timestamp_age_seconds: webhookMaxTimestampAgeSeconds,
+        webhook_max_timestamp_age_seconds: parseInteger(webhookMaxTimestampAgeSeconds) ?? 300,
       });
       setSubmitResult(result);
     } catch (e) {
@@ -572,8 +575,8 @@ export function ServingPage() {
         llm_model_id: selectedLlmModel,
         hf_token: hfToken || undefined,
         llm_adapter_s3: llmAdapterS3 || undefined,
-        vllm_port: vllmPort,
-        max_model_len: maxModelLen,
+        vllm_port: parseInteger(vllmPort) ?? 8000,
+        max_model_len: parseInteger(maxModelLen) ?? 4096,
       });
       setLlmDeployResult(result);
       // Poll endpoint every 20s until healthy
@@ -700,24 +703,22 @@ export function ServingPage() {
             <div className="grid grid-cols-2 gap-3">
               <div className="flex flex-col gap-1">
                 <label className="text-xs text-slate-400">Serving Port</label>
-                <input
-                  type="number"
-                  min={1}
-                  max={65535}
-                  value={vllmPort}
-                  onChange={(e) => setVllmPort(parseInt(e.target.value) || 8000)}
-                  className={INPUT_CLS}
-                />
+                  <NumericInput
+                    min={1}
+                    max={65535}
+                    value={vllmPort}
+                    onChange={setVllmPort}
+                    className={INPUT_CLS}
+                  />
               </div>
               <div className="flex flex-col gap-1">
                 <label className="text-xs text-slate-400">Max Model Length</label>
-                <input
-                  type="number"
-                  min={256}
-                  value={maxModelLen}
-                  onChange={(e) => setMaxModelLen(parseInt(e.target.value) || 4096)}
-                  className={INPUT_CLS}
-                />
+                  <NumericInput
+                    min={256}
+                    value={maxModelLen}
+                    onChange={setMaxModelLen}
+                    className={INPUT_CLS}
+                  />
               </div>
             </div>
 
@@ -1003,15 +1004,12 @@ export function ServingPage() {
                       label="Canary Probability"
                       tooltip="Fraction of traffic routed to the canary model (0–1)."
                     >
-                      <input
-                        type="number"
+                      <NumericInput
                         min={0}
                         max={1}
                         step={0.01}
                         value={canaryProbability}
-                        onChange={(e) =>
-                          setCanaryProbability(parseFloat(e.target.value) || 0)
-                        }
+                        onChange={setCanaryProbability}
                         className={INPUT_CLS}
                       />
                     </Field>
@@ -1019,13 +1017,10 @@ export function ServingPage() {
                       label="Initial Replicas"
                       tooltip="Number of replicas for the canary service. 0 = not deployed yet."
                     >
-                      <input
-                        type="number"
+                      <NumericInput
                         min={0}
                         value={initialReplicas}
-                        onChange={(e) =>
-                          setInitialReplicas(parseInt(e.target.value) || 0)
-                        }
+                        onChange={setInitialReplicas}
                         className={INPUT_CLS}
                       />
                     </Field>
@@ -1060,13 +1055,10 @@ export function ServingPage() {
                     label="Max Timestamp Age (s)"
                     tooltip="Reject webhook requests older than this many seconds."
                   >
-                    <input
-                      type="number"
+                    <NumericInput
                       min={1}
                       value={webhookMaxTimestampAgeSeconds}
-                      onChange={(e) =>
-                        setWebhookMaxTimestampAgeSeconds(parseInt(e.target.value) || 300)
-                      }
+                      onChange={setWebhookMaxTimestampAgeSeconds}
                       className={INPUT_CLS}
                     />
                   </Field>
@@ -1265,7 +1257,7 @@ export function ServingPage() {
       <div className="w-[420px] shrink-0 min-h-0 p-4">
         <YamlPreviewPanel
           content={
-            servingType === 'kafka'
+            servingMode === 'kafka'
               ? rawYamlContent
               : '# raw.yaml not used in this mode'
           }

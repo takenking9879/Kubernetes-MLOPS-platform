@@ -1,3 +1,9 @@
+## 2026-04-13 — Shared numeric and chip input layer
+- Added reusable `NumericInput` and `ChipInput` components for string-backed numeric editing and structured list editing in the frontend.
+- Updated node parameter metadata to distinguish numeric, string, and mixed array inputs so the properties panel can render chips instead of comma-separated text.
+- Began migrating form surfaces away from `type="number"` and raw array strings.
+- Updated context: `context/app/front/key_elements.md`.
+
 ## 2026-04-06 — Tabular SkyPilot out-cluster serving
 - **Issue fix**: tabular training params (target column, num classes, framework, hyperparams) were shown in serving-only mode. Fixed by guarding the section with `isTraining` in `LaunchWizardPage.tsx`.
 - **SkyPilot sky serve support for tabular models**: `deployment_target` toggle in the wizard (in-cluster KubeRay vs out-cluster SkyPilot). SkyPilot path uses `sky.serve.up()` + managed replicas with auto-scaling.

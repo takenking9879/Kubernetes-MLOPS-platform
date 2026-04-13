@@ -69,6 +69,32 @@ Components used: `GPUResourceSelector`, `GPUPricingPanel`, `OrchestrationRecomme
 
 ## Components
 
+### Form inputs
+Files: `app/frontend/src/components/forms/NumericInput.tsx`, `app/frontend/src/components/forms/ChipInput.tsx`
+
+Does:
+- Provide shared string-backed numeric editing without spinner behavior
+- Provide chip/tag editing with Enter-to-add, remove buttons, duplicate prevention, and optional suggestions
+
+Used by:
+- `NodePropertiesForm.tsx`
+- `EdgeSelectorConfig.tsx`
+- `RunPage.tsx` (hyperparameter editors and search-space overrides)
+
+Depends on:
+- `app/frontend/src/lib/formValues.ts`
+
+### Node parameter schema
+File: `app/frontend/src/registry/NodeRegistry.ts`
+
+Does:
+- Declares per-parameter array element metadata for structured form rendering
+- Validates array contents by element type before node params are accepted
+
+Depends on:
+- `app/frontend/src/components/Properties/NodePropertiesForm.tsx`
+- `app/frontend/src/registry/__tests__/NodeRegistry.test.ts`
+
 ### GPUResourceSelector
 File: `app/frontend/src/components/GPUResourceSelector.tsx`
 

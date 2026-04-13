@@ -3,6 +3,9 @@ import type { FlowEdge, EdgeSelector } from '../../types/edges';
 import { usePipelineStore } from '../../store/pipelineStore';
 import type { SparkDataType } from '../../types/schema';
 import { isStageNode } from '../../types/nodes';
+import { ChipInput } from '../forms/ChipInput';
+import { NumericInput } from '../forms/NumericInput';
+import { parseFiniteNumber, parseStringChip, stringifyNumberValue } from '../../lib/formValues';
 
 interface Props {
   readonly edge: FlowEdge;
@@ -167,21 +170,18 @@ export function EdgeSelectorConfig({ edge }: Props) {
             <label className="mb-1 block text-[10px] font-medium text-slate-400">
               Spark Types (comma-separated)
             </label>
-            <input
-              type="text"
-              value={sel.sparkTypeIn?.join(', ') ?? ''}
-              onChange={(e) => {
-                const types = e.target.value
-                  .split(',')
-                  .map((s) => s.trim())
-                  .filter(Boolean) as SparkDataType[];
+            <ChipInput
+              value={(sel.sparkTypeIn ?? []) as SparkDataType[]}
+              onChange={(types) =>
                 setSelector({
                   ...sel,
                   sparkTypeIn: types.length > 0 ? types : undefined,
-                });
-              }}
+                })
+              }
+              parseItem={(raw) => parseStringChip(raw) as SparkDataType | null}
+              formatItem={(item) => item}
               placeholder="integer, double"
-              className="input-field"
+              className="space-y-1"
             />
           </div>
 
@@ -190,14 +190,20 @@ export function EdgeSelectorConfig({ edge }: Props) {
               <label className="mb-1 block text-[10px] font-medium text-slate-400">
                 Cardinality &ge;
               </label>
-              <input
-                type="number"
-                value={sel.cardinalityGte ?? ''}
-                onChange={(e) => {
-                  const n = parseInt(e.target.value);
+              <NumericInput
+                value={stringifyNumberValue(sel.cardinalityGte)}
+                onChange={(next) => {
+                  if (next === '') {
+                    setSelector({
+                      ...sel,
+                      cardinalityGte: undefined,
+                    });
+                    return;
+                  }
+                  const parsed = parseFiniteNumber(next);
                   setSelector({
                     ...sel,
-                    cardinalityGte: isNaN(n) ? undefined : n,
+                    cardinalityGte: parsed ?? sel.cardinalityGte,
                   });
                 }}
                 className="input-field"
@@ -207,14 +213,20 @@ export function EdgeSelectorConfig({ edge }: Props) {
               <label className="mb-1 block text-[10px] font-medium text-slate-400">
                 Cardinality &le;
               </label>
-              <input
-                type="number"
-                value={sel.cardinalityLte ?? ''}
-                onChange={(e) => {
-                  const n = parseInt(e.target.value);
+              <NumericInput
+                value={stringifyNumberValue(sel.cardinalityLte)}
+                onChange={(next) => {
+                  if (next === '') {
+                    setSelector({
+                      ...sel,
+                      cardinalityLte: undefined,
+                    });
+                    return;
+                  }
+                  const parsed = parseFiniteNumber(next);
                   setSelector({
                     ...sel,
-                    cardinalityLte: isNaN(n) ? undefined : n,
+                    cardinalityLte: parsed ?? sel.cardinalityLte,
                   });
                 }}
                 className="input-field"

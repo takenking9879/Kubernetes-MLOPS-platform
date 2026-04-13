@@ -14,6 +14,9 @@ import {
   type FinalFeatureColumn,
   isNumericSparkType,
 } from '../../lib/finalFeatures/model';
+import { ChipInput } from '../forms/ChipInput';
+import { NumericInput } from '../forms/NumericInput';
+import { parseFiniteNumber, parseStringChip, stringifyNumberValue } from '../../lib/formValues';
 
 interface Props {
   readonly node: Node<NodeData>;
@@ -785,12 +788,16 @@ function ParamField({
     case 'number':
       return (
         <Field label={schema.label}>
-          <input
-            type="number"
-            value={value !== undefined && value !== null ? Number(value) : ''}
-            onChange={(e) => {
-              const n = parseFloat(e.target.value);
-              onChange(isNaN(n) ? undefined : n);
+          <NumericInput
+            value={stringifyNumberValue(value as number | string | null | undefined)}
+            onChange={(next) => {
+              if (next === '') {
+                onChange(undefined);
+                return;
+              }
+
+              const parsed = parseFiniteNumber(next);
+              onChange(parsed ?? next);
             }}
             min={schema.min}
             max={schema.max}
@@ -831,23 +838,31 @@ function ParamField({
     case 'array':
       return (
         <Field label={schema.label}>
-          <input
-            type="text"
-            value={Array.isArray(value) ? value.join(', ') : ''}
-            onChange={(e) => {
-              const parts = e.target.value
-                .split(',')
-                .map((s) => s.trim())
-                .filter(Boolean);
-              // Try to parse numbers
-              const parsed = parts.map((p) => {
-                const n = Number(p);
-                return isNaN(n) ? p : n;
-              });
-              onChange(parsed);
-            }}
-            placeholder="Comma-separated values"
-            className="input-field"
+          <ChipInput
+            value={Array.isArray(value) ? (value as Array<string | number>) : []}
+            onChange={onChange as (v: (string | number)[]) => void}
+            parseItem={
+              schema.elementType === 'number'
+                ? (raw) => {
+                    const parsed = parseFiniteNumber(raw);
+                    return parsed === null ? null : parsed;
+                  }
+                : schema.elementType === 'string'
+                  ? parseStringChip
+                  : (raw) => {
+                      const trimmed = raw.trim();
+                      if (!trimmed) return null;
+                      const parsed = parseFiniteNumber(trimmed);
+                      return parsed === null ? trimmed : parsed;
+                    }
+            }
+            formatItem={(item) => String(item)}
+            placeholder={
+              schema.elementType === 'number'
+                ? 'Type a number and press Enter'
+                : 'Type a value and press Enter'
+            }
+            className="space-y-1"
           />
         </Field>
       );

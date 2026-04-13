@@ -213,10 +213,19 @@ export function getParamMetaForTask(
 ): Record<string, ParamMeta> {
   const base = getParamMeta(framework);
   if (framework === 'xgboost' && taskType === 'regression') {
+    const objective: ParamMeta = {
+      type: 'string',
+      defaultValue: 'reg:squarederror',
+      options: ['reg:squarederror', 'reg:pseudohubererror'],
+    };
+    const evalMetric: ParamMeta = {
+      type: 'array',
+      defaultValue: ['rmse', 'mae'],
+    };
     return {
       ...base,
-      objective: { ...base.objective, options: ['reg:squarederror', 'reg:pseudohubererror'] },
-      eval_metric: { ...base.eval_metric, defaultValue: ['rmse', 'mae'] },
+      objective,
+      eval_metric: evalMetric,
     };
   }
   return base;

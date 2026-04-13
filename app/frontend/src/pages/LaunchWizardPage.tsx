@@ -76,6 +76,8 @@ import {
 import { GPUResourceSelector } from '../components/GPUResourceSelector';
 import { OrchestrationRecommendation } from '../components/OrchestrationRecommendation';
 import { GPUPricingPanel } from '../components/GPUPricingPanel';
+import { NumericInput } from '../components/forms/NumericInput';
+import { parseFiniteNumber, parseInteger, stringifyNumberValue } from '../lib/formValues';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -158,8 +160,8 @@ export function LaunchWizardPage() {
   const [taskType, setTaskType] = useState<TaskType>('classification');
   const [pytorchModelType, setPytorchModelType] = useState('mlp');
   const [target, setTarget] = useState('');
-  const [numClasses, setNumClasses] = useState(2);
-  const [seed, setSeed] = useState(42);
+  const [numClasses, setNumClasses] = useState<number | ''>(2);
+  const [seed, setSeed] = useState<number | ''>(42);
   const [experimentName, setExperimentName] = useState('');
   const [registryName, setRegistryName] = useState('');
   const [mlflowTrackingUri, setMlflowTrackingUri] = useState('');
@@ -171,15 +173,15 @@ export function LaunchWizardPage() {
     () => getDefaultsForTask('xgboost', 'classification'),
   );
   const [tuneEnabled, setTuneEnabled] = useState(true);
-  const [numTrials, setNumTrials] = useState(3);
+  const [numTrials, setNumTrials] = useState<number | ''>(3);
   const [sampleFraction, setSampleFraction] = useState(0.2);
-  const [tuneSettings, setTuneSettings] = useState<Record<string, number>>(
+  const [tuneSettings, setTuneSettings] = useState<Record<string, number | ''>>(
     () => getTuneSettingsDefaults('xgboost'),
   );
   const [searchSpaceOverrides, setSearchSpaceOverrides] = useState<
     Record<string, { min?: number; max?: number; options?: number[] }>
   >({});
-  const [finalTrainOverrides, setFinalTrainOverrides] = useState<Record<string, number>>({});
+  const [finalTrainOverrides, setFinalTrainOverrides] = useState<Record<string, number | ''>>({});
   const [showFinalTrainOverrides, setShowFinalTrainOverrides] = useState(false);
   const [showHyperparams, setShowHyperparams] = useState(false);
 
@@ -240,6 +242,16 @@ export function LaunchWizardPage() {
   const datasetOptions = availableDatasets.length > 0
     ? availableDatasets.map((d) => d.name)
     : [...new Set(preprocessRunIds.map((r) => r.dataset).filter(Boolean))];
+
+  const resolveIntegerDraft = (value: number | string, fallback: number) => {
+    const parsed = typeof value === 'number' ? value : parseInteger(value);
+    return parsed ?? fallback;
+  };
+
+  const resolveNumberDraft = (value: number | string, fallback: number) => {
+    const parsed = typeof value === 'number' ? value : parseFiniteNumber(value);
+    return parsed ?? fallback;
+  };
 
   // ── LLM / serving state ──────────────────────────────────────────────────
   const [llmModel, setLlmModel] = useState('');
@@ -581,6 +593,20 @@ export function LaunchWizardPage() {
       const useGpu = (constraints.providers ?? []).some(p =>
         ['runpod', 'vast', 'aws', 'gcp', 'azure'].includes(p),
       );
+      const resolvedNumClasses = resolveIntegerDraft(numClasses, 2);
+      const resolvedSeed = resolveIntegerDraft(seed, 42);
+      const resolvedNumTrials = resolveIntegerDraft(numTrials, 3);
+      const resolvedTuneSettings = Object.fromEntries(
+        Object.entries(tuneSettings).map(([key, value]) => [
+          key,
+          resolveNumberDraft(value, getTuneSettingsDefaults(framework)[key] ?? 0),
+        ]),
+      ) as Record<string, number>;
+      const resolvedFinalTrainOverrides = Object.fromEntries(
+        Object.entries(finalTrainOverrides)
+          .map(([key, value]) => [key, resolveNumberDraft(value, 0)])
+          .filter(([, value]) => Number.isFinite(value as number)),
+      ) as Record<string, number>;
       const result = await submitRun({
         preprocess_run_id: preprocessRunId,
         framework,
@@ -598,15 +624,15 @@ export function LaunchWizardPage() {
           mlflow_tracking_uri: mlflowTrackingUri,
           mlflow_artifact_location: mlflowArtifactLocation,
           target,
-          num_classes:        numClasses,
-          seed,
+          num_classes:        resolvedNumClasses,
+          seed:               resolvedSeed,
           task_type:          taskType,
           model_type:         framework === 'pytorch' ? pytorchModelType : undefined,
         },
-        tuning: { enabled: tuneEnabled, number_of_trials: numTrials },
+        tuning: { enabled: tuneEnabled, number_of_trials: resolvedNumTrials },
         sample_fraction_for_tuning: sampleFraction,
-        hyperparams: tuneEnabled ? finalTrainOverrides : hyperparams,
-        tune_settings: tuneEnabled ? tuneSettings : {},
+        hyperparams: tuneEnabled ? resolvedFinalTrainOverrides : hyperparams,
+        tune_settings: tuneEnabled ? resolvedTuneSettings : {},
         search_space: tuneEnabled ? (() => {
           const baseSpace = getSearchSpace(framework);
           const resolved: Record<string, { type: string; options?: number[]; min?: number; max?: number; value?: unknown }> = {};
@@ -963,12 +989,14 @@ export function LaunchWizardPage() {
                       {taskType === 'classification' && (
                         <div className="flex flex-col gap-1">
                           <span className="text-[10px] text-slate-500">Num classes</span>
-                          <input
-                            type="number"
+                          <NumericInput
                             className={INPUT_CLS}
-                            value={numClasses}
+                            value={stringifyNumberValue(numClasses)}
                             min={2}
-                            onChange={e => setNumClasses(parseInt(e.target.value) || 2)}
+                            onChange={next => {
+                              const parsed = parseInteger(next);
+                              setNumClasses(next === '' ? '' : parsed ?? numClasses);
+                            }}
                           />
                         </div>
                       )}
@@ -994,11 +1022,13 @@ export function LaunchWizardPage() {
                       </div>
                       <div className="flex flex-col gap-1">
                         <span className="text-[10px] text-slate-500">Seed</span>
-                        <input
-                          type="number"
+                        <NumericInput
                           className={INPUT_CLS}
-                          value={seed}
-                          onChange={e => setSeed(parseInt(e.target.value) || 42)}
+                          value={stringifyNumberValue(seed)}
+                          onChange={next => {
+                            const parsed = parseInteger(next);
+                            setSeed(next === '' ? '' : parsed ?? seed);
+                          }}
                         />
                       </div>
                       <div className="flex flex-col gap-1">
@@ -1168,12 +1198,14 @@ export function LaunchWizardPage() {
                               <div className="grid grid-cols-2 gap-3">
                                 <div className="flex flex-col gap-1">
                                   <span className="text-[10px] text-slate-500">Trials</span>
-                                  <input
-                                    type="number"
+                                  <NumericInput
                                     className={INPUT_CLS}
-                                    value={numTrials}
+                                    value={stringifyNumberValue(numTrials)}
                                     min={1}
-                                    onChange={e => setNumTrials(parseInt(e.target.value) || 1)}
+                                    onChange={next => {
+                                      const parsed = parseInteger(next);
+                                      setNumTrials(next === '' ? '' : parsed ?? numTrials);
+                                    }}
                                   />
                                 </div>
                                 <div className="flex flex-col gap-1">
@@ -1191,14 +1223,13 @@ export function LaunchWizardPage() {
                                 {Object.entries(tuneSettingsMeta).map(([k, meta]) => (
                                   <div key={k} className="flex flex-col gap-1">
                                     <span className="text-[10px] text-slate-500">{k}</span>
-                                    <input
-                                      type="number"
+                                    <NumericInput
                                       className={INPUT_CLS}
-                                      value={tuneSettings[k] ?? (meta.defaultValue as number)}
+                                      value={stringifyNumberValue(tuneSettings[k] ?? (meta.defaultValue as number))}
                                       min={meta.min}
                                       step={meta.step ?? 1}
-                                      onChange={e => setTuneSettings(prev => ({
-                                        ...prev, [k]: parseFloat(e.target.value) || 0,
+                                      onChange={next => setTuneSettings(prev => ({
+                                        ...prev, [k]: next === '' ? '' : (parseFiniteNumber(next) ?? ''),
                                       }))}
                                     />
                                   </div>
@@ -1224,21 +1255,20 @@ export function LaunchWizardPage() {
                                   {Object.entries(getFinalTrainMeta(framework)).map(([k, meta]) => (
                                     <div key={k} className="flex flex-col gap-1">
                                       <span className="text-[10px] text-slate-500">{k}</span>
-                                      <input
-                                        type="number"
+                                      <NumericInput
                                         className={INPUT_CLS}
                                         placeholder={String(meta.defaultValue)}
-                                        value={finalTrainOverrides[k] ?? ''}
+                                        value={stringifyNumberValue(finalTrainOverrides[k] ?? '')}
                                         min={meta.min}
                                         step={meta.step ?? 1}
-                                        onChange={e => {
-                                          const v = e.target.value;
+                                        onChange={next => {
                                           setFinalTrainOverrides(prev => {
-                                            if (v === '') {
+                                            if (next === '') {
                                               const { [k]: _removed, ...rest } = prev;
                                               return rest;
                                             }
-                                            return { ...prev, [k]: parseFloat(v) };
+                                            const parsed = parseFiniteNumber(next);
+                                            return { ...prev, [k]: parsed ?? '' };
                                           });
                                         }}
                                       />

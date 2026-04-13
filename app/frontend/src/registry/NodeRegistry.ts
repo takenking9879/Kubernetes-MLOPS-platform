@@ -36,6 +36,7 @@ export interface ParamSchema {
   readonly options?: readonly ParamOption[];
   readonly min?: number;
   readonly max?: number;
+  readonly elementType?: 'string' | 'number' | 'mixed';
 }
 
 // ─── Input cardinality constraint ───────────────────────────────────
@@ -282,8 +283,8 @@ export const NODE_REGISTRY: Readonly<Record<string, RegistryNodeDefinition>> = {
     outputType: 'integer',
     defaultParams: { bins: [0, 10, 50, 100] },
     paramSchema: [
-      { name: 'bins', type: 'array', label: 'Bin Edges (numbers)', required: true, default: [0, 10, 50, 100] },
-      { name: 'labels', type: 'array', label: 'Labels (optional)', required: false },
+      { name: 'bins', type: 'array', label: 'Bin Edges (numbers)', required: true, default: [0, 10, 50, 100], elementType: 'number' },
+      { name: 'labels', type: 'array', label: 'Labels (optional)', required: false, elementType: 'string' },
     ],
   },
 
@@ -312,7 +313,7 @@ export const NODE_REGISTRY: Readonly<Record<string, RegistryNodeDefinition>> = {
           { value: 'equals', label: 'Equals' },
         ],
       },
-      { name: 'values', type: 'array', label: 'Values', required: true },
+      { name: 'values', type: 'array', label: 'Values', required: true, elementType: 'mixed' },
       { name: 'true_value', type: 'number', label: 'True Value', required: true, default: 1 },
       { name: 'false_value', type: 'number', label: 'False Value', required: true, default: 0 },
     ],
@@ -700,8 +701,41 @@ export function validateNodeParams(type: string, params: Record<string, unknown>
       errors.push(`Parameter '${schema.label}' must be a number`);
     }
 
+    if (schema.type === 'number' && typeof value === 'number' && !Number.isFinite(value)) {
+      errors.push(`Parameter '${schema.label}' must be a finite number`);
+    }
+
     if (schema.type === 'boolean' && typeof value !== 'boolean') {
       errors.push(`Parameter '${schema.label}' must be a boolean`);
+    }
+
+    if (schema.type === 'array') {
+      if (!Array.isArray(value)) {
+        errors.push(`Parameter '${schema.label}' must be an array`);
+        continue;
+      }
+      if (schema.required && value.length === 0) {
+        errors.push(`Parameter '${schema.label}' must contain at least one item`);
+        continue;
+      }
+
+      if (schema.elementType === 'number') {
+        for (const item of value) {
+          if (typeof item !== 'number' || !Number.isFinite(item)) {
+            errors.push(`Parameter '${schema.label}' must contain only numbers`);
+            break;
+          }
+        }
+      }
+
+      if (schema.elementType === 'string') {
+        for (const item of value) {
+          if (typeof item !== 'string') {
+            errors.push(`Parameter '${schema.label}' must contain only strings`);
+            break;
+          }
+        }
+      }
     }
 
     if (schema.type === 'number' && typeof value === 'number') {

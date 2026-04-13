@@ -34,6 +34,15 @@ describe('NodeRegistry', () => {
     expect(def.outputExample).toBeDefined();
   });
 
+  it('annotates array element types for structured editors', () => {
+    const binning = getNodeDefinition('binning_transformer');
+    const conditional = getNodeDefinition('conditional_transformer');
+
+    expect(binning.paramSchema.find((p) => p.name === 'bins')?.elementType).toBe('number');
+    expect(binning.paramSchema.find((p) => p.name === 'labels')?.elementType).toBe('string');
+    expect(conditional.paramSchema.find((p) => p.name === 'values')?.elementType).toBe('mixed');
+  });
+
   it('getNodeDefinition throws for unknown type', () => {
     expect(() => getNodeDefinition('nonexistent')).toThrow('Unknown node type');
   });
@@ -92,6 +101,26 @@ describe('validateNodeParams', () => {
   it('validates number min constraint', () => {
     const errors = validateNodeParams('cyclic_transformer', { function: 'sin', period: -1 });
     expect(errors.some((e) => e.includes('>= 0.001'))).toBe(true);
+  });
+
+  it('validates numeric array items for bins', () => {
+    const errors = validateNodeParams('binning_transformer', {
+      bins: [0, '10', 50, 100],
+      labels: ['low', 'mid', 'high'],
+    });
+
+    expect(errors.some((e) => e.includes('must contain only numbers'))).toBe(true);
+  });
+
+  it('accepts string labels and mixed conditional values', () => {
+    const errors = validateNodeParams('conditional_transformer', {
+      condition: 'isin',
+      values: [1, 'two', true],
+      true_value: 1,
+      false_value: 0,
+    });
+
+    expect(errors).toEqual([]);
   });
 
   it('returns empty array for valid standard_scaler params', () => {
