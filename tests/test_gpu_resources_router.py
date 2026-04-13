@@ -9,8 +9,11 @@ if str(_PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(_PROJECT_ROOT))
 
 from app.backend.routers.gpu_resources import (
+    _RUNPOD_AVAILABILITY_EMPTY_TTL_SECONDS,
+    _RUNPOD_AVAILABILITY_TTL_SECONDS,
     _aggregate_runpod_availability_rows,
     _build_runpod_availability_matrix_query,
+    _runpod_availability_cache_ttl,
 )
 
 
@@ -98,3 +101,18 @@ def test_aggregate_runpod_availability_rows_falls_back_when_counts_missing():
     assert row["available"] is True
     assert row["available_counts"] == [3]
     assert row["max_available"] == 3
+
+
+def test_runpod_availability_cache_ttl_uses_full_ttl_when_any_region_available():
+    rows = [
+        {"gpu_type": "RTX2000-Ada", "provider_region_id": "CA-MTL-1", "available": False},
+        {"gpu_type": "RTX2000-Ada", "provider_region_id": "EUR-IS-1", "available": True},
+    ]
+    assert _runpod_availability_cache_ttl(rows) == _RUNPOD_AVAILABILITY_TTL_SECONDS
+
+
+def test_runpod_availability_cache_ttl_uses_short_ttl_when_all_unavailable():
+    rows = [
+        {"gpu_type": "RTXA5000", "provider_region_id": "CA-MTL-1", "available": False},
+    ]
+    assert _runpod_availability_cache_ttl(rows) == _RUNPOD_AVAILABILITY_EMPTY_TTL_SECONDS

@@ -52,10 +52,21 @@ _RUNPOD_REGIONS_TTL_SECONDS = 300
 _runpod_regions_cache: list[dict[str, Any]] = []
 _runpod_regions_cache_ts: float = 0.0
 _RUNPOD_AVAILABILITY_TTL_SECONDS = 20
+_RUNPOD_AVAILABILITY_EMPTY_TTL_SECONDS = 5
 _runpod_availability_cache: dict[
     tuple[tuple[str, ...], tuple[str, ...]],
     tuple[float, list[dict[str, Any]]],
 ] = {}
+
+
+def _runpod_availability_cache_ttl(rows: list[dict[str, Any]]) -> int:
+    """Use a shorter TTL for all-unavailable snapshots to reduce false negatives."""
+    has_available = any(bool((row or {}).get("available")) for row in rows)
+    return (
+        _RUNPOD_AVAILABILITY_TTL_SECONDS
+        if has_available
+        else _RUNPOD_AVAILABILITY_EMPTY_TTL_SECONDS
+    )
 
 # ── Static LLM catalog ────────────────────────────────────────────────────────
 _LLM_CATALOG: list[dict] = [
@@ -373,13 +384,17 @@ def get_runpod_region_availability(body: RunPodAvailabilityRequest) -> list[dict
         return []
 
     cache_key = (tuple(sorted(set(gpu_types))), tuple(region_ids))
+    cached_rows: list[dict[str, Any]] | None = None
     cached = _runpod_availability_cache.get(cache_key)
-    if cached and (time.time() - cached[0]) < _RUNPOD_AVAILABILITY_TTL_SECONDS:
-        return cached[1]
+    if cached:
+        cached_ts, cached_rows = cached
+        ttl_seconds = _runpod_availability_cache_ttl(cached_rows)
+        if (time.time() - cached_ts) < ttl_seconds:
+            return cached_rows
 
     api_key = os.getenv("RUNPOD_API_KEY", "")
     if not api_key:
-        return []
+        return cached_rows or []
 
     try:
         import runpod  # type: ignore[import]
@@ -395,6 +410,8 @@ def get_runpod_region_availability(body: RunPodAvailabilityRequest) -> list[dict
         _runpod_availability_cache[cache_key] = (time.time(), rows)
         return rows
     except Exception:
+        if cached_rows is not None:
+            return cached_rows
         return []
 
 

@@ -674,9 +674,13 @@ class KubeRayTraining(BaseUtils):
             # "Dataset X_Y execution finished" log entries before training even starts.
             # For lazy datasets, report block count as a proxy instead.
             def _count_or_estimate(ds: ray.data.Dataset) -> float:
-                from ray.data import MaterializedDataset
-                if isinstance(ds, MaterializedDataset):
-                    return float(ds.count())   # O(1) — blocks already in object store
+                try:
+                    from ray.data import MaterializedDataset
+                    if isinstance(ds, MaterializedDataset):
+                        return float(ds.count())   # O(1) — blocks already in object store
+                except ImportError:
+                    if type(ds).__name__ == "MaterializedDataset":
+                        return float(ds.count())
                 return float(ds.num_blocks())  # proxy: no scan triggered
 
             try:

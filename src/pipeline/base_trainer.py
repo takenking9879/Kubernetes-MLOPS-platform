@@ -173,11 +173,36 @@ class BaseTrainer(ABC):
         cpus_per_worker = int(os.getenv("CPUS_PER_WORKER", 2))
 
         # 1 — Preprocess datasets (framework-specific)
+        # Record materialization state BEFORE preprocessing: _preprocess_datasets() adds a
+        # lazy select_columns() (Project) operator which turns a MaterializedDataset into a
+        # plain lazy Dataset. Without re-materializing after, the Project operator runs as
+        # CPU-bound Ray tasks every epoch. With all CPUs reserved by the training worker,
+        # it stalls ~4s per dataset per epoch (7.76s/epoch × 50 epochs = 388s overhead).
+        def _is_materialized(ds) -> bool:
+            try:
+                from ray.data import MaterializedDataset
+                return isinstance(ds, MaterializedDataset)
+            except ImportError:
+                return type(ds).__name__ == "MaterializedDataset"
+
+        _train_was_mat = _is_materialized(train_dataset)
+        _val_was_mat = _is_materialized(val_dataset)
+        _test_was_mat = _is_materialized(test_dataset) if test_dataset is not None else False
+
         train_dataset, val_dataset, test_dataset = self._preprocess_datasets(
             train_dataset, val_dataset, test_dataset,
             target=target,
             feature_columns=feature_columns,
         )
+
+        # Re-materialize to bake preprocessing result into the object store.
+        # Only fires when the caller already materialized the datasets (RAY_MATERIALIZE_DATASETS=1).
+        if _train_was_mat:
+            train_dataset = train_dataset.materialize()
+        if _val_was_mat:
+            val_dataset = val_dataset.materialize()
+        if _test_was_mat and test_dataset is not None:
+            test_dataset = test_dataset.materialize()
 
         # 2 — Build config dict for worker train_func
         config = self._build_train_loop_config(

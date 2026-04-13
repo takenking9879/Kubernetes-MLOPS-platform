@@ -268,10 +268,10 @@ deploy_skypilot() {
   sep
   info "Deploying SkyPilot helm chart (k3s/sky/helm/skypilot)"
   #Este es un helm local
-  #helm upgrade --install my-skypilot ./k3s/sky/helm/skypilot \
-    #-n skypilot -f k3s/sky/helm/values.yaml
+  helm upgrade --install my-skypilot ./k3s/sky/helm/skypilot \
+    -n skypilot -f k3s/sky/helm/values.yaml
   #Este es el helm oficial
-  helm install my-skypilot skypilot/skypilot --version 0.12.0 -n skypilot -f k3s/sky/helm/values.yaml
+  #helm install my-skypilot skypilot/skypilot --version 0.12.0 -n skypilot -f k3s/sky/helm/values.yaml
 
   ok "SkyPilot deployed"
 }

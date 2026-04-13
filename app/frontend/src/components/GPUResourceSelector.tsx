@@ -218,6 +218,7 @@ export function GPUResourceSelector({ value, onChange, disabled }: Props) {
     const regionIds = runpodRegions.map((r) => r.provider_region_id.toUpperCase());
     const now = Date.now();
     const staleAfterMs = 20_000;
+    const staleAfterEmptyMs = 5_000;
     const gpuTypesToQuery = Array.from(
       new Set(
         fallbacks
@@ -226,9 +227,13 @@ export function GPUResourceSelector({ value, onChange, disabled }: Props) {
           .filter((gpu) => gpu.length > 0),
       ),
     ).filter((gpuType) => {
-      const hasCached = manualRunpodRegionOptions[gpuType] !== undefined;
+      const cachedOptions = manualRunpodRegionOptions[gpuType];
+      const hasCached = cachedOptions !== undefined;
       const lastFetchAt = manualRunpodRegionFetchedAt[gpuType] ?? 0;
-      const isFresh = hasCached && (now - lastFetchAt) < staleAfterMs;
+      const ttlMs = hasCached && cachedOptions.length > 0
+        ? staleAfterMs
+        : staleAfterEmptyMs;
+      const isFresh = hasCached && (now - lastFetchAt) < ttlMs;
       if (isFresh) return false;
       return !manualRunpodRegionLoading[gpuType];
     });
@@ -283,7 +288,9 @@ export function GPUResourceSelector({ value, onChange, disabled }: Props) {
           setManualRunpodRegionOptions((prev) => {
             const next = { ...prev };
             gpuTypesToQuery.forEach((gpuType) => {
-              next[gpuType] = [];
+              if (next[gpuType] === undefined) {
+                next[gpuType] = [];
+              }
             });
             return next;
           });
