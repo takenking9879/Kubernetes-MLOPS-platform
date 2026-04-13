@@ -70,14 +70,17 @@ import {
   getParamMetaForTask,
   getTuneSettingsMeta,
   getSearchSpace,
+  getNonTunableKeys,
   getFinalTrainMeta,
+  type ParamMeta,
   type TaskType,
 } from '../types/hyperparams';
 import { GPUResourceSelector } from '../components/GPUResourceSelector';
 import { OrchestrationRecommendation } from '../components/OrchestrationRecommendation';
 import { GPUPricingPanel } from '../components/GPUPricingPanel';
+import { ChipInput } from '../components/forms/ChipInput';
 import { NumericInput } from '../components/forms/NumericInput';
-import { parseFiniteNumber, parseInteger, stringifyNumberValue } from '../lib/formValues';
+import { parseFiniteNumber, parseInteger, parseStringChip, stringifyNumberValue } from '../lib/formValues';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -182,7 +185,7 @@ export function LaunchWizardPage() {
     Record<string, { min?: number; max?: number; options?: number[] }>
   >({});
   const [finalTrainOverrides, setFinalTrainOverrides] = useState<Record<string, number | ''>>({});
-  const [showFinalTrainOverrides, setShowFinalTrainOverrides] = useState(false);
+  const [showFinalTrainOverrides, setShowFinalTrainOverrides] = useState(true);
   const [showHyperparams, setShowHyperparams] = useState(false);
 
   const [tabularResult, setTabularResult] = useState<TrainingRunResult | null>(null);
@@ -748,6 +751,21 @@ export function LaunchWizardPage() {
   // ── Param grid helper (tabular hyperparams) ───────────────────────────────
   const paramMeta = getParamMetaForTask(framework, taskType);
   const tuneSettingsMeta = getTuneSettingsMeta(framework);
+  const nonTunableKeys = getNonTunableKeys(framework);
+  const searchSpaceSummary = Object.entries(getSearchSpace(framework)).map(([key, entry]) => {
+    const override = searchSpaceOverrides[key];
+    if (entry.type === 'choice') {
+      const options = (override?.options ?? entry.options) as Array<string | number>;
+      return [key, `choice: [${options.join(', ')}]`] as [string, string];
+    }
+    if (entry.type === 'fixed') {
+      const value = Array.isArray(entry.value) ? entry.value.join(', ') : String(entry.value);
+      return [key, `fixed: ${value}`] as [string, string];
+    }
+    const min = override?.min ?? entry.min;
+    const max = override?.max ?? entry.max;
+    return [key, `${entry.type}: min=${min}, max=${max}`] as [string, string];
+  });
 
   // ── Render ────────────────────────────────────────────────────────────────
 
@@ -1120,7 +1138,7 @@ export function LaunchWizardPage() {
                                   }
                                   if (entry.type === 'choice') {
                                     const ov = searchSpaceOverrides[k];
-                                    const options = ov?.options ?? (entry.options as (number | string)[]);
+                                    const options = (ov?.options ?? entry.options) as number[];
                                     const hasFinalOverride = k in finalTrainOverrides;
                                     return (
                                       <div key={k} className="flex flex-col gap-1">
@@ -1130,17 +1148,19 @@ export function LaunchWizardPage() {
                                             <span className="text-[9px] bg-amber-900/50 text-amber-400 rounded px-1.5 py-px">override</span>
                                           )}
                                         </div>
-                                        <input
-                                          type="text"
-                                          className={INPUT_CLS}
-                                          value={options.join(', ')}
-                                          onChange={e => {
-                                            const opts = e.target.value
-                                              .split(',')
-                                              .map(s => parseFloat(s.trim()))
-                                              .filter(n => !isNaN(n));
-                                            setSearchSpaceOverrides(prev => ({ ...prev, [k]: { options: opts } }));
+                                        <ChipInput
+                                          value={options}
+                                          onChange={(next) => setSearchSpaceOverrides(prev => ({
+                                            ...prev,
+                                            [k]: { ...prev[k], options: next as number[] },
+                                          }))}
+                                          parseItem={(raw) => {
+                                            const parsed = parseFiniteNumber(raw);
+                                            return parsed === null ? null : parsed;
                                           }}
+                                          formatItem={(item) => String(item)}
+                                          placeholder="Type a value and press Enter"
+                                          className="space-y-1"
                                         />
                                       </div>
                                     );
@@ -1161,28 +1181,38 @@ export function LaunchWizardPage() {
                                       <div className="grid grid-cols-2 gap-2">
                                         <div className="flex flex-col gap-0.5">
                                           <span className="text-[9px] text-slate-600">Min</span>
-                                          <input
-                                            type="number"
+                                          <NumericInput
                                             className={INPUT_CLS}
-                                            value={ov?.min ?? rangeEntry.min}
+                                            value={stringifyNumberValue(ov?.min ?? rangeEntry.min)}
                                             step="any"
-                                            onChange={e => setSearchSpaceOverrides(prev => ({
-                                              ...prev,
-                                              [k]: { ...prev[k], min: parseFloat(e.target.value) },
-                                            }))}
+                                            onChange={next => {
+                                              const parsed = parseFiniteNumber(next);
+                                              setSearchSpaceOverrides(prev => ({
+                                                ...prev,
+                                                [k]: {
+                                                  ...prev[k],
+                                                  min: next === '' ? undefined : (parsed ?? prev[k]?.min ?? rangeEntry.min),
+                                                },
+                                              }));
+                                            }}
                                           />
                                         </div>
                                         <div className="flex flex-col gap-0.5">
                                           <span className="text-[9px] text-slate-600">Max</span>
-                                          <input
-                                            type="number"
+                                          <NumericInput
                                             className={INPUT_CLS}
-                                            value={ov?.max ?? rangeEntry.max}
+                                            value={stringifyNumberValue(ov?.max ?? rangeEntry.max)}
                                             step="any"
-                                            onChange={e => setSearchSpaceOverrides(prev => ({
-                                              ...prev,
-                                              [k]: { ...prev[k], max: parseFloat(e.target.value) },
-                                            }))}
+                                            onChange={next => {
+                                              const parsed = parseFiniteNumber(next);
+                                              setSearchSpaceOverrides(prev => ({
+                                                ...prev,
+                                                [k]: {
+                                                  ...prev[k],
+                                                  max: next === '' ? undefined : (parsed ?? prev[k]?.max ?? rangeEntry.max),
+                                                },
+                                              }));
+                                            }}
                                           />
                                         </div>
                                       </div>
@@ -1210,14 +1240,16 @@ export function LaunchWizardPage() {
                                 </div>
                                 <div className="flex flex-col gap-1">
                                   <span className="text-[10px] text-slate-500">Sample fraction</span>
-                                  <input
-                                    type="number"
+                                  <NumericInput
                                     className={INPUT_CLS}
-                                    value={sampleFraction}
+                                    value={stringifyNumberValue(sampleFraction)}
                                     min={0.01}
                                     max={1}
                                     step={0.01}
-                                    onChange={e => setSampleFraction(parseFloat(e.target.value) || 0.2)}
+                                    onChange={next => {
+                                      const parsed = parseFiniteNumber(next);
+                                      if (parsed !== null) setSampleFraction(parsed);
+                                    }}
                                   />
                                 </div>
                                 {Object.entries(tuneSettingsMeta).map(([k, meta]) => (
@@ -1236,6 +1268,60 @@ export function LaunchWizardPage() {
                                 ))}
                               </div>
                             </div>
+
+                            {nonTunableKeys.length > 0 && (
+                              <div className="flex flex-col gap-2">
+                                <span className={LABEL_CLS}>Non-Tunable Constants</span>
+                                <p className="text-[10px] text-slate-500">
+                                  Applied as fixed values in every trial.
+                                </p>
+                                <div className="grid grid-cols-2 gap-2">
+                                  {nonTunableKeys.map((k) => {
+                                    const meta: ParamMeta | undefined = paramMeta[k];
+                                    if (!meta) return null;
+                                    const val = hyperparams[k] ?? meta.defaultValue;
+                                    return (
+                                      <div key={k} className="flex flex-col gap-1">
+                                        <span className="text-[10px] text-slate-500">{k}</span>
+                                        {meta.options ? (
+                                          <select
+                                            className={SELECT_CLS}
+                                            value={String(val)}
+                                            onChange={e => setHyperparams(prev => ({ ...prev, [k]: e.target.value }))}
+                                          >
+                                            {meta.options.map(o => (
+                                              <option key={o} value={o}>{o}</option>
+                                            ))}
+                                          </select>
+                                        ) : meta.type === 'array' ? (
+                                          <ChipInput
+                                            value={Array.isArray(val) ? (val as string[]) : []}
+                                            onChange={(next) => setHyperparams(prev => ({ ...prev, [k]: next }))}
+                                            parseItem={parseStringChip}
+                                            formatItem={(item) => item}
+                                            className="space-y-1"
+                                          />
+                                        ) : (
+                                          <NumericInput
+                                            className={INPUT_CLS}
+                                            value={stringifyNumberValue(val as number | string)}
+                                            min={meta.min}
+                                            max={meta.max}
+                                            step={meta.step}
+                                            onChange={next => {
+                                              const parsed = parseFiniteNumber(next);
+                                              if (parsed !== null) {
+                                                setHyperparams(prev => ({ ...prev, [k]: parsed }));
+                                              }
+                                            }}
+                                          />
+                                        )}
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                              </div>
+                            )}
 
                             {/* ── C: Final Training Overrides (collapsible) ── */}
                             <div className="flex flex-col gap-2">
@@ -1297,26 +1383,26 @@ export function LaunchWizardPage() {
                                       ))}
                                     </select>
                                   ) : meta.type === 'array' ? (
-                                    <input
-                                      type="text"
-                                      className={INPUT_CLS}
-                                      value={Array.isArray(val) ? val.join(', ') : String(val)}
-                                      onChange={e => setHyperparams(prev => ({
-                                        ...prev,
-                                        [k]: e.target.value.split(',').map(s => s.trim()),
-                                      }))}
+                                    <ChipInput
+                                      value={Array.isArray(val) ? (val as string[]) : []}
+                                      onChange={(next) => setHyperparams(prev => ({ ...prev, [k]: next }))}
+                                      parseItem={parseStringChip}
+                                      formatItem={(item) => item}
+                                      className="space-y-1"
                                     />
                                   ) : (
-                                    <input
-                                      type="number"
+                                    <NumericInput
                                       className={INPUT_CLS}
-                                      value={Number(val)}
+                                      value={stringifyNumberValue(val as number | string)}
                                       min={meta.min}
                                       max={meta.max}
                                       step={meta.step}
-                                      onChange={e => setHyperparams(prev => ({
-                                        ...prev, [k]: parseFloat(e.target.value),
-                                      }))}
+                                      onChange={next => {
+                                        const parsed = parseFiniteNumber(next);
+                                        if (parsed !== null) {
+                                          setHyperparams(prev => ({ ...prev, [k]: parsed }));
+                                        }
+                                      }}
                                     />
                                   )}
                                 </div>
@@ -2044,6 +2130,38 @@ export function LaunchWizardPage() {
                         : 'sky launch --retry-until-up'}
                     </dd>
                   </dl>
+
+                  {tuneEnabled && (
+                    <div className="rounded border border-slate-700 bg-slate-800/60 p-3">
+                      <span className="text-xs font-semibold text-slate-300">Tuning Details</span>
+                      <dl className="mt-2 grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
+                        <dt className="text-slate-500">Trials</dt>
+                        <dd className="text-slate-200">{stringifyNumberValue(numTrials) || '—'}</dd>
+                        <dt className="text-slate-500">Sample fraction</dt>
+                        <dd className="text-slate-200">{sampleFraction}</dd>
+                        {Object.entries(tuneSettingsMeta).map(([key, meta]) => (
+                          <div key={`tune-setting-${key}`} className="contents">
+                            <dt className="text-slate-500">{key}</dt>
+                            <dd className="text-slate-200">{String(tuneSettings[key] ?? meta.defaultValue)}</dd>
+                          </div>
+                        ))}
+                        {searchSpaceSummary.map(([key, value]) => (
+                          <div key={`search-space-${key}`} className="contents">
+                            <dt className="text-slate-500">{key}</dt>
+                            <dd className="text-slate-200 break-all">{value}</dd>
+                          </div>
+                        ))}
+                        <dt className="text-slate-500">Final overrides</dt>
+                        <dd className="text-slate-200 break-all">
+                          {Object.keys(finalTrainOverrides).length > 0
+                            ? Object.entries(finalTrainOverrides)
+                                .map(([key, value]) => `${key}=${value}`)
+                                .join(', ')
+                            : 'none'}
+                        </dd>
+                      </dl>
+                    </div>
+                  )}
 
                   {/* GPU Resource Plan */}
                   <div className="rounded border border-slate-700 bg-slate-800/60 p-3">
