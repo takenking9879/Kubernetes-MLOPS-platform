@@ -606,6 +606,19 @@ class KubeRayTraining(BaseUtils):
                 "env" if _env_gpu != "auto" else "params.yaml",
             )
 
+            # ── Build unique run name for checkpoints ──
+            # Using model_type + train_run_id ensures different architectures (mlp, ssm, bae)
+            # and different runs never share the same checkpoint directory.  Without this,
+            # all PyTorch models default to storage_path/pytorch/, and Ray Train may
+            # auto-resume from an incompatible checkpoint on subsequent runs.
+            _train_run_id = (
+                self.params_full.get("run_metadata", {}).get("train_run_id", "")
+                or datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+            )
+            _model_type = self.params.get("model_type", "mlp")
+            _base_name = self.params.get("name") or framework
+            _run_name = f"{_base_name}_{_model_type}_{_train_run_id}"
+
             # ── Tuning phase (optional) ──
             best_params = None
             if self.params.get('tune', False):
@@ -635,7 +648,7 @@ class KubeRayTraining(BaseUtils):
                     sample_fraction=self.params.get('sample_fraction_for_tuning'),
                     seed=int(self.params.get('seed', 42)),
                     storage_path=self.output_dir,
-                    name=self.params.get('name', framework) + "_tune",
+                    name=f"{_run_name}_tune",
                     input_dim=input_dim,
                     num_classes=num_classes,
                     mlflow_tracking_uri=mlflow_tracking_uri,
@@ -656,11 +669,21 @@ class KubeRayTraining(BaseUtils):
             test_ds = self._load_data('test', table_identifier)
 
             # Export dataset sizes for Grafana (best-effort)
+            # Use a lazy-safe helper: .count() on a non-materialized dataset triggers a
+            # full O(N) scan (one Ray task per block), which produces hundreds of
+            # "Dataset X_Y execution finished" log entries before training even starts.
+            # For lazy datasets, report block count as a proxy instead.
+            def _count_or_estimate(ds: ray.data.Dataset) -> float:
+                from ray.data import MaterializedDataset
+                if isinstance(ds, MaterializedDataset):
+                    return float(ds.count())   # O(1) — blocks already in object store
+                return float(ds.num_blocks())  # proxy: no scan triggered
+
             try:
                 if os.getenv('EXPORT_DATASET_COUNTS', '1').lower() in ('1', 'true', 'yes'):
-                    TRAIN_SPLIT_ROWS.labels(framework=framework, split='train').set(float(train_ds.count()))
-                    TRAIN_SPLIT_ROWS.labels(framework=framework, split='val').set(float(val_ds.count()))
-                    TRAIN_SPLIT_ROWS.labels(framework=framework, split='test').set(float(test_ds.count()))
+                    TRAIN_SPLIT_ROWS.labels(framework=framework, split='train').set(_count_or_estimate(train_ds))
+                    TRAIN_SPLIT_ROWS.labels(framework=framework, split='val').set(_count_or_estimate(val_ds))
+                    TRAIN_SPLIT_ROWS.labels(framework=framework, split='test').set(_count_or_estimate(test_ds))
             except Exception as e:
                 self.logger.warning(f"Could not export dataset counts: {e}")
 
@@ -690,7 +713,7 @@ class KubeRayTraining(BaseUtils):
                 val_dataset=val_ds,
                 test_dataset=test_ds,
                 storage_path=self.output_dir,
-                name=self.params.get('name', framework),
+                name=_run_name,
                 target=self.target_col,
                 feature_columns=self.schema,
                 input_dim=input_dim,

@@ -19,6 +19,7 @@ from abc import ABC, abstractmethod
 from typing import Any, Dict, List, Optional, Tuple
 
 import ray.train
+from ray.train import DataConfig
 
 logger = logging.getLogger(__name__)
 
@@ -203,6 +204,11 @@ class BaseTrainer(ABC):
             train_loop_config=config,
             scaling_config=self._build_scaling_config(),
             datasets={"train": train_dataset, "val": val_dataset},
+            # Only shard the training dataset across workers; each worker receives the
+            # full validation set so val metrics are computed on the complete split.
+            # Without this, the default DataConfig(datasets_to_split="all") would split
+            # val too, causing rank-0 to report metrics on only 1/N of the val data.
+            dataset_config=DataConfig(datasets_to_split=["train"]),
             run_config=ray.train.RunConfig(
                 storage_path=storage_path,
                 name=name,

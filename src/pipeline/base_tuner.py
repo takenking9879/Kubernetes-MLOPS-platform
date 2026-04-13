@@ -1,7 +1,7 @@
 """Abstract base class for hyperparameter tuning via Ray Tune.
 
 Defines the driver-side lifecycle shared by all frameworks:
-    build scaling → build ASHA → build _trainable → build Tuner → fit() → return best config
+    build scaling → build ASHA → pre-load datasets → build _trainable → build Tuner → fit() → return best config
 
 Subclasses implement only framework-specific concerns:
     - Search space and tune settings
@@ -10,10 +10,15 @@ Subclasses implement only framework-specific concerns:
     - Which Ray Trainer class to use inside each trial
     - Optional dataset preprocessing (e.g. column selection for PyTorch)
 
-Ray Constraints Respected:
-    - Datasets are loaded inside _trainable (not passed via tune.with_parameters)
-    - train_loop_config propagation is preserved
-    - Placement groups are not double-reserved
+Dataset Loading Strategy:
+    Datasets are loaded ONCE before the Tuner starts and shared across all trials via
+    tune.with_parameters().  tune.with_parameters stores objects via ray.put(), so
+    each trial receives ObjectRefs pointing to the same blocks — no data duplication.
+    Optional materialization is controlled by RAY_MATERIALIZE_DATASETS_TUNE.
+    Lazy datasets remain lazy (plan is serialised as a few KB) enabling Parquet column
+    pushdown and scalability to datasets larger than object store memory.
+    train_loop_config propagation is preserved.
+    Placement groups are not double-reserved.
 """
 
 from __future__ import annotations
@@ -27,7 +32,7 @@ from typing import Any, Dict, List, Optional
 import ray
 import ray.train
 from ray import tune
-from ray.train import ScalingConfig
+from ray.train import DataConfig, ScalingConfig
 from ray.tune import RunConfig
 from ray.tune.schedulers import ASHAScheduler, ResourceChangingScheduler
 
@@ -237,65 +242,78 @@ class BaseTuner(ABC):
         enable_rcs = os.getenv("ENABLE_RESOURCE_CHANGING_SCHEDULER", "false").lower() in ("1", "true", "yes")
         scheduler = ResourceChangingScheduler(base_scheduler=asha) if enable_rcs else asha
 
+        # --- Pre-load datasets ONCE and share across all trials ---
+        # Loading inside _trainable would trigger N×2 Iceberg catalog scans (N = num trials).
+        # Instead, build the dataset plan once here and pass it to each trial via
+        # tune.with_parameters(), which stores the datasets via ray.put() so all trials
+        # reference the same object-store entries without duplicating data.
+        # Lazy datasets remain lazy: only the plan (~KB) is serialised, preserving
+        # Parquet column pushdown and scalability to large datasets.
+        from pyiceberg.expressions import GreaterThanOrEqual, LessThanOrEqual, And
+        from src.utils.baseclass import BaseUtils
+
+        _train_range = split_ranges.get("train", {})
+        _val_range = split_ranges.get("val", {})
+        _t_s = BaseUtils.format_iceberg_ts(_train_range.get("start"))
+        _t_e = BaseUtils.format_iceberg_ts(_train_range.get("end"))
+        _v_s = BaseUtils.format_iceberg_ts(_val_range.get("start"))
+        _v_e = BaseUtils.format_iceberg_ts(_val_range.get("end"))
+
+        _train_filter = (
+            And(GreaterThanOrEqual("timestamp", _t_s), LessThanOrEqual("timestamp", _t_e))
+            if _t_s and _t_e else None
+        )
+        _val_filter = (
+            And(GreaterThanOrEqual("timestamp", _v_s), LessThanOrEqual("timestamp", _v_e))
+            if _v_s and _v_e else None
+        )
+
+        shared_train_ds = maybe_sample_train_ds(
+            ray.data.read_iceberg(
+                table_identifier=table_identifier,
+                catalog_kwargs=catalog_config,
+                row_filter=_train_filter,
+            ),
+            sample_fraction=sample_fraction,
+            seed=seed,
+        )
+        shared_val_ds = ray.data.read_iceberg(
+            table_identifier=table_identifier,
+            catalog_kwargs=catalog_config,
+            row_filter=_val_filter,
+        )
+
+        # Apply framework-specific column selection (lazy — pushed to source readers)
+        shared_train_ds, shared_val_ds = self._preprocess_datasets(
+            shared_train_ds, shared_val_ds, target=target, feature_columns=feature_columns,
+        )
+
+        # Apply row limits (lazy)
+        _max_train_rows = int(os.getenv("TUNE_MAX_TRAIN_ROWS", "0"))
+        _max_val_rows = int(os.getenv("TUNE_MAX_VAL_ROWS", "0"))
+        if _max_train_rows > 0:
+            shared_train_ds = shared_train_ds.limit(_max_train_rows)
+        if _max_val_rows > 0:
+            shared_val_ds = shared_val_ds.limit(_max_val_rows)
+
+        # Optional materialization — only if explicitly requested, not forced by default.
+        # When enabled, blocks are pinned in the object store for the full tuning run.
+        if os.getenv("RAY_MATERIALIZE_DATASETS_TUNE", "0").lower() in ("1", "true", "yes"):
+            shared_train_ds = shared_train_ds.materialize()
+            shared_val_ds = shared_val_ds.materialize()
+
         # --- Capture references for the closure ---
         tuner_self = self
 
-        def _trainable(trial_config: Dict):
-            """Tune trial function. Loads data from Iceberg inside the trial."""
-            from pyiceberg.expressions import GreaterThanOrEqual, LessThanOrEqual, And
-            from src.utils.baseclass import BaseUtils
-
-            # Build Iceberg row filters from split ranges
-            train_range = split_ranges.get("train", {})
-            val_range = split_ranges.get("val", {})
-
-            t_s = BaseUtils.format_iceberg_ts(train_range.get("start"))
-            t_e = BaseUtils.format_iceberg_ts(train_range.get("end"))
-            v_s = BaseUtils.format_iceberg_ts(val_range.get("start"))
-            v_e = BaseUtils.format_iceberg_ts(val_range.get("end"))
-
-            train_filter = (
-                And(GreaterThanOrEqual("timestamp", t_s), LessThanOrEqual("timestamp", t_e))
-                if t_s and t_e else None
-            )
-            val_filter = (
-                And(GreaterThanOrEqual("timestamp", v_s), LessThanOrEqual("timestamp", v_e))
-                if v_s and v_e else None
-            )
-
-            # Load datasets from Iceberg (cannot be passed via tune.with_parameters)
-            train_ds = maybe_sample_train_ds(
-                ray.data.read_iceberg(
-                    table_identifier=table_identifier,
-                    catalog_kwargs=catalog_config,
-                    row_filter=train_filter,
-                ),
-                sample_fraction=sample_fraction,
-                seed=seed,
-            )
-            val_ds = ray.data.read_iceberg(
-                table_identifier=table_identifier,
-                catalog_kwargs=catalog_config,
-                row_filter=val_filter,
-            )
-
-            # Framework-specific dataset preprocessing
-            train_ds, val_ds = tuner_self._preprocess_datasets(
-                train_ds, val_ds, target=target, feature_columns=feature_columns,
-            )
-
-            # Optional row limits
-            max_train_rows = int(os.getenv("TUNE_MAX_TRAIN_ROWS", "0"))
-            max_val_rows = int(os.getenv("TUNE_MAX_VAL_ROWS", "0"))
-            if max_train_rows > 0:
-                train_ds = train_ds.limit(max_train_rows)
-            if max_val_rows > 0:
-                val_ds = val_ds.limit(max_val_rows)
-
-            # Optional materialization
-            if os.getenv("RAY_MATERIALIZE_DATASETS_TUNE", "0").lower() in ("1", "true", "yes"):
-                train_ds = train_ds.materialize()
-                val_ds = val_ds.materialize()
+        def _trainable(trial_config: Dict, train_ds=None, val_ds=None):
+            """Tune trial function. Receives pre-loaded datasets via tune.with_parameters."""
+            # Datasets are provided by the caller via tune.with_parameters.
+            # Fallback to per-trial loading only when called standalone (e.g. tests).
+            if train_ds is None or val_ds is None:
+                raise RuntimeError(
+                    "_trainable must be called via tune.with_parameters with train_ds and val_ds. "
+                    "Direct invocation without datasets is not supported."
+                )
 
             # Build train_loop_config (framework-specific)
             train_loop_config = tuner_self._build_trial_train_loop_config(
@@ -319,6 +337,9 @@ class BaseTuner(ABC):
                 train_loop_config=train_loop_config,
                 scaling_config=scaling_config,
                 datasets={"train": train_ds, "val": val_ds},
+                # Only split train across workers; each worker sees the full val set
+                # for correct per-trial validation metrics with NUM_WORKERS > 1.
+                dataset_config=DataConfig(datasets_to_split=["train"]),
                 run_config=ray.train.RunConfig(
                     storage_path=storage_path,
                     name=f"{name}_train_{trial_id}",
@@ -353,8 +374,10 @@ class BaseTuner(ABC):
             )
 
         # --- Build and run Tuner ---
+        # tune.with_parameters stores shared_train_ds and shared_val_ds via ray.put(),
+        # so all trials reference the same object-store entries — no data duplication.
         tuner = tune.Tuner(
-            _trainable,
+            tune.with_parameters(_trainable, train_ds=shared_train_ds, val_ds=shared_val_ds),
             param_space=param_space,
             tune_config=tune.TuneConfig(
                 num_samples=number_of_trials if number_of_trials is not None else self.default_num_samples,

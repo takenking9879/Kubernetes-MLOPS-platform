@@ -75,7 +75,10 @@ def _evaluate_on_dataset(
 
     total_loss, total_batches = 0.0, 0
 
-    ds_eval = _select_model_columns(ds, target=target, feature_columns=feature_columns)
+    # ds already has only (features + target) columns — _preprocess_datasets() applied
+    # _select_model_columns() upstream before this function is called.  Re-applying it
+    # would add a redundant pipeline operator that re-executes on every block.
+    ds_eval = ds
     feature_cols = feature_columns
 
     if task_type == "classification":

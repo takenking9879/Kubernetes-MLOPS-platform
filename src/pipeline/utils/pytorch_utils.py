@@ -160,6 +160,12 @@ def train_func(config: Dict):
         device = next(model.parameters()).device
     # ─────────────────────────────────────────────────────────────────────────────
 
+    # GPU-aware data pipeline settings.
+    # - prefetch: more batches ahead on GPU (sub-ms compute per batch means 2 isn't enough)
+    # - pin_memory: enables async CPU→GPU DMA transfers, pairs with non_blocking=True below
+    use_gpu = hasattr(device, "type") and device.type == "cuda"
+    prefetch = max(4, cpus_per_worker) if use_gpu else max(2, cpus_per_worker // 2)
+
     # Log actual CPU configuration for debugging
     world_rank = ray.train.get_context().get_world_rank()
     if world_rank == 0:
@@ -246,12 +252,12 @@ def train_func(config: Dict):
     for epoch in range(max_epochs):
         epoch_start = time.perf_counter()
         model.train()
-        # prefetch_batches > 1 enables async data loading using background threads
         train_loader = train_shard.iter_torch_batches(
-            batch_size=batch_size, 
+            batch_size=batch_size,
             dtypes=torch.float32,
-            prefetch_batches=max(2, cpus_per_worker // 2),  # Async prefetch
-            local_shuffle_buffer_size=batch_size * 8,       # Randomness without high RAM
+            prefetch_batches=prefetch,               # GPU: max(4, cpus) / CPU: max(2, cpus//2)
+            local_shuffle_buffer_size=batch_size * 8,
+            pin_memory=use_gpu,                      # async DMA when non_blocking=True below
         )
         train_loss, train_batches = 0.0, 0
         for batch in train_loader:
@@ -306,9 +312,10 @@ def train_func(config: Dict):
 
         model.eval()
         val_loader = val_shard.iter_torch_batches(
-            batch_size=batch_size, 
+            batch_size=batch_size,
             dtypes=torch.float32,
-            prefetch_batches=max(2, cpus_per_worker // 2),  # Async prefetch
+            prefetch_batches=prefetch,
+            pin_memory=use_gpu,
         )
         val_loss, val_batches = 0.0, 0
 

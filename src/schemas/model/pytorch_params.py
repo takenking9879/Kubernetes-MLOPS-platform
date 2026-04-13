@@ -45,7 +45,7 @@ PYTORCH_TUNE_SETTINGS: Dict[str, int] = {
 # Espacio de búsqueda para hyperparameter tuning
 SEARCH_SPACE_PYTORCH_PARAMS: Dict[str, Any] = {
     # Hyperparameters to tune
-    "batch_size": tune.choice([64, 128, 256]),
+    "batch_size": tune.choice([128, 256, 512, 1024]),  # GPU-optimized; 64 removed (too small for A40)
     "lr": tune.loguniform(1e-5, 1e-1),
     "weight_decay": tune.loguniform(1e-6, 1e-2)
 }
