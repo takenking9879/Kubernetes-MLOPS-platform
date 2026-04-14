@@ -271,8 +271,7 @@ export interface ServingConfigRequest {
   webhook_public_base_url?: string;
   webhook_path?: string;
   webhook_max_timestamp_age_seconds?: number;
-  // SkyPilot out-cluster serving
-  deployment_target?: 'in_cluster' | 'skypilot';
+  deployment_target?: 'skypilot';
   min_replicas?: number;
   max_replicas?: number;
   target_qps_per_replica?: number;
@@ -286,17 +285,19 @@ export interface ServingConfigResult {
   train_run_id: string;
   serving_mode: 'ray_only' | 'kafka';
   registry_model_name: string;
-  deployment_target?: 'in_cluster' | 'skypilot';
+  deployment_target?: 'skypilot';
 }
 
 export interface ServingDeployResult {
   dag_run_id: string;
   serve_run_id: string;
+  dag_id?: string;
 }
 
 export interface ServingDeployStatus {
   dag_run_id: string;
   serve_run_id: string;
+  dag_id?: string;
   state: string;
   start_date: string | null;
   end_date: string | null;
@@ -597,9 +598,11 @@ export async function triggerServingDeploy(
 export async function getServingDeployStatus(
   serve_run_id: string,
   dag_run_id: string,
+  dag_id?: string,
 ): Promise<ServingDeployStatus> {
+  const q = dag_id ? `?dag_id=${encodeURIComponent(dag_id)}` : '';
   return _fetch<ServingDeployStatus>(
-    `/api/v2/serving-configs/${encodeURIComponent(serve_run_id)}/deploy/${encodeURIComponent(dag_run_id)}/status`,
+    `/api/v2/serving-configs/${encodeURIComponent(serve_run_id)}/deploy/${encodeURIComponent(dag_run_id)}/status${q}`,
   );
 }
 

@@ -145,7 +145,7 @@ export function LaunchWizardPage() {
   const isServing  = jobType === 'serving' || jobType === 'both';
   const isTraining = jobType === 'training' || jobType === 'both';
 
-  // (no auto-lock: tabular + serving is valid — deploys in-cluster Ray Serve)
+  // (no auto-lock: tabular + serving is valid — deploys via SkyPilot sky serve)
 
   // ── Tabular training state ───────────────────────────────────────────────
   const [preprocessRunIds, setPreprocessRunIds] = useState<PreprocessRunId[]>([]);
@@ -290,7 +290,7 @@ export function LaunchWizardPage() {
   const [tabServWebhookPath, setTabServWebhookPath] = useState('/infer/webhook');
   const [tabServWebhookMaxAge, setTabServWebhookMaxAge] = useState(300);
 
-  const [tabServDeployTarget, setTabServDeployTarget] = useState<'in_cluster' | 'skypilot'>('in_cluster');
+  const tabServDeployTarget: 'skypilot' = 'skypilot';
   const [tabServMinReplicas, setTabServMinReplicas] = useState(1);
   const [tabServMaxReplicas, setTabServMaxReplicas] = useState(3);
   const [tabServQps, setTabServQps] = useState(10);
@@ -473,16 +473,14 @@ export function LaunchWizardPage() {
         webhook_path: tabServWebhookPath,
         webhook_max_timestamp_age_seconds: tabServWebhookMaxAge,
         deployment_target: tabServDeployTarget,
-        ...(tabServDeployTarget === 'skypilot' ? {
-          min_replicas: tabServMinReplicas,
-          max_replicas: tabServMaxReplicas,
-          target_qps_per_replica: tabServQps,
-          resource_constraints: {
-            ...constraints,
-            num_nodes: numNodes,
-            job_type: 'tabular',
-          },
-        } : {}),
+        min_replicas: tabServMinReplicas,
+        max_replicas: tabServMaxReplicas,
+        target_qps_per_replica: tabServQps,
+        resource_constraints: {
+          ...constraints,
+          num_nodes: numNodes,
+          job_type: 'tabular',
+        },
       });
       setTabServSubmitResult(result);
     } catch (e) {
@@ -502,7 +500,7 @@ export function LaunchWizardPage() {
       const result = await triggerServingDeploy(tabServSubmitResult.serve_run_id);
       setTabServDeployResult(result);
       tabServDeployPollRef.current = setInterval(() => {
-        void getServingDeployStatus(tabServSubmitResult.serve_run_id, result.dag_run_id)
+        void getServingDeployStatus(tabServSubmitResult.serve_run_id, result.dag_run_id, result.dag_id)
           .then(s => {
             setTabServDeployState(s.state);
             if (['success', 'failed', 'upstream_failed'].includes(s.state.toLowerCase())) {
@@ -511,19 +509,16 @@ export function LaunchWizardPage() {
           })
           .catch(() => { /* keep polling */ });
       }, 15_000);
-      // For SkyPilot path, also poll endpoint until healthy
-      if (tabServDeployTarget === 'skypilot') {
-        tabServEndpointPollRef.current = setInterval(() => {
-          void getVllmEndpoint(tabServSubmitResult.serve_run_id)
-            .then(ep => {
-              if (ep.status === 'healthy' && ep.endpoint_url) {
-                setTabServEndpoint(ep.endpoint_url);
-                if (tabServEndpointPollRef.current) clearInterval(tabServEndpointPollRef.current);
-              }
-            })
-            .catch(() => { /* keep polling */ });
-        }, 20_000);
-      }
+      tabServEndpointPollRef.current = setInterval(() => {
+        void getVllmEndpoint(tabServSubmitResult.serve_run_id)
+          .then(ep => {
+            if (ep.status === 'healthy' && ep.endpoint_url) {
+              setTabServEndpoint(ep.endpoint_url);
+              if (tabServEndpointPollRef.current) clearInterval(tabServEndpointPollRef.current);
+            }
+          })
+          .catch(() => { /* keep polling */ });
+      }, 20_000);
     } catch (e) {
       setTabServDeployError(e instanceof Error ? e.message : String(e));
       setTabServDeployState('');
@@ -862,7 +857,7 @@ export function LaunchWizardPage() {
                       </label>
                       {id === 'tabular' && modelCategory === 'tabular' && isServing && (
                         <p className="ml-5 text-[10px] text-slate-500 italic">
-                          In-cluster Ray Serve deployment — no external GPU required.
+                          SkyPilot sky serve deployment on external VMs.
                         </p>
                       )}
                     </div>
@@ -1523,61 +1518,41 @@ export function LaunchWizardPage() {
                   {/* Section C: Deployment target */}
                   <div className="flex flex-col gap-2 rounded border border-slate-700/60 p-3">
                     <span className={LABEL_CLS}>Deployment target</span>
-                    <div className="flex gap-2">
-                      <button
-                        type="button"
-                        onClick={() => setTabServDeployTarget('in_cluster')}
-                        className={tabServDeployTarget === 'in_cluster' ? BTN_TOGGLE_ON : BTN_TOGGLE_OFF}
-                      >
-                        In-Cluster (KubeRay)
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setTabServDeployTarget('skypilot')}
-                        className={tabServDeployTarget === 'skypilot' ? BTN_TOGGLE_ON : BTN_TOGGLE_OFF}
-                      >
-                        Out-Cluster (SkyPilot sky serve)
-                      </button>
-                    </div>
                     <p className="text-[10px] text-slate-500">
-                      {tabServDeployTarget === 'in_cluster'
-                        ? 'Patches existing KubeRay RayService on k3s via serving_pipeline DAG. No external GPU provisioned.'
-                        : 'Provisions a SkyPilot sky serve service on external VMs with auto-scaled replicas and Ray Serve.'}
+                      Out-Cluster only: SkyPilot sky serve on external VMs with auto-scaled replicas.
                     </p>
-                    {tabServDeployTarget === 'skypilot' && (
-                      <div className="grid grid-cols-3 gap-3 mt-1">
-                        <div className="flex flex-col gap-1">
-                          <span className="text-[10px] text-slate-500">Min replicas</span>
-                          <input
-                            type="number"
-                            className={INPUT_CLS}
-                            min={0}
-                            value={tabServMinReplicas}
-                            onChange={e => setTabServMinReplicas(parseInt(e.target.value) || 1)}
-                          />
-                        </div>
-                        <div className="flex flex-col gap-1">
-                          <span className="text-[10px] text-slate-500">Max replicas</span>
-                          <input
-                            type="number"
-                            className={INPUT_CLS}
-                            min={1}
-                            value={tabServMaxReplicas}
-                            onChange={e => setTabServMaxReplicas(parseInt(e.target.value) || 3)}
-                          />
-                        </div>
-                        <div className="flex flex-col gap-1">
-                          <span className="text-[10px] text-slate-500">Target QPS / replica</span>
-                          <input
-                            type="number"
-                            className={INPUT_CLS}
-                            min={1}
-                            value={tabServQps}
-                            onChange={e => setTabServQps(parseInt(e.target.value) || 10)}
-                          />
-                        </div>
+                    <div className="grid grid-cols-3 gap-3 mt-1">
+                      <div className="flex flex-col gap-1">
+                        <span className="text-[10px] text-slate-500">Min replicas</span>
+                        <input
+                          type="number"
+                          className={INPUT_CLS}
+                          min={0}
+                          value={tabServMinReplicas}
+                          onChange={e => setTabServMinReplicas(parseInt(e.target.value) || 1)}
+                        />
                       </div>
-                    )}
+                      <div className="flex flex-col gap-1">
+                        <span className="text-[10px] text-slate-500">Max replicas</span>
+                        <input
+                          type="number"
+                          className={INPUT_CLS}
+                          min={1}
+                          value={tabServMaxReplicas}
+                          onChange={e => setTabServMaxReplicas(parseInt(e.target.value) || 3)}
+                        />
+                      </div>
+                      <div className="flex flex-col gap-1">
+                        <span className="text-[10px] text-slate-500">Target QPS / replica</span>
+                        <input
+                          type="number"
+                          className={INPUT_CLS}
+                          min={1}
+                          value={tabServQps}
+                          onChange={e => setTabServQps(parseInt(e.target.value) || 10)}
+                        />
+                      </div>
+                    </div>
                   </div>
 
                   {/* Section D: Serving config */}
@@ -1864,7 +1839,7 @@ export function LaunchWizardPage() {
           ══════════════════════════════════════════════════════════════════ */}
           {step === 1 && (
             <div className="flex flex-col gap-5 rounded border border-slate-700 bg-slate-900/50 p-5">
-              {isTabularServingPath && tabServDeployTarget === 'skypilot' ? (
+              {isTabularServingPath ? (
                 <>
                   <GPUResourceSelector value={constraints} onChange={setConstraints} />
                   <div className="grid grid-cols-2 gap-4">
@@ -1897,18 +1872,6 @@ export function LaunchWizardPage() {
                     </div>
                   </div>
                 </>
-              ) : isTabularServingPath ? (
-                <div className="rounded border border-slate-700 bg-slate-800/40 px-4 py-4 flex flex-col gap-2">
-                  <span className="text-xs font-semibold text-slate-300">In-cluster deployment</span>
-                  <p className="text-xs text-slate-400">
-                    Tabular serving deploys to the existing in-cluster KubeRay RayService via the{' '}
-                    <span className="font-mono text-slate-300">serving_pipeline</span> Airflow DAG.
-                    No external GPU resources are provisioned.
-                  </p>
-                  <p className="text-[10px] text-slate-500">
-                    The model is promoted to the specified MLflow alias and the RayService config is patched automatically.
-                  </p>
-                </div>
               ) : (
                 <GPUResourceSelector value={constraints} onChange={setConstraints} />
               )}
@@ -2012,12 +1975,10 @@ export function LaunchWizardPage() {
                         ['Train run ID', tabServTrainRunId],
                         ['Dataset', tabServDataset],
                         ['Mode', tabServMode],
-                        ['Deployment', tabServDeployTarget === 'in_cluster' ? 'In-Cluster (KubeRay)' : 'Out-Cluster (SkyPilot sky serve)'],
-                        ...(tabServDeployTarget === 'skypilot' ? [
-                          ['Replicas', `${tabServMinReplicas}–${tabServMaxReplicas} (QPS target: ${tabServQps})`],
-                          ['Nodes/replica', String(numNodes)],
-                          ['Providers', (constraints.providers ?? ['runpod']).join(', ')],
-                        ] : []),
+                        ['Deployment', 'Out-Cluster (SkyPilot sky serve)'],
+                        ['Replicas', `${tabServMinReplicas}–${tabServMaxReplicas} (QPS target: ${tabServQps})`],
+                        ['Nodes/replica', String(numNodes)],
+                        ['Providers', (constraints.providers ?? ['runpod']).join(', ')],
                       ] as [string, string][]).map(([k, v]) => (
                         <div key={k} className="contents">
                           <span className="text-[11px] text-slate-500">{k}</span>
@@ -2336,9 +2297,7 @@ export function LaunchWizardPage() {
                             Deploy Now
                           </button>
                           <p className="text-center text-[10px] text-slate-500">
-                            {tabServSubmitResult.deployment_target === 'skypilot'
-                              ? 'Triggers: tabular_serving_skypilot_pipeline DAG → sky serve up → endpoint registered'
-                              : `Triggers: MLflow promotion → Ray Serve patch${tabServSubmitResult.serving_mode === 'kafka' ? ' → Spark Kafka connector' : ''}`}
+                            Triggers: tabular_serving_skypilot_pipeline DAG → sky serve up → endpoint registered
                           </p>
                         </div>
                       ) : (

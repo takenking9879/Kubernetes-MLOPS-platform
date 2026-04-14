@@ -348,10 +348,25 @@ class BaseTuner(ABC):
 
             result = trainer.fit()
 
-            # Report metrics back to Tune
+            # Report metrics back to Tune.
+            # Only report essential keys — the MLflowLoggerCallback logs one HTTP call
+            # per metric to the remote server. Reporting all ~50 per-class fields adds
+            # ~23s of blocking I/O per trial on high-latency connections (e.g. ngrok).
+            # Per-class breakdown is logged in full during final training instead.
+            _TUNE_REPORT_KEYS = frozenset({
+                "epoch", "epoch_time_sec",
+                "train_loss", "val_loss",
+                "val_accuracy",
+                "val_f1_macro", "val_f1_weighted",
+                "val_precision_macro", "val_recall_macro",
+                "val_precision_weighted", "val_recall_weighted",
+                "multiclass_metrics_time_sec",
+            })
             metrics = getattr(result, "metrics", None) or {}
             report_dict: Dict[str, numbers.Real] = {}
             for k, v in metrics.items():
+                if k not in _TUNE_REPORT_KEYS:
+                    continue
                 if not isinstance(v, numbers.Real) or isinstance(v, bool):
                     continue
                 if k in ("training_iteration", "epoch", "step"):

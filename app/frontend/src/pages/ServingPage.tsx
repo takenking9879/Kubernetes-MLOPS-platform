@@ -6,7 +6,7 @@
  *   kafka    — 4 steps: Training Run → Kafka Schema → Serving Config → Review & Deploy
  *
  * After saving the config (params_serving.yaml), a "Deploy Now" button triggers
- * the serving_pipeline Airflow DAG (promotion + RayService patch + optional Spark connector).
+ * the tabular_serving_skypilot_pipeline Airflow DAG.
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -522,6 +522,7 @@ export function ServingPage() {
         serving_mode: servingMode,
         // raw_schema_s3_path is only sent in kafka mode
         ...(servingMode === 'kafka' ? { raw_schema_s3_path: rawSchemaS3Path } : {}),
+        deployment_target: 'skypilot',
         alias,
         canary,
         canary_alias: canaryAlias,
@@ -548,7 +549,7 @@ export function ServingPage() {
       setDeployResult(result);
       // Poll every 15s until terminal state
       deployPollRef.current = setInterval(() => {
-        void getServingDeployStatus(submitResult.serve_run_id, result.dag_run_id)
+        void getServingDeployStatus(submitResult.serve_run_id, result.dag_run_id, result.dag_id)
           .then((s) => {
             setDeployState(s.state);
             if (TERMINAL_STATES.has(s.state.toLowerCase())) {
@@ -1154,8 +1155,7 @@ export function ServingPage() {
                         Deploy Now
                       </button>
                       <p className="text-center text-[10px] text-slate-500">
-                        Triggers: MLflow promotion → Ray Serve patch
-                        {submitResult.serving_mode === 'kafka' ? ' → Spark Kafka connector' : ''}
+                        Triggers: tabular_serving_skypilot_pipeline DAG → sky serve up → endpoint registered
                       </p>
                     </div>
                   ) : (

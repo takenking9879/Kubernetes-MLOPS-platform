@@ -4,13 +4,12 @@ Performs a zero-downtime rolling update of an existing sky serve service so
 that replicas pick up the current MLflow @champion model version.
 
 How it works:
-  1. fetch_service_info   — reads endpoint.json from S3 to get the service_name
-                            that was assigned when the service was originally launched.
-  2. update_tabular_serve — runs `sky_runner.py update-tabular-serve` inside a
-                            KubernetesPodOperator pod.  SkyPilot calls sky.serve.update(),
-                            which triggers a rolling restart of all replicas.  Each new
-                            replica runs app.py which loads mlflow.pyfunc using MODEL_ALIAS
-                            (default "champion") — picking up the new champion version.
+  1. fetch_service_info — reads endpoint.json from S3 to get the service_name
+      assigned when the service was originally launched.
+  2. update_tabular_serve — runs `sky_runner.py update-tabular-serve` via
+      subprocess from the scheduler process. SkyPilot calls sky.serve.update(),
+      which triggers a rolling restart of replicas. New replicas load
+      mlflow.pyfunc using MODEL_ALIAS (default "champion").
 
 Trigger this DAG after promoting a new model version to @champion in MLflow so that
 the SkyPilot serving deployment stays in sync with the registry.
@@ -30,18 +29,20 @@ from __future__ import annotations
 
 import json
 import os
+import subprocess
 from datetime import datetime, timedelta
 
 import boto3
 from airflow.sdk import DAG
-from airflow.providers.cncf.kubernetes.operators.pod import KubernetesPodOperator
 from airflow.providers.standard.operators.python import PythonOperator
-from kubernetes.client import models as k8s
 
 # ─── Constants ────────────────────────────────────────────────────────────────
 
-_SKY_IMAGE  = os.getenv("SKY_RUNNER_IMAGE", "takenking9879/sky-runner:0.13.0")
-_AIRFLOW_NS = os.getenv("AIRFLOW_NAMESPACE", "airflow")
+_SKY_PYTHON = os.getenv("SKYPILOT_VENV_PYTHON", "/opt/skypilot-venv/bin/python")
+_SKY_RUNNER_SCRIPT = os.getenv(
+    "SKY_RUNNER_SCRIPT", "/opt/airflow/dags/repo/k3s/sky/sky_runner.py"
+)
+_SKY_YAML_DIR = os.getenv("SKY_YAML_DIR", "/opt/airflow/dags/repo/k3s/sky")
 S3_BUCKET   = os.getenv("S3_BUCKET", "k8s-mlops-platform-bucket")
 
 TABULAR_SERVE_UPDATE_TIMEOUT_SECONDS = int(
@@ -49,12 +50,33 @@ TABULAR_SERVE_UPDATE_TIMEOUT_SECONDS = int(
 )
 
 
-# ─── Shared pod helpers ───────────────────────────────────────────────────────
+# ─── Helpers ──────────────────────────────────────────────────────────────────
 
-def _aws_env_from() -> list:
-    # Injects AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, RUNPOD_API_KEY,
-    # VASTAI_API_KEY, MLFLOW_TRACKING_URI from env-secret (.env).
-    return [k8s.V1EnvFromSource(secret_ref=k8s.V1SecretEnvSource(name="env-secret"))]
+def _run_sky_runner(command: str, extra_env: dict[str, str]) -> object:
+    """Execute sky_runner.py via subprocess and return its XCom payload."""
+    xcom_path = "/airflow/xcom/return.json"
+    try:
+        os.remove(xcom_path)
+    except FileNotFoundError:
+        pass
+
+    env = os.environ.copy()
+    env.update(
+        {
+            "SKY_YAML_DIR": _SKY_YAML_DIR,
+            "PYTHONPATH": f"/opt/airflow/dags/repo:{env.get('PYTHONPATH', '')}".rstrip(":"),
+        }
+    )
+    env.update({k: str(v) for k, v in extra_env.items() if v is not None})
+
+    cmd = [_SKY_PYTHON, _SKY_RUNNER_SCRIPT, command]
+    subprocess.run(cmd, check=True, env=env)
+
+    if not os.path.exists(xcom_path):
+        return None
+
+    with open(xcom_path) as fh:
+        return json.load(fh)
 
 
 # ─── Task callables ───────────────────────────────────────────────────────────
@@ -90,6 +112,30 @@ def _fetch_service_info(**context) -> dict:
     return {"service_name": service_name, "serve_port": serve_port}
 
 
+def _update_tabular_serve(**context) -> dict:
+    conf = context["dag_run"].conf or {}
+    service_info = context["ti"].xcom_pull(task_ids="fetch_service_info") or {}
+
+    service_name = service_info.get("service_name", "")
+    if not service_name:
+        raise RuntimeError("Missing service_name from fetch_service_info")
+
+    result = _run_sky_runner(
+        "update-tabular-serve",
+        {
+            "SERVICE_NAME": service_name,
+            "SERVE_PORT": service_info.get("serve_port", 8000),
+            "REGISTRY_MODEL_NAME": conf["registry_model_name"],
+            "MODEL_ALIAS": conf.get("alias", "champion"),
+            "NUM_NODES": conf.get("num_nodes", 1),
+            "RESOURCE_CONSTRAINTS_JSON": json.dumps(conf.get("resource_constraints") or {}),
+        },
+    )
+    if not isinstance(result, dict):
+        return {"service_name": service_name, "status": "updated"}
+    return result
+
+
 # ─── DAG definition ───────────────────────────────────────────────────────────
 
 with DAG(
@@ -113,31 +159,10 @@ with DAG(
         python_callable=_fetch_service_info,
     )
 
-    update_task = KubernetesPodOperator(
+    update_task = PythonOperator(
         task_id="update_tabular_serve",
-        name="sky-update-tabular-serve",
-        namespace=_AIRFLOW_NS,
-        image=_SKY_IMAGE,
-        image_pull_policy="IfNotPresent",
-        arguments=["python", "/app/sky_runner.py", "update-tabular-serve"],
-        env_vars={
-            # service_name comes from XCom pushed by fetch_service_info
-            "SERVICE_NAME":             "{{ ti.xcom_pull(task_ids='fetch_service_info')['service_name'] }}",
-            "SERVE_PORT":               "{{ ti.xcom_pull(task_ids='fetch_service_info')['serve_port'] }}",
-            "REGISTRY_MODEL_NAME":      "{{ dag_run.conf['registry_model_name'] }}",
-            "MODEL_ALIAS":              "{{ dag_run.conf.get('alias', 'champion') }}",
-            "NUM_NODES":                "{{ dag_run.conf.get('num_nodes', 1) }}",
-            "RESOURCE_CONSTRAINTS_JSON": "{{ (dag_run.conf.get('resource_constraints') or {}) | tojson }}",
-        },
-        env_from=_aws_env_from(),
-        do_xcom_push=True,
-        get_logs=True,
-        is_delete_operator_pod=True,
+        python_callable=_update_tabular_serve,
         execution_timeout=timedelta(seconds=TABULAR_SERVE_UPDATE_TIMEOUT_SECONDS),
-        container_resources=k8s.V1ResourceRequirements(
-            requests={"cpu": "250m", "memory": "512Mi"},
-            limits={"cpu": "500m", "memory": "1Gi"},
-        ),
     )
 
     fetch_task >> update_task

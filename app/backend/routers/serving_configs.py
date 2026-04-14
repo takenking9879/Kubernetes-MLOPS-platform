@@ -4,13 +4,13 @@ Serving configuration router.
 Endpoints:
   POST /api/v2/serving-configs                              — generate params_serving.yaml, upload to S3
   GET  /api/v2/serving-configs/{id}/params                  — fetch params_serving.yaml for a run
-  POST /api/v2/serving-configs/{id}/deploy                  — trigger serving_pipeline Airflow DAG
+    POST /api/v2/serving-configs/{id}/deploy                  — trigger tabular_serving_skypilot_pipeline Airflow DAG
   GET  /api/v2/serving-configs/{id}/deploy/{dag_run_id}/status — poll DAG run state
   POST /api/v2/serving-configs/{id}/update-champion         — rolling sky serve update to sync @champion (SkyPilot only)
 
 Serving modes:
-  ray_only — deploys Ray Serve with MLflow promotion only; raw.yaml not required
-  kafka    — deploys Ray Serve + Spark Kafka streaming connector; raw.yaml required
+    ray_only — model metadata mode (SkyPilot deployment path)
+    kafka    — legacy metadata mode; deployment path is still SkyPilot
 """
 
 from __future__ import annotations
@@ -37,12 +37,8 @@ AIRFLOW_NAMESPACE = os.getenv("AIRFLOW_NAMESPACE", "airflow")
 AIRFLOW_PORT = os.getenv("AIRFLOW_PORT", "8080")
 AIRFLOW_USER = os.getenv("AIRFLOW_USER", "admin")
 AIRFLOW_PASSWORD = os.getenv("AIRFLOW_PASSWORD", "admin")
-SERVING_DAG_ID = "serving_pipeline"
 TABULAR_SKY_SERVING_DAG_ID = "tabular_serving_skypilot_pipeline"
 TABULAR_SKY_CHAMPION_SYNC_DAG_ID = "tabular_serve_champion_sync"
-
-RAY_SERVICE_NAME = os.getenv("RAY_SERVICE_NAME", "model-serving")
-RAY_SERVICE_NAMESPACE = os.getenv("RAY_SERVICE_NAMESPACE", "ray")
 
 
 def _s3_client():
@@ -134,8 +130,8 @@ class ServingConfigRequest(BaseModel):
     webhook_public_base_url: str = ""
     webhook_path: str = "/infer/webhook"
     webhook_max_timestamp_age_seconds: int = Field(300, ge=1)
-    # SkyPilot out-cluster serving
-    deployment_target: Literal["in_cluster", "skypilot"] = "in_cluster"
+    # In-cluster serving is deprecated.
+    deployment_target: Literal["skypilot"] = "skypilot"
     min_replicas: int = Field(1, ge=0)
     max_replicas: int = Field(3, ge=1)
     target_qps_per_replica: int = Field(10, ge=1)
@@ -254,14 +250,12 @@ async def submit_serving_config(request: ServingConfigRequest):
             "raw_schema_s3_path": request.raw_schema_s3_path,
         }
 
-    # skypilot_serving block is only written when deployment_target == "skypilot"
-    if request.deployment_target == "skypilot":
-        params["skypilot_serving"] = {
-            "min_replicas": request.min_replicas,
-            "max_replicas": request.max_replicas,
-            "target_qps_per_replica": request.target_qps_per_replica,
-            "resource_constraints": request.resource_constraints,
-        }
+    params["skypilot_serving"] = {
+        "min_replicas": request.min_replicas,
+        "max_replicas": request.max_replicas,
+        "target_qps_per_replica": request.target_qps_per_replica,
+        "resource_constraints": request.resource_constraints,
+    }
 
     params_yaml_str = _yaml.dump(params, default_flow_style=False, allow_unicode=True)
     key = f"runs/serving/{serve_run_id}/params_serving.yaml"
@@ -303,7 +297,7 @@ async def get_serving_params(serve_run_id: str):
 
 @router.post("/{serve_run_id}/deploy", status_code=202)
 async def deploy_serving_config(serve_run_id: str):
-    """Read params_serving.yaml from S3 and trigger the serving_pipeline Airflow DAG."""
+    """Read params_serving.yaml from S3 and trigger the SkyPilot serving DAG."""
     s3 = _s3_client()
     serving_params = _fetch_serving_params(serve_run_id, s3, S3_BUCKET)
 
@@ -313,8 +307,17 @@ async def deploy_serving_config(serve_run_id: str):
     kafka_block = serving_params.get("kafka_inference", {})
     params_s3_key = f"runs/serving/{serve_run_id}/params_serving.yaml"
 
-    deployment_target = serving_block.get("deployment_target", "in_cluster")
-    skypilot_block = serving_params.get("skypilot_serving", {})
+    deployment_target = serving_block.get("deployment_target", "skypilot")
+    skypilot_block = serving_params.get("skypilot_serving", {}) or {}
+
+    if deployment_target != "skypilot":
+        raise HTTPException(
+            status_code=410,
+            detail=(
+                "In-cluster serving deployment is deprecated. "
+                "Re-generate params_serving.yaml with deployment_target='skypilot'."
+            ),
+        )
 
     dag_conf: dict[str, Any] = {
         "serve_run_id": serve_run_id,
@@ -323,22 +326,14 @@ async def deploy_serving_config(serve_run_id: str):
         "serving_mode": serving_block.get("serving_mode", "ray_only"),
         "registry_model_name": serving_block.get("registry_model_name", ""),
         "params_serving_s3_path": f"s3://{S3_BUCKET}/{params_s3_key}",
-        "ray_service_name": RAY_SERVICE_NAME,
-        "ray_service_namespace": RAY_SERVICE_NAMESPACE,
         "raw_schema_s3_path": kafka_block.get("raw_schema_s3_path"),
+        "alias": serving_block.get("alias", "champion"),
+        "min_replicas": skypilot_block.get("min_replicas", 1),
+        "max_replicas": skypilot_block.get("max_replicas", 3),
+        "target_qps_per_replica": skypilot_block.get("target_qps_per_replica", 10),
+        "resource_constraints": skypilot_block.get("resource_constraints"),
     }
-
-    if deployment_target == "skypilot":
-        active_dag_id = TABULAR_SKY_SERVING_DAG_ID
-        dag_conf.update({
-            "alias": serving_block.get("alias", "champion"),
-            "min_replicas": skypilot_block.get("min_replicas", 1),
-            "max_replicas": skypilot_block.get("max_replicas", 3),
-            "target_qps_per_replica": skypilot_block.get("target_qps_per_replica", 10),
-            "resource_constraints": skypilot_block.get("resource_constraints"),
-        })
-    else:
-        active_dag_id = SERVING_DAG_ID
+    active_dag_id = TABULAR_SKY_SERVING_DAG_ID
 
     try:
         status, data = _airflow_request(
@@ -376,7 +371,7 @@ async def serving_deploy_status(
 
     dag_id query param allows polling non-default DAGs (e.g. tabular_serving_skypilot_pipeline).
     """
-    target_dag = dag_id or SERVING_DAG_ID
+    target_dag = dag_id or TABULAR_SKY_SERVING_DAG_ID
     try:
         status, data = _airflow_request(
             "GET", f"api/v2/dags/{target_dag}/dagRuns/{dag_run_id}"
@@ -397,6 +392,7 @@ async def serving_deploy_status(
     return {
         "dag_run_id": dag_run_id,
         "serve_run_id": serve_run_id,
+        "dag_id": target_dag,
         "state": data.get("state", "unknown"),
         "start_date": data.get("start_date"),
         "end_date": data.get("end_date"),
@@ -427,7 +423,7 @@ async def update_champion(serve_run_id: str, request: UpdateChampionRequest):
     serving_params = _fetch_serving_params(serve_run_id, s3, S3_BUCKET)
 
     serving_block = serving_params.get("serving", {})
-    deployment_target = serving_block.get("deployment_target", "in_cluster")
+    deployment_target = serving_block.get("deployment_target", "skypilot")
     if deployment_target != "skypilot":
         raise HTTPException(
             status_code=400,
