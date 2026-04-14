@@ -20,6 +20,7 @@ dag_run.conf keys:
     alias                 : str      — model alias (default "champion")
     num_nodes             : int      — nodes per SkyServe replica (default 1, must match launch)
     resource_constraints  : dict|None — optional GPUSelectorService constraints
+    serve_controller      : dict|None — optional SkyServe controller config override
 
 Endpoint.json location:
     s3://{S3_BUCKET}/runs/serving/{serve_run_id}/endpoint.json
@@ -129,6 +130,7 @@ def _update_tabular_serve(**context) -> dict:
             "MODEL_ALIAS": conf.get("alias", "champion"),
             "NUM_NODES": conf.get("num_nodes", 1),
             "RESOURCE_CONSTRAINTS_JSON": json.dumps(conf.get("resource_constraints") or {}),
+            "SKYSERVE_CONTROLLER_CONFIG_JSON": json.dumps(conf.get("serve_controller") or {}),
         },
     )
     if not isinstance(result, dict):

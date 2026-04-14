@@ -200,47 +200,6 @@ export interface RunRequest {
   search_space?: Record<string, { type: string; options?: number[]; min?: number; max?: number; value?: unknown }>;
 }
 
-// ─── Training config types (GET /api/v2/config) ───────────────────────────────
-
-export interface TrainingMetricInfo {
-  key: string;
-  label: string;
-  range: string;
-  perfect: number | string;
-  note: string;
-}
-
-export interface TrainingLossInfo {
-  name: string;
-  description: string;
-}
-
-export interface TaskTypeConfig {
-  id: string;
-  label: string;
-  description: string;
-  loss: Record<string, TrainingLossInfo>;
-  metrics: TrainingMetricInfo[];
-}
-
-export interface ModelTypeConfig {
-  id: string;
-  label: string;
-  framework: string;
-  description: string;
-}
-
-export interface FrameworkConfig {
-  id: string;
-  label: string;
-  description: string;
-}
-
-export interface TrainingConfig {
-  frameworks: FrameworkConfig[];
-  task_types: TaskTypeConfig[];
-  model_types: ModelTypeConfig[];
-}
 
 /** Entry from GET /api/v2/processing-runs/ids */
 export interface PreprocessRunId {
@@ -257,6 +216,15 @@ export interface TrainingRunId {
 export interface SchemaUploadSingleResult {
   version: number;
   s3_path: string;
+}
+
+export interface SkyServeControllerConfig {
+  high_availability?: boolean;
+  resources?: {
+    infra?: string;
+    cpus?: string;
+    disk_size?: number;
+  };
 }
 
 export interface ServingConfigRequest {
@@ -276,6 +244,7 @@ export interface ServingConfigRequest {
   max_replicas?: number;
   target_qps_per_replica?: number;
   resource_constraints?: ResourceConstraints;
+  serve_controller?: SkyServeControllerConfig;
 }
 
 export interface ServingConfigResult {
@@ -490,10 +459,6 @@ export async function checkArtifact(
   );
 }
 
-export async function getTrainingConfig(): Promise<TrainingConfig> {
-  return _fetch<TrainingConfig>('/api/v2/config');
-}
-
 export async function submitRun(request: RunRequest): Promise<TrainingRunResult> {
   return _fetch<TrainingRunResult>('/api/v2/runs', {
     method: 'POST',
@@ -503,11 +468,6 @@ export async function submitRun(request: RunRequest): Promise<TrainingRunResult>
 
 export async function listTrainingRunIds(): Promise<{ runs: TrainingRunId[] }> {
   return _fetch<{ runs: TrainingRunId[] }>('/api/v2/runs/ids');
-}
-
-export async function getRunStatus(dagRunId: string, skypilot = false): Promise<RunStatus> {
-  const q = skypilot ? '?skypilot=true' : '';
-  return _fetch<RunStatus>(`/api/v2/runs/${encodeURIComponent(dagRunId)}/status${q}`);
 }
 
 // ─── Processing Runs API ─────────────────────────────────────────────────────
@@ -725,35 +685,10 @@ export async function queryRunpodRegionAvailability(payload: {
 
 // ─── vLLM Serving API (Phase 6) ───────────────────────────────────────────────
 
-export interface VllmDeployRequest {
-  serve_run_id?: string;
-  llm_model_id: string;
-  hf_token?: string;
-  llm_adapter_s3?: string;
-  vllm_port?: number;
-  max_model_len?: number;
-  resource_constraints?: ResourceConstraints | null;
-}
-
-export interface VllmDeployResult {
-  serve_run_id: string;
-  dag_run_id: string;
-  sky_cluster_name: string;
-}
-
 export interface VllmEndpointResult {
   endpoint_url: string;
   model_id: string;
   status: 'healthy' | 'pending' | 'not_found';
-}
-
-export async function triggerVllmDeploy(
-  request: VllmDeployRequest,
-): Promise<VllmDeployResult> {
-  return _fetch<VllmDeployResult>('/api/v2/serving-configs/vllm-deploy', {
-    method: 'POST',
-    body: JSON.stringify(request),
-  });
 }
 
 export async function getVllmEndpoint(

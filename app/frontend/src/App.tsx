@@ -3,8 +3,6 @@ import { ReactFlowProvider } from 'reactflow';
 import { MainLayout } from './components/Layout/MainLayout';
 import { DatasetPage } from './pages/DatasetPage';
 import { ProcessingPage } from './pages/ProcessingPage';
-import { RunPage } from './pages/RunPage';
-import { ServingPage } from './pages/ServingPage';
 import { LaunchWizardPage } from './pages/LaunchWizardPage';
 import { useDatasetStore } from './store/datasetStore';
 import { usePipelineStore } from './store/pipelineStore';
@@ -14,8 +12,6 @@ const TAB_LABELS: Record<Page, string> = {
   'datasets':    'Datasets',
   'dsl-builder': 'DSL Builder',
   'processing':  'Processing',
-  'run-pipeline':'Training',
-  'serving':     'Serving',
   'launch':      'Launch',
 };
 
@@ -122,10 +118,6 @@ export default function App() {
         )}
 
         {page === 'processing' && <ProcessingPage />}
-
-        {page === 'run-pipeline' && <RunPage />}
-
-        {page === 'serving' && <ServingPage />}
 
         {page === 'launch' && <LaunchWizardPage />}
       </div>

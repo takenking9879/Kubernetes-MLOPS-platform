@@ -8,7 +8,7 @@
 import { create } from 'zustand';
 import { devtools, persist } from 'zustand/middleware';
 
-export type Page = 'datasets' | 'dsl-builder' | 'processing' | 'run-pipeline' | 'serving' | 'launch';
+export type Page = 'datasets' | 'dsl-builder' | 'processing' | 'launch';
 
 interface UIState {
   page: Page;
@@ -28,8 +28,15 @@ export const useUIStore = create<UIState>()(
       }),
       {
         name: 'mlops-ui-store',
-        version: 1,
+        version: 2,
         partialize: (state) => ({ page: state.page }),
+        migrate: (state: unknown, _version: number) => {
+          const s = state as { page?: string };
+          if (s.page === 'run-pipeline' || s.page === 'serving') {
+            return { ...s, page: 'launch' };
+          }
+          return state;
+        },
       },
     ),
     { name: 'UIStore' },

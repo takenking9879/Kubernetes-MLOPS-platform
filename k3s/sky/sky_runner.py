@@ -64,6 +64,103 @@ def _provider(rc: dict | None) -> str:
     return str(providers[0]).lower() if providers else "runpod"
 
 
+def _deep_merge(dst: dict, src: dict) -> dict:
+    """Recursively merge src into dst and return dst."""
+    for key, value in src.items():
+        if isinstance(value, dict) and isinstance(dst.get(key), dict):
+            _deep_merge(dst[key], value)
+        else:
+            dst[key] = value
+    return dst
+
+
+def _extract_serve_controller_cfg() -> dict | None:
+    """Read SKYSERVE_CONTROLLER_CONFIG_JSON and normalize it to controller-only shape."""
+    raw = _env("SKYSERVE_CONTROLLER_CONFIG_JSON")
+    if not raw or raw in ("null", "{}"):
+        return None
+
+    try:
+        payload = json.loads(raw)
+    except Exception as exc:
+        print(f"[warn] Invalid SKYSERVE_CONTROLLER_CONFIG_JSON ({exc}); skipping")
+        return None
+
+    if not isinstance(payload, dict):
+        print("[warn] SKYSERVE_CONTROLLER_CONFIG_JSON must be a JSON object; skipping")
+        return None
+
+    # Accept one of:
+    #  1) {"high_availability": ..., "resources": {...}}
+    #  2) {"controller": {...}}
+    #  3) {"serve": {"controller": {...}}}
+    if isinstance(payload.get("serve"), dict):
+        payload = payload["serve"].get("controller", {})
+    elif isinstance(payload.get("controller"), dict):
+        payload = payload["controller"]
+
+    if not isinstance(payload, dict) or not payload:
+        return None
+
+    normalized: dict = {}
+    if "high_availability" in payload and isinstance(payload["high_availability"], bool):
+        normalized["high_availability"] = payload["high_availability"]
+
+    resources = payload.get("resources")
+    if isinstance(resources, dict):
+        resources_norm: dict = {}
+        for key in ("infra", "cpus", "disk_size"):
+            value = resources.get(key)
+            if value is not None and value != "":
+                resources_norm[key] = value
+        if resources_norm:
+            normalized["resources"] = resources_norm
+
+    return normalized or None
+
+
+def _apply_serve_controller_config() -> None:
+    """Merge optional serve.controller settings into ~/.sky/config.yaml.
+
+    SkyServe controller tuning is consumed from sky config, not from task YAML.
+    """
+    controller_cfg = _extract_serve_controller_cfg()
+    if not controller_cfg:
+        return
+
+    import yaml as _yaml
+
+    config_path = Path.home() / ".sky" / "config.yaml"
+    config_path.parent.mkdir(parents=True, exist_ok=True)
+
+    config_data: dict = {}
+    if config_path.exists():
+        try:
+            with open(config_path) as fh:
+                loaded = _yaml.safe_load(fh) or {}
+                if isinstance(loaded, dict):
+                    config_data = loaded
+        except Exception as exc:
+            print(f"[warn] Failed to read existing {config_path}: {exc}; rebuilding file")
+
+    serve_block = config_data.setdefault("serve", {})
+    if not isinstance(serve_block, dict):
+        config_data["serve"] = {}
+        serve_block = config_data["serve"]
+
+    controller_block = serve_block.setdefault("controller", {})
+    if not isinstance(controller_block, dict):
+        serve_block["controller"] = {}
+        controller_block = serve_block["controller"]
+
+    _deep_merge(controller_block, controller_cfg)
+
+    with open(config_path, "w") as fh:
+        _yaml.safe_dump(config_data, fh, default_flow_style=False, sort_keys=False)
+
+    print(f"Applied SkyServe controller config to {config_path}: {controller_cfg}")
+
+
 # ─── YAML routing ─────────────────────────────────────────────────────────────
 
 _SKY_YAML_DIR = Path(os.getenv("SKY_YAML_DIR", "/app/k3s/sky"))
@@ -711,6 +808,8 @@ def launch_ray_vllm():
     yaml_path    = _yaml_path("vllm_multi", rc)
     print(f"Using Ray+vLLM YAML: {yaml_path}  ({pipeline_parallel} nodes × {replicas} replicas)")
 
+    _apply_serve_controller_config()
+
     # Load base YAML and override num_nodes + service.replicas
     tmp_src = f"/tmp/sky_ray_vllm_base_{serve_run_id}.yaml"
     with open(yaml_path) as fh:
@@ -989,6 +1088,8 @@ def launch_tabular_serve():
     yaml_path = _yaml_path(kind, rc)
     print(f"Using tabular serve YAML: {yaml_path}  (num_nodes={num_nodes})")
 
+    _apply_serve_controller_config()
+
     with open(yaml_path) as fh:
         sky_conf = _yaml.safe_load(fh)
 
@@ -1134,6 +1235,8 @@ def update_tabular_serve():
     kind = "tabular_serve_multi" if num_nodes > 1 else "tabular_serve"
     yaml_path = _yaml_path(kind, rc)
     print(f"Updating sky serve service '{service_name}' using YAML: {yaml_path}  (num_nodes={num_nodes})")
+
+    _apply_serve_controller_config()
 
     with open(yaml_path) as fh:
         sky_conf = _yaml.safe_load(fh)

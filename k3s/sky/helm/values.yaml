@@ -170,8 +170,10 @@ apiService:
     PY
 
   # ── SkyPilot config ─────────────────────────────────────────────────────────
-  # consolidation_mode: true → controller runs in-process inside this pod.
-  # No cloud controller VM is provisioned; no SSH-based polling.
+  # jobs.controller and serve.controller can live together in the same
+  # ~/.sky/config.yaml without conflicts.
+  # consolidation_mode: true → jobs controller runs in-process inside this pod.
+  # No cloud jobs controller VM is provisioned; no SSH-based polling.
   # jobs.bucket → needed for workdir persistence across rolling updates.
   # Replace s3://sky-workdir with an actual S3 bucket before deploying.
   config: |
@@ -179,6 +181,12 @@ apiService:
       controller:
         consolidation_mode: true
       bucket: s3://k8s-mlops-platform-bucket/sky-workdir
+    serve:
+      controller:
+        # Optional: set resources.infra to pin controller region/provider.
+        resources:
+          cpus: 2+
+          disk_size: 1024
   # ── Cloud credentials (injected via chart-native credential values below) ────
   # Do NOT use envFrom here — the chart has dedicated values for each provider.
   # See runpodCredentials / vastCredentials / awsCredentials sections below.

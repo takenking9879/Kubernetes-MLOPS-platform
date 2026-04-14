@@ -136,6 +136,13 @@ class ServingConfigRequest(BaseModel):
     max_replicas: int = Field(3, ge=1)
     target_qps_per_replica: int = Field(10, ge=1)
     resource_constraints: Optional[dict] = None
+    # Optional SkyServe controller override written into ~/.sky/config.yaml.
+    # Supported shape:
+    # {
+    #   "high_availability": true,
+    #   "resources": {"infra": "gcp/us-central1", "cpus": "2+", "disk_size": 1024}
+    # }
+    serve_controller: Optional[dict] = None
 
     @model_validator(mode="after")
     def validate_kafka_requires_schema(self) -> "ServingConfigRequest":
@@ -255,6 +262,7 @@ async def submit_serving_config(request: ServingConfigRequest):
         "max_replicas": request.max_replicas,
         "target_qps_per_replica": request.target_qps_per_replica,
         "resource_constraints": request.resource_constraints,
+        "serve_controller": request.serve_controller,
     }
 
     params_yaml_str = _yaml.dump(params, default_flow_style=False, allow_unicode=True)
@@ -332,6 +340,7 @@ async def deploy_serving_config(serve_run_id: str):
         "max_replicas": skypilot_block.get("max_replicas", 3),
         "target_qps_per_replica": skypilot_block.get("target_qps_per_replica", 10),
         "resource_constraints": skypilot_block.get("resource_constraints"),
+        "serve_controller": skypilot_block.get("serve_controller"),
     }
     active_dag_id = TABULAR_SKY_SERVING_DAG_ID
 
@@ -406,6 +415,7 @@ class UpdateChampionRequest(BaseModel):
     alias: str = "champion"
     num_nodes: int = Field(1, ge=1)
     resource_constraints: Optional[dict] = None
+    serve_controller: Optional[dict] = None
 
 
 @router.post("/{serve_run_id}/update-champion", status_code=202)
@@ -423,6 +433,7 @@ async def update_champion(serve_run_id: str, request: UpdateChampionRequest):
     serving_params = _fetch_serving_params(serve_run_id, s3, S3_BUCKET)
 
     serving_block = serving_params.get("serving", {})
+    skypilot_block = serving_params.get("skypilot_serving", {}) or {}
     deployment_target = serving_block.get("deployment_target", "skypilot")
     if deployment_target != "skypilot":
         raise HTTPException(
@@ -448,6 +459,14 @@ async def update_champion(serve_run_id: str, request: UpdateChampionRequest):
     }
     if request.resource_constraints:
         dag_conf["resource_constraints"] = request.resource_constraints
+
+    # Reuse the saved controller config by default so champion sync keeps
+    # the same SkyServe controller sizing unless explicitly overridden.
+    serve_controller = request.serve_controller
+    if serve_controller is None:
+        serve_controller = skypilot_block.get("serve_controller")
+    if serve_controller:
+        dag_conf["serve_controller"] = serve_controller
 
     try:
         status, data = _airflow_request(

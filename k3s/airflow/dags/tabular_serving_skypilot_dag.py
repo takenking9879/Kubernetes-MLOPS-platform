@@ -13,6 +13,7 @@ dag_run.conf keys:
     max_replicas            : int       - maximum replica count (default 3)
     target_qps_per_replica  : int       - QPS target for autoscaling (default 10)
     resource_constraints    : dict|None - optional GPUSelectorService constraints
+    serve_controller        : dict|None - optional SkyServe controller config override
 
 Endpoint written to:
     s3://{S3_BUCKET}/runs/serving/{serve_run_id}/endpoint.json
@@ -87,6 +88,7 @@ def _launch_tabular_serve(**context) -> dict:
             "MAX_REPLICAS": conf.get("max_replicas", 3),
             "TARGET_QPS_PER_REPLICA": conf.get("target_qps_per_replica", 10),
             "RESOURCE_CONSTRAINTS_JSON": json.dumps(conf.get("resource_constraints") or {}),
+            "SKYSERVE_CONTROLLER_CONFIG_JSON": json.dumps(conf.get("serve_controller") or {}),
         },
     )
     if not isinstance(result, dict):
