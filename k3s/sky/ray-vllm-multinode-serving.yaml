@@ -25,6 +25,7 @@ name: ray-vllm-multinode-serving
 num_nodes: 2   # overridden by JobBuilder from serving config
 
 service:
+  ports: 8081  # Required by SkyServe autoscaler; overridden by runner when needed
   replicas: 1  # overridden by sky_runner.py via YAML injection
   readiness_probe:
     path: /v1/chat/completions

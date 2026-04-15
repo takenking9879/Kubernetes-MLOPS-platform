@@ -824,7 +824,9 @@ def launch_ray_vllm():
     with open(yaml_path) as fh:
         sky_conf = _yaml.safe_load(fh)
     sky_conf["num_nodes"] = pipeline_parallel
-    sky_conf.setdefault("service", {})["replicas"] = replicas
+    service_cfg = sky_conf.setdefault("service", {})
+    service_cfg["replicas"] = replicas
+    service_cfg["ports"] = str(vllm_port)
     with open(tmp_src, "w") as fh:
         _yaml.dump(sky_conf, fh, default_flow_style=False, allow_unicode=True)
     task = sky.Task.from_yaml(tmp_src)
@@ -1102,8 +1104,11 @@ def launch_tabular_serve():
     with open(yaml_path) as fh:
         sky_conf = _yaml.safe_load(fh)
 
+    service_cfg = sky_conf.setdefault("service", {})
+    service_cfg["ports"] = str(serve_port)
+
     # Inject replica policy
-    sky_conf.setdefault("service", {}).setdefault("replica_policy", {}).update({
+    service_cfg.setdefault("replica_policy", {}).update({
         "min_replicas": min_replicas,
         "max_replicas": max_replicas,
         "target_qps_per_replica": target_qps,
@@ -1249,6 +1254,9 @@ def update_tabular_serve():
 
     with open(yaml_path) as fh:
         sky_conf = _yaml.safe_load(fh)
+
+    service_cfg = sky_conf.setdefault("service", {})
+    service_cfg["ports"] = str(serve_port)
 
     if num_nodes > 1:
         sky_conf["num_nodes"] = num_nodes

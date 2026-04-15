@@ -91,3 +91,7 @@ stop_cluster #Podria ser clave para parar el job
 7) TARGET
 
 Ser un Data Scientist pero que hace sin saberlo lo de un ML engineer
+
+sky serve status
+
+sky serve logs --controller <name>

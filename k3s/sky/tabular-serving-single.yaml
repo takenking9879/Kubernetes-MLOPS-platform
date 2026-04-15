@@ -27,6 +27,7 @@
 name: tabular-serving-single
 
 service:
+  ports: 8000              # Required by SkyServe autoscaler (task.service.ports)
   readiness_probe: /infer    # ModelRouter handles GET /infer → 200 {"status": "ok"}
   replica_policy:
     min_replicas: 1           # overridden by DAG
