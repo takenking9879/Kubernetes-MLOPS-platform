@@ -77,3 +77,17 @@ ngrok http --url https://metrics.ngrok-free.dev 9090
 
 ~/sky_templates/ray/start_cluster
 stop_cluster #Podria ser clave para parar el job
+
+#Reducir un poco los tokens
+/caveman lite
+
+
+1) KEY (granularidad)
+2) JOIN (alineación)
+3) GROUPBY (features)
+4) TIME RULES (no leakage) 🔥
+5) ROW TRANSFORMS
+6) CLEANING
+7) TARGET
+
+Ser un Data Scientist pero que hace sin saberlo lo de un ML engineer

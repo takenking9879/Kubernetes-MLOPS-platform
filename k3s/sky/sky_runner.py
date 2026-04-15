@@ -286,7 +286,16 @@ def _load_task(yaml_path: str, run_id: str, rc: dict | None, prefer_spot: bool =
 def _k8s_name(name: str, prefix: str, max_len: int = 40) -> str:
     slug = re.sub(r"[^a-z0-9-]", "-", f"{prefix}-{name}".lower())
     slug = re.sub(r"-+", "-", slug).strip("-")
-    return slug[:max_len]
+    if not slug:
+        slug = prefix
+    if len(slug) <= max_len:
+        return slug
+
+    # Preserve deterministic uniqueness when truncation is required.
+    suffix = hashlib.sha1(slug.encode("utf-8")).hexdigest()[:8]
+    base_max_len = max(1, max_len - len(suffix) - 1)
+    trimmed = slug[:base_max_len].rstrip("-") or slug[:base_max_len]
+    return f"{trimmed}-{suffix}"
 
 
 def _managed_job_name(name: str, prefix: str, max_len: int = 40) -> str:

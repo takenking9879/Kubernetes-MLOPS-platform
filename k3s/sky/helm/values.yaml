@@ -167,6 +167,28 @@ apiService:
       'runpod.instance_cluster_info_ip_fallback',
     )
 
+    patch(
+      '/usr/local/lib/python3.10/site-packages/sky/utils/common_utils.py',
+      "    user_hash = ''\n"
+      "    if add_user_hash:\n"
+      "        user_hash = get_user_hash()\n"
+      "        user_hash = f'-{user_hash}'\n",
+      "    user_hash = ''\n"
+      "    if add_user_hash:\n"
+      "        user_hash = get_user_hash()\n"
+      "        # Controller display names can already include this user hash.\n"
+      "        # Keep legacy behavior for all non-controller cluster names.\n"
+      "        is_controller_name = (\n"
+      "            cluster_name_on_cloud.startswith('sky-serve-controller-')\n"
+      "            or cluster_name_on_cloud.startswith('sky-jobs-controller-')\n"
+      "        )\n"
+      "        if is_controller_name and cluster_name_on_cloud.endswith(f'-{user_hash}'):\n"
+      "            user_hash = ''\n"
+      "        else:\n"
+      "            user_hash = f'-{user_hash}'\n",
+      'common_utils.cluster_name_on_cloud_avoid_double_user_hash',
+    )
+
     PY
 
   # ── SkyPilot config ─────────────────────────────────────────────────────────
@@ -183,10 +205,11 @@ apiService:
       bucket: s3://k8s-mlops-platform-bucket/sky-workdir
     serve:
       controller:
-        # Optional: set resources.infra to pin controller region/provider.
+        high_availability: true
         resources:
-          cpus: 2+
-          disk_size: 1024
+          cloud: kubernetes
+          cpus: 2
+          disk_size: 30
   # ── Cloud credentials (injected via chart-native credential values below) ────
   # Do NOT use envFrom here — the chart has dedicated values for each provider.
   # See runpodCredentials / vastCredentials / awsCredentials sections below.
