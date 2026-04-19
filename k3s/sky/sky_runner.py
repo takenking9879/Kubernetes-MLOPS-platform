@@ -3,7 +3,8 @@
 
 Runs inside takenking9879/sky-runner:0.12.0.
 All inputs come from environment variables; return values are written to
-/airflow/xcom/return.json so KubernetesPodOperator do_xcom_push=True works.
+`SKY_RUNNER_XCOM_PATH` (default `/airflow/xcom/return.json`) so
+KubernetesPodOperator do_xcom_push=True works.
 
 Commands:
     submit-training     Launch managed tabular training job; pushes job_name (str)
@@ -34,12 +35,18 @@ from pathlib import Path
 
 # ─── XCom ─────────────────────────────────────────────────────────────────────
 
-_XCOM_DIR = Path("/airflow/xcom")
+_DEFAULT_XCOM_PATH = Path("/airflow/xcom/return.json")
+
+
+def _xcom_output_path() -> Path:
+    custom_path = os.getenv("SKY_RUNNER_XCOM_PATH", "").strip()
+    return Path(custom_path) if custom_path else _DEFAULT_XCOM_PATH
 
 
 def _xcom_push(value) -> None:
-    _XCOM_DIR.mkdir(parents=True, exist_ok=True)
-    (_XCOM_DIR / "return.json").write_text(json.dumps(value))
+    xcom_path = _xcom_output_path()
+    xcom_path.parent.mkdir(parents=True, exist_ok=True)
+    xcom_path.write_text(json.dumps(value))
 
 
 # ─── Environment helpers ───────────────────────────────────────────────────────

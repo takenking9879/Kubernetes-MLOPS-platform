@@ -26,6 +26,7 @@ from __future__ import annotations
 import json
 import os
 import subprocess
+import tempfile
 from datetime import datetime, timedelta
 
 from airflow.sdk import DAG
@@ -48,7 +49,8 @@ S3_BUCKET = os.getenv("S3_BUCKET", "k8s-mlops-platform-bucket")
 
 def _run_sky_runner(command: str, extra_env: dict[str, str]) -> object:
     """Execute sky_runner.py via subprocess and return its XCom payload."""
-    xcom_path = "/airflow/xcom/return.json"
+    fd, xcom_path = tempfile.mkstemp(prefix=f"sky_runner_{command}_", suffix=".json")
+    os.close(fd)
     try:
         os.remove(xcom_path)
     except FileNotFoundError:
@@ -58,6 +60,7 @@ def _run_sky_runner(command: str, extra_env: dict[str, str]) -> object:
     env.update(
         {
             "SKY_YAML_DIR": _SKY_YAML_DIR,
+            "SKY_RUNNER_XCOM_PATH": xcom_path,
             # Helps optional imports in sky_runner.py (src.services.*)
             "PYTHONPATH": f"/opt/airflow/dags/repo:{env.get('PYTHONPATH', '')}".rstrip(":"),
         }
