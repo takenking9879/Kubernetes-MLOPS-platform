@@ -3,15 +3,73 @@ import json
 import logging
 import tempfile
 import numbers
+import time
 import numpy as np
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import mlflow
 from mlflow.tracking import MlflowClient
-from typing import Any, Dict, Optional
+from typing import Any, Callable, Dict, Optional
 
 logger = logging.getLogger(__name__)
+
+_MLFLOW_CONNECTIVITY_RETRIES = 2
+_MLFLOW_RETRY_BASE_DELAY_SECONDS = 2.0
+
+
+def _is_mlflow_connectivity_error(exc: Exception) -> bool:
+    """Return True when the exception looks like a transient tracking outage.
+
+    This is intentionally heuristic because the exact exception class/message
+    varies across requests/mlflow versions and providers.
+    """
+    msg = str(exc).lower()
+    if not msg:
+        return False
+
+    ngrok_offline = "err_ngrok_3200" in msg or ("ngrok" in msg and "offline" in msg)
+    network_markers = (
+        "failed to establish a new connection",
+        "max retries exceeded with url",
+        "temporary failure in name resolution",
+        "name or service not known",
+        "connection refused",
+        "connection aborted",
+        "remote end closed connection",
+        "connection reset by peer",
+        "connect timeout",
+        "read timed out",
+    )
+    return ngrok_offline or any(marker in msg for marker in network_markers)
+
+
+def _run_with_mlflow_connectivity_retries(
+    *,
+    operation_name: str,
+    operation: Callable[[], Any],
+) -> Any:
+    """Run an operation and retry only on transient MLflow connectivity errors."""
+    max_attempts = _MLFLOW_CONNECTIVITY_RETRIES + 1
+    for attempt in range(1, max_attempts + 1):
+        try:
+            return operation()
+        except Exception as exc:
+            if not _is_mlflow_connectivity_error(exc):
+                raise
+            if attempt == max_attempts:
+                raise
+            delay_sec = _MLFLOW_RETRY_BASE_DELAY_SECONDS * float(attempt)
+            logger.warning(
+                "MLflow connectivity issue during %s (attempt %d/%d): %s. "
+                "Retrying in %.1fs.",
+                operation_name,
+                attempt,
+                max_attempts,
+                exc,
+                delay_sec,
+            )
+            time.sleep(delay_sec)
 
 def log_evaluation_artifacts(metrics: Dict[str, Any], framework: str):
     """
@@ -101,7 +159,7 @@ def _log_and_register_model(
 
     Returns the model version string, or None on failure.
     """
-    try:
+    def _register_once() -> Optional[str]:
         # Log using the native MLflow flavor for best compatibility
         if framework == "xgboost":
             import mlflow.xgboost
@@ -141,8 +199,22 @@ def _log_and_register_model(
         )
         return version
 
+    try:
+        return _run_with_mlflow_connectivity_retries(
+            operation_name="model registration",
+            operation=_register_once,
+        )
+
     except Exception as e:
-        logger.error("Failed to register model in MLflow: %s", e, exc_info=True)
+        if _is_mlflow_connectivity_error(e):
+            logger.warning(
+                "MLflow endpoint unavailable during model registration after %d retries; "
+                "skipping registry step. Details: %s",
+                _MLFLOW_CONNECTIVITY_RETRIES,
+                e,
+            )
+        else:
+            logger.error("Failed to register model in MLflow: %s", e, exc_info=True)
         return None
 
 
@@ -212,63 +284,82 @@ def log_training_run(
     if not tracking_uri or not experiment_name:
         return None
 
-    mlflow.set_tracking_uri(tracking_uri)
-
-    # Ensure experiment exists
-    if mlflow.get_experiment_by_name(experiment_name) is None:
-        mlflow.create_experiment(experiment_name, artifact_location=artifact_location)
-
-    mlflow.set_experiment(experiment_name)
-
     run_name = f"{params.get('name', framework)}_final_{framework}"
-    with mlflow.start_run(run_name=run_name) as run:
-        # 1. Log Parameters
-        mlflow.log_param("framework", framework)
-        mlflow.log_param("target", params.get("target"))
-        mlflow.log_param("num_classes", params.get("num_classes"))
-        mlflow.log_param("num_workers", os.getenv("NUM_WORKERS", ""))
+    def _log_once() -> Dict[str, Any]:
+        mlflow.set_tracking_uri(tracking_uri)
 
-        if framework == "xgboost" and params.get("xgboost_params"):
-            for k, v in params["xgboost_params"].items():
-                mlflow.log_param(f"xgb_{k}", v)
-        elif framework == "pytorch" and params.get("pytorch_params"):
-            for k, v in params["pytorch_params"].items():
-                mlflow.log_param(f"pt_{k}", v)
+        # Ensure experiment exists
+        if mlflow.get_experiment_by_name(experiment_name) is None:
+            mlflow.create_experiment(experiment_name, artifact_location=artifact_location)
 
-        # 2. Data-Lineage Tags
-        mlflow.set_tag("training_type", "distributed_final")
-        if artifact_set_id:
-            mlflow.set_tag("artifact_set_id", artifact_set_id)
-        if table_identifier:
-            mlflow.set_tag("iceberg_table", table_identifier)
-        if train_run_id:
-            mlflow.set_tag("train_run_id", train_run_id)
+        mlflow.set_experiment(experiment_name)
 
-        # 3. Log Numeric Metrics
-        for k, v in (metrics or {}).items():
-            if isinstance(v, numbers.Real) and not isinstance(v, bool):
-                mlflow.log_metric(k, float(v))
+        with mlflow.start_run(run_name=run_name) as run:
+            # 1. Log Parameters
+            mlflow.log_param("framework", framework)
+            mlflow.log_param("target", params.get("target"))
+            mlflow.log_param("num_classes", params.get("num_classes"))
+            mlflow.log_param("num_workers", os.getenv("NUM_WORKERS", ""))
 
-        # 4. Log Evaluation Artifacts (Confusion Matrices, Classification Reports)
-        log_evaluation_artifacts(metrics, framework)
+            if framework == "xgboost" and params.get("xgboost_params"):
+                for k, v in params["xgboost_params"].items():
+                    mlflow.log_param(f"xgb_{k}", v)
+            elif framework == "pytorch" and params.get("pytorch_params"):
+                for k, v in params["pytorch_params"].items():
+                    mlflow.log_param(f"pt_{k}", v)
 
-        # 5. Model Registry: log model + register a new version
-        model_version = None
-        effective_registry_name = None
-        if model is not None:
-            effective_registry_name = registry_model_name or experiment_name
-            model_version = _log_and_register_model(
-                model=model,
-                framework=framework,
-                registered_model_name=effective_registry_name,
-                artifact_set_id=artifact_set_id,
-                table_identifier=table_identifier,
-                train_run_id=train_run_id,
-                run_id=run.info.run_id,
+            # 2. Data-Lineage Tags
+            mlflow.set_tag("training_type", "distributed_final")
+            if artifact_set_id:
+                mlflow.set_tag("artifact_set_id", artifact_set_id)
+            if table_identifier:
+                mlflow.set_tag("iceberg_table", table_identifier)
+            if train_run_id:
+                mlflow.set_tag("train_run_id", train_run_id)
+
+            # 3. Log Numeric Metrics
+            for k, v in (metrics or {}).items():
+                if isinstance(v, numbers.Real) and not isinstance(v, bool):
+                    mlflow.log_metric(k, float(v))
+
+            # 4. Log Evaluation Artifacts (Confusion Matrices, Classification Reports)
+            log_evaluation_artifacts(metrics, framework)
+
+            # 5. Model Registry: log model + register a new version
+            model_version = None
+            effective_registry_name = None
+            if model is not None:
+                effective_registry_name = registry_model_name or experiment_name
+                model_version = _log_and_register_model(
+                    model=model,
+                    framework=framework,
+                    registered_model_name=effective_registry_name,
+                    artifact_set_id=artifact_set_id,
+                    table_identifier=table_identifier,
+                    train_run_id=train_run_id,
+                    run_id=run.info.run_id,
+                )
+
+        return {
+            "run_id": run.info.run_id,
+            "model_version": model_version,
+            "registry_model_name": effective_registry_name,
+        }
+
+    try:
+        return _run_with_mlflow_connectivity_retries(
+            operation_name=f"training run logging ({run_name})",
+            operation=_log_once,
+        )
+
+    except Exception as e:
+        if _is_mlflow_connectivity_error(e):
+            logger.warning(
+                "MLflow tracking endpoint unavailable while logging run '%s' even after "
+                "%d retries; keeping training workflow alive. Details: %s",
+                run_name,
+                _MLFLOW_CONNECTIVITY_RETRIES,
+                e,
             )
-
-    return {
-        "run_id": run.info.run_id,
-        "model_version": model_version,
-        "registry_model_name": effective_registry_name,
-    }
+            return None
+        raise
