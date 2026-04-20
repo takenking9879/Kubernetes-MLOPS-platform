@@ -66,7 +66,8 @@ def _xcom_push(value) -> None:
 
 # Hardcoded SkyServe wait log-streaming defaults (live mode only).
 _SERVE_LOG_MAX_REPLICAS = 2
-_SERVE_STREAM_LOAD_BALANCER = True
+_SERVE_STREAM_CONTROLLER = False
+_SERVE_STREAM_LOAD_BALANCER = False
 _SERVE_FALLBACK_REPLICA_IDS = ("1",)
 _ANSI_ESCAPE_RE = re.compile(r"\x1b\[[0-9;]*[A-Za-z]")
 _SKY_CLI_PREFIX: list[str] | None = None
@@ -175,16 +176,18 @@ def _discover_serve_replica_ids(service_name: str, max_replicas: int) -> tuple[l
     return ids[: max(1, max_replicas)], ""
 
 class _SkyServeLiveStreamer:
-    """Streams SkyServe logs in follow mode (controller/LB/replicas)."""
+    """Streams SkyServe logs in follow mode (replicas by default)."""
 
     def __init__(
         self,
         service_name: str,
         max_replicas: int = 2,
+        include_controller: bool = False,
         include_load_balancer: bool = True,
     ):
         self.service_name = service_name
         self.max_replicas = max(1, max_replicas)
+        self.include_controller = include_controller
         self.include_load_balancer = include_load_balancer
         self._procs: dict[str, subprocess.Popen[str]] = {}
         self._warned_once: set[str] = set()
@@ -242,10 +245,11 @@ class _SkyServeLiveStreamer:
         print(f"[serve-live][{label}] streaming started")
 
     def start_base_streams(self) -> None:
-        self._start_follow(
-            "controller",
-            _sky_cli_cmd("serve", "logs", "--follow", "--controller", self.service_name),
-        )
+        if self.include_controller:
+            self._start_follow(
+                "controller",
+                _sky_cli_cmd("serve", "logs", "--follow", "--controller", self.service_name),
+            )
         if self.include_load_balancer:
             self._start_follow(
                 "load-balancer",
@@ -1207,14 +1211,16 @@ def wait_ray_vllm():
     live_streamer = _SkyServeLiveStreamer(
         service_name=service_name,
         max_replicas=_SERVE_LOG_MAX_REPLICAS,
+        include_controller=_SERVE_STREAM_CONTROLLER,
         include_load_balancer=_SERVE_STREAM_LOAD_BALANCER,
     )
     live_streamer.start_base_streams()
     live_streamer.refresh_replica_streams()
     print(
-        "[serve-live] streaming controller/replicas"
-        f" (follow_only=True, replicas={_SERVE_LOG_MAX_REPLICAS},"
-        f" load_balancer={_SERVE_STREAM_LOAD_BALANCER})"
+        "[serve-live] streaming replica logs only "
+        f"(follow_only=True, replicas={_SERVE_LOG_MAX_REPLICAS}, "
+        f"controller={_SERVE_STREAM_CONTROLLER}, "
+        f"load_balancer={_SERVE_STREAM_LOAD_BALANCER})"
     )
 
     elapsed = 0
@@ -1531,14 +1537,16 @@ def wait_tabular_serve():
     live_streamer = _SkyServeLiveStreamer(
         service_name=service_name,
         max_replicas=_SERVE_LOG_MAX_REPLICAS,
+        include_controller=_SERVE_STREAM_CONTROLLER,
         include_load_balancer=_SERVE_STREAM_LOAD_BALANCER,
     )
     live_streamer.start_base_streams()
     live_streamer.refresh_replica_streams()
     print(
-        "[serve-live] streaming controller/replicas"
-        f" (follow_only=True, replicas={_SERVE_LOG_MAX_REPLICAS},"
-        f" load_balancer={_SERVE_STREAM_LOAD_BALANCER})"
+        "[serve-live] streaming replica logs only "
+        f"(follow_only=True, replicas={_SERVE_LOG_MAX_REPLICAS}, "
+        f"controller={_SERVE_STREAM_CONTROLLER}, "
+        f"load_balancer={_SERVE_STREAM_LOAD_BALANCER})"
     )
 
     elapsed = 0

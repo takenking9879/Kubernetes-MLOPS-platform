@@ -153,7 +153,7 @@ class CanaryModel:
 
 @serve.deployment(name="ModelRouter")
 class ModelRouter:
-    def __init__(self, stable, canary):
+    def __init__(self, stable, canary=None):
         self._logger = create_logger("ModelRouter")
         started = time.perf_counter()
         self._logger.info("ModelRouter init start")
@@ -168,8 +168,11 @@ class ModelRouter:
         self._registry_name  = config.model.registry_name
         self._default_alias  = config.model.default_alias
         self._webhook_max_age = config.webhook.max_timestamp_age_seconds
+        self._canary_enabled = bool(
+            config.canary_enabled and config.canary is not None and self._canary is not None
+        )
         canary_probability   = (
-            config.canary.probability if config.canary_enabled and config.canary else 0.0
+            config.canary.probability if self._canary_enabled else 0.0
         )
 
         self._traffic_router = TrafficRouter(
@@ -177,6 +180,8 @@ class ModelRouter:
             canary_handle=self._canary,
             canary_probability=canary_probability,
         )
+        if not self._canary_enabled:
+            self._logger.info("Canary disabled: CanaryModel deployment is not bound.")
         self._serve_admin_url = os.getenv(
             "RAY_SERVE_ADMIN_URL",
             "http://model-serving-head-svc.ray.svc.cluster.local:8265",
@@ -204,22 +209,25 @@ class ModelRouter:
 
     async def _reload_all_stable_replicas(self, alias: str) -> None:
         """Update user_config via Ray Serve admin API so ALL StableModel replicas reload."""
+        deployments = [
+            {
+                "name": "StableModel",
+                "user_config": {
+                    "alias": alias,
+                    "reload_nonce": int(time.time() * 1000),
+                },
+            },
+            {"name": "ModelRouter", "user_config": {}},
+        ]
+        if self._canary_enabled:
+            deployments.insert(1, {"name": "CanaryModel", "user_config": {}})
+
         payload = json.dumps({
             "applications": [{
                 "name": "inference",
                 "import_path": "k3s.kuberay.serving.app:deployment_graph",
                 "route_prefix": "/infer",
-                "deployments": [
-                    {
-                        "name": "StableModel",
-                        "user_config": {
-                            "alias": alias,
-                            "reload_nonce": int(time.time() * 1000),
-                        },
-                    },
-                    {"name": "CanaryModel", "user_config": {}},
-                    {"name": "ModelRouter", "user_config": {}},
-                ],
+                "deployments": deployments,
             }]
         }).encode()
 
@@ -245,7 +253,7 @@ class ModelRouter:
         serving_config = ConfigLoader.load()
         p = (
             serving_config.canary.probability
-            if serving_config.canary_enabled and serving_config.canary
+            if self._canary_enabled and serving_config.canary
             else 0.0
         )
         self._traffic_router.set_canary_probability(p)
@@ -273,8 +281,19 @@ class ModelRouter:
         if request.method == "GET":
             return JSONResponse({
                 "status": "ok",
+                "canary_enabled": self._canary_enabled,
                 "canary_probability": self._traffic_router.canary_probability,
             })
+
+        if not self._canary_enabled:
+            return JSONResponse(
+                {
+                    "status": "error",
+                    "reason": "canary_disabled",
+                    "message": "Canary is disabled for this deployment.",
+                },
+                status_code=400,
+            )
 
         try:
             body = await request.json()
@@ -348,5 +367,8 @@ class ModelRouter:
 
         return await self._traffic_router.route(payload)
 
-
-deployment_graph = ModelRouter.bind(StableModel.bind(), CanaryModel.bind())
+_graph_config = ConfigLoader.load()
+if _graph_config.canary_enabled and _graph_config.canary is not None:
+    deployment_graph = ModelRouter.bind(StableModel.bind(), CanaryModel.bind())
+else:
+    deployment_graph = ModelRouter.bind(StableModel.bind(), None)

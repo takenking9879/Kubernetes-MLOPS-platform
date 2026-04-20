@@ -109,7 +109,8 @@ class PipelineArtifactLoader:
         mlflow.set_tracking_uri(tracking_uri)
         client = MlflowClient()
 
-        mv   = client.get_model_version_by_alias(registry_name, alias)
+        mv = client.get_model_version_by_alias(registry_name, alias)
+
         tags = getattr(mv, "tags", {}) or {}
         artifact_set_id = tags.get("artifact_set_id")
 
@@ -122,7 +123,10 @@ class PipelineArtifactLoader:
 
         self._logger.info(
             "MLflow %s@%s v%s → artifact_set_id=%s",
-            registry_name, alias, mv.version, artifact_set_id,
+            registry_name,
+            alias,
+            mv.version,
+            artifact_set_id,
         )
         return str(artifact_set_id)
 

@@ -277,6 +277,46 @@ class ConfigLoader:
         # Priority: kuberay.* in primary file → PARAMS_SERVING_PATH/S3 overlay → config.yaml.
         serving_overlay = cls._load_serving_overlay()
 
+        # Apply run-scoped model overrides from params_serving overlay.
+        # This is critical for SkyServe replicas, because PARAMS_PATH usually
+        # points to static k3s/params.yaml while registry model selection is
+        # provided per run in params_serving.yaml.
+        if isinstance(model_cfg, dict):
+            model_cfg = dict(model_cfg)
+
+            overlay_serving = serving_overlay.get("serving", {})
+            overlay_model = serving_overlay.get("model", {})
+
+            overlay_registry_model_name = ""
+            if isinstance(overlay_serving, dict):
+                overlay_registry_model_name = str(
+                    overlay_serving.get("registry_model_name", "")
+                ).strip()
+
+            if not overlay_registry_model_name and isinstance(overlay_model, dict):
+                overlay_registry_model_name = str(
+                    overlay_model.get("registry_model_name")
+                    or overlay_model.get("mlflow_registry_model_name")
+                    or ""
+                ).strip()
+
+            if overlay_registry_model_name:
+                current_registry_model_name = str(
+                    model_cfg.get("mlflow_registry_model_name", "")
+                ).strip()
+                if overlay_registry_model_name != current_registry_model_name:
+                    print(
+                        "[config] Overriding kuberay.model.mlflow_registry_model_name "
+                        "with serving overlay registry_model_name"
+                    )
+                model_cfg["mlflow_registry_model_name"] = overlay_registry_model_name
+
+            overlay_tracking_uri = str(
+                serving_overlay.get("mlflow_tracking_uri", "")
+            ).strip()
+            if overlay_tracking_uri:
+                model_cfg["mlflow_tracking_uri"] = overlay_tracking_uri
+
         if not isinstance(serving_cfg, dict):
             overlay = serving_overlay.get("serving", {})
             serving_cfg = overlay if isinstance(overlay, dict) and overlay else {

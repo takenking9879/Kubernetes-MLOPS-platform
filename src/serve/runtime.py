@@ -96,6 +96,12 @@ class ModelRuntime:
 
     def load(self, alias_override: Optional[str] = None) -> None:
         alias = alias_override or self._default_alias
+        self._logger.info(
+            "Resolving model for runtime (%s): registry=%s alias=%s",
+            self._variant,
+            self._registry_name,
+            alias,
+        )
         artifact = self._registry.load_by_alias(self._registry_name, alias)
 
         self._artifact = artifact
