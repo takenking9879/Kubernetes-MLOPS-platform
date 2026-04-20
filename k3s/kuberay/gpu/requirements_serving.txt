@@ -21,6 +21,7 @@ numpy==2.3.3; python_version >= "3.11"
 pandas==2.3.3
 pyarrow==22.0.0
 scikit-learn==1.8.0
+pyiceberg==0.10.0
 
 # =========================
 # Gradient Boosting

@@ -196,7 +196,7 @@ setup: |
   ${SUDO} "${RUNTIME_PYTHON}" -m pip install --no-cache-dir -r "${REQ_FILE}"
 
   "${RUNTIME_PYTHON}" - <<'PY'
-  import boto3, mlflow, numpy, pandas, ray, sklearn, xgboost, yaml
+  import boto3, mlflow, numpy, pandas, pyiceberg, ray, sklearn, xgboost, yaml
   print('Setup import smoke test passed.')
   PY
 
