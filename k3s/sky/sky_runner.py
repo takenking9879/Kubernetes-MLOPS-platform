@@ -57,6 +57,15 @@ _SERVE_LOG_MAX_REPLICAS = 2
 _SERVE_STREAM_LOAD_BALANCER = True
 
 
+def _sky_cli_cmd(*args: str) -> list[str]:
+    """Build a Sky CLI command robustly for containerized Airflow tasks.
+
+    Using the module entrypoint avoids PATH/permissions issues with a `sky`
+    wrapper binary that may be absent or non-executable in some images.
+    """
+    return [sys.executable, "-m", "sky.cli", *args]
+
+
 def _run_cmd_capture(cmd: list[str], timeout_s: int = 25) -> tuple[int, str]:
     """Run command and capture combined stdout/stderr safely.
 
@@ -79,12 +88,16 @@ def _run_cmd_capture(cmd: list[str], timeout_s: int = 25) -> tuple[int, str]:
         if exc.stderr:
             output += exc.stderr if isinstance(exc.stderr, str) else exc.stderr.decode(errors="replace")
         return 124, output
+    except OSError as exc:
+        return 126, f"process launch failed ({exc})"
+    except Exception as exc:
+        return 1, f"command execution failed ({exc})"
 
 
 def _discover_serve_replica_ids(service_name: str, max_replicas: int) -> list[str]:
     # Parse IDs from the "Service Replicas" table:
     # <service_name>  <id>  <version> ...
-    cmd = ["sky", "serve", "status", service_name]
+    cmd = _sky_cli_cmd("serve", "status", service_name)
     rc, output = _run_cmd_capture(cmd, timeout_s=20)
     if rc != 0:
         return []
@@ -170,12 +183,12 @@ class _SkyServeLiveStreamer:
         base = ["--tail", str(self.tail_lines)]
         self._start_follow(
             "controller",
-            ["sky", "serve", "logs", *base, "--controller", self.service_name],
+            _sky_cli_cmd("serve", "logs", *base, "--controller", self.service_name),
         )
         if self.include_load_balancer:
             self._start_follow(
                 "load-balancer",
-                ["sky", "serve", "logs", *base, "--load-balancer", self.service_name],
+                _sky_cli_cmd("serve", "logs", *base, "--load-balancer", self.service_name),
             )
 
     def refresh_replica_streams(self) -> None:
@@ -184,15 +197,14 @@ class _SkyServeLiveStreamer:
             label = f"replica-{replica_id}"
             self._start_follow(
                 label,
-                [
-                    "sky",
+                _sky_cli_cmd(
                     "serve",
                     "logs",
                     "--tail",
                     str(self.tail_lines),
                     self.service_name,
                     replica_id,
-                ],
+                ),
             )
 
     def stop(self) -> None:
@@ -220,6 +232,56 @@ class _SkyServeLiveStreamer:
 
 def _env(key: str, default: str = "") -> str:
     return os.environ.get(key, default)
+
+
+def _aws_runtime_envs() -> dict[str, str]:
+    """Build AWS env vars to forward into remote SkyPilot tasks.
+
+    Keeps credentials out of logs while still surfacing enough context to debug
+    S3 connectivity issues from remote replicas.
+    """
+    access_key = _env("AWS_ACCESS_KEY_ID").strip()
+    secret_key = _env("AWS_SECRET_ACCESS_KEY").strip()
+    session_token = _env("AWS_SESSION_TOKEN").strip()
+    region = (
+        _env("AWS_REGION").strip()
+        or _env("AWS_DEFAULT_REGION").strip()
+        or "us-east-1"
+    )
+    endpoint = (
+        _env("AWS_S3_ENDPOINT_URL").strip()
+        or _env("AWS_ENDPOINT_URL").strip()
+    )
+
+    envs: dict[str, str] = {
+        "AWS_REGION": region,
+        "AWS_DEFAULT_REGION": region,
+    }
+    if access_key:
+        envs["AWS_ACCESS_KEY_ID"] = access_key
+    if secret_key:
+        envs["AWS_SECRET_ACCESS_KEY"] = secret_key
+    if session_token:
+        envs["AWS_SESSION_TOKEN"] = session_token
+    if endpoint:
+        envs["AWS_S3_ENDPOINT_URL"] = endpoint
+        envs["AWS_ENDPOINT_URL"] = endpoint
+
+    has_creds = bool(access_key and secret_key)
+    print(
+        "[aws-forward]"
+        f" region={region}"
+        f" endpoint={'set' if endpoint else 'default'}"
+        f" creds={'yes' if has_creds else 'no'}"
+        f" session_token={'yes' if bool(session_token) else 'no'}"
+    )
+    if not has_creds:
+        print(
+            "[warn] AWS_ACCESS_KEY_ID/AWS_SECRET_ACCESS_KEY not set for SkyServe task; "
+            "private S3 downloads in remote replicas may fail."
+        )
+
+    return envs
 
 
 def _rc() -> dict | None:
@@ -913,14 +975,16 @@ def launch_vllm():
     print(f"Using vLLM YAML: {yaml_path}")
 
     task = _load_task(yaml_path, serve_run_id, rc, prefer_spot=False)
-    task.update_envs({
+    task_envs = {
         "SERVE_RUN_ID":   serve_run_id,
         "HF_MODEL_ID":    model_id,
         "HF_TOKEN":       hf_token,
         "LLM_ADAPTER_S3": adapter_s3,
         "VLLM_PORT":      str(vllm_port),
         "MAX_MODEL_LEN":  str(max_model_len),
-    })
+    }
+    task_envs.update(_aws_runtime_envs())
+    task.update_envs(task_envs)
 
     # detach_run=True: API server provisions cluster and starts vllm serve in
     # background. stream_and_get() returns once provisioning is done (not when
@@ -1005,7 +1069,7 @@ def launch_ray_vllm():
         _yaml.dump(sky_conf, fh, default_flow_style=False, allow_unicode=True)
     task = sky.Task.from_yaml(tmp_src)
 
-    task.update_envs({
+    task_envs = {
         "SERVE_RUN_ID":           serve_run_id,
         "HF_MODEL_ID":            model_id,
         "HF_TOKEN":               hf_token,
@@ -1014,7 +1078,9 @@ def launch_ray_vllm():
         "MAX_MODEL_LEN":          str(max_model_len),
         "TENSOR_PARALLEL_SIZE":   str(tensor_parallel),
         "PIPELINE_PARALLEL_SIZE": str(pipeline_parallel),
-    })
+    }
+    task_envs.update(_aws_runtime_envs())
+    task.update_envs(task_envs)
 
     sky.stream_and_get(sky.serve.up(task, service_name=service_name))
     print(f"Ray+vLLM service launched: {service_name} ({pipeline_parallel} nodes × {replicas} replicas)")
@@ -1321,12 +1387,14 @@ def launch_tabular_serve():
         _yaml.dump(sky_conf, fh, default_flow_style=False, allow_unicode=True)
 
     task = sky.Task.from_yaml(tmp)
-    task.update_envs({
+    task_envs = {
         "SERVE_RUN_ID":        serve_run_id,
         "REGISTRY_MODEL_NAME": registry_model,
         "MODEL_ALIAS":         alias,
         "SERVE_PORT":          str(serve_port),
-    })
+    }
+    task_envs.update(_aws_runtime_envs())
+    task.update_envs(task_envs)
 
     service_name = _k8s_name(serve_run_id, "tabserv", max_len=32)
     print(f"Launching sky serve service: {service_name}")

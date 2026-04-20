@@ -60,6 +60,49 @@ class ServingConfig:
 class ConfigLoader:
     _instance: Optional[ServingConfig] = None
 
+    @staticmethod
+    def _build_overlay_s3_client() -> tuple[object, Dict[str, Any]]:
+        import boto3
+        from botocore.config import Config as _BotoConfig
+
+        access_key = (os.getenv("AWS_ACCESS_KEY_ID") or "").strip()
+        secret_key = (os.getenv("AWS_SECRET_ACCESS_KEY") or "").strip()
+        session_token = (os.getenv("AWS_SESSION_TOKEN") or "").strip()
+        region = (
+            (os.getenv("AWS_REGION") or "").strip()
+            or (os.getenv("AWS_DEFAULT_REGION") or "").strip()
+            or "us-east-1"
+        )
+        endpoint_url = (
+            (os.getenv("AWS_S3_ENDPOINT_URL") or "").strip()
+            or (os.getenv("AWS_ENDPOINT_URL") or "").strip()
+        )
+
+        kwargs: Dict[str, Any] = {
+            "region_name": region,
+        }
+        if access_key:
+            kwargs["aws_access_key_id"] = access_key
+        if secret_key:
+            kwargs["aws_secret_access_key"] = secret_key
+        if session_token:
+            kwargs["aws_session_token"] = session_token
+        if endpoint_url:
+            # Path-style addressing is safer for S3-compatible endpoints.
+            kwargs["endpoint_url"] = endpoint_url
+            kwargs["config"] = _BotoConfig(
+                signature_version="s3v4",
+                s3={"addressing_style": "path"},
+            )
+
+        return boto3.client("s3", **kwargs), {
+            "region": region,
+            "endpoint_url": endpoint_url,
+            "has_access_key": bool(access_key),
+            "has_secret_key": bool(secret_key),
+            "has_session_token": bool(session_token),
+        }
+
     @classmethod
     def _load_serving_overlay(cls) -> Dict[str, Any]:
         """Load optional params_serving.yaml providing serving.* and canary.* overrides.
@@ -78,18 +121,43 @@ class ConfigLoader:
         if not local_path:
             s3_uri = os.getenv("PARAMS_SERVING_S3_PATH")
             if s3_uri:
-                import boto3
                 import tempfile
                 from urllib.parse import urlparse as _urlparse
+
                 parsed = _urlparse(s3_uri)
-                tmp = tempfile.NamedTemporaryFile(suffix=".yaml", delete=False)
-                boto3.client(
-                    "s3",
-                    aws_access_key_id=os.getenv("AWS_ACCESS_KEY_ID"),
-                    aws_secret_access_key=os.getenv("AWS_SECRET_ACCESS_KEY"),
-                    region_name=os.getenv("AWS_REGION", "us-east-2"),
-                ).download_file(parsed.netloc, parsed.path.lstrip("/"), tmp.name)
-                local_path = tmp.name
+                if parsed.scheme != "s3" or not parsed.netloc or not parsed.path or parsed.path == "/":
+                    raise RuntimeError(
+                        "PARAMS_SERVING_S3_PATH must be a valid s3://bucket/key URI "
+                        f"(got: {s3_uri!r})"
+                    )
+
+                bucket = parsed.netloc
+                key = parsed.path.lstrip("/")
+                client, client_meta = cls._build_overlay_s3_client()
+
+                with tempfile.NamedTemporaryFile(suffix=".yaml", delete=False) as tmp:
+                    local_tmp = tmp.name
+
+                endpoint = client_meta["endpoint_url"] or "<aws-default>"
+                print(
+                    "[config] Loading serving overlay from "
+                    f"s3://{bucket}/{key} "
+                    f"(region={client_meta['region']}, endpoint={endpoint}, "
+                    f"has_access_key={client_meta['has_access_key']}, "
+                    f"has_session_token={client_meta['has_session_token']})"
+                )
+
+                try:
+                    client.download_file(bucket, key, local_tmp)
+                except Exception as exc:
+                    raise RuntimeError(
+                        "Failed to download PARAMS_SERVING_S3_PATH "
+                        f"s3://{bucket}/{key} (region={client_meta['region']}, endpoint={endpoint}). "
+                        "Check AWS_ACCESS_KEY_ID/AWS_SECRET_ACCESS_KEY/AWS_SESSION_TOKEN, "
+                        "AWS_REGION/AWS_DEFAULT_REGION, and AWS_S3_ENDPOINT_URL."
+                    ) from exc
+
+                local_path = local_tmp
         if not local_path or not os.path.exists(local_path):
             return {}
         with open(local_path) as f:
