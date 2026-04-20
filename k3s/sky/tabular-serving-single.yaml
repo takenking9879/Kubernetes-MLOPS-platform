@@ -317,10 +317,15 @@ run: |
   echo "[run] Starting Ray Serve app — models:/${REGISTRY_MODEL_NAME}@${MODEL_ALIAS}"
   echo "[run] PARAMS_SERVING_S3_PATH=${PARAMS_SERVING_S3_PATH}"
 
+  # Ray 2.53+ does not accept --host/--port on `serve run`.
+  # Configure proxy bind/port via `serve start`, then deploy with `serve run`.
+  "${SERVE_BIN}" start \
+    --address="127.0.0.1:6379" \
+    --http-host="0.0.0.0" \
+    --http-port="${SERVE_PORT}"
+
   # serve run blocks until the process is killed (SkyServe replica stays alive).
   "${SERVE_BIN}" run \
     k3s.kuberay.serving.app:deployment_graph \
     --address="127.0.0.1:6379" \
-    --host="0.0.0.0" \
-    --port="${SERVE_PORT}" \
     --route-prefix="/infer"

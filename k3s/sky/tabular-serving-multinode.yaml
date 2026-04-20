@@ -316,11 +316,16 @@ run: |
 
     echo "[head] Starting Ray Serve app — models:/${REGISTRY_MODEL_NAME}@${MODEL_ALIAS}"
 
+    # Ray 2.53+ does not accept --host/--port on `serve run`.
+    # Configure proxy bind/port via `serve start`, then deploy with `serve run`.
+    "${SERVE_BIN}" start \
+      --address="127.0.0.1:${RAY_PORT}" \
+      --http-host="0.0.0.0" \
+      --http-port="${SERVE_PORT}"
+
     "${SERVE_BIN}" run \
       k3s.kuberay.serving.app:deployment_graph \
       --address="127.0.0.1:${RAY_PORT}" \
-      --host="0.0.0.0" \
-      --port="${SERVE_PORT}" \
       --route-prefix="/infer"
 
   else

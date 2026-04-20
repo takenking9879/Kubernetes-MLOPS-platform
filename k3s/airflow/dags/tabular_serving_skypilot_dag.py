@@ -15,6 +15,9 @@ dag_run.conf keys:
     resource_constraints    : dict|None - optional GPUSelectorService constraints
     serve_controller        : dict|None - optional SkyServe controller config override
 
+Logs during wait_for_endpoint are streamed live from SkyServe
+(controller/load balancer/replicas) by sky_runner.py.
+
 Endpoint written to:
     s3://{S3_BUCKET}/runs/serving/{serve_run_id}/endpoint.json
 """

@@ -29,7 +29,9 @@ import hashlib
 import json
 import os
 import re
+import subprocess
 import sys
+import threading
 import time
 from pathlib import Path
 
@@ -48,6 +50,171 @@ def _xcom_push(value) -> None:
     xcom_path.parent.mkdir(parents=True, exist_ok=True)
     xcom_path.write_text(json.dumps(value))
 
+
+# Hardcoded SkyServe wait log-streaming defaults (live mode only).
+_SERVE_LOG_TAIL_LINES = 150
+_SERVE_LOG_MAX_REPLICAS = 2
+_SERVE_STREAM_LOAD_BALANCER = True
+
+
+def _run_cmd_capture(cmd: list[str], timeout_s: int = 25) -> tuple[int, str]:
+    """Run command and capture combined stdout/stderr safely.
+
+    Returns (exit_code, output). Timeout returns code 124 with partial output.
+    """
+    try:
+        proc = subprocess.run(
+            cmd,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            text=True,
+            check=False,
+            timeout=timeout_s,
+        )
+        return proc.returncode, proc.stdout or ""
+    except subprocess.TimeoutExpired as exc:
+        output = ""
+        if exc.stdout:
+            output += exc.stdout if isinstance(exc.stdout, str) else exc.stdout.decode(errors="replace")
+        if exc.stderr:
+            output += exc.stderr if isinstance(exc.stderr, str) else exc.stderr.decode(errors="replace")
+        return 124, output
+
+
+def _discover_serve_replica_ids(service_name: str, max_replicas: int) -> list[str]:
+    # Parse IDs from the "Service Replicas" table:
+    # <service_name>  <id>  <version> ...
+    cmd = ["sky", "serve", "status", service_name]
+    rc, output = _run_cmd_capture(cmd, timeout_s=20)
+    if rc != 0:
+        return []
+
+    ids: list[str] = []
+    pattern = re.compile(rf"^\s*{re.escape(service_name)}\s+(\d+)\b")
+    for line in output.splitlines():
+        m = pattern.match(line)
+        if not m:
+            continue
+        rid = m.group(1)
+        if rid not in ids:
+            ids.append(rid)
+
+    return ids[: max(1, max_replicas)]
+
+class _SkyServeLiveStreamer:
+    """Streams SkyServe logs in follow mode (controller/LB/replicas)."""
+
+    def __init__(
+        self,
+        service_name: str,
+        tail_lines: int = 120,
+        max_replicas: int = 2,
+        include_load_balancer: bool = True,
+    ):
+        self.service_name = service_name
+        self.tail_lines = max(10, tail_lines)
+        self.max_replicas = max(1, max_replicas)
+        self.include_load_balancer = include_load_balancer
+        self._procs: dict[str, subprocess.Popen[str]] = {}
+        self._warned_once: set[str] = set()
+
+    def _warn_once(self, key: str, msg: str) -> None:
+        if key in self._warned_once:
+            return
+        self._warned_once.add(key)
+        print(msg)
+
+    def _pump_output(self, label: str, proc: subprocess.Popen[str]) -> None:
+        assert proc.stdout is not None
+        try:
+            for raw in proc.stdout:
+                line = raw.rstrip("\n")
+                if line:
+                    print(f"[serve-live][{label}] {line}")
+        finally:
+            rc = proc.poll()
+            if rc is None:
+                try:
+                    rc = proc.wait(timeout=1)
+                except Exception:
+                    rc = None
+            print(f"[serve-live][{label}] stream ended (rc={rc if rc is not None else 'unknown'})")
+
+    def _start_follow(self, label: str, cmd: list[str]) -> None:
+        if label in self._procs:
+            proc = self._procs[label]
+            if proc.poll() is None:
+                return
+
+        try:
+            proc = subprocess.Popen(
+                cmd,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                text=True,
+                bufsize=1,
+            )
+        except Exception as exc:
+            self._warn_once(
+                f"start:{label}",
+                f"[serve-live][{label}] could not start streaming ({exc}); cmd={' '.join(cmd)}",
+            )
+            return
+
+        self._procs[label] = proc
+        thread = threading.Thread(target=self._pump_output, args=(label, proc), daemon=True)
+        thread.start()
+        print(f"[serve-live][{label}] streaming started")
+
+    def start_base_streams(self) -> None:
+        base = ["--tail", str(self.tail_lines)]
+        self._start_follow(
+            "controller",
+            ["sky", "serve", "logs", *base, "--controller", self.service_name],
+        )
+        if self.include_load_balancer:
+            self._start_follow(
+                "load-balancer",
+                ["sky", "serve", "logs", *base, "--load-balancer", self.service_name],
+            )
+
+    def refresh_replica_streams(self) -> None:
+        replica_ids = _discover_serve_replica_ids(self.service_name, self.max_replicas)
+        for replica_id in replica_ids:
+            label = f"replica-{replica_id}"
+            self._start_follow(
+                label,
+                [
+                    "sky",
+                    "serve",
+                    "logs",
+                    "--tail",
+                    str(self.tail_lines),
+                    self.service_name,
+                    replica_id,
+                ],
+            )
+
+    def stop(self) -> None:
+        for label, proc in list(self._procs.items()):
+            try:
+                if proc.poll() is None:
+                    proc.terminate()
+            except Exception as exc:
+                self._warn_once(f"stop-term:{label}", f"[serve-live][{label}] terminate failed: {exc}")
+
+        deadline = time.time() + 3
+        for label, proc in list(self._procs.items()):
+            if proc.poll() is not None:
+                continue
+            try:
+                remaining = max(0.1, deadline - time.time())
+                proc.wait(timeout=remaining)
+            except Exception:
+                try:
+                    proc.kill()
+                except Exception as exc:
+                    self._warn_once(f"stop-kill:{label}", f"[serve-live][{label}] kill failed: {exc}")
 
 # ─── Environment helpers ───────────────────────────────────────────────────────
 
@@ -867,36 +1034,55 @@ def wait_ray_vllm():
         raise RuntimeError("SERVICE_INFO_JSON must contain 'service_name'")
 
     print(f"Polling sky serve status for Ray+vLLM service '{service_name}' (timeout={timeout}s)")
+    live_streamer = _SkyServeLiveStreamer(
+        service_name=service_name,
+        tail_lines=_SERVE_LOG_TAIL_LINES,
+        max_replicas=_SERVE_LOG_MAX_REPLICAS,
+        include_load_balancer=_SERVE_STREAM_LOAD_BALANCER,
+    )
+    live_streamer.start_base_streams()
+    live_streamer.refresh_replica_streams()
+    print(
+        "[serve-live] streaming controller/replicas"
+        f" (tail={_SERVE_LOG_TAIL_LINES}, replicas={_SERVE_LOG_MAX_REPLICAS},"
+        f" load_balancer={_SERVE_STREAM_LOAD_BALANCER})"
+    )
 
     elapsed = 0
-    while elapsed < timeout:
-        try:
-            statuses = sky.get(sky.serve.status(service_names=[service_name]))
-            if statuses:
-                svc = statuses[0]
-                if isinstance(svc, dict):
-                    endpoint   = svc.get("endpoint_url") or svc.get("endpoint", "")
-                    status_val = str(svc.get("status", "")).upper()
-                else:
-                    endpoint   = getattr(svc, "endpoint_url", None) or getattr(svc, "endpoint", "")
-                    status_val = str(getattr(svc, "status", "")).upper()
-                if "READY" in status_val and endpoint:
-                    print(f"Ray+vLLM service healthy after {elapsed}s: {endpoint}")
-                    _xcom_push(endpoint)
-                    return
-                if "FAILED" in status_val:
-                    raise RuntimeError(f"Service '{service_name}' entered FAILED state.")
-                print(f"[{elapsed}s] Status={status_val}, endpoint={endpoint or '—'}")
-        except RuntimeError:
-            raise
-        except Exception as exc:
-            print(f"[{elapsed}s] status check error: {exc}")
-        time.sleep(interval)
-        elapsed += interval
+    try:
+        while elapsed < timeout:
+            try:
+                statuses = sky.get(sky.serve.status(service_names=[service_name]))
+                if statuses:
+                    svc = statuses[0]
+                    if isinstance(svc, dict):
+                        endpoint   = svc.get("endpoint_url") or svc.get("endpoint", "")
+                        status_val = str(svc.get("status", "")).upper()
+                    else:
+                        endpoint   = getattr(svc, "endpoint_url", None) or getattr(svc, "endpoint", "")
+                        status_val = str(getattr(svc, "status", "")).upper()
+                    if "READY" in status_val and endpoint:
+                        print(f"Ray+vLLM service healthy after {elapsed}s: {endpoint}")
+                        _xcom_push(endpoint)
+                        return
+                    if "FAILED" in status_val:
+                        raise RuntimeError(f"Service '{service_name}' entered FAILED state.")
+                    print(f"[{elapsed}s] Status={status_val}, endpoint={endpoint or '—'}")
+            except RuntimeError:
+                raise
+            except Exception as exc:
+                print(f"[{elapsed}s] status check error: {exc}")
 
-    raise RuntimeError(
-        f"Ray+vLLM service '{service_name}' not READY after {timeout}s."
-    )
+            live_streamer.refresh_replica_streams()
+
+            time.sleep(interval)
+            elapsed += interval
+
+        raise RuntimeError(
+            f"Ray+vLLM service '{service_name}' not READY after {timeout}s."
+        )
+    finally:
+        live_streamer.stop()
 
 
 def run_training():
@@ -1155,7 +1341,6 @@ def wait_tabular_serve():
 
     info         = json.loads(_env("SERVICE_INFO_JSON") or "{}")
     service_name = info.get("service_name", "")
-    serve_port   = int(info.get("serve_port") or _env("SERVE_PORT", "8000"))
     timeout      = int(_env("TABULAR_SERVE_HEALTH_TIMEOUT_SECONDS", "600"))
     interval     = 20
 
@@ -1163,36 +1348,55 @@ def wait_tabular_serve():
         raise RuntimeError("SERVICE_INFO_JSON must contain 'service_name'")
 
     print(f"Polling sky serve status for service '{service_name}' (timeout={timeout}s)")
+    live_streamer = _SkyServeLiveStreamer(
+        service_name=service_name,
+        tail_lines=_SERVE_LOG_TAIL_LINES,
+        max_replicas=_SERVE_LOG_MAX_REPLICAS,
+        include_load_balancer=_SERVE_STREAM_LOAD_BALANCER,
+    )
+    live_streamer.start_base_streams()
+    live_streamer.refresh_replica_streams()
+    print(
+        "[serve-live] streaming controller/replicas"
+        f" (tail={_SERVE_LOG_TAIL_LINES}, replicas={_SERVE_LOG_MAX_REPLICAS},"
+        f" load_balancer={_SERVE_STREAM_LOAD_BALANCER})"
+    )
 
     elapsed = 0
-    while elapsed < timeout:
-        try:
-            statuses = sky.get(sky.serve.status(service_names=[service_name]))
-            if statuses:
-                svc = statuses[0]
-                if isinstance(svc, dict):
-                    endpoint  = svc.get("endpoint_url") or svc.get("endpoint", "")
-                    status_val = str(svc.get("status", "")).upper()
-                else:
-                    endpoint  = getattr(svc, "endpoint_url", None) or getattr(svc, "endpoint", "")
-                    status_val = str(getattr(svc, "status", "")).upper()
-                if "READY" in status_val and endpoint:
-                    print(f"Tabular serve healthy after {elapsed}s: {endpoint}")
-                    _xcom_push(endpoint)
-                    return
-                if "FAILED" in status_val:
-                    raise RuntimeError(f"Service '{service_name}' entered FAILED state.")
-                print(f"[{elapsed}s] Status={status_val}, endpoint={endpoint or '—'}")
-        except RuntimeError:
-            raise
-        except Exception as exc:
-            print(f"[{elapsed}s] status check error: {exc}")
-        time.sleep(interval)
-        elapsed += interval
+    try:
+        while elapsed < timeout:
+            try:
+                statuses = sky.get(sky.serve.status(service_names=[service_name]))
+                if statuses:
+                    svc = statuses[0]
+                    if isinstance(svc, dict):
+                        endpoint  = svc.get("endpoint_url") or svc.get("endpoint", "")
+                        status_val = str(svc.get("status", "")).upper()
+                    else:
+                        endpoint  = getattr(svc, "endpoint_url", None) or getattr(svc, "endpoint", "")
+                        status_val = str(getattr(svc, "status", "")).upper()
+                    if "READY" in status_val and endpoint:
+                        print(f"Tabular serve healthy after {elapsed}s: {endpoint}")
+                        _xcom_push(endpoint)
+                        return
+                    if "FAILED" in status_val:
+                        raise RuntimeError(f"Service '{service_name}' entered FAILED state.")
+                    print(f"[{elapsed}s] Status={status_val}, endpoint={endpoint or '—'}")
+            except RuntimeError:
+                raise
+            except Exception as exc:
+                print(f"[{elapsed}s] status check error: {exc}")
 
-    raise RuntimeError(
-        f"Tabular serve service '{service_name}' not READY after {timeout}s."
-    )
+            live_streamer.refresh_replica_streams()
+
+            time.sleep(interval)
+            elapsed += interval
+
+        raise RuntimeError(
+            f"Tabular serve service '{service_name}' not READY after {timeout}s."
+        )
+    finally:
+        live_streamer.stop()
 
 
 def register_endpoint():
