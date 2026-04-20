@@ -32,8 +32,14 @@ def _load_executor(loader, registry_name: str, alias: str, logger):
 @serve.deployment(name="StableModel")
 class StableModel:
     def __init__(self):
-        config = ConfigLoader.load()
         logger = create_logger("StableModel")
+        started = time.perf_counter()
+        logger.info("StableModel init start")
+
+        t0 = time.perf_counter()
+        config = ConfigLoader.load()
+        logger.info("StableModel config loaded in %.2fs", time.perf_counter() - t0)
+
         registry = MLflowRegistry(config.model.tracking_uri, logger)
 
         self._rt = ModelRuntime(
@@ -46,7 +52,9 @@ class StableModel:
             num_classes=config.model.num_classes,
             dsl_path=config.model.dsl_path,
         )
+        t0 = time.perf_counter()
         self._rt.load()
+        logger.info("StableModel runtime/model load completed in %.2fs", time.perf_counter() - t0)
 
         self._registry_name = config.model.registry_name
         self._default_alias = config.model.default_alias
@@ -55,8 +63,13 @@ class StableModel:
         from src.serve.pipeline_loader import PipelineArtifactLoader
         params_path  = os.getenv("PARAMS_PATH", "/home/ray/app/repo/k3s/params.yaml")
         self._loader = PipelineArtifactLoader(params_path, logger)
+
+        t0 = time.perf_counter()
         executor     = _load_executor(self._loader, self._registry_name, self._default_alias, logger)
+        logger.info("StableModel executor load completed in %.2fs", time.perf_counter() - t0)
+
         self._rt.set_executor(executor)
+        logger.info("StableModel init complete in %.2fs", time.perf_counter() - started)
 
     def reconfigure(self, config: Dict[str, str]) -> None:
         alias = config.get("alias") if config else None
@@ -78,8 +91,14 @@ class StableModel:
 @serve.deployment(name="CanaryModel")
 class CanaryModel:
     def __init__(self):
-        config = ConfigLoader.load()
         logger = create_logger("CanaryModel")
+        started = time.perf_counter()
+        logger.info("CanaryModel init start")
+
+        t0 = time.perf_counter()
+        config = ConfigLoader.load()
+        logger.info("CanaryModel config loaded in %.2fs", time.perf_counter() - t0)
+
         registry = MLflowRegistry(config.model.tracking_uri, logger)
 
         self._rt = ModelRuntime(
@@ -94,7 +113,9 @@ class CanaryModel:
         )
 
         canary_alias = config.canary.alias if config.canary else "challenger"
+        t0 = time.perf_counter()
         self._rt.load(alias_override=canary_alias)
+        logger.info("CanaryModel runtime/model load completed in %.2fs", time.perf_counter() - t0)
 
         self._registry_name = config.model.registry_name
         self._canary_alias  = canary_alias
@@ -103,8 +124,13 @@ class CanaryModel:
         from src.serve.pipeline_loader import PipelineArtifactLoader
         params_path  = os.getenv("PARAMS_PATH", "/home/ray/app/repo/k3s/params.yaml")
         self._loader = PipelineArtifactLoader(params_path, logger)
+
+        t0 = time.perf_counter()
         executor     = _load_executor(self._loader, self._registry_name, self._canary_alias, logger)
+        logger.info("CanaryModel executor load completed in %.2fs", time.perf_counter() - t0)
+
         self._rt.set_executor(executor)
+        logger.info("CanaryModel init complete in %.2fs", time.perf_counter() - started)
 
     def reconfigure(self, config: Dict[str, str]) -> None:
         alias = config.get("alias") if config else None
@@ -129,10 +155,16 @@ class CanaryModel:
 class ModelRouter:
     def __init__(self, stable, canary):
         self._logger = create_logger("ModelRouter")
+        started = time.perf_counter()
+        self._logger.info("ModelRouter init start")
+
         self._stable = stable
         self._canary = canary
 
+        t0 = time.perf_counter()
         config = ConfigLoader.load()
+        self._logger.info("ModelRouter config loaded in %.2fs", time.perf_counter() - t0)
+
         self._registry_name  = config.model.registry_name
         self._default_alias  = config.model.default_alias
         self._webhook_max_age = config.webhook.max_timestamp_age_seconds
@@ -156,15 +188,19 @@ class ModelRouter:
         # Register the MLflow webhook so model + executor reload automatically on alias change.
         registry = MLflowRegistry(config.model.tracking_uri, self._logger)
         try:
+            t0 = time.perf_counter()
             registry.ensure_webhook(
                 config.webhook,
                 config.model.registry_name,
                 config.model.default_alias,
             )
+            self._logger.info("ModelRouter webhook ensure completed in %.2fs", time.perf_counter() - t0)
         except Exception as e:
             self._logger.warning(
                 "Could not ensure MLflow webhook (expected if MLflow requires HTTPS): %s", e
             )
+
+        self._logger.info("ModelRouter init complete in %.2fs", time.perf_counter() - started)
 
     async def _reload_all_stable_replicas(self, alias: str) -> None:
         """Update user_config via Ray Serve admin API so ALL StableModel replicas reload."""

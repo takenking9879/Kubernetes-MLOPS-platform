@@ -64,13 +64,16 @@ def _run_sky_runner(command: str, extra_env: dict[str, str]) -> object:
         {
             "SKY_YAML_DIR": _SKY_YAML_DIR,
             "SKY_RUNNER_XCOM_PATH": xcom_path,
+            # Force unbuffered stdout/stderr so live logs appear in Airflow
+            # while wait-tabular-serve is running.
+            "PYTHONUNBUFFERED": "1",
             # Helps optional imports in sky_runner.py (src.services.*)
             "PYTHONPATH": f"/opt/airflow/dags/repo:{env.get('PYTHONPATH', '')}".rstrip(":"),
         }
     )
     env.update({k: str(v) for k, v in extra_env.items() if v is not None})
 
-    cmd = [_SKY_PYTHON, _SKY_RUNNER_SCRIPT, command]
+    cmd = [_SKY_PYTHON, "-u", _SKY_RUNNER_SCRIPT, command]
     subprocess.run(cmd, check=True, env=env)
 
     if not os.path.exists(xcom_path):

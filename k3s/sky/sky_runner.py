@@ -35,6 +35,18 @@ import threading
 import time
 from pathlib import Path
 
+
+def _enable_line_buffered_output() -> None:
+    """Best-effort unbuffered-ish output for Airflow task logs."""
+    for stream in (sys.stdout, sys.stderr):
+        try:
+            stream.reconfigure(line_buffering=True, write_through=True)
+        except Exception:
+            pass
+
+
+_enable_line_buffered_output()
+
 # ─── XCom ─────────────────────────────────────────────────────────────────────
 
 _DEFAULT_XCOM_PATH = Path("/airflow/xcom/return.json")
@@ -55,6 +67,8 @@ def _xcom_push(value) -> None:
 _SERVE_LOG_TAIL_LINES = 150
 _SERVE_LOG_MAX_REPLICAS = 2
 _SERVE_STREAM_LOAD_BALANCER = True
+_SERVE_FALLBACK_REPLICA_IDS = ("1",)
+_ANSI_ESCAPE_RE = re.compile(r"\x1b\[[0-9;]*[A-Za-z]")
 
 
 def _sky_cli_cmd(*args: str) -> list[str]:
@@ -94,25 +108,52 @@ def _run_cmd_capture(cmd: list[str], timeout_s: int = 25) -> tuple[int, str]:
         return 1, f"command execution failed ({exc})"
 
 
-def _discover_serve_replica_ids(service_name: str, max_replicas: int) -> list[str]:
+def _strip_ansi(text: str) -> str:
+    return _ANSI_ESCAPE_RE.sub("", text)
+
+
+def _discover_serve_replica_ids(service_name: str, max_replicas: int) -> tuple[list[str], str]:
     # Parse IDs from the "Service Replicas" table:
     # <service_name>  <id>  <version> ...
     cmd = _sky_cli_cmd("serve", "status", service_name)
     rc, output = _run_cmd_capture(cmd, timeout_s=20)
     if rc != 0:
-        return []
+        snippet_lines = [ln.strip() for ln in output.splitlines() if ln.strip()][:2]
+        snippet = " | ".join(snippet_lines) if snippet_lines else "<no output>"
+        return [], f"status rc={rc}, snippet={snippet[:220]}"
 
     ids: list[str] = []
-    pattern = re.compile(rf"^\s*{re.escape(service_name)}\s+(\d+)\b")
+    strict_pattern = re.compile(rf"\b{re.escape(service_name)}\b\s+(\d+)\b")
     for line in output.splitlines():
-        m = pattern.match(line)
-        if not m:
+        clean_line = _strip_ansi(line).strip()
+        if not clean_line or service_name not in clean_line:
             continue
-        rid = m.group(1)
+
+        rid: str | None = None
+        m = strict_pattern.search(clean_line)
+        if m:
+            rid = m.group(1)
+        else:
+            parts = re.split(r"\s+", clean_line)
+            try:
+                start_idx = parts.index(service_name)
+            except ValueError:
+                start_idx = -1
+            if start_idx >= 0:
+                for token in parts[start_idx + 1 :]:
+                    if token.isdigit():
+                        rid = token
+                        break
+
+        if not rid:
+            continue
         if rid not in ids:
             ids.append(rid)
 
-    return ids[: max(1, max_replicas)]
+    if not ids:
+        return [], "status ok but no replica IDs parsed yet"
+
+    return ids[: max(1, max_replicas)], ""
 
 class _SkyServeLiveStreamer:
     """Streams SkyServe logs in follow mode (controller/LB/replicas)."""
@@ -130,6 +171,10 @@ class _SkyServeLiveStreamer:
         self.include_load_balancer = include_load_balancer
         self._procs: dict[str, subprocess.Popen[str]] = {}
         self._warned_once: set[str] = set()
+        self._primary_discovery_attempts = 0
+        self._primary_discovery_successes = 0
+        self._fallback_uses = 0
+        self._fallback_active = False
 
     def _warn_once(self, key: str, msg: str) -> None:
         if key in self._warned_once:
@@ -192,7 +237,39 @@ class _SkyServeLiveStreamer:
             )
 
     def refresh_replica_streams(self) -> None:
-        replica_ids = _discover_serve_replica_ids(self.service_name, self.max_replicas)
+        self._primary_discovery_attempts += 1
+        replica_ids, primary_reason = _discover_serve_replica_ids(
+            self.service_name, self.max_replicas
+        )
+        if replica_ids:
+            self._primary_discovery_successes += 1
+            if self._fallback_active:
+                print(
+                    "[serve-live] primary replica discovery recovered; "
+                    f"using discovered IDs: {','.join(replica_ids)}"
+                )
+                self._fallback_active = False
+
+        if not replica_ids:
+            self._warn_once(
+                "replica-primary-empty",
+                "[serve-live] primary replica discovery returned no IDs "
+                f"({primary_reason})",
+            )
+            replica_ids = list(_SERVE_FALLBACK_REPLICA_IDS)
+            self._fallback_uses += 1
+            if self._fallback_uses == 1:
+                print(
+                    "[serve-live] fallback triggered: using static replica IDs "
+                    f"{','.join(replica_ids)}"
+                )
+            elif self._fallback_uses % 5 == 0:
+                print(
+                    "[serve-live] fallback still active "
+                    f"(uses={self._fallback_uses}, primary_successes={self._primary_discovery_successes})"
+                )
+            self._fallback_active = True
+
         for replica_id in replica_ids:
             label = f"replica-{replica_id}"
             self._start_follow(
@@ -227,6 +304,18 @@ class _SkyServeLiveStreamer:
                     proc.kill()
                 except Exception as exc:
                     self._warn_once(f"stop-kill:{label}", f"[serve-live][{label}] kill failed: {exc}")
+
+        print(
+            "[serve-live] replica discovery summary: "
+            f"primary_attempts={self._primary_discovery_attempts}, "
+            f"primary_successes={self._primary_discovery_successes}, "
+            f"fallback_uses={self._fallback_uses}"
+        )
+        if self._fallback_uses > 0 and self._primary_discovery_successes == 0:
+            print(
+                "[serve-live][warn] fallback was used but primary discovery never succeeded; "
+                "fallback acted as principal path and primary parsing should be revisited."
+            )
 
 # ─── Environment helpers ───────────────────────────────────────────────────────
 

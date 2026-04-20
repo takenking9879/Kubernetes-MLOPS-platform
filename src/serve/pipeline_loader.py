@@ -17,6 +17,7 @@ Used by app.py when kuberay.serving.online = true.
 import logging
 import os
 import tempfile
+import time
 from typing import Optional
 
 import yaml
@@ -56,18 +57,36 @@ class PipelineArtifactLoader:
         """
         from src.dsl.numpy_executor import NumpyPipelineExecutor
 
+        total_started = time.perf_counter()
+
+        t0 = time.perf_counter()
         artifact_set_id = self._resolve_artifact_set_id(registry_name, alias)
+        t1 = time.perf_counter()
+
         pipeline_hash   = self._resolve_pipeline_hash(artifact_set_id)
+        t2 = time.perf_counter()
+
         tmpdir          = tempfile.mkdtemp(prefix="pipeline_artifacts_")
 
         self._download_artifacts(pipeline_hash, tmpdir)
+        t3 = time.perf_counter()
 
         executor = NumpyPipelineExecutor.from_dir(tmpdir)
+        t4 = time.perf_counter()
+
         self._logger.info(
             "NumpyPipelineExecutor ready: %d features (artifact_set_id=%s, pipeline_hash=%s)",
             len(executor.final_features),
             artifact_set_id,
             pipeline_hash,
+        )
+        self._logger.info(
+            "Pipeline loader timings (s): mlflow=%.2f iceberg=%.2f s3=%.2f executor=%.2f total=%.2f",
+            t1 - t0,
+            t2 - t1,
+            t3 - t2,
+            t4 - t3,
+            t4 - total_started,
         )
         return executor
 
@@ -118,6 +137,7 @@ class PipelineArtifactLoader:
         Mirrors kafka_main.py's _resolve_pipeline_hash_from_metadata().
         """
         from pyiceberg.catalog import load_catalog
+        from pyiceberg.expressions import EqualTo
 
         catalog_kwargs = self._get_iceberg_catalog_kwargs()
         meta_cfg       = self._params.get("iceberg_tables", {}).get("metadata", {})
@@ -131,9 +151,37 @@ class PipelineArtifactLoader:
         )
         catalog = load_catalog("iceberg", **catalog_kwargs)
         table   = catalog.load_table(identifier)
-        df      = table.scan().to_pandas()
 
-        rows = df[df["artifact_set_id"] == artifact_set_id]
+        # Fast path: predicate pushdown to avoid full-table scan on every replica init.
+        try:
+            scan = table.scan(
+                row_filter=EqualTo("artifact_set_id", artifact_set_id),
+                selected_fields=("artifact_set_id", "pipeline_hash"),
+            )
+            try:
+                scan = scan.limit(1)
+            except Exception:
+                # limit() may not exist on older pyiceberg versions.
+                pass
+            rows = scan.to_pandas()
+        except Exception as exc:
+            self._logger.warning(
+                "Filtered Iceberg scan failed (%s); falling back to full-table scan.",
+                exc,
+            )
+            df = table.scan().to_pandas()
+            rows = df[df["artifact_set_id"] == artifact_set_id]
+
+        # Defensive fallback if pushdown path returns no rows due type/engine mismatch.
+        if rows.empty:
+            self._logger.warning(
+                "Filtered Iceberg scan returned no rows for artifact_set_id=%s; "
+                "retrying with full-table scan.",
+                artifact_set_id,
+            )
+            df = table.scan().to_pandas()
+            rows = df[df["artifact_set_id"] == artifact_set_id]
+
         if rows.empty:
             raise RuntimeError(
                 f"No row found in Iceberg table {identifier!r} "
