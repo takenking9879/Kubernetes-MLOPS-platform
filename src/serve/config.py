@@ -1,7 +1,9 @@
 import os
+import socket
 from dataclasses import dataclass
 from enum import Enum
 from typing import Any, Dict, Optional
+from urllib.parse import urlparse
 
 import yaml
 
@@ -59,6 +61,46 @@ class ServingConfig:
 
 class ConfigLoader:
     _instance: Optional[ServingConfig] = None
+
+    @staticmethod
+    def _validate_tracking_uri_reachable(tracking_uri: str, source: str) -> None:
+        """Fail fast when HTTP(S) MLflow host cannot be resolved in this runtime."""
+        parsed = urlparse(tracking_uri)
+        scheme = (parsed.scheme or "").lower()
+        host = parsed.hostname
+        if scheme not in ("http", "https") or not host:
+            return
+
+        port = parsed.port or (443 if scheme == "https" else 80)
+        try:
+            socket.getaddrinfo(host, port, type=socket.SOCK_STREAM)
+        except socket.gaierror as exc:
+            raise RuntimeError(
+                "MLflow tracking URI is not DNS-resolvable from serving replica runtime. "
+                f"source={source}, uri={tracking_uri!r}. "
+                "Set MLFLOW_TRACKING_URI to a reachable MLflow endpoint "
+                "(for example, a public/ngrok URL) for SkyServe replicas."
+            ) from exc
+
+    @classmethod
+    def _resolve_model_tracking_uri(cls, model_cfg: Dict[str, Any]) -> str:
+        configured_uri = cls._require_str(model_cfg, "mlflow_tracking_uri", "kuberay.model")
+        env_override = (os.getenv("MLFLOW_TRACKING_URI") or "").strip()
+
+        if env_override:
+            if env_override != configured_uri:
+                print(
+                    "[config] Overriding kuberay.model.mlflow_tracking_uri "
+                    "with MLFLOW_TRACKING_URI from environment"
+                )
+            selected_uri = env_override
+            source = "MLFLOW_TRACKING_URI"
+        else:
+            selected_uri = configured_uri
+            source = "kuberay.model.mlflow_tracking_uri"
+
+        cls._validate_tracking_uri_reachable(selected_uri, source)
+        return selected_uri
 
     @staticmethod
     def _build_overlay_s3_client() -> tuple[object, Dict[str, Any]]:
@@ -266,7 +308,7 @@ class ConfigLoader:
         )
 
         model = ModelConfig(
-            tracking_uri=cls._require_str(model_cfg, "mlflow_tracking_uri", "kuberay.model"),
+            tracking_uri=cls._resolve_model_tracking_uri(model_cfg),
             registry_name=cls._require_str(model_cfg, "mlflow_registry_model_name", "kuberay.model"),
             default_alias=cls._get_str(serving_cfg, "alias", "champion"),
             dsl_path=dsl_path,

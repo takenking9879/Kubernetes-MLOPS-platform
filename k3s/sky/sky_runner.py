@@ -29,6 +29,7 @@ import hashlib
 import json
 import os
 import re
+import shutil
 import subprocess
 import sys
 import threading
@@ -64,20 +65,38 @@ def _xcom_push(value) -> None:
 
 
 # Hardcoded SkyServe wait log-streaming defaults (live mode only).
-_SERVE_LOG_TAIL_LINES = 150
 _SERVE_LOG_MAX_REPLICAS = 2
 _SERVE_STREAM_LOAD_BALANCER = True
 _SERVE_FALLBACK_REPLICA_IDS = ("1",)
 _ANSI_ESCAPE_RE = re.compile(r"\x1b\[[0-9;]*[A-Za-z]")
+_SKY_CLI_PREFIX: list[str] | None = None
 
 
 def _sky_cli_cmd(*args: str) -> list[str]:
     """Build a Sky CLI command robustly for containerized Airflow tasks.
 
-    Using the module entrypoint avoids PATH/permissions issues with a `sky`
-    wrapper binary that may be absent or non-executable in some images.
+    Prefer an absolute sky binary path to avoid PATH collisions (e.g. k3s/sky
+    directory shadowing) and preserve CLI follow semantics.
     """
-    return [sys.executable, "-m", "sky.cli", *args]
+    global _SKY_CLI_PREFIX
+    if _SKY_CLI_PREFIX is None:
+        venv_sky = Path(sys.executable).with_name("sky")
+        if venv_sky.exists() and os.access(venv_sky, os.X_OK):
+            _SKY_CLI_PREFIX = [str(venv_sky)]
+        else:
+            discovered = shutil.which("sky")
+            if discovered:
+                _SKY_CLI_PREFIX = [discovered]
+            else:
+                _SKY_CLI_PREFIX = [sys.executable, "-m", "sky.cli"]
+                print(
+                    "[serve-live][warn] Could not resolve executable sky binary; "
+                    "falling back to python -m sky.cli."
+                )
+
+        print(f"[serve-live] sky cli invocation: {' '.join(_SKY_CLI_PREFIX)}")
+
+    return [*_SKY_CLI_PREFIX, *args]
 
 
 def _run_cmd_capture(cmd: list[str], timeout_s: int = 25) -> tuple[int, str]:
@@ -161,12 +180,10 @@ class _SkyServeLiveStreamer:
     def __init__(
         self,
         service_name: str,
-        tail_lines: int = 120,
         max_replicas: int = 2,
         include_load_balancer: bool = True,
     ):
         self.service_name = service_name
-        self.tail_lines = max(10, tail_lines)
         self.max_replicas = max(1, max_replicas)
         self.include_load_balancer = include_load_balancer
         self._procs: dict[str, subprocess.Popen[str]] = {}
@@ -225,15 +242,14 @@ class _SkyServeLiveStreamer:
         print(f"[serve-live][{label}] streaming started")
 
     def start_base_streams(self) -> None:
-        base = ["--tail", str(self.tail_lines)]
         self._start_follow(
             "controller",
-            _sky_cli_cmd("serve", "logs", *base, "--controller", self.service_name),
+            _sky_cli_cmd("serve", "logs", "--follow", "--controller", self.service_name),
         )
         if self.include_load_balancer:
             self._start_follow(
                 "load-balancer",
-                _sky_cli_cmd("serve", "logs", *base, "--load-balancer", self.service_name),
+                _sky_cli_cmd("serve", "logs", "--follow", "--load-balancer", self.service_name),
             )
 
     def refresh_replica_streams(self) -> None:
@@ -277,8 +293,7 @@ class _SkyServeLiveStreamer:
                 _sky_cli_cmd(
                     "serve",
                     "logs",
-                    "--tail",
-                    str(self.tail_lines),
+                    "--follow",
                     self.service_name,
                     replica_id,
                 ),
@@ -1191,7 +1206,6 @@ def wait_ray_vllm():
     print(f"Polling sky serve status for Ray+vLLM service '{service_name}' (timeout={timeout}s)")
     live_streamer = _SkyServeLiveStreamer(
         service_name=service_name,
-        tail_lines=_SERVE_LOG_TAIL_LINES,
         max_replicas=_SERVE_LOG_MAX_REPLICAS,
         include_load_balancer=_SERVE_STREAM_LOAD_BALANCER,
     )
@@ -1199,7 +1213,7 @@ def wait_ray_vllm():
     live_streamer.refresh_replica_streams()
     print(
         "[serve-live] streaming controller/replicas"
-        f" (tail={_SERVE_LOG_TAIL_LINES}, replicas={_SERVE_LOG_MAX_REPLICAS},"
+        f" (follow_only=True, replicas={_SERVE_LOG_MAX_REPLICAS},"
         f" load_balancer={_SERVE_STREAM_LOAD_BALANCER})"
     )
 
@@ -1442,6 +1456,7 @@ def launch_tabular_serve():
     target_qps     = int(_env("TARGET_QPS_PER_REPLICA", "10"))
     num_nodes      = int(_env("NUM_NODES", "1"))
     rc             = _rc()
+    mlflow_tracking_uri = _env("MLFLOW_TRACKING_URI").strip()
 
     kind = "tabular_serve_multi" if num_nodes > 1 else "tabular_serve"
     yaml_path = _yaml_path(kind, rc)
@@ -1482,6 +1497,14 @@ def launch_tabular_serve():
         "MODEL_ALIAS":         alias,
         "SERVE_PORT":          str(serve_port),
     }
+    if mlflow_tracking_uri:
+        task_envs["MLFLOW_TRACKING_URI"] = mlflow_tracking_uri
+        print("[serve] MLFLOW_TRACKING_URI override is set for remote replicas")
+    else:
+        print(
+            "[serve][warn] MLFLOW_TRACKING_URI override is empty; "
+            "replicas will use params/config value."
+        )
     task_envs.update(_aws_runtime_envs())
     task.update_envs(task_envs)
 
@@ -1507,7 +1530,6 @@ def wait_tabular_serve():
     print(f"Polling sky serve status for service '{service_name}' (timeout={timeout}s)")
     live_streamer = _SkyServeLiveStreamer(
         service_name=service_name,
-        tail_lines=_SERVE_LOG_TAIL_LINES,
         max_replicas=_SERVE_LOG_MAX_REPLICAS,
         include_load_balancer=_SERVE_STREAM_LOAD_BALANCER,
     )
@@ -1515,7 +1537,7 @@ def wait_tabular_serve():
     live_streamer.refresh_replica_streams()
     print(
         "[serve-live] streaming controller/replicas"
-        f" (tail={_SERVE_LOG_TAIL_LINES}, replicas={_SERVE_LOG_MAX_REPLICAS},"
+        f" (follow_only=True, replicas={_SERVE_LOG_MAX_REPLICAS},"
         f" load_balancer={_SERVE_STREAM_LOAD_BALANCER})"
     )
 

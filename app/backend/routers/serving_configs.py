@@ -212,6 +212,11 @@ async def submit_serving_config(request: ServingConfigRequest):
         or training_params.get("kuberay", {}).get("model", {}).get("mlflow_registry_model_name", "")
         or ""
     )
+    mlflow_tracking_uri = (
+        str((training_params.get("model") or {}).get("mlflow_tracking_uri", "") or "").strip()
+        or str(((training_params.get("kuberay") or {}).get("model") or {}).get("mlflow_tracking_uri", "") or "").strip()
+        or (os.getenv("MLFLOW_TRACKING_URI") or "").strip()
+    )
 
     if not dataset:
         raise HTTPException(
@@ -230,6 +235,7 @@ async def submit_serving_config(request: ServingConfigRequest):
             "dataset": dataset,
             "generated_at": datetime.now(timezone.utc).isoformat(),
         },
+        "mlflow_tracking_uri": mlflow_tracking_uri,
         "lineage": {
             "preprocess_run_id": preprocess_run_id,
             "train_run_id": request.train_run_id,
@@ -317,6 +323,12 @@ async def deploy_serving_config(serve_run_id: str):
 
     deployment_target = serving_block.get("deployment_target", "skypilot")
     skypilot_block = serving_params.get("skypilot_serving", {}) or {}
+    mlflow_tracking_uri = (
+        str(serving_params.get("mlflow_tracking_uri", "") or "").strip()
+        or str((serving_params.get("model") or {}).get("mlflow_tracking_uri", "") or "").strip()
+        or str(((serving_params.get("kuberay") or {}).get("model") or {}).get("mlflow_tracking_uri", "") or "").strip()
+        or (os.getenv("MLFLOW_TRACKING_URI") or "").strip()
+    )
 
     if deployment_target != "skypilot":
         raise HTTPException(
@@ -333,6 +345,7 @@ async def deploy_serving_config(serve_run_id: str):
         "dataset": run_meta.get("dataset", ""),
         "serving_mode": serving_block.get("serving_mode", "ray_only"),
         "registry_model_name": serving_block.get("registry_model_name", ""),
+        "mlflow_tracking_uri": mlflow_tracking_uri,
         "params_serving_s3_path": f"s3://{S3_BUCKET}/{params_s3_key}",
         "raw_schema_s3_path": kafka_block.get("raw_schema_s3_path"),
         "alias": serving_block.get("alias", "champion"),

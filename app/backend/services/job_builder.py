@@ -261,11 +261,13 @@ class JobBuilder:
             "REGISTRY_MODEL_NAME":  config.registry_model_name,
             "MODEL_ALIAS":          config.alias,
             "SERVE_PORT":           str(config.serve_port),
+            "MLFLOW_TRACKING_URI":  _MLFLOW_URI,
         })
 
         dag_conf: dict[str, Any] = {
             "serve_run_id":           config.serve_run_id,
             "registry_model_name":    config.registry_model_name,
+            "mlflow_tracking_uri":    _MLFLOW_URI,
             "alias":                  config.alias,
             "serve_port":             config.serve_port,
             "num_nodes":              config.num_nodes,

@@ -6,6 +6,7 @@ training_pipeline_skypilot pattern. No KubernetesPodOperator tasks are used.
 dag_run.conf keys:
     serve_run_id            : str       - unique serving run ID
     registry_model_name     : str       - MLflow registered model name
+    mlflow_tracking_uri     : str       - optional MLflow URI override for remote serving replicas
     alias                   : str       - model alias (default "champion")
     serve_port              : int       - HTTP port for the serve endpoint (default 8000)
     num_nodes               : int       - nodes per replica (1=single, >1=multi-node Ray)
@@ -85,11 +86,16 @@ def _run_sky_runner(command: str, extra_env: dict[str, str]) -> object:
 
 def _launch_tabular_serve(**context) -> dict:
     conf = context["dag_run"].conf or {}
+    mlflow_tracking_uri = (
+        (conf.get("mlflow_tracking_uri") or "").strip()
+        or (os.getenv("MLFLOW_TRACKING_URI") or "").strip()
+    )
     result = _run_sky_runner(
         "launch-tabular-serve",
         {
             "SERVE_RUN_ID": conf["serve_run_id"],
             "REGISTRY_MODEL_NAME": conf.get("registry_model_name", ""),
+            "MLFLOW_TRACKING_URI": mlflow_tracking_uri,
             "MODEL_ALIAS": conf.get("alias", "champion"),
             "SERVE_PORT": conf.get("serve_port", 8000),
             "NUM_NODES": conf.get("num_nodes", 1),
