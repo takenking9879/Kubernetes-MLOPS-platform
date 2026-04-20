@@ -30,6 +30,7 @@ from __future__ import annotations
 import json
 import os
 import subprocess
+import sys
 import tempfile
 from datetime import datetime, timedelta
 
@@ -39,6 +40,7 @@ from airflow.providers.standard.operators.python import PythonOperator
 # ─── Constants ────────────────────────────────────────────────────────────────
 
 _SKY_PYTHON = os.getenv("SKYPILOT_VENV_PYTHON", "/opt/skypilot-venv/bin/python")
+_AIRFLOW_PYTHON = os.getenv("AIRFLOW_PYTHON", sys.executable)
 _SKY_RUNNER_SCRIPT = os.getenv(
     "SKY_RUNNER_SCRIPT", "/opt/airflow/dags/repo/k3s/sky/sky_runner.py"
 )
@@ -51,7 +53,11 @@ S3_BUCKET = os.getenv("S3_BUCKET", "k8s-mlops-platform-bucket")
 
 # ─── Helpers ──────────────────────────────────────────────────────────────────
 
-def _run_sky_runner(command: str, extra_env: dict[str, str]) -> object:
+def _run_sky_runner(
+    command: str,
+    extra_env: dict[str, str],
+    python_bin: str | None = None,
+) -> object:
     """Execute sky_runner.py via subprocess and return its XCom payload."""
     fd, xcom_path = tempfile.mkstemp(prefix=f"sky_runner_{command}_", suffix=".json")
     os.close(fd)
@@ -74,7 +80,8 @@ def _run_sky_runner(command: str, extra_env: dict[str, str]) -> object:
     )
     env.update({k: str(v) for k, v in extra_env.items() if v is not None})
 
-    cmd = [_SKY_PYTHON, "-u", _SKY_RUNNER_SCRIPT, command]
+    runner_python = python_bin or _SKY_PYTHON
+    cmd = [runner_python, "-u", _SKY_RUNNER_SCRIPT, command]
     subprocess.run(cmd, check=True, env=env)
 
     if not os.path.exists(xcom_path):
@@ -145,6 +152,7 @@ def _register_endpoint(**context) -> None:
             "ORCHESTRATION": "tabular_serving_skypilot",
             "S3_BUCKET": S3_BUCKET,
         },
+        python_bin=_AIRFLOW_PYTHON,
     )
 
 
