@@ -23,6 +23,7 @@ import {
   getTuneSettingsMeta, getSearchSpace, getNonTunableKeys, getFinalTrainMeta,
 } from '../../../types/hyperparams';
 import { parseFiniteNumber, parseStringChip, stringifyNumberValue } from '../../../lib/formValues';
+import { GPUCatalogPanel } from '../../GPUCatalogPanel';
 
 interface Props {
   nodeId: string;
@@ -548,6 +549,13 @@ export function TrainingInspector({ nodeId, data }: Props) {
           )}
         </div>
       )}
+
+      {/* GPU Catalog panel — floats left of inspector when Resources open */}
+      <GPUCatalogPanel
+        open={showResources}
+        selectedGpuType={data.resourceConstraints.gpu_types?.[0] ?? null}
+        onSelect={(gpuType) => set({ resourceConstraints: { ...data.resourceConstraints, gpu_types: [gpuType] } })}
+      />
 
       {/* ══════════════════════════════════════════════════
           Resources (collapsible)

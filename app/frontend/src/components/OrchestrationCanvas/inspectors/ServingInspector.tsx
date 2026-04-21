@@ -7,6 +7,7 @@ import {
 import { StatusLED } from '../../../design/components/StatusLED';
 import { SectionTitle } from '../../../design/components/SectionTitle';
 import { GPUResourceSelector } from '../../GPUResourceSelector';
+import { GPUCatalogPanel } from '../../GPUCatalogPanel';
 import { submitServingConfig, type ResourceConstraints } from '../../../api/platformClient';
 
 interface Props {
@@ -27,6 +28,7 @@ export function ServingInspector({ nodeId, data }: Props) {
   const [creating, setCreating]       = useState(false);
   const [showController, setShowController] = useState(false);
   const [showScaling, setShowScaling]       = useState(false);
+  const [showServingGpu, setShowServingGpu] = useState(false);
 
   const set = (patch: Partial<ServingOrchNodeData>) =>
     updateNodeData(nodeId, (prev) => ({ ...prev, ...patch } as ServingOrchNodeData));
@@ -232,13 +234,29 @@ export function ServingInspector({ nodeId, data }: Props) {
             ))}
           </div>
 
-          {/* Serving GPU resources */}
-          <div className="space-y-1">
-            <p className={SUB_HEADING}>Serving GPU Resources</p>
-            <GPUResourceSelector
-              value={data.servingResourceConstraints as ResourceConstraints}
-              onChange={(rc) => set({ servingResourceConstraints: rc })}
-            />
+          {/* GPU Catalog panel — floats left of inspector when GPU section open */}
+          <GPUCatalogPanel
+            open={showServingGpu}
+            selectedGpuType={data.servingResourceConstraints.gpu_types?.[0] ?? null}
+            onSelect={(gpuType) => set({ servingResourceConstraints: { ...data.servingResourceConstraints, gpu_types: [gpuType] } })}
+          />
+
+          {/* Serving GPU resources (collapsible) */}
+          <div className="rounded border border-slate-700/60">
+            <button type="button"
+              className="flex w-full items-center justify-between px-3 py-2 text-[10px] font-semibold uppercase tracking-wider text-slate-400 hover:bg-slate-800/40"
+              onClick={() => setShowServingGpu((v) => !v)}>
+              <span>Serving GPU Resources</span>
+              <span>{showServingGpu ? '▲' : '▼'}</span>
+            </button>
+            {showServingGpu && (
+              <div className="border-t border-slate-700/60 p-3">
+                <GPUResourceSelector
+                  value={data.servingResourceConstraints as ResourceConstraints}
+                  onChange={(rc) => set({ servingResourceConstraints: rc })}
+                />
+              </div>
+            )}
           </div>
 
           {/* SkyServe Controller (collapsible) */}

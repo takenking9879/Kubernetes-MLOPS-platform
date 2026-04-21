@@ -22,16 +22,15 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { ChevronDown, ChevronUp, Zap, Plus, Trash2, ArrowUp, ArrowDown } from 'lucide-react';
 import {
   getRunpodSupportedRegions,
-  queryGPUCatalog,
   queryRunpodRegionAvailability,
   selectGPUResources,
-  type GPUOffer,
   type GPUSelectResult,
   type ResourceConstraints,
   type GPUFallbackEntry,
   type RunPodRegionOption,
   type RunPodRegionAvailability,
 } from '../api/platformClient';
+import { useGpuCatalogStore } from '../store/gpuCatalogStore';
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -80,7 +79,10 @@ interface Props {
 
 export function GPUResourceSelector({ value, onChange, disabled }: Props) {
   const [open, setOpen] = useState(false);
-  const [catalog, setCatalog] = useState<GPUOffer[]>([]);
+  const catalog        = useGpuCatalogStore((s) => s.catalog);
+  const catalogLoading = useGpuCatalogStore((s) => s.loading);
+  const refreshCatalog = useGpuCatalogStore((s) => s.refreshIfStale);
+  void catalogLoading; // available for future loading indicator if needed
   const [selectResult, setSelectResult] = useState<GPUSelectResult | null>(null);
   const [runpodRegions, setRunpodRegions] = useState<RunPodRegionOption[]>([]);
   const [runpodAvailability, setRunpodAvailability] = useState<RunPodRegionAvailability[]>([]);
@@ -117,13 +119,10 @@ export function GPUResourceSelector({ value, onChange, disabled }: Props) {
     [value.gpu_fallbacks, set],
   );
 
-  // Fetch catalog once on open (auto mode only)
+  // Trigger catalog refresh on open (stale-while-revalidate via shared store)
   useEffect(() => {
-    if (!open || mode !== 'auto' || catalog.length > 0) return;
-    queryGPUCatalog({ providers: (value.providers ?? ['runpod']).join(',') })
-      .then(setCatalog)
-      .catch(() => {/* silent — catalog unavailable */});
-  }, [open, mode]); // eslint-disable-line react-hooks/exhaustive-deps
+    if (open) refreshCatalog();
+  }, [open, refreshCatalog]);
 
   useEffect(() => {
     if (!open) return;
@@ -807,112 +806,135 @@ export function GPUResourceSelector({ value, onChange, disabled }: Props) {
 
                 return (
                   <div
-                  key={idx}
-                  className={`flex items-center gap-2 rounded border px-2 py-1.5 ${
-                    idx === 0
-                      ? 'border-blue-700/60 bg-blue-950/20'
-                      : 'border-slate-700 bg-slate-800/40'
-                  }`}
-                >
-                  {/* Priority badge */}
-                  <span
-                    className={`w-5 shrink-0 text-center text-[10px] font-bold ${
-                      idx === 0 ? 'text-blue-400' : 'text-slate-600'
+                    key={idx}
+                    className={`flex flex-col gap-1.5 rounded border px-2 py-2 ${
+                      idx === 0
+                        ? 'border-blue-700/60 bg-blue-950/20'
+                        : 'border-slate-700 bg-slate-800/40'
                     }`}
                   >
-                    {idx + 1}
-                  </span>
+                    {/* ── Row 1: priority + infra + region ── */}
+                    <div className="flex items-center gap-1.5">
+                      {/* Priority badge */}
+                      <span
+                        className={`w-5 shrink-0 text-center text-[10px] font-bold ${
+                          idx === 0 ? 'text-blue-400' : 'text-slate-600'
+                        }`}
+                      >
+                        {idx + 1}
+                      </span>
 
-                  {/* Cloud / infra */}
-                  <select
-                    className="w-24 shrink-0 rounded bg-slate-800 px-1.5 py-1 text-xs text-slate-100 outline-none focus:ring-1 focus:ring-blue-500"
-                    value={provider}
-                    onChange={(e) => {
-                      const provider = e.target.value;
-                      updateFallback(idx, { infra: provider });
-                    }}
-                  >
-                    {INFRA_OPTIONS.map(({ id, label }) => (
-                      <option key={id} value={id}>{label}</option>
-                    ))}
-                  </select>
+                      {/* Cloud / infra */}
+                      <select
+                        className="w-24 shrink-0 rounded bg-slate-800 px-1.5 py-1 text-xs text-slate-100 outline-none focus:ring-1 focus:ring-blue-500"
+                        value={provider}
+                        onChange={(e) => updateFallback(idx, { infra: e.target.value })}
+                      >
+                        {INFRA_OPTIONS.map(({ id, label }) => (
+                          <option key={id} value={id}>{label}</option>
+                        ))}
+                      </select>
 
-                  {provider === 'runpod' && (
-                    <select
-                      className="w-36 shrink-0 rounded bg-slate-800 px-1.5 py-1 text-xs text-slate-100 outline-none focus:ring-1 focus:ring-blue-500"
-                      value={entry.infra.startsWith('runpod/') ? entry.infra : 'runpod'}
-                      onChange={(e) => updateFallback(idx, { infra: e.target.value })}
-                      title="RunPod region"
-                    >
-                      <option value="runpod">Any RunPod region</option>
-                      {isLoadingRegions && (
-                        <option value="" disabled>Checking live availability...</option>
+                      {provider === 'runpod' && (
+                        <select
+                          className="min-w-0 flex-1 rounded bg-slate-800 px-1.5 py-1 text-xs text-slate-100 outline-none focus:ring-1 focus:ring-blue-500"
+                          value={entry.infra.startsWith('runpod/') ? entry.infra : 'runpod'}
+                          onChange={(e) => updateFallback(idx, { infra: e.target.value })}
+                          title="RunPod region"
+                        >
+                          <option value="runpod">Any RunPod region</option>
+                          {isLoadingRegions && (
+                            <option value="" disabled>Checking live availability…</option>
+                          )}
+                          {!isLoadingRegions && rowGpuType && rowRunpodRegions.length === 0 && (
+                            <option value="" disabled>No regions currently available</option>
+                          )}
+                          {rowRunpodRegions.map((r) => (
+                            <option key={r.provider_region_id} value={r.skypilot_infra}>
+                              {r.provider_region_id}
+                            </option>
+                          ))}
+                        </select>
                       )}
-                      {!isLoadingRegions && rowGpuType && rowRunpodRegions.length === 0 && (
-                        <option value="" disabled>No regions currently available</option>
-                      )}
-                      {rowRunpodRegions.map((r) => (
-                        <option key={r.provider_region_id} value={r.skypilot_infra}>
-                          {r.provider_region_id}
-                        </option>
-                      ))}
-                    </select>
-                  )}
+                    </div>
 
-                  {/* Accelerator spec */}
-                  <input
-                    type="text"
-                    className="min-w-0 flex-1 rounded bg-slate-800 px-1.5 py-1 text-xs text-slate-100 outline-none focus:ring-1 focus:ring-blue-500"
-                    value={entry.accelerators}
-                    placeholder="A100-80GB:1"
-                    onChange={(e) => updateFallback(idx, { accelerators: e.target.value })}
-                  />
+                    {/* ── Row 2: GPU type + count + spot + reorder + delete ── */}
+                    <div className="flex items-center gap-1.5">
+                      {/* GPU type select */}
+                      <select
+                        className="min-w-0 flex-1 rounded bg-slate-800 px-1.5 py-1 text-xs text-slate-100 outline-none focus:ring-1 focus:ring-blue-500"
+                        value={parseAcceleratorGpuType(entry.accelerators) || ''}
+                        onChange={(e) => {
+                          const count = entry.accelerators.split(':')[1] ?? '1';
+                          updateFallback(idx, { accelerators: `${e.target.value}:${count}` });
+                        }}
+                      >
+                        <option value="">— select GPU —</option>
+                        {gpuTypes.map((g) => (
+                          <option key={g} value={g}>{g}</option>
+                        ))}
+                      </select>
 
-                  {/* Spot toggle */}
-                  <button
-                    type="button"
-                    onClick={() => updateFallback(idx, { use_spot: !entry.use_spot })}
-                    className={`shrink-0 rounded px-2 py-0.5 text-[10px] font-medium transition-colors ${
-                      entry.use_spot
-                        ? 'bg-yellow-800/60 text-yellow-300 hover:bg-yellow-700/60'
-                        : 'bg-slate-700 text-slate-400 hover:bg-slate-600'
-                    }`}
-                    title="Toggle spot / on-demand"
-                  >
-                    {entry.use_spot ? 'spot' : 'on-dem'}
-                  </button>
+                      {/* GPU count */}
+                      <select
+                        className="w-12 shrink-0 rounded bg-slate-800 px-1 py-1 text-xs text-slate-100 outline-none focus:ring-1 focus:ring-blue-500"
+                        value={entry.accelerators.split(':')[1] ?? '1'}
+                        onChange={(e) => {
+                          const gpuType = parseAcceleratorGpuType(entry.accelerators);
+                          updateFallback(idx, { accelerators: `${gpuType}:${e.target.value}` });
+                        }}
+                      >
+                        {['1','2','4','8'].map((n) => (
+                          <option key={n} value={n}>×{n}</option>
+                        ))}
+                      </select>
 
-                  {/* Reorder arrows */}
-                  <div className="flex shrink-0 flex-col">
-                    <button
-                      type="button"
-                      onClick={() => moveFallback(idx, -1)}
-                      disabled={idx === 0}
-                      className="text-slate-500 hover:text-slate-300 disabled:opacity-25"
-                      title="Move up (higher priority)"
-                    >
-                      <ArrowUp size={10} />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => moveFallback(idx, 1)}
-                      disabled={idx === fallbacks.length - 1}
-                      className="text-slate-500 hover:text-slate-300 disabled:opacity-25"
-                      title="Move down (lower priority)"
-                    >
-                      <ArrowDown size={10} />
-                    </button>
-                  </div>
+                      {/* Spot toggle */}
+                      <button
+                        type="button"
+                        onClick={() => updateFallback(idx, { use_spot: !entry.use_spot })}
+                        className={`shrink-0 rounded px-2 py-0.5 text-[10px] font-medium transition-colors ${
+                          entry.use_spot
+                            ? 'bg-yellow-800/60 text-yellow-300 hover:bg-yellow-700/60'
+                            : 'bg-slate-700 text-slate-400 hover:bg-slate-600'
+                        }`}
+                        title="Toggle spot / on-demand"
+                      >
+                        {entry.use_spot ? 'spot' : 'on-dem'}
+                      </button>
 
-                  {/* Remove */}
-                  <button
-                    type="button"
-                    onClick={() => removeFallback(idx)}
-                    className="shrink-0 text-slate-600 hover:text-red-400 transition-colors"
-                    title="Remove this option"
-                  >
-                    <Trash2 size={12} />
-                  </button>
+                      {/* Reorder arrows */}
+                      <div className="flex shrink-0 flex-col">
+                        <button
+                          type="button"
+                          onClick={() => moveFallback(idx, -1)}
+                          disabled={idx === 0}
+                          className="text-slate-500 hover:text-slate-300 disabled:opacity-25"
+                          title="Move up (higher priority)"
+                        >
+                          <ArrowUp size={10} />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => moveFallback(idx, 1)}
+                          disabled={idx === fallbacks.length - 1}
+                          className="text-slate-500 hover:text-slate-300 disabled:opacity-25"
+                          title="Move down (lower priority)"
+                        >
+                          <ArrowDown size={10} />
+                        </button>
+                      </div>
+
+                      {/* Remove */}
+                      <button
+                        type="button"
+                        onClick={() => removeFallback(idx)}
+                        className="shrink-0 text-slate-600 hover:text-red-400 transition-colors"
+                        title="Remove this option"
+                      >
+                        <Trash2 size={12} />
+                      </button>
+                    </div>
                   </div>
                 );
               })}
