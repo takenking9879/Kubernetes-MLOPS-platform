@@ -4,10 +4,10 @@
  */
 
 export const INPUT_CLS =
-  'rounded border border-cyan-500/20 bg-brand-panel px-2 py-1 text-xs text-cyan-100 outline-none focus:ring-1 focus:ring-cyan-500/50 focus:border-cyan-500/50 w-full placeholder-slate-600';
+  'rounded border border-cyan-500/20 bg-brand-panel px-2 py-1 text-sm text-cyan-100 outline-none focus:ring-1 focus:ring-cyan-500/50 focus:border-cyan-500/50 w-full placeholder-slate-600';
 
 export const SELECT_CLS =
-  'rounded border border-cyan-500/20 bg-brand-panel px-2 py-1 text-xs text-cyan-100 outline-none focus:ring-1 focus:ring-cyan-500/50 w-full';
+  'rounded border border-cyan-500/20 bg-brand-panel px-2 py-1 text-sm text-cyan-100 outline-none focus:ring-1 focus:ring-cyan-500/50 w-full';
 
 export const BTN_NEUTRAL =
   'rounded border border-slate-700/60 bg-slate-800/40 px-2 py-1 text-xs text-slate-300 hover:border-cyan-500/30 hover:text-cyan-300 transition-colors disabled:opacity-40';

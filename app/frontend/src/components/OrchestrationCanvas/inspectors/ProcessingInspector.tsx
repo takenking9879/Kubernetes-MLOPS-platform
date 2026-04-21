@@ -20,6 +20,12 @@ import type { FullFieldEntry } from '../../../lib/schemaYaml';
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/;
 
+const DEFAULT_SPLITS = {
+  train: { start: '2026-01-01 00:30:00', end: '2026-01-01 13:00:00' },
+  val:   { start: '2026-01-01 13:00:00', end: '2026-01-02 05:40:00' },
+  test:  { start: '2026-01-02 07:00:00', end: '2026-01-03 03:50:00' },
+};
+
 // ─── DateTime segmented input ─────────────────────────────────────────────────
 
 const SEG_WIDTHS = ['w-11', 'w-7', 'w-7', 'w-7', 'w-7', 'w-7'] as const;
@@ -35,14 +41,24 @@ function buildDtString(parts: string[]): string {
   return `${parts[0]}-${parts[1]}-${parts[2]} ${parts[3]}:${parts[4]}:${parts[5]}`;
 }
 
+/**
+ * Segmented datetime input — YYYY-MM-DD HH:MM:SS.
+ * Each segment is independently editable via typing or arrow keys.
+ * Local state buffers in-progress edits so partial typing works;
+ * commits to parent on blur or when a segment reaches its max length.
+ */
 function DateTimeSegInput({ value, onChange }: { value: string; onChange: (v: string) => void }) {
-  const parts = parseDtParts(value);
+  const [localParts, setLocalParts] = useState<string[] | null>(null);
   const inputRefs = useRef<Array<HTMLInputElement | null>>(Array(6).fill(null));
 
-  const commit = (idx: number, raw: string) => {
-    const cleaned = raw.replace(/\D/g, '').padStart(SEG_MAX[idx]!, '0').slice(-(SEG_MAX[idx]!));
-    const next = [...parts];
-    next[idx] = cleaned;
+  const committed = parseDtParts(value);
+  const parts = localParts ?? committed;
+
+  const commitBlur = (idx: number, raw: string) => {
+    const padded = raw.replace(/\D/g, '').padStart(SEG_MAX[idx]!, '0').slice(-(SEG_MAX[idx]!));
+    const next = [...(localParts ?? committed)];
+    next[idx] = padded;
+    setLocalParts(null);
     onChange(buildDtString(next));
   };
 
@@ -62,24 +78,34 @@ function DateTimeSegInput({ value, onChange }: { value: string; onChange: (v: st
             value={p}
             placeholder={SEG_HINTS[idx]}
             title={SEG_HINTS[idx]}
-            onFocus={(e) => e.target.select()}
+            onFocus={(e) => {
+              setLocalParts(parseDtParts(value));
+              e.target.select();
+            }}
             onChange={(e) => {
               const raw = e.target.value.replace(/\D/g, '').slice(0, SEG_MAX[idx]);
-              const next = [...parts];
+              const next = [...(localParts ?? committed)];
               next[idx] = raw;
-              onChange(buildDtString(next));
+              // Auto-advance + commit when segment is full
               if (raw.length === SEG_MAX[idx] && idx < 5) {
-                inputRefs.current[idx + 1]?.focus();
-                inputRefs.current[idx + 1]?.select();
+                setLocalParts(null);
+                onChange(buildDtString(next));
+                setTimeout(() => {
+                  inputRefs.current[idx + 1]?.focus();
+                  inputRefs.current[idx + 1]?.select();
+                }, 0);
+              } else {
+                setLocalParts([...next]);
               }
             }}
-            onBlur={(e) => commit(idx, e.target.value)}
+            onBlur={(e) => commitBlur(idx, e.target.value)}
             onKeyDown={(e) => {
               if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
                 e.preventDefault();
                 const curr = parseInt(p, 10) || 0;
                 const next = [...parts];
                 next[idx] = String(Math.max(0, curr + (e.key === 'ArrowUp' ? 1 : -1))).padStart(SEG_MAX[idx]!, '0');
+                setLocalParts(null);
                 onChange(buildDtString(next));
               }
             }}
@@ -329,10 +355,18 @@ export function ProcessingInspector({ nodeId, data }: Props) {
 
       {/* ── Temporal Splits ── */}
       <div className="space-y-2">
-        <p className={SUB_HEADING}>Temporal Splits</p>
+        <div className="flex items-center justify-between">
+          <p className={SUB_HEADING}>Temporal Splits</p>
+          <button
+            className="flex items-center gap-1 rounded border border-slate-700/50 bg-slate-800/60 px-1.5 py-0.5 text-[9px] text-slate-500 transition-colors hover:border-cyan-500/30 hover:text-cyan-400"
+            title="Reset to default splits"
+            onClick={() => set({ splits: DEFAULT_SPLITS })}
+          >
+            <RefreshCw size={9} /> reset
+          </button>
+        </div>
         <p className={HELP}>
-          Click each segment to edit. <span className={META}>↑↓ arrows</span> nudge values.
-          Ranges must not overlap.
+          Type or use <span className={META}>↑↓ arrows</span>. Ranges must not overlap.
         </p>
 
         {(['train', 'val', 'test'] as SplitKey[]).map((split) => (

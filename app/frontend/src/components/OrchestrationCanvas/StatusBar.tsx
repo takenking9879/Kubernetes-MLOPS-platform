@@ -12,8 +12,8 @@ export function StatusBar() {
       style={{ borderBottom: 'none', borderLeft: 'none', borderRight: 'none' }}
     >
       <span className="text-[9px] font-bold uppercase tracking-widest text-slate-700 mr-2 shrink-0">Pipeline</span>
-      {nodes.map((n) => (
-        <span key={n.id} className="flex items-center gap-1.5 shrink-0">
+      {nodes.map((n, index) => (
+        <span key={`${n.id}-${index}`} className="flex items-center gap-1.5 shrink-0">
           <StatusLED status={n.data.status} size="sm" label={n.data.label || n.data.nodeKind} />
         </span>
       ))}

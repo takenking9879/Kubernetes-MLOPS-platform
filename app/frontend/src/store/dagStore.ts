@@ -67,11 +67,21 @@ async function pollUntilDone(
   return 'error';
 }
 
-// ─── ID counter ───────────────────────────────────────────────────────────────
+// ─── ID helper ───────────────────────────────────────────────────────────────
 
-let _idCounter = 1;
-function nextId(kind: string) {
-  return `${kind}-${_idCounter++}`;
+function nextId(kind: string, existingIds: string[]) {
+  const prefix = `${kind}-`;
+  let maxSuffix = 0;
+
+  for (const id of existingIds) {
+    if (!id.startsWith(prefix)) continue;
+    const suffix = Number(id.slice(prefix.length));
+    if (Number.isFinite(suffix) && suffix > maxSuffix) {
+      maxSuffix = suffix;
+    }
+  }
+
+  return `${kind}-${maxSuffix + 1}`;
 }
 
 // ─── State shape ──────────────────────────────────────────────────────────────
@@ -146,7 +156,7 @@ export const useDagStore = create<DagState>()(
         ...INITIAL_STATE,
 
         addNode: (kind, position = { x: 200, y: 200 }) => {
-          const id = nextId(kind);
+          const id = nextId(kind, get().nodes.map((n) => n.id));
           let data: OrchestrationNodeData;
           switch (kind) {
             case 'dataset':    data = makeDatasetNodeData();    break;
