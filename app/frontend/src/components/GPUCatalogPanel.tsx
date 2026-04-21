@@ -193,6 +193,11 @@ export function GPUCatalogPanel({ open, selectedGpuTypes, onSelect }: Props) {
   const [activeProviders, setActiveProviders] = useState<string[]>(ALL_PROVIDERS);
   const [sortMode, setSortMode]         = useState<SortMode>('spot');
   const [showSave, setShowSave]         = useState(false);
+  const [filtersOpen, setFiltersOpen]   = useState(false);
+  const [onlyAvailable, setOnlyAvailable] = useState(false);
+  const [minVram, setMinVram]           = useState(0);
+  const [maxSpot, setMaxSpot]           = useState('');
+  const [maxOd, setMaxOd]               = useState('');
 
   useEffect(() => {
     if (open) refreshIfStale();
@@ -214,17 +219,27 @@ export function GPUCatalogPanel({ open, selectedGpuTypes, onSelect }: Props) {
     }));
   }, [catalog]);
 
+  const maxSpotNum = maxSpot !== '' ? parseFloat(maxSpot) : null;
+  const maxOdNum   = maxOd   !== '' ? parseFloat(maxOd)   : null;
+  const activeFilterCount = (onlyAvailable ? 1 : 0) + (minVram > 0 ? 1 : 0) + (maxSpotNum !== null ? 1 : 0) + (maxOdNum !== null ? 1 : 0);
+
   const rows = useMemo(() => {
     const base = catalog.length > 0 ? aggregateCatalog(catalog) : STATIC_ROWS;
+    const spotBudget  = maxSpot !== '' ? parseFloat(maxSpot) : null;
+    const odBudget    = maxOd   !== '' ? parseFloat(maxOd)   : null;
     const filtered = base.filter((r) => {
       const providerKey = r.provider.toLowerCase();
       const normalized = providerKey === 'vast.ai' ? 'vast' : providerKey;
       if (!activeProviders.some((p) => normalized.startsWith(p))) return false;
+      if (onlyAvailable && !r.anyAvailable) return false;
+      if (minVram > 0 && r.vramGb < minVram) return false;
+      if (spotBudget !== null && !isNaN(spotBudget) && (r.spotMin === null || r.spotMin > spotBudget)) return false;
+      if (odBudget   !== null && !isNaN(odBudget)   && (r.ondemandMin === null || r.ondemandMin > odBudget)) return false;
       if (query.trim()) return r.gpuType.toLowerCase().includes(query.trim().toLowerCase());
       return true;
     });
     return sortRows(filtered, sortMode);
-  }, [catalog, activeProviders, query, sortMode]);
+  }, [catalog, activeProviders, onlyAvailable, minVram, maxSpot, maxOd, query, sortMode]);
 
   if (!open) return null;
 
@@ -324,6 +339,105 @@ export function GPUCatalogPanel({ open, selectedGpuTypes, onSelect }: Props) {
             {m === 'spot' ? 'Spot ↑' : m === 'od' ? 'OD ↑' : 'Save ↓'}
           </button>
         ))}
+      </div>
+
+      {/* ── Filters collapsible ────────────────────────────────────────────── */}
+      <div className="shrink-0" style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
+        <button
+          type="button"
+          onClick={() => setFiltersOpen((v) => !v)}
+          className="flex w-full items-center gap-2 px-3 py-1.5 text-[10px] text-slate-500 hover:text-slate-300 transition-colors"
+        >
+          <span className="font-semibold uppercase tracking-wider">Filters</span>
+          {activeFilterCount > 0 && (
+            <span className="rounded-full bg-cyan-500/20 px-1.5 py-px text-[9px] font-bold text-cyan-300"
+              style={{ boxShadow: '0 0 6px rgba(6,182,212,0.4)' }}>
+              {activeFilterCount}
+            </span>
+          )}
+          <span className="ml-auto">{filtersOpen ? '▲' : '▼'}</span>
+        </button>
+
+        {filtersOpen && (
+          <div className="flex flex-col gap-2 px-3 pb-2.5 pt-1">
+            {/* Row 1: Available toggle + VRAM */}
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setOnlyAvailable((v) => !v)}
+                className={`flex items-center gap-1.5 rounded border px-2 py-1 text-[10px] font-semibold transition-all ${
+                  onlyAvailable
+                    ? 'border-emerald-500/50 bg-emerald-500/10 text-emerald-300 shadow-[0_0_6px_rgba(52,211,153,0.3)]'
+                    : 'border-slate-700/60 text-slate-500 hover:text-slate-300'
+                }`}
+              >
+                <span
+                  className={`inline-block h-1.5 w-1.5 rounded-full ${onlyAvailable ? 'bg-emerald-400' : 'bg-slate-600'}`}
+                  style={onlyAvailable ? { boxShadow: '0 0 4px rgba(52,211,153,0.8)' } : undefined}
+                />
+                Available only
+              </button>
+
+              <div className="flex flex-1 items-center gap-1.5">
+                <span className="shrink-0 text-[9px] font-semibold uppercase tracking-wider text-slate-600">VRAM ≥</span>
+                <select
+                  value={minVram}
+                  onChange={(e) => setMinVram(Number(e.target.value))}
+                  className="flex-1 rounded border border-slate-700/60 bg-slate-900/80 px-1.5 py-1 text-[10px] text-slate-200 outline-none focus:border-cyan-500/40"
+                >
+                  {[0, 8, 12, 16, 24, 32, 40, 48, 80].map((v) => (
+                    <option key={v} value={v}>{v === 0 ? 'Any' : `${v} GB`}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            {/* Row 2: Spot budget + OD budget */}
+            <div className="flex items-center gap-2">
+              <div className="flex flex-1 items-center gap-1.5">
+                <span className="shrink-0 text-[9px] font-semibold uppercase tracking-wider text-slate-600">Spot ≤</span>
+                <div className="relative flex-1">
+                  <span className="absolute left-2 top-1/2 -translate-y-1/2 text-[10px] text-slate-500">$</span>
+                  <input
+                    type="number"
+                    value={maxSpot}
+                    onChange={(e) => setMaxSpot(e.target.value)}
+                    placeholder="∞"
+                    min={0}
+                    step={0.01}
+                    className="w-full rounded border border-slate-700/60 bg-slate-900/80 py-1 pl-4 pr-2 text-[10px] text-slate-200 outline-none placeholder:text-slate-700 focus:border-cyan-500/40"
+                  />
+                </div>
+              </div>
+
+              <div className="flex flex-1 items-center gap-1.5">
+                <span className="shrink-0 text-[9px] font-semibold uppercase tracking-wider text-slate-600">OD ≤</span>
+                <div className="relative flex-1">
+                  <span className="absolute left-2 top-1/2 -translate-y-1/2 text-[10px] text-slate-500">$</span>
+                  <input
+                    type="number"
+                    value={maxOd}
+                    onChange={(e) => setMaxOd(e.target.value)}
+                    placeholder="∞"
+                    min={0}
+                    step={0.01}
+                    className="w-full rounded border border-slate-700/60 bg-slate-900/80 py-1 pl-4 pr-2 text-[10px] text-slate-200 outline-none placeholder:text-slate-700 focus:border-cyan-500/40"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {activeFilterCount > 0 && (
+              <button
+                type="button"
+                onClick={() => { setOnlyAvailable(false); setMinVram(0); setMaxSpot(''); setMaxOd(''); }}
+                className="self-start text-[9px] text-slate-600 hover:text-red-400 transition-colors"
+              >
+                ✕ Clear all filters
+              </button>
+            )}
+          </div>
+        )}
       </div>
 
       {/* ── Search ─────────────────────────────────────────────────────────── */}
