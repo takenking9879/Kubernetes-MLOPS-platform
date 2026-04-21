@@ -26,9 +26,13 @@ const DEFAULT_SPLITS = {
   test:  { start: '2026-01-02 07:00:00', end: '2026-01-03 03:50:00' },
 };
 
+const SECTION = 'rounded border border-slate-700/60';
+const SEC_HDR = 'flex w-full items-center justify-between px-3 py-2 text-xs font-semibold uppercase tracking-wider text-slate-300 hover:bg-slate-800/30';
+const SEC_BODY = 'space-y-3 border-t border-slate-700/60 p-3';
+
 // ─── DateTime segmented input ─────────────────────────────────────────────────
 
-const SEG_WIDTHS = ['w-11', 'w-7', 'w-7', 'w-7', 'w-7', 'w-7'] as const;
+const SEG_WIDTHS = ['w-12', 'w-8', 'w-8', 'w-8', 'w-8', 'w-8'] as const;
 const SEG_MAX    = [4, 2, 2, 2, 2, 2] as const;
 const SEG_HINTS  = ['YYYY', 'MM', 'DD', 'HH', 'MM', 'SS'] as const;
 
@@ -63,12 +67,12 @@ function DateTimeSegInput({ value, onChange }: { value: string; onChange: (v: st
   };
 
   return (
-    <div className="flex items-center gap-0.5 font-mono text-xs">
+    <div className="flex items-center gap-0.5 font-mono text-sm">
       {parts.map((p, idx) => (
         <span key={idx} className="flex items-center gap-0.5">
-          {idx === 3 && <span className="mx-1 select-none text-slate-700">·</span>}
+          {idx === 3 && <span className="mx-1 select-none text-slate-600">·</span>}
           {idx > 0 && idx !== 3 && (
-            <span className="select-none text-slate-700">{idx < 3 ? '-' : ':'}</span>
+            <span className="select-none text-slate-600">{idx < 3 ? '-' : ':'}</span>
           )}
           <input
             ref={(el) => { inputRefs.current[idx] = el; }}
@@ -109,7 +113,7 @@ function DateTimeSegInput({ value, onChange }: { value: string; onChange: (v: st
                 onChange(buildDtString(next));
               }
             }}
-            className={`${SEG_WIDTHS[idx]} rounded border border-slate-700/50 bg-slate-800 px-1 py-0.5 text-center text-cyan-200 transition-colors focus:border-cyan-500/60 focus:bg-slate-700 focus:outline-none`}
+            className={`${SEG_WIDTHS[idx]} rounded border border-slate-700/50 bg-slate-800 px-1.5 py-1 text-center text-cyan-200 transition-colors focus:border-cyan-500/60 focus:bg-slate-700 focus:outline-none`}
           />
         </span>
       ))}
@@ -153,8 +157,8 @@ function SplitTimeline({ splits }: { splits: SplitConfig }) {
   const span = tMin !== null && tMax !== null ? tMax - tMin : null;
 
   return (
-    <div className="rounded border border-slate-800/60 bg-[#03060a]/60 p-2.5 space-y-2">
-      <p className="text-xs uppercase tracking-wider text-slate-400">Split coverage</p>
+    <div className="rounded border border-slate-800/60 bg-[#03060a]/60 p-3 space-y-3">
+      <p className="text-sm font-semibold uppercase tracking-wider text-slate-300">Split coverage</p>
 
       {/* Proportional timeline bar */}
       {span && span > 0 && tMin !== null && (
@@ -182,15 +186,16 @@ function SplitTimeline({ splits }: { splits: SplitConfig }) {
           const gap  = next && d.end !== null && next.start !== null ? next.start - d.end : null;
           return (
             <div key={d.key}>
-              <div className="flex items-center gap-2">
-                <div className={`h-2 w-2 flex-shrink-0 rounded-sm ${d.bar} opacity-80`} />
-                <span className={`w-10 ${LBL}`}>{d.label}</span>
-                <span className={`text-[10px] font-mono ${d.dur !== null && d.dur > 0 ? d.text : 'text-slate-700'}`}>
+              <div className="flex items-center gap-2.5">
+                <div className={`h-2.5 w-2.5 flex-shrink-0 rounded-sm ${d.bar} opacity-80`} />
+                <span className={`w-12 ${LBL}`}>{d.label}</span>
+                <div className="h-px flex-1 bg-slate-800/80" />
+                <span className={`text-sm font-mono font-semibold ${d.dur !== null && d.dur > 0 ? d.text : 'text-slate-700'}`}>
                   {d.dur !== null && d.dur > 0 ? fmtDuration(d.dur) : '—'}
                 </span>
               </div>
               {gap !== null && (
-                <div className={`ml-4 mt-0.5 text-xs ${gap < 0 ? 'text-red-400' : 'text-slate-300'}`}>
+                <div className={`ml-5 mt-1 text-sm ${gap < 0 ? 'text-red-400' : 'text-slate-300'}`}>
                   {gap < 0
                     ? `⚠ overlaps ${fmtDuration(gap)}`
                     : `↕ gap ${fmtDuration(gap)}`}
@@ -248,6 +253,7 @@ export function ProcessingInspector({ nodeId, data }: Props) {
 
   // Schema section
   const [schemaOpen, setSchemaOpen]     = useState(false);
+  const [showTemporalSplits, setShowTemporalSplits] = useState(true);
   const [fullFields, setFullFields]     = useState<FullFieldEntry[]>([]);
   const [isSavingSchema, setIsSavingSchema] = useState(false);
   const [schemaResult, setSchemaResult] = useState<SchemaUploadSingleResult | null>(null);
@@ -354,46 +360,56 @@ export function ProcessingInspector({ nodeId, data }: Props) {
       </div>
 
       {/* ── Temporal Splits ── */}
-      <div className="space-y-2">
-        <div className="flex items-center justify-between">
-          <p className={SUB_HEADING}>Temporal Splits</p>
-          <button
-            className="flex items-center gap-1 rounded border border-slate-700/50 bg-slate-800/60 px-1.5 py-0.5 text-[9px] text-slate-500 transition-colors hover:border-cyan-500/30 hover:text-cyan-400"
-            title="Reset to default splits"
-            onClick={() => set({ splits: DEFAULT_SPLITS })}
-          >
-            <RefreshCw size={9} /> reset
-          </button>
-        </div>
-        <p className={HELP}>
-          Type or use <span className={META}>↑↓ arrows</span>. Ranges must not overlap.
-        </p>
-
-        {(['train', 'val', 'test'] as SplitKey[]).map((split) => (
-          <div key={split} className="rounded border border-slate-800/60 p-2 space-y-1.5">
-            <p className={`${LBL} uppercase tracking-wide`}>
-              {SPLIT_LABEL[split]}
-            </p>
-            <div className="flex flex-col gap-1">
-              <div className="flex items-center gap-1.5">
-                <span className={`w-10 ${LBL}`}>Start</span>
-                <DateTimeSegInput
-                  value={data.splits[split].start}
-                  onChange={(v) => setSplit(split, 'start', v)}
-                />
-              </div>
-              <div className="flex items-center gap-1.5">
-                <span className={`w-10 ${LBL}`}>End</span>
-                <DateTimeSegInput
-                  value={data.splits[split].end}
-                  onChange={(v) => setSplit(split, 'end', v)}
-                />
-              </div>
+      <div className={SECTION}>
+        <button type="button" className={SEC_HDR} onClick={() => setShowTemporalSplits((v) => !v)}>
+          <span className="flex items-center gap-2">
+            <span>Temporal Splits</span>
+            {!showTemporalSplits && <span className="rounded bg-slate-800 px-1.5 py-0.5 text-xs font-normal normal-case tracking-normal text-slate-400">collapsed</span>}
+          </span>
+          <span>{showTemporalSplits ? '▲' : '▼'}</span>
+        </button>
+        {showTemporalSplits && (
+          <div className={SEC_BODY}>
+            <div className="flex items-center justify-between gap-2">
+              <p className={HELP}>
+                Type or use <span className={META}>↑↓ arrows</span>. Ranges must not overlap.
+              </p>
+              <button
+                className="flex items-center gap-1 rounded border border-slate-700/50 bg-slate-800/70 px-2 py-1 text-xs text-slate-400 transition-colors hover:border-cyan-500/30 hover:text-cyan-300"
+                title="Reset to default splits"
+                onClick={() => set({ splits: { train: { ...DEFAULT_SPLITS.train }, val: { ...DEFAULT_SPLITS.val }, test: { ...DEFAULT_SPLITS.test } } })}
+              >
+                <RefreshCw size={10} /> reset
+              </button>
             </div>
-          </div>
-        ))}
 
-        <SplitTimeline splits={data.splits} />
+            {(['train', 'val', 'test'] as SplitKey[]).map((split) => (
+              <div key={split} className="rounded border border-slate-800/60 p-3 space-y-2">
+                <p className={`${LBL} uppercase tracking-wide`}>
+                  {SPLIT_LABEL[split]}
+                </p>
+                <div className="flex flex-col gap-1.5">
+                  <div className="flex items-center gap-2">
+                    <span className={`w-12 ${LBL}`}>Start</span>
+                    <DateTimeSegInput
+                      value={data.splits[split].start}
+                      onChange={(v) => setSplit(split, 'start', v)}
+                    />
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className={`w-12 ${LBL}`}>End</span>
+                    <DateTimeSegInput
+                      value={data.splits[split].end}
+                      onChange={(v) => setSplit(split, 'end', v)}
+                    />
+                  </div>
+                </div>
+              </div>
+            ))}
+
+            <SplitTimeline splits={data.splits} />
+          </div>
+        )}
       </div>
 
       {/* ── Preprocessed run ID (read-only, propagated) ── */}
@@ -446,7 +462,7 @@ export function ProcessingInspector({ nodeId, data }: Props) {
           <span className="flex items-center gap-2">
             Input Schema (full.yaml)
             {schemaResult && (
-              <span className="rounded bg-emerald-900/40 px-1.5 py-0.5 text-[9px] font-bold text-emerald-400 ring-1 ring-emerald-700/40">
+              <span className="rounded bg-emerald-900/40 px-1.5 py-0.5 text-xs font-bold text-emerald-400 ring-1 ring-emerald-700/40">
                 Saved v{schemaResult.version}
               </span>
             )}
