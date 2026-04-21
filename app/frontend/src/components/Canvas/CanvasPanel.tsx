@@ -248,10 +248,10 @@ export function CanvasPanel() {
   return (
     <div ref={reactFlowWrapper} className="relative h-full w-full">
       <div className="pointer-events-none absolute z-10 ml-2 mt-2 flex gap-2">
-        <span className={`rounded px-2 py-1 text-[10px] ${datasetOk ? 'bg-emerald-900/70 text-emerald-300' : 'bg-slate-800 text-slate-300'}`}>
+        <span className={`rounded px-2 py-1 text-[10px] border ${datasetOk ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-300' : 'border-slate-700/40 bg-brand-panel text-slate-400'}`}>
           Dataset {datasetOk ? '✓' : 'required'}
         </span>
-        <span className={`rounded px-2 py-1 text-[10px] ${finalOk ? 'bg-red-900/70 text-red-300' : 'bg-slate-800 text-slate-300'}`}>
+        <span className={`rounded px-2 py-1 text-[10px] border ${finalOk ? 'border-orange-500/30 bg-orange-500/10 text-orange-300' : 'border-slate-700/40 bg-brand-panel text-slate-400'}`}>
           Final Features {finalOk ? '✓' : 'required'}
         </span>
       </div>
@@ -272,17 +272,16 @@ export function CanvasPanel() {
         proOptions={{ hideAttribution: true }}
         className="bg-canvas-bg"
       >
-        <Background color="#1e293b" gap={20} size={1} />
-        <Controls className="!bg-slate-800 !border-slate-700 [&>button]:!bg-slate-800 [&>button]:!border-slate-700 [&>button]:!text-slate-300" />
+        <Background color="#0e1f2e" gap={24} size={1} />
+        <Controls />
         <MiniMap
           nodeColor={(node) => {
             const d = node.data as NodeData;
             if (d.type === 'dataset') return '#10b981';
-            if ('stageType' in d && d.stageType === 'estimator') return '#8b5cf6';
-            if ('stageType' in d) return '#3b82f6';
-            return '#ef4444';
+            if ('stageType' in d && d.stageType === 'estimator') return '#a78bfa';
+            if ('stageType' in d) return '#22d3ee';
+            return '#f97316';
           }}
-          className="!bg-slate-900 !border-slate-700"
         />
       </ReactFlow>
     </div>

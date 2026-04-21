@@ -11,87 +11,70 @@ function StageNodeInner({ data, id, selected }: NodeProps<StageNodeData>) {
 
   const def = getNodeDefinition(data.type);
   const isEstimator = data.stageType === 'estimator';
-  const accentColor = isEstimator ? 'purple' : 'blue';
 
   // Check if this node has validation errors
   const hasError = validationResult?.errors.some((e) => e.nodeId === id) ?? false;
   const inputModes = incomingEdges.map((edge) => edge.selector.type);
   const uniqueInputModes = Array.from(new Set(inputModes));
 
-  const borderClass = hasError
-    ? 'border-red-500 ring-2 ring-red-500/30'
+  const glowClass = hasError
+    ? 'neon-border-red'
     : selected
-      ? `border-${accentColor}-400 ring-2 ring-${accentColor}-400/30`
-      : `border-${accentColor}-600/50`;
+      ? 'neon-selected-cyan'
+      : isEstimator ? 'neon-border-purple' : 'neon-border-cyan';
+
+  const headerBg = isEstimator ? 'rgba(167,139,250,0.08)' : 'rgba(34,211,238,0.06)';
+  const dotColor = isEstimator ? 'bg-purple-400' : 'bg-cyan-400';
+  const labelColor = isEstimator ? 'text-purple-300' : 'text-cyan-300';
+  const handleBorder = isEstimator ? '!border-purple-500' : '!border-cyan-500';
 
   return (
     <div
       onClick={() => selectNode(id)}
-      className={`min-w-[170px] rounded-lg border-2 bg-slate-900 shadow-lg ${borderClass}`}
+      className={`min-w-[170px] rounded-xl transition-all ${glowClass}`}
+      style={{ background: '#03060a' }}
     >
       {/* Input handle */}
       <div className="relative">
         <Handle
           type="target"
           position={Position.Top}
-          className={`!h-3 !w-3 !border-2 !bg-slate-900 ${
-            isEstimator ? '!border-purple-500' : '!border-blue-500'
-          }`}
+          className={`!h-3 !w-3 !border-2 !bg-brand-surface ${handleBorder}`}
         />
-        <span className="absolute -top-4 left-1/2 -translate-x-1/2 text-[8px] text-slate-500">
-          Input
-        </span>
+        <span className="absolute -top-4 left-1/2 -translate-x-1/2 text-[8px] text-slate-600 uppercase tracking-wide">in</span>
       </div>
 
       {/* Header */}
-      <div
-        className={`flex items-center gap-2 rounded-t-md px-3 py-2 ${
-          isEstimator ? 'bg-purple-600/20' : 'bg-blue-600/20'
-        }`}
-      >
-        <div
-          className={`h-2.5 w-2.5 rounded-full ${
-            isEstimator ? 'bg-purple-400' : 'bg-blue-400'
-          }`}
-        />
-        <span
-          className={`text-xs font-semibold uppercase tracking-wider ${
-            isEstimator ? 'text-purple-300' : 'text-blue-300'
-          }`}
-        >
+      <div className="flex items-center gap-2 rounded-t-xl px-3 py-2" style={{ background: headerBg }}>
+        <div className={`h-2 w-2 rounded-full ${dotColor}`} />
+        <span className={`text-[10px] font-bold uppercase tracking-widest ${labelColor}`}>
           {isEstimator ? 'Estimator' : 'Transformer'}
         </span>
       </div>
 
       {/* Body */}
       <div className="px-3 py-2">
-        <p className="text-sm font-medium text-slate-200">{data.label}</p>
+        <p className="text-sm font-medium text-slate-100">{data.label}</p>
         <p className="mt-0.5 text-[10px] text-slate-500">{def.description}</p>
 
-        {/* Inputs/Outputs summary */}
         <div className="mt-2 flex gap-3 text-[10px]">
-          <span className="text-slate-400">
-            in: {data.resolvedInputs.length}
-          </span>
-          <span className="text-slate-400">
-            out: {data.resolvedOutputs.length}
-          </span>
+          <span className="text-slate-500">in: {data.resolvedInputs.length}</span>
+          <span className="text-slate-500">out: {data.resolvedOutputs.length}</span>
         </div>
 
-        {/* Compilation state + Input Mode on same row */}
         <div className="mt-1 flex items-center justify-between gap-1 text-[10px]">
-          <span className={`rounded px-1.5 py-0.5 ${
+          <span className={`rounded border px-1.5 py-0.5 ${
             data.compilation.status === 'compiled'
-              ? 'bg-emerald-900/40 text-emerald-400'
+              ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-400'
               : data.compilation.status === 'error'
-                ? 'bg-red-900/40 text-red-400'
-                : 'bg-slate-800 text-slate-500'
+                ? 'border-red-500/30 bg-red-500/10 text-red-400'
+                : 'border-slate-700/40 bg-brand-panel text-slate-500'
           }`}>
             {data.compilation.status}
           </span>
           <div className="flex gap-1">
             {uniqueInputModes.map((mode) => (
-              <span key={mode} className="rounded bg-slate-800 px-1.5 py-0.5 text-slate-300">
+              <span key={mode} className="rounded border border-cyan-500/20 bg-brand-panel px-1.5 py-0.5 text-cyan-400/70">
                 {mode}
               </span>
             ))}
@@ -104,13 +87,9 @@ function StageNodeInner({ data, id, selected }: NodeProps<StageNodeData>) {
         <Handle
           type="source"
           position={Position.Bottom}
-          className={`!h-3 !w-3 !border-2 !bg-slate-900 ${
-            isEstimator ? '!border-purple-500' : '!border-blue-500'
-          }`}
+          className={`!h-3 !w-3 !border-2 !bg-brand-surface ${handleBorder}`}
         />
-        <span className="absolute -bottom-4 left-1/2 -translate-x-1/2 text-[8px] text-slate-500">
-          Output
-        </span>
+        <span className="absolute -bottom-4 left-1/2 -translate-x-1/2 text-[8px] text-slate-600 uppercase tracking-wide">out</span>
       </div>
     </div>
   );

@@ -1,36 +1,24 @@
 import { useRef } from 'react';
 import { ReactFlowProvider } from 'reactflow';
-import { MainLayout } from './components/Layout/MainLayout';
-import { DatasetPage } from './pages/DatasetPage';
-import { ProcessingPage } from './pages/ProcessingPage';
-import { LaunchWizardPage } from './pages/LaunchWizardPage';
-import { useDatasetStore } from './store/datasetStore';
-import { usePipelineStore } from './store/pipelineStore';
-import { useUIStore, type Page } from './store/uiStore';
-
-const TAB_LABELS: Record<Page, string> = {
-  'datasets':    'Datasets',
-  'dsl-builder': 'DSL Builder',
-  'processing':  'Processing',
-  'launch':      'Launch',
-};
+import { MainLayout }              from './components/Layout/MainLayout';
+import { OrchestrationCanvasPage } from './pages/OrchestrationCanvasPage';
+import { usePipelineStore }        from './store/pipelineStore';
+import { useUIStore }              from './store/uiStore';
 
 export default function App() {
   const { page, setPage } = useUIStore();
-  const { activeDataset } = useDatasetStore();
-  
-  // YAML Actions (lifting logic for visibility)
-  const exportYAML = usePipelineStore((s) => s.exportYAML);
-  const importYAML = usePipelineStore((s) => s.importYAML);
+
+  const exportYAML  = usePipelineStore((s) => s.exportYAML);
+  const importYAML  = usePipelineStore((s) => s.importYAML);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleExport = () => {
     const yaml = exportYAML();
     if (!yaml) return;
     const blob = new Blob([yaml], { type: 'text/yaml' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement('a');
+    a.href     = url;
     a.download = 'pipeline.yaml';
     a.click();
     URL.revokeObjectURL(url);
@@ -49,78 +37,55 @@ export default function App() {
   };
 
   return (
-    <div className="flex h-screen flex-col bg-slate-950 text-slate-100">
-      {/* ── Top navigation ── */}
-      <nav className="flex shrink-0 items-center border-b border-slate-700 bg-slate-900 px-4 py-1.5 shadow-md">
-        <div className="flex items-center gap-1">
-          {(Object.entries(TAB_LABELS) as [Page, string][]).map(([id, label]) => (
-            <button
-              key={id}
-              onClick={() => setPage(id)}
-              className={`rounded px-3 py-1.5 text-sm font-semibold transition-all ${
-                page === id
-                  ? 'bg-slate-700 text-white shadow-inner'
-                  : 'text-slate-400 hover:bg-slate-800 hover:text-slate-200'
-              }`}
-            >
-              {label}
-            </button>
-          ))}
+    <div className="flex h-screen flex-col overflow-hidden text-slate-100" style={{ background: '#03060a' }}>
+      {/* ── Orchestration canvas (default) ── */}
+      {page === 'canvas' && (
+        <div className="flex-1 min-h-0 overflow-hidden">
+          <OrchestrationCanvasPage />
         </div>
+      )}
 
-        {/* Global Pipeline Actions (Visible when in DSL Builder) */}
-        {page === 'dsl-builder' && (
-          <div className="ml-6 flex items-center gap-2 border-l border-slate-700 pl-6">
+      {/* ── DSL Builder ── */}
+      {page === 'dsl-builder' && (
+        <div className="flex-1 min-h-0 overflow-hidden flex flex-col">
+          {/* Minimal DSL nav bar */}
+          <nav
+            className="flex shrink-0 items-center gap-2 px-4 py-1.5 glass-panel"
+            style={{ borderTop: 'none', borderLeft: 'none', borderRight: 'none' }}
+          >
             <button
-              onClick={handleExport}
-              className="rounded bg-emerald-600 px-2.5 py-1 text-[11px] font-bold text-white hover:bg-emerald-500 transition-colors"
+              onClick={() => setPage('canvas')}
+              className="rounded border border-cyan-500/30 bg-cyan-500/10 px-2 py-1 text-[10px] font-bold text-cyan-300 hover:bg-cyan-500/20 transition-colors"
             >
-              Export YAML
+              ← Pipeline Canvas
             </button>
-            <button
-              onClick={() => fileInputRef.current?.click()}
-              className="rounded bg-amber-600 px-2.5 py-1 text-[11px] font-bold text-white hover:bg-amber-500 transition-colors"
-            >
-              Import YAML
-            </button>
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept=".yaml,.yml"
-              className="hidden"
-              onChange={handleImport}
-            />
-          </div>
-        )}
-
-        {activeDataset && (
-          <div className="ml-auto flex items-center gap-2">
-            <span className="rounded bg-blue-900/40 px-2 py-0.5 text-[10px] font-bold text-blue-300 ring-1 ring-blue-700/50">
-              dataset: {activeDataset}
+            <span className="text-[10px] font-bold text-cyan-400/60 uppercase tracking-widest ml-1">
+              DSL Builder
             </span>
-          </div>
-        )}
-      </nav>
+            <div className="ml-auto flex items-center gap-2">
+              <button
+                onClick={handleExport}
+                className="rounded border border-emerald-500/30 bg-emerald-500/10 px-2 py-1 text-[10px] font-bold text-emerald-300 hover:bg-emerald-500/20 transition-colors"
+              >
+                Export YAML
+              </button>
+              <button
+                onClick={() => fileInputRef.current?.click()}
+                className="rounded border border-orange-500/30 bg-orange-500/10 px-2 py-1 text-[10px] font-bold text-orange-300 hover:bg-orange-500/20 transition-colors"
+              >
+                Import YAML
+              </button>
+              <input ref={fileInputRef} type="file" accept=".yaml,.yml" className="hidden" onChange={handleImport} />
+            </div>
+          </nav>
 
-      {/* ── Page content ── */}
-      <div
-        className={`flex-1 min-h-0 ${page === 'dsl-builder' ? 'overflow-hidden' : 'overflow-y-auto'}`}
-      >
-        {page === 'datasets' && <DatasetPage />}
-
-        {/* ReactFlowProvider only wraps the DSL Builder */}
-        {page === 'dsl-builder' && (
-          <div className="h-full min-h-0">
+          <div className="flex-1 min-h-0">
             <ReactFlowProvider>
               <MainLayout />
             </ReactFlowProvider>
           </div>
-        )}
-
-        {page === 'processing' && <ProcessingPage />}
-
-        {page === 'launch' && <LaunchWizardPage />}
-      </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -42,10 +42,10 @@ export function Header() {
   };
 
   return (
-    <header className="flex h-10 shrink-0 items-center justify-between border-b border-slate-800 bg-slate-900 px-4 shadow-sm">
+    <header className="flex h-10 shrink-0 items-center justify-between px-4 glass-panel" style={{ borderTop: 'none', borderLeft: 'none', borderRight: 'none' }}>
       {/* Title */}
       <div className="flex items-center gap-3">
-        <h1 className="text-xs font-bold text-slate-400 uppercase tracking-wider">Feature Designer</h1>
+        <h1 className="text-xs font-bold text-cyan-400/80 uppercase tracking-widest">Feature Designer</h1>
         {validationResult && (
           <div className="flex items-center gap-2">
             <span
@@ -79,14 +79,14 @@ export function Header() {
       {/* Dataset badge + S3 save */}
       <div className="flex items-center gap-2">
         {activeDataset && (
-          <span className="rounded bg-blue-900/50 px-2 py-0.5 text-[10px] font-bold text-blue-300 ring-1 ring-blue-700/30">
+          <span className="rounded border border-cyan-500/30 bg-cyan-500/10 px-2 py-0.5 text-[10px] font-bold text-cyan-300">
             {activeDataset}
           </span>
         )}
         <button
           onClick={() => { void handleSaveDSLToS3(); }}
           disabled={isSavingDSL}
-          className="rounded border border-indigo-500/30 bg-indigo-600/20 px-2 py-0.5 text-[10px] font-bold text-indigo-300 hover:bg-indigo-600/40 disabled:opacity-40"
+          className="rounded border border-cyan-500/30 bg-cyan-500/10 px-2 py-0.5 text-[10px] font-bold text-cyan-300 hover:bg-cyan-500/20 transition-colors disabled:opacity-40"
         >
           {isSavingDSL ? 'Saving…' : 'Save to S3'}
         </button>
@@ -126,7 +126,7 @@ export function Header() {
             addNode(datasetNode);
             setTimeout(() => selectNode(id), 50);
           }}
-          className="rounded-md bg-slate-800 px-2 py-1 text-[10px] font-bold text-slate-300 hover:bg-slate-700"
+          className="rounded border border-emerald-500/30 bg-emerald-500/10 px-2 py-1 text-[10px] font-bold text-emerald-300 hover:bg-emerald-500/20 transition-colors"
         >
           + DATASET
         </button>
@@ -134,17 +134,15 @@ export function Header() {
         <button
           onClick={() => validate()}
           disabled={isValidating}
-          className="rounded-md bg-slate-800 px-2 py-1 text-[10px] font-bold text-slate-300 hover:bg-slate-700 disabled:opacity-40"
+          className="rounded border border-cyan-500/30 bg-cyan-500/10 px-2 py-1 text-[10px] font-bold text-cyan-300 hover:bg-cyan-500/20 transition-colors disabled:opacity-40"
         >
           {isValidating ? '...' : 'VALIDATE'}
         </button>
 
-        
-
         <button
           onClick={() => { dryRun().catch(() => {}); }}
           disabled={isDryRunning}
-          className="rounded-md bg-blue-700 px-2 py-1 text-[10px] font-bold text-white hover:bg-blue-600 disabled:opacity-40"
+          className="rounded border border-orange-500/30 bg-orange-500/10 px-2 py-1 text-[10px] font-bold text-orange-300 hover:bg-orange-500/20 transition-colors disabled:opacity-40"
         >
           {isDryRunning ? '...' : 'DRY-RUN'}
         </button>

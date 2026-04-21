@@ -7,22 +7,31 @@ A SaaS MLOps orchestrator for multi-cloud GPU compute. Users upload datasets, bu
 
 | Layer | Path | Role |
 |-------|------|------|
-| Frontend | `app/frontend/` | React SPA — 6 pages, Zustand state, REST calls to backend |
+| Frontend | `app/frontend/` | React SPA — ZENTHROSML CANVAS DAG UI, 2 pages, Zustand state, REST calls to backend |
 | Backend | `app/backend/` | FastAPI — 10 routers, triggers Airflow + writes to S3/Iceberg |
 | Core logic | `src/` | DSL pipelines, serving runtime, GPU catalog, training pipeline |
 | Orchestration | `k3s/` | Airflow DAGs, SkyPilot YAMLs, Spark/KubeRay manifests |
 | Data producer | `producer/` | Synthetic Kafka traffic generator for testing |
 
-## 6 Frontend Pages
+## Frontend Pages (post-ZENTHROSML CANVAS redesign)
 
-| Page | Tab | Purpose |
-|------|-----|---------|
-| DatasetPage | datasets | Upload parquets → ingest to Iceberg |
-| DSL Builder | dsl-builder | Visual pipeline editor (ReactFlow) |
-| ProcessingPage | processing | Run Spark preprocessing DSL |
-| RunPage | run-pipeline | Train model (XGBoost / PyTorch) |
-| ServingPage | serving | Deploy to Ray Serve or vLLM |
-| LaunchWizardPage | launch | Unified GPU job wizard (tabular / LLM) |
+| Page | Route | Purpose |
+|------|-------|---------|
+| OrchestrationCanvasPage | `canvas` (default) | Visual DAG pipeline editor — node-based orchestration with right-panel inspector |
+| DSL Builder (MainLayout) | `dsl-builder` | Feature engineering pipeline editor (ReactFlow + pipelineStore) |
+
+The canvas has 4 active node types: Dataset, Processing, Training, Serving.  
+Legacy pages (DatasetPage, ProcessingPage, LaunchWizardPage) are removed from top-nav; their logic is embedded in node inspectors.  
+See `context/dag_multi_input_future.md` for planned future nodes.
+
+## Frontend State Stores
+
+| Store | File | Scope |
+|-------|------|-------|
+| `uiStore` | `src/store/uiStore.ts` | Active page (`canvas` or `dsl-builder`) |
+| `dagStore` | `src/store/dagStore.ts` | Orchestration DAG nodes, edges, artifact propagation, run execution |
+| `pipelineStore` | `src/store/pipelineStore.ts` | DSL Builder node graph, validation, dry-run |
+| `datasetStore` | `src/store/datasetStore.ts` | Active dataset for DSL Builder |
 
 ## 10 Backend Routers
 

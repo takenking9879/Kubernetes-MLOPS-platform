@@ -66,10 +66,7 @@ const DEFAULT_FALLBACK: GPUFallbackEntry = {
   use_spot: true,
 };
 
-const INPUT_CLS =
-  'rounded bg-slate-800 px-2 py-1 text-xs text-slate-100 outline-none focus:ring-1 focus:ring-blue-500 w-full';
-const SELECT_CLS =
-  'rounded bg-slate-800 px-2 py-1 text-xs text-slate-100 outline-none focus:ring-1 focus:ring-blue-500 w-full';
+import { INPUT_CLS, SELECT_CLS } from '../lib/uiTokens';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -371,7 +368,14 @@ export function GPUResourceSelector({ value, onChange, disabled }: Props) {
 
   // ── Derived (auto mode) ───────────────────────────────────────────────────
 
-  const gpuTypes = Array.from(new Set(catalog.map((o) => o.gpu_type))).sort();
+  const STATIC_GPU_TYPES = [
+    'A100-80GB', 'A100-40GB', 'H100', 'H100-80GB',
+    'RTX-4090', 'RTX-3090', 'RTX-3080',
+    'A10G', 'A10', 'A30', 'V100', 'V100-32GB', 'L4', 'L40',
+  ];
+  const gpuTypes = catalog.length > 0
+    ? Array.from(new Set(catalog.map((o) => o.gpu_type))).sort()
+    : STATIC_GPU_TYPES;
   const runpodRegionSet = new Set(runpodRegions.map((r) => r.provider_region_id.toUpperCase()));
   const selectedRunpodRegions = (value.preferred_regions ?? [])
     .map((r) => r.toUpperCase())

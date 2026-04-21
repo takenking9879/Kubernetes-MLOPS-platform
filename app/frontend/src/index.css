@@ -4,27 +4,106 @@
 
 @layer base {
   body {
-    @apply bg-slate-950 text-slate-100 antialiased;
+    background-color: #03060a;
+    @apply text-slate-100 antialiased;
+  }
+
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(34,211,238,0.4) transparent;
+  }
+  *::-webkit-scrollbar {
+    width: 4px;
+    height: 4px;
+  }
+  *::-webkit-scrollbar-track { background: transparent; }
+  *::-webkit-scrollbar-thumb {
+    background: rgba(34,211,238,0.35);
+    border-radius: 4px;
+  }
+  *::-webkit-scrollbar-thumb:hover {
+    background: rgba(34,211,238,0.6);
   }
 }
 
 @layer components {
   .input-field {
-    @apply w-full rounded-md border border-slate-700 bg-slate-800 px-2 py-1.5
-           text-xs text-slate-200 placeholder-slate-500
-           focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500;
+    @apply w-full rounded-md border border-cyan-500/20 bg-brand-panel px-2 py-1.5
+           text-xs text-cyan-100 placeholder-slate-600
+           focus:border-cyan-500/60 focus:outline-none focus:ring-1 focus:ring-cyan-500/40;
   }
 }
 
-/* React Flow overrides for dark theme */
+/* LED pulse animation */
+@keyframes led-pulse {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.55; }
+}
+.led-pulse {
+  animation: led-pulse 2s ease-in-out infinite;
+}
+
+/* Fiber optic flow animation on edges */
+@keyframes flow-dash {
+  to { stroke-dashoffset: -20; }
+}
+.edge-flow {
+  stroke-dasharray: 6 4;
+  animation: flow-dash 1.2s linear infinite;
+}
+
+/* React Flow overrides — ZENTHROSML */
 .react-flow__node {
   cursor: default;
 }
 
 .react-flow__edge-path {
-  stroke: #475569;
+  stroke: rgba(34,211,238,0.6);
+  filter: drop-shadow(0 0 3px rgba(34,211,238,0.4));
 }
 
 .react-flow__minimap {
-  background-color: #0f172a;
+  background-color: #03060a;
+  border: 1px solid rgba(34,211,238,0.15);
+}
+
+.react-flow__controls {
+  background: #060d14;
+  border: 1px solid rgba(34,211,238,0.15);
+}
+.react-flow__controls button {
+  background: #060d14;
+  border-color: rgba(34,211,238,0.15);
+  color: #67e8f9;
+}
+.react-flow__controls button:hover {
+  background: rgba(34,211,238,0.08);
+}
+
+/* Glass panel utility */
+.glass-panel {
+  background: rgba(6,13,20,0.7);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(34,211,238,0.15);
+}
+
+/* Neon border glow classes */
+.neon-border-cyan    { border: 1px solid rgba(34,211,238,0.35);  box-shadow: 0 0 12px rgba(34,211,238,0.2); }
+.neon-border-orange  { border: 1px solid rgba(249,115,22,0.35);  box-shadow: 0 0 12px rgba(249,115,22,0.2); }
+.neon-border-emerald { border: 1px solid rgba(16,185,129,0.35);  box-shadow: 0 0 12px rgba(16,185,129,0.2); }
+.neon-border-purple  { border: 1px solid rgba(167,139,250,0.35); box-shadow: 0 0 12px rgba(167,139,250,0.2); }
+.neon-border-red     { border: 1px solid rgba(248,113,113,0.35); box-shadow: 0 0 12px rgba(248,113,113,0.2); }
+
+/* Active node / selected state */
+.neon-selected-cyan {
+  border: 1.5px solid rgba(34,211,238,0.7);
+  box-shadow: 0 0 20px rgba(34,211,238,0.35), inset 0 0 20px rgba(34,211,238,0.04);
+}
+
+/* Light filament divider */
+.filament-divider {
+  border: none;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(34,211,238,0.25), transparent);
+  box-shadow: 0 0 6px rgba(34,211,238,0.15);
 }

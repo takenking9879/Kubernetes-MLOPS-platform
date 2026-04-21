@@ -81,20 +81,13 @@ import { GPUPricingPanel } from '../components/GPUPricingPanel';
 import { ChipInput } from '../components/forms/ChipInput';
 import { NumericInput } from '../components/forms/NumericInput';
 import { parseFiniteNumber, parseInteger, parseStringChip, stringifyNumberValue } from '../lib/formValues';
+import { INPUT_CLS, SELECT_CLS, BTN_PRIMARY, BTN_NEUTRAL as BTN_SECONDARY } from '../lib/uiTokens';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-const LABEL_CLS = 'text-[10px] font-semibold uppercase tracking-wider text-slate-500';
-const INPUT_CLS =
-  'rounded bg-slate-800 px-2 py-1 text-xs text-slate-100 outline-none focus:ring-1 focus:ring-blue-500 w-full';
-const SELECT_CLS =
-  'rounded bg-slate-800 px-2 py-1 text-xs text-slate-100 outline-none focus:ring-1 focus:ring-blue-500 w-full';
-const BTN_PRIMARY =
-  'rounded bg-blue-600 px-4 py-1.5 text-xs font-semibold text-white hover:bg-blue-500 transition-colors disabled:opacity-40';
-const BTN_SECONDARY =
-  'rounded bg-slate-700 px-4 py-1.5 text-xs font-semibold text-slate-300 hover:bg-slate-600 transition-colors';
-const BTN_TOGGLE_ON  = 'rounded px-3 py-1 text-xs font-medium bg-blue-600 text-white transition-colors';
-const BTN_TOGGLE_OFF = 'rounded px-3 py-1 text-xs font-medium bg-slate-700 text-slate-400 hover:bg-slate-600 transition-colors';
+const LABEL_CLS    = 'text-[10px] font-semibold uppercase tracking-wider text-cyan-500/60';
+const BTN_TOGGLE_ON  = 'rounded border border-cyan-500/40 bg-cyan-500/15 px-3 py-1 text-xs font-medium text-cyan-300 transition-colors';
+const BTN_TOGGLE_OFF = 'rounded border border-slate-700/40 bg-brand-panel px-3 py-1 text-xs font-medium text-slate-500 hover:border-cyan-500/20 hover:text-slate-300 transition-colors';
 
 const STEPS = ['Model', 'Resources', 'Review', 'Launch'];
 
