@@ -23,3 +23,12 @@ export const BTN_SUCCESS =
 
 export const SUB_HEADING =
   'text-xs font-semibold text-cyan-500/70 uppercase tracking-wider';
+
+export const INSPECTOR_LABEL_CLS =
+  'text-sm font-medium text-slate-200';
+
+export const INSPECTOR_HELP_CLS =
+  'text-sm leading-5 text-slate-300';
+
+export const INSPECTOR_META_CLS =
+  'text-xs text-slate-400';

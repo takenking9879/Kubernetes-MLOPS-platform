@@ -8,6 +8,7 @@ import { useDagStore } from '../../../store/dagStore';
 import type { TrainingOrchNodeData } from '../../../types/dag';
 import {
   INPUT_CLS, SELECT_CLS, BTN_PRIMARY, BTN_NEUTRAL, BTN_SUCCESS, SUB_HEADING,
+  INSPECTOR_HELP_CLS, INSPECTOR_LABEL_CLS, INSPECTOR_META_CLS,
 } from '../../../lib/uiTokens';
 import { StatusLED } from '../../../design/components/StatusLED';
 import { SectionTitle } from '../../../design/components/SectionTitle';
@@ -15,8 +16,8 @@ import { GPUResourceSelector } from '../../GPUResourceSelector';
 import { ChipInput } from '../../forms/ChipInput';
 import { NumericInput } from '../../forms/NumericInput';
 import {
-  getLLMCatalog, listArchitectures, uploadArchitecture,
-  type LLMModelInfo, type ArchitectureInfo, type ResourceConstraints,
+  getLLMCatalog, listArchitectures, listTrainingRunIds, uploadArchitecture,
+  type LLMModelInfo, type ArchitectureInfo, type ResourceConstraints, type TrainingRunId,
 } from '../../../api/platformClient';
 import {
   getDefaultsForTask, getTuneSettingsDefaults, getParamMetaForTask,
@@ -36,7 +37,9 @@ const BTN_OFF = 'rounded border border-slate-700/40 bg-brand-panel px-2.5 py-0.5
 const SECTION = 'rounded border border-slate-700/60';
 const SEC_HDR = 'flex w-full items-center justify-between px-3 py-2 text-[10px] font-semibold uppercase tracking-wider text-slate-400 hover:bg-slate-800/30';
 const SEC_BODY = 'flex flex-col gap-3 border-t border-slate-700/60 p-3';
-const LBL = 'text-[10px] text-slate-500';
+const LBL = INSPECTOR_LABEL_CLS;
+const HELP = INSPECTOR_HELP_CLS;
+const META = INSPECTOR_META_CLS;
 
 export function TrainingInspector({ nodeId, data }: Props) {
   const updateNodeData = useDagStore((s) => s.updateNodeData);
@@ -44,8 +47,9 @@ export function TrainingInspector({ nodeId, data }: Props) {
   const runUpTo        = useDagStore((s) => s.runUpTo);
   const assignRunId    = useDagStore((s) => s.assignRunId);
 
-  const [loading, setLoading]         = useState(false);
-  const [assignInput, setAssignInput] = useState('');
+  const [loading, setLoading]           = useState(false);
+  const [trainRunIds, setTrainRunIds]   = useState<TrainingRunId[]>([]);
+  const [selectedTrainId, setSelectedTrainId] = useState('');
 
   // Catalog state
   const [llmCatalog, setLlmCatalog]       = useState<LLMModelInfo[]>([]);
@@ -68,10 +72,11 @@ export function TrainingInspector({ nodeId, data }: Props) {
     [nodeId, updateNodeData],
   );
 
-  // Load catalogs once
+  // Load catalogs + train run IDs once
   useEffect(() => {
     getLLMCatalog().then(setLlmCatalog).catch(() => {});
     listArchitectures().then(setArchitectures).catch(() => {});
+    listTrainingRunIds().then((r) => setTrainRunIds(r.runs)).catch(() => {});
   }, []);
 
   // Auto-select first LLM
@@ -135,7 +140,7 @@ export function TrainingInspector({ nodeId, data }: Props) {
       {/* Upstream ID */}
       <div className="space-y-0.5">
         <p className={SUB_HEADING}>Preprocess Run ID</p>
-        <p className={`text-xs font-mono ${data.preprocessRunId ? 'text-orange-300' : 'text-slate-600'}`}>
+        <p className={`text-xs font-mono ${data.preprocessRunId ? 'text-orange-300' : 'text-slate-400'}`}>
           {data.preprocessRunId || 'not set — run Processing node first'}
         </p>
       </div>
@@ -286,7 +291,7 @@ export function TrainingInspector({ nodeId, data }: Props) {
                           return (
                             <div key={k} className="flex items-center justify-between">
                               <span className={LBL}>{k}</span>
-                              <span className="rounded bg-slate-800 px-2 py-0.5 text-[10px] text-slate-400">
+                              <span className="rounded bg-slate-800 px-2 py-0.5 text-xs text-slate-300">
                                 {Array.isArray(entry.value) ? entry.value.join(', ') : String(entry.value)}
                               </span>
                             </div>
@@ -296,7 +301,7 @@ export function TrainingInspector({ nodeId, data }: Props) {
                           const opts = (data.searchSpaceOverrides[k]?.options ?? entry.options) as number[];
                           return (
                             <div key={k} className="space-y-0.5">
-                              <p className={LBL}>{k} <span className="text-slate-600">choice</span></p>
+                              <p className={LBL}>{k} <span className={META}>choice</span></p>
                               <ChipInput
                                 value={opts}
                                 onChange={(next) => set({ searchSpaceOverrides: { ...data.searchSpaceOverrides, [k]: { ...data.searchSpaceOverrides[k], options: next as number[] } } })}
@@ -312,16 +317,16 @@ export function TrainingInspector({ nodeId, data }: Props) {
                         const re  = entry as { type: string; min: number; max: number };
                         return (
                           <div key={k} className="space-y-0.5">
-                            <p className={LBL}>{k} <span className="text-slate-600">{entry.type}</span></p>
+                            <p className={LBL}>{k} <span className={META}>{entry.type}</span></p>
                             <div className="grid grid-cols-2 gap-1">
                               <div className="space-y-0.5">
-                                <p className="text-[9px] text-slate-600">Min</p>
+                                <p className={LBL}>Min</p>
                                 <NumericInput className={INPUT_CLS}
                                   value={stringifyNumberValue(ov?.min ?? re.min)} step="any"
                                   onChange={(v) => set({ searchSpaceOverrides: { ...data.searchSpaceOverrides, [k]: { ...ov, min: parseFiniteNumber(v) ?? undefined } } })} />
                               </div>
                               <div className="space-y-0.5">
-                                <p className="text-[9px] text-slate-600">Max</p>
+                                <p className={LBL}>Max</p>
                                 <NumericInput className={INPUT_CLS}
                                   value={stringifyNumberValue(ov?.max ?? re.max)} step="any"
                                   onChange={(v) => set({ searchSpaceOverrides: { ...data.searchSpaceOverrides, [k]: { ...ov, max: parseFiniteNumber(v) ?? undefined } } })} />
@@ -395,7 +400,7 @@ export function TrainingInspector({ nodeId, data }: Props) {
 
                     {/* Final Train Overrides */}
                     <div className="space-y-2">
-                      <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">Final Train Overrides <span className="font-normal normal-case text-slate-600">— optional</span></p>
+                      <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">Final Train Overrides <span className="font-normal normal-case text-slate-300">— optional</span></p>
                       <div className="grid grid-cols-2 gap-2">
                         {Object.entries(finalTrainMeta).map(([k, meta]) => (
                           <div key={k} className="space-y-0.5">
@@ -461,7 +466,7 @@ export function TrainingInspector({ nodeId, data }: Props) {
               }
             </select>
             {selectedLLM && (
-              <div className="flex gap-3 text-[10px] text-slate-400">
+              <div className="flex gap-3 text-xs text-slate-300">
                 <span>VRAM: <strong className="text-slate-200">{selectedLLM.vram_gb} GB</strong></span>
                 <span>Min GPUs: <strong className="text-slate-200">{selectedLLM.min_gpus}</strong></span>
                 <span>Rec: <strong className="text-slate-200">{selectedLLM.recommended_gpu}</strong></span>
@@ -613,7 +618,7 @@ export function TrainingInspector({ nodeId, data }: Props) {
                     sky jobs launch (managed)
                   </button>
                 </div>
-                <p className={LBL}>Direct launch keeps retry-until-up. Managed jobs skip that flag.</p>
+                <p className={HELP}>Direct launch keeps retry-until-up. Managed jobs skip that flag.</p>
               </div>
             )}
           </div>
@@ -631,14 +636,32 @@ export function TrainingInspector({ nodeId, data }: Props) {
       {/* Assign existing */}
       <div className="space-y-1">
         <p className={SUB_HEADING}>Assign Existing Train Run ID</p>
-        <div className="flex gap-1">
-          <input className={INPUT_CLS} placeholder="paste trainRunId"
-            value={assignInput} onChange={(e) => setAssignInput(e.target.value)} />
-          <button className={BTN_SUCCESS} disabled={!assignInput.trim()}
-            onClick={() => { assignRunId(nodeId, assignInput.trim()); setAssignInput(''); }}>
-            Assign
-          </button>
-        </div>
+        {trainRunIds.length === 0 ? (
+          <p className={`${HELP} italic`}>No previous training runs found in S3.</p>
+        ) : (
+          <div className="flex gap-1">
+            <select
+              className={SELECT_CLS}
+              value={selectedTrainId}
+              onChange={(e) => setSelectedTrainId(e.target.value)}
+            >
+              <option value="">— select run from S3 —</option>
+              {trainRunIds.map((r) => (
+                <option key={r.train_run_id} value={r.train_run_id}>
+                  {r.train_run_id}{r.dataset ? ` · ${r.dataset}` : ''}
+                </option>
+              ))}
+            </select>
+            <button
+              className={BTN_SUCCESS}
+              disabled={!selectedTrainId}
+              onClick={() => { assignRunId(nodeId, selectedTrainId); setSelectedTrainId(''); }}
+            >
+              Assign
+            </button>
+          </div>
+        )}
+        <p className={HELP}>Marks node as success and propagates ID downstream.</p>
       </div>
 
       {data.errors.length > 0 && (

@@ -6,7 +6,10 @@ import {
   listDsls, listPreprocessRunIds, uploadFullSchema,
   type DslVersion, type PreprocessRunId, type SchemaUploadSingleResult,
 } from '../../../api/platformClient';
-import { INPUT_CLS, SELECT_CLS, BTN_PRIMARY, BTN_NEUTRAL, BTN_SUCCESS, SUB_HEADING } from '../../../lib/uiTokens';
+import {
+  INPUT_CLS, SELECT_CLS, BTN_PRIMARY, BTN_NEUTRAL, BTN_SUCCESS, SUB_HEADING,
+  INSPECTOR_HELP_CLS, INSPECTOR_LABEL_CLS, INSPECTOR_META_CLS,
+} from '../../../lib/uiTokens';
 import { StatusLED } from '../../../design/components/StatusLED';
 import { SectionTitle } from '../../../design/components/SectionTitle';
 import { useUIStore } from '../../../store/uiStore';
@@ -125,7 +128,7 @@ function SplitTimeline({ splits }: { splits: SplitConfig }) {
 
   return (
     <div className="rounded border border-slate-800/60 bg-[#03060a]/60 p-2.5 space-y-2">
-      <p className="text-[9px] uppercase tracking-wider text-slate-600">Split coverage</p>
+      <p className="text-xs uppercase tracking-wider text-slate-400">Split coverage</p>
 
       {/* Proportional timeline bar */}
       {span && span > 0 && tMin !== null && (
@@ -155,13 +158,13 @@ function SplitTimeline({ splits }: { splits: SplitConfig }) {
             <div key={d.key}>
               <div className="flex items-center gap-2">
                 <div className={`h-2 w-2 flex-shrink-0 rounded-sm ${d.bar} opacity-80`} />
-                <span className="w-9 text-[10px] text-slate-500">{d.label}</span>
+                <span className={`w-10 ${LBL}`}>{d.label}</span>
                 <span className={`text-[10px] font-mono ${d.dur !== null && d.dur > 0 ? d.text : 'text-slate-700'}`}>
                   {d.dur !== null && d.dur > 0 ? fmtDuration(d.dur) : '—'}
                 </span>
               </div>
               {gap !== null && (
-                <div className={`ml-4 mt-0.5 text-[9px] ${gap < 0 ? 'text-red-400' : 'text-slate-600'}`}>
+                <div className={`ml-4 mt-0.5 text-xs ${gap < 0 ? 'text-red-400' : 'text-slate-300'}`}>
                   {gap < 0
                     ? `⚠ overlaps ${fmtDuration(gap)}`
                     : `↕ gap ${fmtDuration(gap)}`}
@@ -197,6 +200,10 @@ interface Props {
 type SplitKey  = 'train' | 'val' | 'test';
 type BoundKey  = 'start' | 'end';
 
+const LBL = INSPECTOR_LABEL_CLS;
+const HELP = INSPECTOR_HELP_CLS;
+const META = INSPECTOR_META_CLS;
+
 // ─── Main component ───────────────────────────────────────────────────────────
 
 export function ProcessingInspector({ nodeId, data }: Props) {
@@ -211,7 +218,6 @@ export function ProcessingInspector({ nodeId, data }: Props) {
   const [loading, setLoading]       = useState(false);
 
   // Assign existing run
-  const [assignInput, setAssignInput] = useState('');
   const [selectedRunId, setSelectedRunId] = useState('');
 
   // Schema section
@@ -269,7 +275,7 @@ export function ProcessingInspector({ nodeId, data }: Props) {
       <div className="space-y-1">
         <p className={SUB_HEADING}>Dataset (propagated)</p>
         <p className="text-xs font-mono text-cyan-300">
-          {data.datasetName || <span className="text-slate-600">—</span>}
+          {data.datasetName || <span className={META}>—</span>}
         </p>
       </div>
 
@@ -324,26 +330,26 @@ export function ProcessingInspector({ nodeId, data }: Props) {
       {/* ── Temporal Splits ── */}
       <div className="space-y-2">
         <p className={SUB_HEADING}>Temporal Splits</p>
-        <p className="text-[10px] text-slate-600">
-          Click each segment to edit. <span className="text-slate-500">↑↓ arrows</span> nudge values.
+        <p className={HELP}>
+          Click each segment to edit. <span className={META}>↑↓ arrows</span> nudge values.
           Ranges must not overlap.
         </p>
 
         {(['train', 'val', 'test'] as SplitKey[]).map((split) => (
           <div key={split} className="rounded border border-slate-800/60 p-2 space-y-1.5">
-            <p className="text-[10px] font-medium uppercase tracking-wide text-slate-500">
+            <p className={`${LBL} uppercase tracking-wide`}>
               {SPLIT_LABEL[split]}
             </p>
             <div className="flex flex-col gap-1">
               <div className="flex items-center gap-1.5">
-                <span className="w-8 text-[9px] text-slate-600">Start</span>
+                <span className={`w-10 ${LBL}`}>Start</span>
                 <DateTimeSegInput
                   value={data.splits[split].start}
                   onChange={(v) => setSplit(split, 'start', v)}
                 />
               </div>
               <div className="flex items-center gap-1.5">
-                <span className="w-8 text-[9px] text-slate-600">End</span>
+                <span className={`w-10 ${LBL}`}>End</span>
                 <DateTimeSegInput
                   value={data.splits[split].end}
                   onChange={(v) => setSplit(split, 'end', v)}
@@ -367,15 +373,18 @@ export function ProcessingInspector({ nodeId, data }: Props) {
       {/* ── Assign Existing Run ── */}
       <div className="space-y-1">
         <p className={SUB_HEADING}>Assign Existing Run ID</p>
-
-        {runIds.length > 0 && (
+        {runIds.length === 0 ? (
+          <p className={`${HELP} italic`}>
+            {data.datasetName ? 'No previous runs found in S3 for this dataset.' : 'Set a dataset to load runs.'}
+          </p>
+        ) : (
           <div className="flex gap-1">
             <select
               className={SELECT_CLS}
               value={selectedRunId}
               onChange={(e) => setSelectedRunId(e.target.value)}
             >
-              <option value="">— select from S3 —</option>
+              <option value="">— select run from S3 —</option>
               {runIds.map((r) => (
                 <option key={r.preprocess_run_id} value={r.preprocess_run_id}>
                   {r.preprocess_run_id}
@@ -391,23 +400,7 @@ export function ProcessingInspector({ nodeId, data }: Props) {
             </button>
           </div>
         )}
-
-        <div className="flex gap-1">
-          <input
-            className={INPUT_CLS}
-            placeholder={runIds.length > 0 ? 'or paste run ID manually' : 'paste preprocessRunId'}
-            value={assignInput}
-            onChange={(e) => setAssignInput(e.target.value)}
-          />
-          <button
-            className={BTN_SUCCESS}
-            disabled={!assignInput.trim()}
-            onClick={() => { assignRunId(nodeId, assignInput.trim()); setAssignInput(''); }}
-          >
-            Assign
-          </button>
-        </div>
-        <p className="text-[10px] text-slate-600">Marks node as success and propagates ID downstream.</p>
+        <p className={HELP}>Marks node as success and propagates ID downstream.</p>
       </div>
 
       {/* ── Input Schema (full.yaml) ── */}
@@ -429,7 +422,7 @@ export function ProcessingInspector({ nodeId, data }: Props) {
 
         {schemaOpen && (
           <div className="space-y-3 border-t border-slate-700/60 px-3 pb-3 pt-2.5">
-            <p className="text-[10px] text-slate-500">
+            <p className={HELP}>
               Defines columns for{' '}
               <code className="rounded bg-slate-800 px-1">iceberg.raw.{data.datasetName || '<dataset>'}</code>.
               Save before running — backend auto-detects latest version.

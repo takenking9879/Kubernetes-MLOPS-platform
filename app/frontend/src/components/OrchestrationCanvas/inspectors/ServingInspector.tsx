@@ -3,6 +3,7 @@ import { useDagStore } from '../../../store/dagStore';
 import type { ServingOrchNodeData } from '../../../types/dag';
 import {
   SELECT_CLS, INPUT_CLS, BTN_PRIMARY, BTN_NEUTRAL, BTN_SUCCESS, SUB_HEADING,
+  INSPECTOR_LABEL_CLS,
 } from '../../../lib/uiTokens';
 import { StatusLED } from '../../../design/components/StatusLED';
 import { SectionTitle } from '../../../design/components/SectionTitle';
@@ -17,6 +18,7 @@ interface Props {
 
 const BTN_TOGGLE_ON  = 'rounded border border-cyan-500/40 bg-cyan-500/15 px-3 py-0.5 text-xs font-medium text-cyan-300 transition-colors';
 const BTN_TOGGLE_OFF = 'rounded border border-slate-700/40 bg-brand-panel px-3 py-0.5 text-xs font-medium text-slate-500 hover:text-slate-300 transition-colors';
+const LBL = INSPECTOR_LABEL_CLS;
 
 export function ServingInspector({ nodeId, data }: Props) {
   const updateNodeData = useDagStore((s) => s.updateNodeData);
@@ -89,7 +91,7 @@ export function ServingInspector({ nodeId, data }: Props) {
 
       <div className="space-y-1">
         <p className={SUB_HEADING}>Train Run ID (propagated)</p>
-        <p className={`text-xs font-mono ${data.trainRunId ? 'text-purple-300' : 'text-slate-600'}`}>
+        <p className={`text-xs font-mono ${data.trainRunId ? 'text-purple-300' : 'text-slate-400'}`}>
           {data.trainRunId || 'not set — run Training node first'}
         </p>
       </div>
@@ -114,7 +116,7 @@ export function ServingInspector({ nodeId, data }: Props) {
             { key: 'llmAdapterS3',  label: 'LoRA Adapter S3',   placeholder: 's3://...',     type: 'text'   },
           ].map(({ key, label, placeholder, type }) => (
             <div key={key} className="space-y-0.5">
-              <p className="text-[10px] text-slate-500">{label}</p>
+              <p className={LBL}>{label}</p>
               <input className={INPUT_CLS} type={type} placeholder={placeholder}
                 value={(data as unknown as Record<string, unknown>)[key] as string}
                 onChange={(e) => set({ [key]: e.target.value } as Partial<ServingOrchNodeData>)} />
@@ -129,7 +131,7 @@ export function ServingInspector({ nodeId, data }: Props) {
               { key: 'vllmReplicas',          label: 'Replicas',          min: 1,     step: 1    },
             ].map(({ key, label, min, max, step }) => (
               <div key={key} className="space-y-0.5">
-                <p className="text-[10px] text-slate-500">{label}</p>
+                <p className={LBL}>{label}</p>
                 <input className={INPUT_CLS} type="number" min={min} max={max} step={step}
                   value={(data as unknown as Record<string, unknown>)[key] as number}
                   onChange={(e) => set({ [key]: parseInt(e.target.value) || min } as Partial<ServingOrchNodeData>)} />
@@ -166,12 +168,12 @@ export function ServingInspector({ nodeId, data }: Props) {
             {data.canary && (
               <div className="grid grid-cols-2 gap-2 pl-2 border-l border-orange-500/20">
                 <div className="space-y-0.5">
-                  <p className="text-[10px] text-slate-500">Canary Alias</p>
+                  <p className={LBL}>Canary Alias</p>
                   <input className={INPUT_CLS} placeholder="challenger"
                     value={data.canaryAlias} onChange={(e) => set({ canaryAlias: e.target.value })} />
                 </div>
                 <div className="space-y-0.5">
-                  <p className="text-[10px] text-slate-500">Traffic Prob (0–1)</p>
+                  <p className={LBL}>Traffic Prob (0–1)</p>
                   <input className={INPUT_CLS} type="number" min={0} max={1} step={0.05}
                     value={data.canaryProbability}
                     onChange={(e) => set({ canaryProbability: parseFloat(e.target.value) || 0.1 })} />
@@ -197,7 +199,7 @@ export function ServingInspector({ nodeId, data }: Props) {
                   { key: 'targetQpsPerReplica',    label: 'Target QPS',  min: 1, step: 1 },
                 ].map(({ key, label, min, step }) => (
                   <div key={key} className="space-y-0.5">
-                    <p className="text-[10px] text-slate-500">{label}</p>
+                    <p className={LBL}>{label}</p>
                     <input className={INPUT_CLS} type="number" min={min} step={step}
                       value={(data as unknown as Record<string, unknown>)[key] as number}
                       onChange={(e) => set({ [key]: parseInt(e.target.value) || min } as Partial<ServingOrchNodeData>)} />
@@ -226,7 +228,7 @@ export function ServingInspector({ nodeId, data }: Props) {
               { key: 'webhookMaxTimestampAge', label: 'Max Age (s)', placeholder: '300',                type: 'number' },
             ].map(({ key, label, placeholder, type }) => (
               <div key={key} className="space-y-0.5">
-                <p className="text-[10px] text-slate-500">{label}</p>
+                <p className={LBL}>{label}</p>
                 <input className={INPUT_CLS} type={type} placeholder={placeholder}
                   value={(data as unknown as Record<string, unknown>)[key] as string | number}
                   onChange={(e) => set({ [key]: type === 'number' ? parseInt(e.target.value) || 300 : e.target.value } as Partial<ServingOrchNodeData>)} />
@@ -278,7 +280,7 @@ export function ServingInspector({ nodeId, data }: Props) {
                     checked={data.serveControllerHighAvailability}
                     onChange={(e) => set({ serveControllerHighAvailability: e.target.checked })}
                     className="accent-cyan-400" />
-                  <label htmlFor={`${nodeId}-ha`} className="text-[10px] text-slate-400">High Availability</label>
+                  <label htmlFor={`${nodeId}-ha`} className={LBL}>High Availability</label>
                 </div>
                 {[
                   { key: 'serveControllerInfra',    label: 'Infra',     placeholder: 'runpod/...',  type: 'text'   },
@@ -286,7 +288,7 @@ export function ServingInspector({ nodeId, data }: Props) {
                   { key: 'serveControllerDiskSize', label: 'Disk (GB)', placeholder: '100',         type: 'number' },
                 ].map(({ key, label, placeholder, type }) => (
                   <div key={key} className="space-y-0.5">
-                    <p className="text-[10px] text-slate-500">{label}</p>
+                    <p className={LBL}>{label}</p>
                     <input className={INPUT_CLS} type={type} placeholder={placeholder}
                       value={(data as unknown as Record<string, unknown>)[key] as string | number}
                       onChange={(e) => set({ [key]: type === 'number' ? parseInt(e.target.value) || 100 : e.target.value } as Partial<ServingOrchNodeData>)} />
