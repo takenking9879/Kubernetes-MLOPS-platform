@@ -95,10 +95,8 @@ export function GPUResourceSelector({ value, onChange, disabled }: Props) {
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const manualDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Derive mode from current value: manual when gpu_fallbacks is a non-empty list
-  const [mode, setMode] = useState<'auto' | 'manual'>(() =>
-    value.gpu_fallbacks && value.gpu_fallbacks.length > 0 ? 'manual' : 'auto',
-  );
+  // Mode derived from value — external writes (e.g. catalog panel adding a fallback) auto-switch UI
+  const mode: 'auto' | 'manual' = value.gpu_fallbacks && value.gpu_fallbacks.length > 0 ? 'manual' : 'auto';
   const fallbacks = value.gpu_fallbacks ?? [];
 
   const set = useCallback(
@@ -108,11 +106,9 @@ export function GPUResourceSelector({ value, onChange, disabled }: Props) {
 
   const switchMode = useCallback(
     (m: 'auto' | 'manual') => {
-      setMode(m);
       if (m === 'auto') {
         set({ gpu_fallbacks: null });
       } else if (!value.gpu_fallbacks || value.gpu_fallbacks.length === 0) {
-        // Seed with one default entry on first switch to manual
         set({ gpu_fallbacks: [{ ...DEFAULT_FALLBACK }] });
       }
     },

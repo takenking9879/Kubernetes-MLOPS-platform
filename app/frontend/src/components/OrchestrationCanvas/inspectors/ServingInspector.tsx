@@ -237,8 +237,12 @@ export function ServingInspector({ nodeId, data }: Props) {
           {/* GPU Catalog panel — floats left of inspector when GPU section open */}
           <GPUCatalogPanel
             open={showServingGpu}
-            selectedGpuType={data.servingResourceConstraints.gpu_types?.[0] ?? null}
-            onSelect={(gpuType) => set({ servingResourceConstraints: { ...data.servingResourceConstraints, gpu_types: [gpuType] } })}
+            selectedGpuTypes={(data.servingResourceConstraints.gpu_fallbacks ?? []).map((f) => f.accelerators.split(':')[0] ?? '')}
+            onSelect={(gpuType) => {
+              const cur = data.servingResourceConstraints;
+              const existing = cur.gpu_fallbacks ?? [];
+              set({ servingResourceConstraints: { ...cur, gpu_fallbacks: [...existing, { infra: 'runpod', accelerators: `${gpuType}:1`, use_spot: true }] } });
+            }}
           />
 
           {/* Serving GPU resources (collapsible) */}

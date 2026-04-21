@@ -553,8 +553,12 @@ export function TrainingInspector({ nodeId, data }: Props) {
       {/* GPU Catalog panel — floats left of inspector when Resources open */}
       <GPUCatalogPanel
         open={showResources}
-        selectedGpuType={data.resourceConstraints.gpu_types?.[0] ?? null}
-        onSelect={(gpuType) => set({ resourceConstraints: { ...data.resourceConstraints, gpu_types: [gpuType] } })}
+        selectedGpuTypes={(data.resourceConstraints.gpu_fallbacks ?? []).map((f) => f.accelerators.split(':')[0] ?? '')}
+        onSelect={(gpuType) => {
+          const cur = data.resourceConstraints;
+          const existing = cur.gpu_fallbacks ?? [];
+          set({ resourceConstraints: { ...cur, gpu_fallbacks: [...existing, { infra: 'runpod', accelerators: `${gpuType}:1`, use_spot: true }] } });
+        }}
       />
 
       {/* ══════════════════════════════════════════════════

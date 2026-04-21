@@ -178,11 +178,11 @@ function saveColor(pct: number | null): string {
 
 interface Props {
   open: boolean;
-  selectedGpuType: string | null;
+  selectedGpuTypes: string[];
   onSelect: (gpuType: string) => void;
 }
 
-export function GPUCatalogPanel({ open, selectedGpuType, onSelect }: Props) {
+export function GPUCatalogPanel({ open, selectedGpuTypes, onSelect }: Props) {
   const catalog      = useGpuCatalogStore((s) => s.catalog);
   const loading      = useGpuCatalogStore((s) => s.loading);
   const lastFetched  = useGpuCatalogStore((s) => s.lastFetched);
@@ -364,7 +364,8 @@ export function GPUCatalogPanel({ open, selectedGpuType, onSelect }: Props) {
         {rows.map((row) => {
           const providerKey = row.provider.toLowerCase() === 'vast.ai' ? 'vast' : row.provider.toLowerCase();
           const cfg = getProviderCfg(providerKey);
-          const isSelected = selectedGpuType === row.gpuType;
+          const isSelected = selectedGpuTypes.includes(row.gpuType);
+          const liveData = catalog.length > 0;
 
           return (
             <button
@@ -383,7 +384,7 @@ export function GPUCatalogPanel({ open, selectedGpuType, onSelect }: Props) {
                   : `inset 3px 0 0 ${cfg.leftGlow}`,
               }}
             >
-              {/* GPU name + provider badge */}
+              {/* GPU name + provider badge + availability */}
               <span className="flex min-w-0 flex-col gap-0.5">
                 <span
                   className={`truncate font-mono text-[11px] font-semibold ${isSelected ? 'text-cyan-200' : 'text-slate-100'}`}
@@ -391,14 +392,27 @@ export function GPUCatalogPanel({ open, selectedGpuType, onSelect }: Props) {
                 >
                   {row.gpuType}
                 </span>
-                <span
-                  className={`inline-flex w-fit items-center gap-1 rounded border px-1 py-px text-[8px] font-bold uppercase tracking-wide ${cfg.pill}`}
-                >
+                <span className="flex items-center gap-1">
                   <span
-                    className="inline-block h-1.5 w-1.5 rounded-full"
-                    style={{ background: cfg.dot, boxShadow: `0 0 4px ${cfg.dot}` }}
-                  />
-                  {cfg.label}
+                    className={`inline-flex items-center gap-1 rounded border px-1 py-px text-[8px] font-bold uppercase tracking-wide ${cfg.pill}`}
+                  >
+                    <span
+                      className="inline-block h-1.5 w-1.5 rounded-full"
+                      style={{ background: cfg.dot, boxShadow: `0 0 4px ${cfg.dot}` }}
+                    />
+                    {cfg.label}
+                  </span>
+                  {liveData && (
+                    <span
+                      className={`rounded border px-1 py-px text-[8px] font-bold uppercase tracking-wide ${
+                        row.anyAvailable
+                          ? 'border-emerald-500/30 bg-emerald-500/8 text-emerald-400'
+                          : 'border-red-500/30 bg-red-500/8 text-red-400'
+                      }`}
+                    >
+                      {row.anyAvailable ? 'available' : 'no stock'}
+                    </span>
+                  )}
                 </span>
               </span>
 
