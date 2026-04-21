@@ -209,9 +209,9 @@ export function makeProcessingNodeData(overrides?: Partial<ProcessingOrchNodeDat
     dslVersion: '',
     executionId: '',
     splits: {
-      train: { start: '', end: '' },
-      val:   { start: '', end: '' },
-      test:  { start: '', end: '' },
+      train: { start: '2026-01-01 00:30:00', end: '2026-01-01 13:00:00' },
+      val:   { start: '2026-01-01 13:00:00', end: '2026-01-02 05:40:00' },
+      test:  { start: '2026-01-02 07:00:00', end: '2026-01-03 03:50:00' },
     },
     preprocessRunId: null,
     dagRunId: null,
