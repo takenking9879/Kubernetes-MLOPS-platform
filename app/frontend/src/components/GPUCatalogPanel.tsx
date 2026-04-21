@@ -206,11 +206,18 @@ export function GPUCatalogPanel({ open, selectedGpuType, onSelect }: Props) {
     );
   };
 
+  const presentProviders = useMemo(() => {
+    const base = catalog.length > 0 ? aggregateCatalog(catalog) : STATIC_ROWS;
+    return new Set(base.map((r) => {
+      const k = r.provider.toLowerCase();
+      return k === 'vast.ai' ? 'vast' : k;
+    }));
+  }, [catalog]);
+
   const rows = useMemo(() => {
     const base = catalog.length > 0 ? aggregateCatalog(catalog) : STATIC_ROWS;
     const filtered = base.filter((r) => {
       const providerKey = r.provider.toLowerCase();
-      // normalize "vast" vs "vast.ai"
       const normalized = providerKey === 'vast.ai' ? 'vast' : providerKey;
       if (!activeProviders.some((p) => normalized.startsWith(p))) return false;
       if (query.trim()) return r.gpuType.toLowerCase().includes(query.trim().toLowerCase());
@@ -220,15 +227,6 @@ export function GPUCatalogPanel({ open, selectedGpuType, onSelect }: Props) {
   }, [catalog, activeProviders, query, sortMode]);
 
   if (!open) return null;
-
-  // Determine which providers are actually present in filtered base
-  const presentProviders = useMemo(() => {
-    const base = catalog.length > 0 ? aggregateCatalog(catalog) : STATIC_ROWS;
-    return new Set(base.map((r) => {
-      const k = r.provider.toLowerCase();
-      return k === 'vast.ai' ? 'vast' : k;
-    }));
-  }, [catalog]);
 
   return createPortal(
     <div
