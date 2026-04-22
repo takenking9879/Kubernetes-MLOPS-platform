@@ -101,6 +101,7 @@ _SKY_DIR = _REPO_ROOT / "k3s/sky"
 # Tabular training — provider-specific (RunPod/Vast templates, AWS custom image)
 _SKY_GPU_RUNPOD_YAML = _SKY_DIR / "ray-gpu-training-runpod.yaml"
 _SKY_GPU_VAST_YAML   = _SKY_DIR / "ray-gpu-training-vast.yaml"
+_SKY_GPU_LOCAL_YAML  = _SKY_DIR / "ray-gpu-training-local.yaml"
 _SKY_MULTINODE_YAML  = _SKY_DIR / "ray-gpu-multinode-aws.yaml"
 
 # LLM training — provider-specific
@@ -129,7 +130,9 @@ def _provider_from_any_of(any_of: list[dict]) -> str:
 
     infra = str(first.get("infra", "")).strip().lower()
     if infra:
-        return infra.split("/", 1)[0]
+        prefix = infra.split("/", 1)[0]
+        # ssh/ prefix = SkyPilot SSH Node Pool → local Docker GPU execution
+        return "local" if prefix == "ssh" else prefix
 
     return "runpod"
 
@@ -163,7 +166,12 @@ class JobBuilder:
             else:
                 base_yaml_path = _SKY_LLM_RUNPOD_YAML
         else:
-            base_yaml_path = _SKY_GPU_VAST_YAML if provider == "vast" else _SKY_GPU_RUNPOD_YAML
+            if provider == "vast":
+                base_yaml_path = _SKY_GPU_VAST_YAML
+            elif provider == "local":
+                base_yaml_path = _SKY_GPU_LOCAL_YAML
+            else:
+                base_yaml_path = _SKY_GPU_RUNPOD_YAML
 
         sky_conf = self._load_base_yaml(base_yaml_path)
 

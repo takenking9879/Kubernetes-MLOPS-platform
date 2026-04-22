@@ -360,6 +360,12 @@ def build_any_of_from_constraints(constraints: dict[str, Any] | None) -> list[di
     if not constraints:
         return []
 
+    # Local SSH node pool: infra is preserved from the YAML template.
+    # any_of must be empty so job_builder.py does not overwrite infra: ssh/local-gpu.
+    _providers = [_normalize_provider(p) for p in (constraints.get("providers") or []) if str(p).strip()]
+    if _providers == ["local"]:
+        return []
+
     n_gpus = max(1, int(constraints.get("num_gpus_per_node") or 1))
     manual = sanitize_gpu_fallbacks(constraints.get("gpu_fallbacks"), default_num_gpus=n_gpus)
     if manual:

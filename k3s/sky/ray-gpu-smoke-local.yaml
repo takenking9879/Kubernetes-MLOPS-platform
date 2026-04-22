@@ -1,0 +1,17 @@
+name: ray-gpu-smoke-local
+num_nodes: 1
+
+resources:
+  infra: ssh/local-gpu
+
+run: |
+  set -euo pipefail
+  echo "SMOKE_START"
+  nvidia-smi | head -6
+  echo "GPU_OK"
+  python3 -c "
+  import torch
+  assert torch.cuda.is_available(), 'CUDA not available'
+  print('TORCH_CUDA_OK:', torch.cuda.get_device_name(0))
+  "
+    echo "SMOKE_PASS"

@@ -123,7 +123,17 @@ def _run_sky_training(
         or ""
     ).strip()
 
-    if not aws_access_key_id or not aws_secret_access_key:
+    # Derive provider early (needed to skip AWS credential check for local provider).
+    _rc_early: dict | None = None
+    if resource_constraints_json and resource_constraints_json not in ("null", "{}"):
+        try:
+            _rc_early = json.loads(resource_constraints_json)
+        except Exception:
+            pass
+    _early_providers = (_rc_early or {}).get("providers") or []
+    _early_provider = str(_early_providers[0]).lower() if _early_providers else "runpod"
+
+    if _early_provider != "local" and (not aws_access_key_id or not aws_secret_access_key):
         raise RuntimeError(
             "Missing AWS credentials in Airflow scheduler environment. "
             "Expected AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY from env-secret."
@@ -181,6 +191,7 @@ def _run_sky_training(
     _yaml_map = {
         ("train",       "runpod"): "ray-gpu-training-runpod.yaml",
         ("train",       "vast"):   "ray-gpu-training-vast.yaml",
+        ("train",       "local"):  "ray-gpu-training-local.yaml",
         ("train_multi", "aws"):    "ray-gpu-multinode-aws.yaml",
     }
     kind = "train_multi" if (use_gpu and n_nodes > 1) else "train"
@@ -236,6 +247,11 @@ def _run_sky_training(
         "USE_DEEPSPEED":       use_deepspeed,
         "DEEPSPEED_STAGE":     deepspeed_stage,
     })
+
+    if provider == "local":
+        sky_envs["METRICS_SOURCE"] = "local_docker"
+        sky_envs["GPU_PRICE_PER_HOUR"] = "0"
+        sky_envs["USE_SPOT"] = "false"
 
     # Remove secret placeholders from template envs to avoid persisting secret keys
     # with empty/default values in the generated YAML.

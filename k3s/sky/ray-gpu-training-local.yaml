@@ -1,0 +1,450 @@
+# k3s/sky/ray-gpu-training-local.yaml
+#
+# Single-node GPU training on a LOCAL Docker container via SkyPilot SSH Node Pool.
+# SkyPilot SSHes into a Docker container (--gpus all) running on the WSL host.
+#
+# WHY this differs from ray-gpu-training-runpod.yaml:
+#   resources: uses infra: ssh/local-gpu (no image_id, no ordered list, no disk_size).
+#              The container is already running — SkyPilot does NOT provision it.
+#   setup:     Simplified. takenking9879/ray-train-ssh:2.53.0 already has torch+CUDA+
+#              Ray+ML libs baked in. Venv is created with --system-site-packages so
+#              inheritance is instant; pip only fills missing gaps (~30 s total vs
+#              5-8 min on RunPod which starts from a base provider image).
+#   run:       IDENTICAL to ray-gpu-training-runpod.yaml. Same entry point, same Ray
+#              topology. SKYPILOT_NUM_GPUS_PER_NODE is injected by SkyPilot before run:
+#              executes regardless of provider.
+#
+# ONE-TIME SETUP (do this before triggering a local job):
+#
+#   1. Build + push the SSH-enabled image:
+#        docker build -f k3s/sky/Dockerfile.local-gpu \
+#          -t takenking9879/ray-train-ssh:2.53.0 .
+#        docker push takenking9879/ray-train-ssh:2.53.0
+#
+#   2. Start the container on the WSL host:
+#        bash k3s/sky/start-local-gpu-node.sh
+#
+#   3. Register the SSH Node Pool in the SkyPilot API server pod:
+#        kubectl exec -it -n skypilot deployment/skypilot-api-server -- bash
+#        mkdir -p ~/.sky/ssh_keys
+#        # Paste the private key from ~/.sky/ssh_keys/local-gpu (WSL host):
+#        cat > ~/.sky/ssh_keys/local-gpu << 'EOF'
+#        <paste private key>
+#        EOF
+#        chmod 600 ~/.sky/ssh_keys/local-gpu
+#        # Append node pool config:
+#        python3 -c "
+#        import yaml, pathlib
+#        p = pathlib.Path.home() / '.sky' / 'ssh_node_pools.yaml'
+#        cfg = yaml.safe_load(p.read_text()) if p.exists() else {}
+#        cfg['local-gpu'] = {'hosts': ['host.docker.internal'], 'user': 'root',
+#            'identity_file': str(pathlib.Path.home() / '.sky/ssh_keys/local-gpu'), 'port': 2222}
+#        p.write_text(yaml.dump(cfg))
+#        print('Registered local-gpu SSH Node Pool')
+#        "
+#
+#   4. Verify:
+#        sky check ssh
+#        sky launch -y --infra ssh/local-gpu k3s/sky/hello-sky.yaml
+#
+# TRIGGERING VIA AIRFLOW:
+#   Trigger training_pipeline_skypilot with:
+#     { "providers": ["local"], "train_run_id": "...", ... }
+#   Do NOT include gpu_fallbacks — that would overwrite infra: ssh/local-gpu.
+#   Triggered automatically by training_dag_skypilot.py when provider=local.
+
+name: ray-gpu-training-local
+
+num_nodes: 1
+
+resources:
+  # SSH Node Pool: SkyPilot SSHes into the already-running Docker container.
+  # Container is started via start-local-gpu-node.sh (docker run --gpus all).
+  # No image_id, disk_size, or ordered list — those are VM/cloud concepts only.
+  infra: ssh/local-gpu
+
+envs:
+  # ── Per-run parameters (overridden at launch time by training_dag_skypilot.py) ──
+  TRAIN_RUN_ID: ""
+  PREPROCESS_RUN_ID: ""
+  MODEL_TYPE: "pytorch"
+  PARAMS_S3_PATH: ""
+  PROCESSED_TABLE: ""
+
+  # ── GPU control ──
+  USE_GPU: "true"
+  USE_SPOT: "false"       # no spot concept locally
+  USE_DEEPSPEED: "false"
+
+  # ── Infrastructure ──
+  MLFLOW_TRACKING_URI: ""
+  AWS_ACCESS_KEY_ID: ""
+  AWS_SECRET_ACCESS_KEY: ""
+  AWS_DEFAULT_REGION: "us-east-1"
+  AWS_S3_ENDPOINT_URL: ""
+
+  # ── Outbound metrics shipping ──
+  GPU_PRICE_PER_HOUR: "0"
+  SKY_CLUSTER_NAME: ""
+  SKY_PROVIDER: "local"
+  METRICS_SOURCE: "local_docker"
+  METRICS_REMOTE_WRITE_URL: ""
+  METRICS_REMOTE_WRITE_USERNAME: ""
+  METRICS_REMOTE_WRITE_PASSWORD: ""
+  METRICS_PUSHGATEWAY_URL: ""
+
+  # Legacy aliases
+  GRAFANA_REMOTE_WRITE_URL: ""
+  GRAFANA_INSTANCE_ID: ""
+  GRAFANA_API_KEY: ""
+
+  # ── Ray training parameters ──
+  NUM_WORKERS: "1"
+  CPUS_PER_WORKER: "4"
+  NUM_WORKERS_TUNE: "1"
+  CPUS_PER_WORKER_TUNE: "4"
+  MAX_CONCURRENT_TRIALS: "1"
+  TUNE_MAX_TRAIN_ROWS: "250000"
+  TUNE_MAX_VAL_ROWS: "150000"
+  RAY_MATERIALIZE_DATASETS: "1"
+  RAY_MATERIALIZE_DATASETS_TUNE: "1"
+  PROMETHEUS_GRACE_SECONDS: "10"
+  REPORT_FREQUENCY: "4"
+
+  # ── Ray internals ──
+  RAY_enable_infeasible_task_early_exit: "true"
+  RAY_DEFAULT_OBJECT_STORE_MEMORY_PROPORTION: "0.7"
+  RAY_ACCEL_ENV_VAR_OVERRIDE_ON_ZERO: "0"
+
+setup: |
+  set -euo pipefail
+
+  # GPU must be visible — if not, the container was started without --gpus all.
+  nvidia-smi || { echo "ERROR: nvidia-smi failed — container not started with --gpus all"; exit 1; }
+
+  if [ "$(id -u)" -eq 0 ]; then
+    SUDO=""
+  else
+    SUDO="sudo"
+  fi
+
+  if ! id -u ray >/dev/null 2>&1; then
+    ${SUDO} useradd -m -s /bin/bash -d /home/ray ray 2>/dev/null || true
+  fi
+  ${SUDO} mkdir -p /home/ray/app /home/ray/.cache/ray /tmp/ray
+  ${SUDO} chown -R ray:ray /home/ray /tmp/ray
+
+  # git is present in the base image; install only if missing
+  if ! command -v git >/dev/null 2>&1; then
+    ${SUDO} apt-get update -qq
+    ${SUDO} apt-get install -y --no-install-recommends git
+    ${SUDO} rm -rf /var/lib/apt/lists/*
+  fi
+
+  if [ ! -d /home/ray/app/repo/.git ]; then
+    git clone --depth=1 --branch main \
+      https://github.com/takenking9879/Kubernetes-MLOPS-platform.git \
+      /home/ray/app/repo
+  else
+    git -C /home/ray/app/repo pull --ff-only origin main || true
+  fi
+
+  REQ_FILE="/home/ray/app/repo/k3s/kuberay/gpu/requirements_tabular_runtime.txt"
+  [ -f "${REQ_FILE}" ] || { echo "ERROR: requirements file not found: ${REQ_FILE}"; exit 1; }
+
+  # Find the system Python that already has torch+CUDA (baked into ray-train:2.53.0).
+  # We do NOT reinstall torch or CUDA — the image provides them.
+  PYTHON_BIN=""
+  PYTHON_VERSION=""
+  for candidate in python3.12 /usr/bin/python3.12 python3.11 /usr/bin/python3.11 \
+                   /usr/local/bin/python3.12 /usr/local/bin/python3.11 \
+                   /root/miniconda3/bin/python python3 python; do
+    if [ -x "${candidate}" ]; then
+      CAND_PATH="${candidate}"
+    elif command -v "${candidate}" >/dev/null 2>&1; then
+      CAND_PATH="$(command -v "${candidate}")"
+    else
+      continue
+    fi
+
+    if CAND_VER="$("${CAND_PATH}" -c \
+        "import sys, torch; assert torch.cuda.is_available(); \
+         print('.'.join(map(str, sys.version_info[:3])))" 2>/dev/null)"; then
+      echo "[setup] Accepted: ${CAND_PATH} (python=${CAND_VER}, torch+cuda OK)"
+      PYTHON_BIN="${CAND_PATH}"
+      PYTHON_VERSION="${CAND_VER}"
+      break
+    fi
+  done
+
+  [ -n "${PYTHON_BIN}" ] || {
+    echo "ERROR: No system Python with torch+CUDA found in image takenking9879/ray-train-ssh:2.53.0."
+    echo "The SSH image must extend takenking9879/ray-train:2.53.0 which provides torch+CUDA."
+    exit 1
+  }
+
+  echo "[setup] Selected Python: ${PYTHON_BIN} (version=${PYTHON_VERSION})"
+
+  # Fast venv: --system-site-packages inherits torch, ray, sklearn, xgboost, etc.
+  # from the image's system Python. Only truly missing packages are installed below.
+  RUNTIME_VENV="/opt/ml-platform-runtime"
+  ${SUDO} rm -rf "${RUNTIME_VENV}"
+  ${SUDO} "${PYTHON_BIN}" -m venv --system-site-packages "${RUNTIME_VENV}"
+
+  RUNTIME_PYTHON="${RUNTIME_VENV}/bin/python"
+  [ -x "${RUNTIME_PYTHON}" ] || { echo "ERROR: venv python not found: ${RUNTIME_PYTHON}"; exit 1; }
+
+  echo "${RUNTIME_PYTHON}" | ${SUDO} tee /home/ray/app/runtime_python.txt >/dev/null
+  echo "[setup] Runtime venv Python: ${RUNTIME_PYTHON}"
+
+  # Install only packages missing from system site-packages.
+  # --no-deps avoids re-downloading transitive deps already present in the image.
+  ${SUDO} "${RUNTIME_PYTHON}" -m pip install --quiet --no-cache-dir -r "${REQ_FILE}"
+
+  # Smoke test — verify all imports pass and GPU is accessible via the venv.
+  "${RUNTIME_PYTHON}" - <<'PY'
+  import boto3
+  import mlflow
+  import numpy
+  import pandas
+  import prometheus_client
+  import pyarrow
+  import pyiceberg
+  import ray
+  import sklearn
+  import torch
+  import xgboost
+  import yaml
+
+  print('[setup] Import smoke test passed.')
+  print(f'[setup] runtime torch={torch.__version__} cuda={torch.version.cuda}')
+  if not torch.cuda.is_available():
+      raise SystemExit('ERROR: runtime torch.cuda.is_available() is False')
+  print(f'[setup] GPU visible: {torch.cuda.get_device_name(0)}')
+  PY
+
+  echo "Setup complete (local Docker GPU node)."
+
+  # Grafana Agent is optional — skip download on local (metrics via pushgateway only).
+  METRICS_RW_URL="${METRICS_REMOTE_WRITE_URL:-${GRAFANA_REMOTE_WRITE_URL:-}}"
+  if [ -n "${METRICS_RW_URL}" ]; then
+    AGENT_BIN=/usr/local/bin/grafana-agent
+    if [ ! -f "${AGENT_BIN}" ]; then
+      AGENT_VER=v0.43.3 ARCH=amd64
+      curl -sL "https://github.com/grafana/agent/releases/download/${AGENT_VER}/grafana-agent-linux-${ARCH}.zip" \
+        -o /tmp/grafana-agent.zip
+      unzip -q /tmp/grafana-agent.zip -d /tmp/
+      mv /tmp/grafana-agent-linux-${ARCH} "${AGENT_BIN}"
+      chmod +x "${AGENT_BIN}"
+    fi
+  fi
+
+run: |
+  set -euo pipefail
+
+  PYTHON_BIN="$(cat /home/ray/app/runtime_python.txt)"
+  [ -x "${PYTHON_BIN}" ] || { echo "ERROR: runtime python not executable: ${PYTHON_BIN}"; exit 1; }
+  "${PYTHON_BIN}" - <<'PY'
+  import sys
+  import torch
+
+  print(f"[run] runtime python={sys.version.split()[0]} exe={sys.executable}")
+  print(f"[run] runtime torch={torch.__version__} cuda_runtime={torch.version.cuda}")
+  print(f"[run] runtime cuda_available={torch.cuda.is_available()}")
+  PY
+
+  RAY_BIN="$(dirname "${PYTHON_BIN}")/ray"
+  if [ ! -x "${RAY_BIN}" ]; then
+    if command -v ray >/dev/null 2>&1; then
+      RAY_BIN="$(command -v ray)"
+    else
+      echo "ERROR: Ray CLI not found for runtime python (${PYTHON_BIN})"
+      exit 1
+    fi
+  fi
+
+  export PYTHONPATH=/home/ray/app/repo:/home/ray/app/repo/src
+
+  LOG_DIR="/tmp/skypilot-logs"
+  mkdir -p "${LOG_DIR}"
+  GPU_EXPORTER_LOG="${LOG_DIR}/gpu_exporter.log"
+  GRAFANA_AGENT_LOG="${LOG_DIR}/grafana-agent.log"
+
+  GPU_EXPORTER_PID=""
+  GRAFANA_AGENT_PID=""
+  _terminate_pid() {
+    local pid="${1:-}"
+    local label="${2:-process}"
+    if [ -z "${pid}" ] || ! kill -0 "${pid}" 2>/dev/null; then
+      return 0
+    fi
+
+    kill "${pid}" 2>/dev/null || true
+    for _ in $(seq 1 10); do
+      if ! kill -0 "${pid}" 2>/dev/null; then
+        break
+      fi
+      sleep 1
+    done
+
+    if kill -0 "${pid}" 2>/dev/null; then
+      echo "[run] ${label} still alive after SIGTERM; sending SIGKILL (PID=${pid})"
+      kill -9 "${pid}" 2>/dev/null || true
+    fi
+    wait "${pid}" 2>/dev/null || true
+  }
+
+  cleanup_background() {
+    set +e
+    _terminate_pid "${GRAFANA_AGENT_PID}" "grafana-agent"
+    _terminate_pid "${GPU_EXPORTER_PID}" "gpu-exporter"
+
+    echo "[run] Stopping training Ray cluster (port 6379)..."
+    pkill -SIGTERM -f "ray.*[=:]6379" 2>/dev/null || true
+    sleep 5
+    pkill -SIGKILL -f "ray.*[=:]6379" 2>/dev/null || true
+    echo "[run] Training Ray cluster stopped."
+  }
+  trap cleanup_background EXIT INT TERM
+
+  "${PYTHON_BIN}" /home/ray/app/repo/k3s/sky/gpu_exporter.py \
+    >"${GPU_EXPORTER_LOG}" 2>&1 &
+  GPU_EXPORTER_PID=$!
+  echo "[run] GPU exporter started (PID=${GPU_EXPORTER_PID}, log=${GPU_EXPORTER_LOG})"
+
+  METRICS_RW_URL="${METRICS_REMOTE_WRITE_URL:-${GRAFANA_REMOTE_WRITE_URL:-}}"
+  if [ -n "${METRICS_RW_URL}" ] && command -v grafana-agent >/dev/null 2>&1; then
+    "${PYTHON_BIN}" /home/ray/app/repo/k3s/sky/write_grafana_config.py
+    grafana-agent --config.file=/tmp/grafana-agent-config.yaml \
+      >"${GRAFANA_AGENT_LOG}" 2>&1 &
+    GRAFANA_AGENT_PID=$!
+    echo "[run] Grafana Agent started → ${METRICS_RW_URL} (PID=${GRAFANA_AGENT_PID}, log=${GRAFANA_AGENT_LOG})"
+  fi
+
+  export RAY_ADDRESS="127.0.0.1:6379"
+
+  if [ "${SKYPILOT_NUM_GPUS_PER_NODE:-0}" -gt 0 ]; then
+    "${RAY_BIN}" start --head \
+      --port=6379 \
+      --dashboard-port=8265 \
+      --dashboard-host=0.0.0.0 \
+      --disable-usage-stats \
+      --include-dashboard=True \
+      --num-gpus="${SKYPILOT_NUM_GPUS_PER_NODE}"
+  else
+    "${RAY_BIN}" start --head \
+      --port=6379 \
+      --dashboard-port=8265 \
+      --dashboard-host=0.0.0.0 \
+      --disable-usage-stats \
+      --include-dashboard=True
+  fi
+
+  for i in $(seq 1 60); do
+    "${RAY_BIN}" health-check --address=127.0.0.1:6379 &>/dev/null && break
+    echo "Waiting for Ray head ($i/60)"
+    sleep 1
+  done
+  "${RAY_BIN}" health-check --address=127.0.0.1:6379 \
+    || { echo "ERROR: Ray head did not become healthy"; exit 1; }
+
+  sleep 5
+
+  GPUS=${SKYPILOT_NUM_GPUS_PER_NODE:-1}
+  export NUM_WORKERS=${NUM_WORKERS:-${GPUS}}
+  export NUM_WORKERS_TUNE=${NUM_WORKERS_TUNE:-1}
+  export MAX_CONCURRENT_TRIALS=${MAX_CONCURRENT_TRIALS:-${NUM_WORKERS}}
+  export GPUS_PER_WORKER=${GPUS_PER_WORKER:-1}
+  export GPUS_PER_WORKER_TUNE=${GPUS_PER_WORKER_TUNE:-${GPUS_PER_WORKER}}
+
+  _detect_node_cpus() {
+    local ray_cpus
+    ray_cpus="$("${PYTHON_BIN}" -c '
+  import os
+  try:
+    import ray
+    ray.init(address=os.getenv("RAY_ADDRESS", "127.0.0.1:6379"), ignore_reinit_error=True, log_to_driver=False)
+    cpu = int(ray.cluster_resources().get("CPU", 0))
+    print(cpu if cpu > 0 else "")
+  except Exception:
+    print("")
+  finally:
+    try:
+      import ray
+      if ray.is_initialized():
+        ray.shutdown()
+    except Exception:
+      pass
+  ' 2>/dev/null || true)"
+    if [ -n "${ray_cpus}" ] && [ "${ray_cpus}" -gt 0 ] 2>/dev/null; then
+      echo "${ray_cpus}"; return
+    fi
+    nproc 2>/dev/null || echo 1
+  }
+  TOTAL_CPUS_NODE=$(_detect_node_cpus)
+  _cpus_per_worker_uniform_with_leftover() {
+    local total_cpus="${1:-1}"
+    local workers="${2:-1}"
+    if [ "${workers}" -le 0 ]; then
+      workers=1
+    fi
+    local base=$(( total_cpus / workers ))
+    local rem=$(( total_cpus % workers ))
+    local out="${base}"
+    if [ "${rem}" -eq 0 ]; then
+      out=$(( base - 1 ))
+    fi
+    if [ "${out}" -lt 1 ]; then
+      out=1
+    fi
+    echo "${out}"
+  }
+
+  export CPUS_PER_WORKER=$(_cpus_per_worker_uniform_with_leftover "${TOTAL_CPUS_NODE}" "${NUM_WORKERS}")
+  export CPUS_PER_WORKER_TUNE=${CPUS_PER_WORKER}
+
+  echo "[run] Ray params: NUM_WORKERS=${NUM_WORKERS} NUM_WORKERS_TUNE=${NUM_WORKERS_TUNE} MAX_CONCURRENT_TRIALS=${MAX_CONCURRENT_TRIALS} GPUS_PER_WORKER=${GPUS_PER_WORKER} GPUS_PER_WORKER_TUNE=${GPUS_PER_WORKER_TUNE} CPUS_PER_WORKER=${CPUS_PER_WORKER} CPUS_PER_WORKER_TUNE=${CPUS_PER_WORKER_TUNE} (node_cpus=${TOTAL_CPUS_NODE} SKYPILOT_NUM_GPUS_PER_NODE=${SKYPILOT_NUM_GPUS_PER_NODE:-unset})"
+
+  "${PYTHON_BIN}" /home/ray/app/repo/k3s/kuberay/main.py
+
+  echo "=============================="
+  echo "===== MAIN.PY TERMINATED ====="
+  date
+  echo "=============================="
+
+  sleep 2
+
+  echo ""
+  echo "=== TOP PROCESSES (CPU) ==="
+  ps -eo pid,ppid,cmd,%mem,%cpu --sort=-%cpu | head -n 30
+
+  echo ""
+  echo "=== PROCESS TREE (IMPORTANT) ==="
+  pstree -ap 2>/dev/null | head -n 100 || echo "pstree not available"
+
+  echo ""
+  echo "=== RAY PROCESSES ==="
+  ps -eo pid,ppid,cmd | grep -E "raylet|gcs_server|plasma|ray::" | grep -v grep || echo "No Ray processes"
+
+  echo ""
+  echo "=== GRAFANA AGENT ==="
+  ps -eo pid,ppid,cmd | grep grafana-agent | grep -v grep || echo "No grafana-agent"
+
+  echo ""
+  echo "=== GPU EXPORTER ==="
+  ps -eo pid,ppid,cmd | grep gpu_exporter | grep -v grep || echo "No gpu exporter"
+
+  echo ""
+  echo "=== PYTHON PROCESSES ==="
+  ps -eo pid,ppid,cmd | grep python | grep -v grep
+
+  echo ""
+  echo "=== OPEN FILES (CURRENT SHELL) ==="
+  lsof -p $$ 2>/dev/null | head -n 50 || echo "lsof not available"
+
+  echo ""
+  echo "=== NETWORK PORTS ==="
+  ss -tulpn 2>/dev/null | head -n 50 || echo "ss not available"
+
+  echo ""
+  echo "=== DONE DEBUG ==="

@@ -40,14 +40,16 @@ const PROVIDERS = [
   { id: 'aws', label: 'AWS' },
   { id: 'gcp', label: 'GCP' },
   { id: 'azure', label: 'Azure' },
+  { id: 'local', label: 'Local GPU' },
 ];
 
 const INFRA_OPTIONS = [
-  { id: 'runpod', label: 'RunPod' },
-  { id: 'vast',   label: 'Vast.ai' },
-  { id: 'aws',    label: 'AWS' },
-  { id: 'gcp',    label: 'GCP' },
-  { id: 'azure',  label: 'Azure' },
+  { id: 'runpod',        label: 'RunPod' },
+  { id: 'vast',          label: 'Vast.ai' },
+  { id: 'aws',           label: 'AWS' },
+  { id: 'gcp',           label: 'GCP' },
+  { id: 'azure',         label: 'Azure' },
+  { id: 'ssh/local-gpu', label: 'Local GPU' },
 ];
 
 const VRAM_OPTIONS = [0, 8, 16, 24, 40, 80];
@@ -130,6 +132,12 @@ export function GPUResourceSelector({ value, onChange, disabled }: Props) {
   // Debounced select call whenever constraints change (auto mode only)
   useEffect(() => {
     if (!open || mode !== 'auto') return;
+    // Local SSH node pool: no catalog needed; backend derives infra from YAML.
+    const _providers = value.providers ?? ['runpod'];
+    if (_providers.length === 1 && _providers[0] === 'local') {
+      setSelectResult(null);
+      return;
+    }
     if (debounceRef.current) clearTimeout(debounceRef.current);
     debounceRef.current = setTimeout(() => {
       setLoading(true);
@@ -379,6 +387,10 @@ export function GPUResourceSelector({ value, onChange, disabled }: Props) {
     (r) => !runpodRegionSet.has(r.toUpperCase()),
   );
 
+  const isLocalOnly =
+    (value.providers ?? ['runpod']).length === 1 &&
+    (value.providers ?? ['runpod'])[0] === 'local';
+
   const savings =
     selectResult?.estimated_cost_spot != null &&
     selectResult?.estimated_cost_ondemand != null &&
@@ -484,6 +496,18 @@ export function GPUResourceSelector({ value, onChange, disabled }: Props) {
                   })}
                 </div>
               </div>
+
+              {/* Local GPU note (no catalog needed) */}
+              {isLocalOnly && (
+                <p className="rounded border border-blue-700/40 bg-blue-950/30 px-3 py-2 text-[11px] text-blue-300">
+                  Routes to local Docker container via SSH Node Pool
+                  (<span className="font-mono">host.docker.internal:2222</span>).
+                  No GPU catalog or cost estimate — uses the pre-running container with{' '}
+                  <span className="font-mono">--gpus all</span>.
+                </p>
+              )}
+
+              {!isLocalOnly && (<>
 
               {/* GPU type + VRAM row */}
               <div className="grid grid-cols-2 gap-3">
@@ -757,6 +781,7 @@ export function GPUResourceSelector({ value, onChange, disabled }: Props) {
                   )}
                 </div>
               )}
+              </>)}
             </>
           )}
 

@@ -1,0 +1,19 @@
+FROM takenking9879/ray-train:2.53.0
+
+USER root
+
+RUN apt-get update && apt-get install -y --no-install-recommends openssh-server \
+    && rm -rf /var/lib/apt/lists/* \
+    && mkdir -p /run/sshd \
+    && echo 'PermitRootLogin yes' >> /etc/ssh/sshd_config \
+    && echo 'PubkeyAuthentication yes' >> /etc/ssh/sshd_config \
+    && echo 'PasswordAuthentication no' >> /etc/ssh/sshd_config \
+    && echo 'StrictModes no' >> /etc/ssh/sshd_config
+
+COPY k3s/sky/local-gpu-entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
+
+EXPOSE 22
+
+USER ray
+ENTRYPOINT ["/entrypoint.sh"]
