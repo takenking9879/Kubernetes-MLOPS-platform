@@ -1,147 +1,119 @@
-Local GPU SSH Node Pool — End-to-End Test Sequence
-====================================================
+Local GPU SSH + SkyPilot (Docker Desktop / k3s)
+================================================
 
-PREREQUISITES
--------------
-- WSL with Docker + nvidia-container-toolkit installed
-- ~/.sky/ssh_keys/local-gpu key pair exists (create if not: ssh-keygen -t ed25519 -f ~/.sky/ssh_keys/local-gpu -N "")
-- KUBECONFIG points to k3s cluster
-- helm + kubectl available
+Objetivo
+--------
+Tener una prueba reproducible donde un job de SkyPilot en `ssh/local-gpu` confirme:
+1) `nvidia-smi` funcional dentro del job.
+2) PyTorch con CUDA disponible.
+3) Un mini workload GPU (matmul) exitoso.
 
+Estado validado (2026-04-22)
+----------------------------
+Marcadores observados en logs del smoke:
+- `SMOKE_START`
+- `GPU_OK`
+- `TORCH_CUDA_OK: NVIDIA GeForce RTX 4070 Laptop GPU`
+- `TORCH_GPU_MATMUL_OK: ...`
+- `SMOKE_PASS`
 
-STEP 1 — Build and push Docker image
---------------------------------------
-docker build -f k3s/sky/Dockerfile.local-gpu \
-  -t takenking9879/ray-train-ssh:2.53.0 .
+Ejecucion automatizable (recomendada)
+-------------------------------------
+Desde la raiz del repo:
 
-docker push takenking9879/ray-train-ssh:2.53.0
+```bash
+bash k3s/sky/e2e-local-gpu-smoke.sh
+```
 
-# Verify image exists:
-docker images | grep ray-train-ssh
+Opcional (mas rapido para debug):
 
+```bash
+SKY_SSH_UP_TIMEOUT=60 JOB_TIMEOUT_SECONDS=1200 bash k3s/sky/e2e-local-gpu-smoke.sh
+```
 
-STEP 2 — Start local GPU container on WSL host
-------------------------------------------------
+Que hace este script
+--------------------
+1. Reinicia `sky-local-gpu` con GPU y flags de sistema.
+2. Garantiza `/usr/lib/wsl/lib/libdxcore.so` dentro del nodo local.
+3. Verifica GPU del nodo (`docker exec sky-local-gpu nvidia-smi`).
+4. Ajusta `/root/.sky/config.yaml` (runtimeClass `nvidia` para `ssh/local-gpu`).
+5. Ejecuta `sky ssh up` con timeout (no se queda colgado indefinidamente).
+6. Cancela requests colgados `sky.ssh_node_pools.up` si quedaron en RUNNING.
+7. Pre-pull de imagen en k3s containerd:
+   `k3s crictl pull docker.io/takenking9879/ray-train-ssh:2.53.0`
+8. Lanza smoke `k3s/sky/ray-gpu-smoke-local.yaml`, espera estado final y valida markers.
+9. Limpia cluster `local-smoke` (si `CLEANUP_CLUSTER=1`, default).
+
+Smoke YAML usado
+----------------
+Archivo: `k3s/sky/ray-gpu-smoke-local.yaml`
+
+Puntos clave del run:
+- ejecuta `nvidia-smi`
+- hace `unset CUDA_VISIBLE_DEVICES` antes de PyTorch
+- valida `torch.cuda.is_available()`
+- corre matmul pequeño en GPU
+
+Nota importante de Ray/SkyPilot
+-------------------------------
+En este flujo local, Ray puede dejar `CUDA_VISIBLE_DEVICES=""` para jobs CPU.
+Si no se limpia esa variable, PyTorch puede reportar `cuda=False` aunque `nvidia-smi` vea GPU.
+Por eso el smoke incluye:
+
+```bash
+unset CUDA_VISIBLE_DEVICES
+```
+
+Validacion manual minima (si quieres correrlo por partes)
+---------------------------------------------------------
+1) Nodo local:
+
+```bash
 bash k3s/sky/start-local-gpu-node.sh
-
-# Verify container running with GPU access:
 docker exec sky-local-gpu nvidia-smi
-# Expected: GPU table with your card listed
+```
 
-# Verify SSH port is open:
-ss -tlnp | grep 2222
-# Expected: LISTEN on 0.0.0.0:2222
+2) Subir runtime SSH (timeboxed):
 
+```bash
+bash k3s/sky/sky-ssh-up-timeboxed.sh 60
+```
 
-STEP 3 — Test SSH from WSL host to container
-----------------------------------------------
-ssh -p 2222 \
-  -i ~/.sky/ssh_keys/local-gpu \
-  -o StrictHostKeyChecking=no \
-  root@127.0.0.1 \
-  "echo SSH_OK && nvidia-smi | head -3"
-# Expected: SSH_OK + GPU line
+3) Cancelar request colgado (si aplica):
 
+```bash
+API_CTN=$(docker ps --format '{{.Names}}' | rg '^k8s_skypilot-api_' -m1)
+docker exec "$API_CTN" sky api status
+docker exec "$API_CTN" sky api cancel <request_id_de_sky.ssh_node_pools.up>
+```
 
-STEP 4 — Deploy Helm with SSH node pool config
-------------------------------------------------
-helm upgrade --install skypilot ./k3s/sky/helm/skypilot \
-  --namespace skypilot \
-  --set-file apiService.sshNodePools=k3s/sky/ssh_node_pools.yaml \
-  -f k3s/sky/helm/values.yaml
+4) Pre-pull imagen en k3s:
 
-# Verify config landed in pod:
-kubectl exec -n skypilot deployment/skypilot-api-server -- \
-  cat ~/.sky/ssh_node_pools.yaml
-# Expected: local-gpu: user: root, port: 2222, hosts: [host.docker.internal]
+```bash
+docker exec sky-local-gpu bash -lc 'k3s crictl pull docker.io/takenking9879/ray-train-ssh:2.53.0'
+```
 
+5) Lanzar smoke:
 
-STEP 5 — Copy SSH private key into API server pod
---------------------------------------------------
-# One-time; survives pod restarts only if key is baked into image or re-copied after restarts.
-# For persistence consider a K8s secret instead.
+```bash
+API_CTN=$(docker ps --format '{{.Names}}' | rg '^k8s_skypilot-api_' -m1)
+cat k3s/sky/ray-gpu-smoke-local.yaml | kubectl exec -i -n skypilot my-skypilot-api-server-56dd5f5bf7-n7jl4 -- sh -lc 'cat > /tmp/ray-gpu-smoke-local.yaml'
+docker exec "$API_CTN" sky launch -y --cluster local-smoke /tmp/ray-gpu-smoke-local.yaml
+docker exec "$API_CTN" sky logs local-smoke --no-follow --tail 220
+```
 
-POD=$(kubectl get pod -n skypilot -l app=skypilot-api-server \
-  -o jsonpath='{.items[0].metadata.name}')
+6) Cleanup:
 
-kubectl exec -n skypilot $POD -- mkdir -p /root/.sky/ssh_keys
+```bash
+docker exec "$API_CTN" sky down local-smoke -y
+```
 
-kubectl cp ~/.sky/ssh_keys/local-gpu \
-  skypilot/$POD:/root/.sky/ssh_keys/local-gpu
-
-kubectl exec -n skypilot $POD -- \
-  chmod 600 /root/.sky/ssh_keys/local-gpu
-
-# Verify key present:
-kubectl exec -n skypilot deployment/skypilot-api-server -- \
-  ls -la /root/.sky/ssh_keys/local-gpu
-
-
-STEP 6 — sky check ssh
-------------------------
-kubectl exec -n skypilot deployment/skypilot-api-server -- sky check ssh
-# Expected: local-gpu   ✓   1 node(s)
-
-# If FAILED: pod cannot reach host.docker.internal:2222
-#   - Check container is running: docker ps | grep sky-local-gpu
-#   - Check host.docker.internal resolves from pod:
-#     kubectl exec -n skypilot $POD -- getent hosts host.docker.internal
-#   - Check pod can TCP-reach port 2222:
-#     kubectl exec -n skypilot $POD -- nc -zv host.docker.internal 2222
-
-
-STEP 7 — Smoke YAML (minimal GPU verify, no pip install)
----------------------------------------------------------
-kubectl exec -n skypilot deployment/skypilot-api-server -- \
-  sky launch -y --cluster-name local-smoke \
-  /path/to/k3s/sky/ray-gpu-smoke-local.yaml
-
-# Stream logs:
-kubectl exec -n skypilot deployment/skypilot-api-server -- \
-  sky logs local-smoke
-# Expected lines: SMOKE_START / GPU_OK / TORCH_CUDA_OK: <GPU name> / SMOKE_PASS
-
-# Cleanup:
-kubectl exec -n skypilot deployment/skypilot-api-server -- \
-  sky down local-smoke -y
-
-
-STEP 8 — Full training YAML via Airflow UI (end-to-end)
----------------------------------------------------------
-1. Open Airflow UI -> training_dag_skypilot
-2. Trigger with dag_conf JSON:
-   {
-     "model_type": "pytorch",
-     "gpu_resource_constraints": {
-       "providers": ["local"]
-     },
-     ... (other required training params)
-   }
-
-3. Verify in task logs:
-   - Task "build_sky_job": YAML = ray-gpu-training-local.yaml, any_of = []
-   - Task "launch_sky_job": sky launch uses infra: ssh/local-gpu (no cloud VM provisioned)
-   - METRICS_SOURCE = local_docker, GPU_PRICE_PER_HOUR = 0, USE_SPOT = false
-
-4. Check sky logs from Airflow task output or:
-   kubectl exec -n skypilot deployment/skypilot-api-server -- \
-     sky logs <job-name>
-   # Expected: setup (~30s, --system-site-packages), run section completes
-
-
-TROUBLESHOOTING
----------------
-Container not reachable from pod:
-  → host.docker.internal only resolves in Docker Desktop K8s.
-  → In k3s on WSL, may need to use host IP instead.
-  → Get host IP: ip route | awk '/default/ {print $3}'
-  → Update k3s/sky/ssh_node_pools.yaml hosts: [<that IP>] and redeploy.
-
-sky check ssh shows 0 nodes:
-  → Check SSH key perms in pod (must be 600).
-  → Check authorized_keys in container has the PUBLIC key:
-    docker exec sky-local-gpu cat /root/.ssh/authorized_keys
-
-Training job fails at setup:
-  → Check Ray version in container matches ray in training YAML run: section.
-  → Check CUDA visible: docker exec sky-local-gpu python3 -c "import torch; print(torch.cuda.is_available())"
+Troubleshooting rapido
+----------------------
+- `sky ssh up` se queda despues de `runtime is up`:
+  - comportamiento conocido en este entorno; usar helper timeboxed.
+- Cluster en `INIT` por mucho tiempo:
+  - revisar pulls de imagen en pod events.
+  - hacer pre-pull con `k3s crictl pull ...`.
+- `nvidia-smi` OK pero `torch.cuda.is_available()==False`:
+  - verificar que el run haga `unset CUDA_VISIBLE_DEVICES`.

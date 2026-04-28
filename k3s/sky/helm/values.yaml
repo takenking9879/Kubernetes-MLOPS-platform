@@ -239,7 +239,7 @@ apiService:
   #     --namespace skypilot \
   #     --set-file apiService.sshNodePools=k3s/sky/ssh_node_pools.yaml \
   #     -f k3s/sky/helm/values.yaml
-  # Verify: kubectl exec -n skypilot deployment/skypilot-api-server -- cat ~/.sky/ssh_node_pools.yaml
+  # Verify: kubectl exec -n skypilot deployment/skypilot-api-server -- cat /root/.sky/ssh_node_pools.yaml
   sshNodePools:
 
 # ── Cloud credentials ─────────────────────────────────────────────────────────

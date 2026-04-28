@@ -1,0 +1,2 @@
+[22:25:52] HOST $ kubectl --kubeconfig '/etc/rancher/k3s/k3s.yaml' get nodes -o jsonpath='{range .items[*]}{.metadata.name}{
+bash: -c: line 1: unexpected EOF while looking for matching `''

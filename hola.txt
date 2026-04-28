@@ -1,2 +1,66 @@
-- Documento POC
-- NDA
+## Coding Philosophy & Execution Rules
+
+Code must be simple, efficient, scalable, and production-ready.
+
+### Core Principles
+
+- Prioritize readability over cleverness.
+- Keep logic explicit, flat, use early returns.
+- Avoid duplicated logic and unnecessary abstractions.
+- Split files only if it improves clarity.
+
+### Performance & Scalability
+
+- Optimize from the start (CPU, GPU, memory, I/O).
+- Use parallelism, batching, vectorization when applicable.
+- Consider large-scale data (lazy-loading).
+- Balance scalability with low overhead for small inputs.
+
+### Logging & Observability
+
+- Use structured logging (e.g., self.logger).
+- Logs must indicate: what, where, why it failed.
+- Do NOT over-log.
+
+### Error Handling
+
+- FAIL FAST for internal errors (bad logic, invalid inputs).
+- Do NOT hide bugs with fallbacks.
+- try/except only when necessary (~1 per function).
+- Fallbacks/retries ONLY for external failures (network, APIs, infra).
+- Retries must be explicit, limited, logged.
+
+### Modularity & OOP
+
+- Use OOP when it improves structure.
+- Each class/function must have a clear responsibility.
+- Avoid monolithic "god objects".
+- Keep modules easy to navigate for humans and LLMs.
+
+### Production Readiness
+
+- Code must be robust in real environments.
+- Ensure debuggable through logs.
+- Handle edge cases that occur in production.
+
+### Full Stack Changes
+
+A configuration or feature change must propagate through ALL affected layers:
+
+- Identify every component the change touches
+- Update each layer in the correct order
+- Missing a layer = broken feature
+
+Always map the full chain before implementing.
+
+### Tech Stack
+
+- **Local Dev**: conda env `ml-platform` (Python libs pre-installed)
+- **Infra**: Kubernetes (kubeadm, Docker Desktop, WSL2)
+- **Stack**: Frontend → Backend → Airflow → SkyPilot
+
+### Final Rule
+
+If code is hard to read, inefficient, not scalable, or hard to debug → it is WRONG.
+
+

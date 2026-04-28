@@ -217,6 +217,32 @@ notebooks/processed/
 # Zone identifier files
 *:Zone.Identifier
 app/frontend/node_modules/
+virtual-kubelet-ml-platform/
+**/node_modules/
+**/dist/
+**/build/
+**/coverage/
+**/.next/
+**/.turbo/
+**/.cache/
+**/__pycache__/
+**/*.pyc
+**/*.pyo
+**/*.log
+**/*.sqlite
+**/*.db
+**/*.csv
+**/*.parquet
+**/.env
+**/.env.*
+**/secrets/
+**/credentials/
+**/*.pem
+**/*.key
+**/*.p12
+**/*.pfx
+**/.tmp/
+**/tmp/
 
 # API de RunPod
 runpod_API.txt
@@ -227,3 +253,15 @@ UI_code.txt
 UI_prompt.txt
 skytest.yaml
 images/
+# Added by code-review-graph
+.code-review-graph/
+
+.kiro/
+.codex/
+.claude/
+.github/hooks/
+.github/copilot-instructions.md
+.cursorrules
+.mcp.json
+.opencode.json
+.windsurfrules

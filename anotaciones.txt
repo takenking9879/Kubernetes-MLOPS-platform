@@ -95,3 +95,9 @@ Ser un Data Scientist pero que hace sin saberlo lo de un ML engineer
 sky serve status
 
 sky serve logs --controller <name>
+
+Quiero que cheques porque sky ssh up se queda en “runtime is up” 
+y tengo que interrumpirlo manualmente para evitar quedarnos trabados 
+aunque sky check ssh lo ve que esta up...
+
+https://github.com/tirth8205/code-review-graph/tree/main
