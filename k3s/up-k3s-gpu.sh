@@ -62,6 +62,7 @@ ensure_local_docker_engine() {
   os_name="$(docker_os)"
   if [[ "${os_name}" != *"Docker Desktop"* ]]; then
     log "Docker engine is local: ${os_name}"
+    run "systemctl enable --now docker"
     return
   fi
 

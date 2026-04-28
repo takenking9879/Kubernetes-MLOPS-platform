@@ -9,7 +9,7 @@ set -euo pipefail
 # Optional env vars:
 #   STOP_LOCAL_DOCKER=0   # set to 1 to stop docker.service after removing k3s
 
-STOP_LOCAL_DOCKER="${STOP_LOCAL_DOCKER:-0}"
+STOP_LOCAL_DOCKER="${STOP_LOCAL_DOCKER:-1}"
 
 log() {
   echo "[down-k3s-gpu] $*"
@@ -40,7 +40,10 @@ run "rm -f /usr/local/bin/kubectl /usr/local/bin/crictl /usr/local/bin/ctr || tr
 
 if [[ "${STOP_LOCAL_DOCKER}" == "1" ]]; then
   log "Stopping local Docker daemon"
+  run "systemctl stop docker.socket || true"
   run "systemctl stop docker || true"
+  run "systemctl disable docker.socket || true"
+  run "systemctl disable docker || true"
 fi
 
 log "Done. k3s is down."
