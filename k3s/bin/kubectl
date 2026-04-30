@@ -1,0 +1,14 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Central translation layer: every kubectl call uses k3s built-in kubectl.
+if command -v k3s >/dev/null 2>&1; then
+  exec k3s kubectl "$@"
+fi
+
+if [[ -x /usr/local/bin/k3s ]]; then
+  exec /usr/local/bin/k3s kubectl "$@"
+fi
+
+echo "k3s binary not found. Install/start k3s before using kubectl wrapper." >&2
+exit 1
