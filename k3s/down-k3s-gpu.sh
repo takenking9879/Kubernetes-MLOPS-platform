@@ -19,6 +19,9 @@ set -euo pipefail
 #   PLATFORM_NAMESPACES="kafka ray spark monitoring apps airflow skypilot"
 #   NAMESPACE_DELETE_TIMEOUT=180s
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+export PATH="${SCRIPT_DIR}/bin:/usr/local/bin:${PATH}"
+
 STOP_K3S="${STOP_K3S:-1}"
 CLEAN_K3S_CONTAINERS="${CLEAN_K3S_CONTAINERS:-1}"
 STOP_K3S_EMBEDDED_CONTAINERD="${STOP_K3S_EMBEDDED_CONTAINERD:-1}"
@@ -98,6 +101,29 @@ kube_cmd() {
   kubectl --kubeconfig "${K3S_KUBECONFIG}" "$@"
 }
 
+restore_kubectl_context() {
+  local kubeconfig="$1" owner="$2"
+  [[ ! -f "${kubeconfig}" ]] && return
+
+  # Switch away from k3s before removing it so kubectl doesn't point at dead cluster
+  local fallback=""
+  for ctx in docker-desktop docker-for-desktop minikube; do
+    if kubectl --kubeconfig "${kubeconfig}" config get-contexts "${ctx}" >/dev/null 2>&1; then
+      fallback="${ctx}"
+      break
+    fi
+  done
+  [[ -n "${fallback}" ]] && kubectl --kubeconfig "${kubeconfig}" config use-context "${fallback}" >/dev/null 2>&1 || true
+
+  # Remove k3s context/cluster/user entries (both new "k3s" name and legacy "default")
+  for entry in k3s default; do
+    kubectl --kubeconfig "${kubeconfig}" config delete-context "${entry}" >/dev/null 2>&1 || true
+    kubectl --kubeconfig "${kubeconfig}" config delete-cluster "${entry}" >/dev/null 2>&1 || true
+    kubectl --kubeconfig "${kubeconfig}" config unset "users.${entry}" >/dev/null 2>&1 || true
+  done
+  log "kubeconfig cleaned for ${owner}${fallback:+, current-context restored to ${fallback}}"
+}
+
 cluster_api_reachable() {
   kube_cmd get --raw=/readyz >/dev/null 2>&1
 }
@@ -167,6 +193,8 @@ cleanup_platform_state
 
 if [[ "${STOP_K3S}" == "1" ]]; then
   stop_unit_if_present "k3s.service"
+  run "systemctl disable k3s 2>/dev/null || true"
+  log "k3s.service disabled (will not auto-start on next boot/WSL session)"
 fi
 
 if [[ "${CLEAN_K3S_CONTAINERS}" == "1" ]] && [[ -x "/usr/local/bin/k3s-killall.sh" ]]; then
@@ -198,6 +226,12 @@ fi
 if [[ "${UNMOUNT_DOCKER_HOST}" == "1" ]] && grep -q ' /Docker/host ' /proc/mounts 2>/dev/null; then
   log "Unmounting /Docker/host to avoid kubelet mount parser issues on next k3s start"
   run "umount /Docker/host || true"
+fi
+
+restore_kubectl_context "/root/.kube/config" "root"
+if [[ -n "${SUDO_USER:-}" ]]; then
+  user_home="$(getent passwd "${SUDO_USER}" | cut -d: -f6 2>/dev/null || true)"
+  [[ -n "${user_home}" ]] && restore_kubectl_context "${user_home}/.kube/config" "${SUDO_USER}"
 fi
 
 log "Done. k3s and selected dependencies are down."

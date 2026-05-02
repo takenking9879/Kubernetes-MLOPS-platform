@@ -9,6 +9,7 @@ Este documento explica el flujo de los scripts GPU de `k3s` usando `containerd` 
   - Configura runtime NVIDIA para pods GPU (RuntimeClass `nvidia` + device plugin).
   - Verifica que el nodo tenga `nvidia.com/gpu` allocatable.
   - Verifica que tu imagen ya exista en `k3s containerd` (no importa ni guarda).
+  - Ejecuta `update-win-hosts.sh` automáticamente al final.
 
 - `k3s/down-k3s-gpu.sh`
   - Baja `k3s`.
@@ -20,11 +21,16 @@ Este documento explica el flujo de los scripts GPU de `k3s` usando `containerd` 
   - Ejecuta `nvidia-smi`.
   - Falla con diagnóstico si no hay GPU o la imagen no está.
 
+- `k3s/update-win-hosts.sh`
+  - Sincroniza Windows hosts file y portproxy para que `*.localhost` resuelva al ingress.
+  - Ver sección [Ingress en WSL2](#ingress-en-wsl2-por-qué-es-necesario) abajo.
+
 ## Flujo normal diario
 
 ```bash
-sudo bash k3s/up-k3s-gpu.sh
+sudo bash k3s/up-k3s-gpu.sh   # levanta k3s + actualiza hosts/portproxy
 sudo bash k3s/test-k3s-gpu.sh
+./k3s/deploy.sh                # deploya la plataforma + actualiza hosts/portproxy
 ```
 
 Si quieres apagar todo:
@@ -32,6 +38,42 @@ Si quieres apagar todo:
 ```bash
 sudo bash k3s/down-k3s-gpu.sh
 ```
+
+## Ingress en WSL2 — por qué es necesario
+
+Con Docker Desktop / kubeadm el ingress funcionaba sin configuración extra porque esos entornos mapean puertos al `127.0.0.1` de Windows automáticamente.
+
+Con k3s en WSL2 hay dos problemas:
+
+1. **IP dinámica**: la IP de WSL2 cambia en cada reboot (`172.25.x.x`). El hosts file de Windows necesita apuntar `*.localhost` a esa IP.
+2. **Chrome ignora el hosts file para `*.localhost`**: los browsers modernos tratan `*.localhost` como loopback (`127.0.0.1`) por RFC 6761, ignorando cualquier entrada en hosts.
+
+La solución son dos cosas juntas:
+
+- **Windows hosts file**: `*.localhost → WSL2 IP` (para resolución DNS general)
+- **netsh portproxy**: `127.0.0.1:80/443 → WSL2 IP:80/443` (para que Chrome llegue al ingress)
+
+### `update-win-hosts.sh`
+
+El script `k3s/update-win-hosts.sh` hace ambas cosas automáticamente. Se ejecuta solo desde `up-k3s-gpu.sh` y `deploy.sh`, pero también puedes correrlo manualmente después de un reboot:
+
+```bash
+bash k3s/update-win-hosts.sh
+```
+
+Disparará un UAC prompt de Windows (click "Yes") y actualizará hosts + portproxy con la IP actual.
+
+**Servicios expuestos:**
+
+| URL | Servicio |
+|-----|----------|
+| http://airflow.localhost | Airflow UI |
+| http://app.localhost | DSL App frontend |
+| http://mlflow.localhost | MLflow |
+| http://grafana.localhost | Grafana |
+| http://kafka.localhost | Kafka UI |
+| http://serving.localhost/infer | Ray Serve |
+| http://prom-write.localhost/api/v1/write | Prometheus remote write |
 
 ## Importación manual one-time de imagen a k3s containerd
 

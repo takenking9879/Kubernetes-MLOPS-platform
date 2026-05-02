@@ -283,6 +283,15 @@ deploy_monitoring() {
   sep
   info "Deploying Monitoring Stack (Prometheus, Grafana, kube-state-metrics, node-exporter)"
 
+  # Release any Retain-policy PVs left from a previous deploy cycle so new PVCs can bind.
+  for pv in prometheus-pv-host; do
+    phase="$(kubectl get pv "${pv}" -o jsonpath='{.status.phase}' 2>/dev/null || true)"
+    if [[ "${phase}" == "Released" ]]; then
+      info "Releasing stale PV ${pv} (was Retain/Released from previous cycle)"
+      kubectl patch pv "${pv}" --type json -p '[{"op":"remove","path":"/spec/claimRef"}]'
+    fi
+  done
+
   # Apply all monitoring manifests
   info "Applying Prometheus"
   kubectl apply -f k3s/monitoring/prometheus/prometheus-stack.yaml
@@ -414,6 +423,13 @@ deploy_ingress() {
     -f k3s/ingress/values.yaml
 
   ok "Platform ingress deployed 🚀"
+
+  # k3s on WSL2 only: sync Windows hosts file so *.localhost resolves to the current
+  # WSL2 IP. Not needed with Docker Desktop / kubeadm (those map ports to 127.0.0.1
+  # automatically). Triggers a one-time UAC prompt on Windows.
+  INGRESS_IP="$(kubectl get svc ingress-nginx-controller -n ingress-nginx \
+    -o jsonpath='{.status.loadBalancer.ingress[0].ip}' 2>/dev/null || true)"
+  bash "$(dirname "$0")/update-win-hosts.sh" "${INGRESS_IP:-}" || true
 }
 
 # ============================================================

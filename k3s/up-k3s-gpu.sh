@@ -18,6 +18,9 @@ set -euo pipefail
 #   VERIFY_LOCAL_IMAGE=1
 #   LOCAL_IMAGE=takenking9879/ray-train:2.53.0
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+export PATH="${SCRIPT_DIR}/bin:${PATH}"
+
 START_LOCAL_DOCKER="${START_LOCAL_DOCKER:-0}"
 INSTALL_K3S_VERSION="${INSTALL_K3S_VERSION:-v1.34.1+k3s1}"
 K3S_HTTPS_PORT="${K3S_HTTPS_PORT:-16443}"
@@ -34,7 +37,7 @@ LOCAL_IMAGE="${LOCAL_IMAGE:-takenking9879/ray-train:2.53.0}"
 K3S_KUBECONFIG="${K3S_KUBECONFIG:-/etc/rancher/k3s/k3s.yaml}"
 K3S_SERVICE_ENV_FILE="/etc/systemd/system/k3s.service.env"
 K3S_SERVICE_FILE="/etc/systemd/system/k3s.service"
-RUNTIME_CLASS_FILE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/kuberay/nvidia-runtime-class.yaml"
+RUNTIME_CLASS_FILE="${SCRIPT_DIR}/kuberay/nvidia-runtime-class.yaml"
 
 log() {
   echo "[up-k3s-gpu] $*"
@@ -254,6 +257,67 @@ YAML"
   fi
 }
 
+setup_kubectl_and_kubeconfig() {
+  if ! command -v kubectl >/dev/null 2>&1; then
+    log "No kubectl found — installing wrapper to /usr/local/bin/kubectl"
+    cp "${SCRIPT_DIR}/bin/kubectl" /usr/local/bin/kubectl
+    chmod +x /usr/local/bin/kubectl
+  fi
+
+  # k3s names its context/cluster/user "default" — rename to "k3s" to avoid
+  # clobbering docker-desktop or kubeadm contexts that also use "default"
+  local tmp_cfg
+  tmp_cfg="$(mktemp)"
+  sed -e 's/\(cluster:\|user:\|name:\) default$/\1 k3s/g' \
+      -e 's/current-context: default/current-context: k3s/' \
+      "${K3S_KUBECONFIG}" > "${tmp_cfg}"
+
+  _merge_and_switch_context "/root/.kube" "root" "${tmp_cfg}"
+
+  if [[ -n "${SUDO_USER:-}" ]]; then
+    local user_home
+    user_home="$(getent passwd "${SUDO_USER}" | cut -d: -f6)"
+    if [[ -n "${user_home}" ]]; then
+      _merge_and_switch_context "${user_home}/.kube" "${SUDO_USER}" "${tmp_cfg}"
+    fi
+  fi
+
+  rm -f "${tmp_cfg}"
+
+  # Make k3s kubectl respect ~/.kube/config instead of /etc/rancher/k3s/k3s.yaml
+  if [[ -n "${SUDO_USER:-}" ]]; then
+    local user_home
+    user_home="$(getent passwd "${SUDO_USER}" | cut -d: -f6)"
+    local kubeconfig_line='export KUBECONFIG="$HOME/.kube/config"'
+    for rc in "${user_home}/.bashrc" "${user_home}/.zshrc"; do
+      if [[ -f "${rc}" ]] && ! grep -q 'KUBECONFIG' "${rc}"; then
+        echo "${kubeconfig_line}" >> "${rc}"
+        log "Added KUBECONFIG export to ${rc}"
+      fi
+    done
+  fi
+}
+
+_merge_and_switch_context() {
+  local kube_dir="$1" owner="$2" src="$3"
+  local dest="${kube_dir}/config"
+  mkdir -p "${kube_dir}"
+  if [[ -f "${dest}" ]]; then
+    KUBECONFIG="${dest}:${src}" kubectl config view --flatten > "${dest}.tmp"
+    mv "${dest}.tmp" "${dest}"
+  else
+    cp "${src}" "${dest}"
+  fi
+  chmod 600 "${dest}"
+  [[ "${owner}" != "root" ]] && chown "${owner}:${owner}" "${kube_dir}" "${dest}"
+  # Remove legacy k3s "default" context that existed before the rename
+  kubectl --kubeconfig "${dest}" config delete-context default >/dev/null 2>&1 || true
+  kubectl --kubeconfig "${dest}" config delete-cluster default >/dev/null 2>&1 || true
+  kubectl --kubeconfig "${dest}" config unset "users.default" >/dev/null 2>&1 || true
+  kubectl --kubeconfig "${dest}" config use-context k3s
+  log "kubeconfig merged, current-context=k3s for ${owner}"
+}
+
 verify_local_image_in_k3s_containerd() {
   if [[ "${VERIFY_LOCAL_IMAGE}" != "1" ]]; then
     log "Skipping local image verification (VERIFY_LOCAL_IMAGE=${VERIFY_LOCAL_IMAGE})."
@@ -280,7 +344,7 @@ if [[ "${EUID}" -ne 0 ]]; then
   exit 1
 fi
 
-for cmd in bash curl kubectl systemctl awk grep sed; do
+for cmd in bash curl systemctl awk grep sed; do
   require_cmd "${cmd}"
 done
 
@@ -299,8 +363,9 @@ fi
 ensure_k3s_containerd_mode
 sanitize_wsl_docker_host_mount
 
-log "Starting k3s"
-run "systemctl enable --now k3s"
+log "Starting k3s (boot auto-start disabled; use up-k3s-gpu.sh to start manually)"
+run "systemctl disable k3s 2>/dev/null || true"
+run "systemctl start k3s"
 run "systemctl is-active k3s"
 api_timeout_seconds="$(timeout_to_seconds "${WAIT_TIMEOUT}")"
 if ! wait_for_kube_api "${api_timeout_seconds}"; then
@@ -313,5 +378,10 @@ run "kubectl --kubeconfig '${K3S_KUBECONFIG}' get nodes -o wide"
 ensure_nvidia_runtime_for_k3s
 deploy_gpu_stack
 verify_local_image_in_k3s_containerd
+setup_kubectl_and_kubeconfig
 
-log "Done. k3s is up with GPU stack and image precheck (no auto-import)."
+# k3s on WSL2 only: pre-seed Windows hosts with current WSL2 IP so *.localhost
+# resolves correctly after deploy. Not needed with Docker Desktop / kubeadm.
+bash "${SCRIPT_DIR}/update-win-hosts.sh" || true
+
+log "Done. k3s is up — 'kubectl get pods -A' should work in your terminal now."
