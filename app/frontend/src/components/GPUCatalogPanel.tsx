@@ -62,9 +62,17 @@ const PROVIDER_CFG: Record<string, {
     pill: 'border-sky-500/40 text-sky-300 bg-sky-500/10',
     filterActive: 'bg-sky-600/25 border-sky-400/70 text-sky-200 shadow-[0_0_8px_rgba(14,165,233,0.45)]',
   },
+  local: {
+    label: 'Local K3S',
+    leftGlow: 'rgba(34,197,94,0.65)',
+    borderColor: '#22c55e',
+    dot: '#22c55e',
+    pill: 'border-green-500/40 text-green-300 bg-green-500/10',
+    filterActive: 'bg-green-600/25 border-green-400/70 text-green-200 shadow-[0_0_8px_rgba(34,197,94,0.45)]',
+  },
 };
 
-const ALL_PROVIDERS = ['runpod', 'vast', 'aws', 'gcp', 'azure'];
+const ALL_PROVIDERS = ['runpod', 'vast', 'aws', 'gcp', 'azure', 'local'];
 
 // ── Aggregation ───────────────────────────────────────────────────────────────
 
@@ -516,7 +524,11 @@ export function GPUCatalogPanel({ open, selectedGpuTypes, onSelect }: Props) {
                     />
                     {cfg.label}
                   </span>
-                  {liveData && (
+                  {row.provider === 'local' ? (
+                    <span className="rounded border border-green-500/30 bg-green-500/8 px-1 py-px text-[8px] font-bold uppercase tracking-wide text-green-400">
+                      in-cluster
+                    </span>
+                  ) : liveData && (
                     <span
                       className={`rounded border px-1 py-px text-[8px] font-bold uppercase tracking-wide ${
                         row.anyAvailable

@@ -227,6 +227,98 @@ ensure_nvidia_runtime_for_k3s() {
   run "kubectl --kubeconfig '${K3S_KUBECONFIG}' wait --for=condition=Ready node --all --timeout='${WAIT_TIMEOUT}'"
 }
 
+map_nvidia_name_to_skypilot() {
+  # Maps nvidia-smi GPU names (spaces) or GFD labels (hyphens) to lowercase
+  # SkyPilot accelerator names. skypilot.co/accelerator label must be lowercase.
+  local raw
+  raw=$(echo "$1" | tr '[:upper:]' '[:lower:]' \
+    | sed 's/nvidia //g; s/geforce //g; s/ laptop gpu//g; s/laptop gpu//g; s/-laptop-gpu//g' \
+    | sed 's/nvidia-//g; s/geforce-//g' \
+    | xargs)
+
+  case "$raw" in
+    "rtx 5090"|"rtx5090"|"rtx-5090")           echo "rtx5090" ;;
+    "rtx 4090"|"rtx4090"|"rtx-4090")           echo "rtx4090" ;;
+    "rtx 4080"|"rtx4080"|"rtx-4080")           echo "rtx4080" ;;
+    "rtx 4070 ti super"|"rtx4070tisuper")       echo "rtx4070ti" ;;
+    "rtx 4070 ti"|"rtx4070ti"|"rtx-4070-ti")   echo "rtx4070ti" ;;
+    "rtx 4070 super"|"rtx4070super")            echo "rtx4070" ;;
+    "rtx 4070"|"rtx4070"|"rtx-4070")           echo "rtx4070" ;;
+    "rtx 4060"|"rtx4060"|"rtx-4060")           echo "rtx4060" ;;
+    "rtx 3090 ti"|"rtx3090ti"|"rtx-3090-ti")   echo "rtx3090" ;;
+    "rtx 3090"|"rtx3090"|"rtx-3090")           echo "rtx3090" ;;
+    "rtx 3080 ti"|"rtx3080ti"|"rtx-3080-ti")   echo "rtx3080" ;;
+    "rtx 3080"|"rtx3080"|"rtx-3080")           echo "rtx3080" ;;
+    *"a100"*"80gb"*"sxm"*)                      echo "a100-80gb-sxm" ;;
+    *"a100"*"80gb"*)                             echo "a100-80gb" ;;
+    *"a100"*)                                    echo "a100" ;;
+    *"a40"*)                                     echo "a40" ;;
+    *"h100"*"nvl"*)                              echo "h100-nvl" ;;
+    *"h100"*"sxm"*)                              echo "h100-sxm" ;;
+    *"h100"*)                                    echo "h100" ;;
+    *"h200"*)                                    echo "h200-sxm" ;;
+    *"l40s"*)                                    echo "l40s" ;;
+    *"l40"*)                                     echo "l40" ;;
+    *"l4"*)                                      echo "l4" ;;
+    *"v100"*"32gb"*)                             echo "v100-32gb" ;;
+    *"v100"*)                                    echo "v100" ;;
+    *"a4000"*)                                   echo "rtxa4000" ;;
+    *"a5000"*)                                   echo "rtxa5000" ;;
+    *"a6000"*)                                   echo "rtxa6000" ;;
+    *"rtx 2000 ada"*|*"rtx2000ada"*)             echo "rtx2000-ada" ;;
+    *"rtx 4000 ada"*|*"rtx4000ada"*)             echo "rtx4000-ada" ;;
+    *"rtx 6000 ada"*|*"rtx6000ada"*)             echo "rtx6000-ada" ;;
+    *)
+      # Fallback: strip spaces, lowercase
+      echo "$raw" | tr -d ' -' | tr '[:upper:]' '[:lower:]'
+      ;;
+  esac
+}
+
+label_gpu_nodes_for_skypilot() {
+  log "Detecting GPU for SkyPilot node labeling (skypilot.co/accelerator)"
+
+  local gpu_name=""
+  # Primary: nvidia-smi on host (reliable, no GFD needed)
+  if command -v nvidia-smi >/dev/null 2>&1; then
+    gpu_name=$(nvidia-smi --query-gpu=name --format=csv,noheader 2>/dev/null | head -1 | xargs)
+  fi
+
+  # Fallback: GFD product label (only if GFD is deployed via helm)
+  if [[ -z "$gpu_name" ]]; then
+    gpu_name=$(kubectl --kubeconfig "${K3S_KUBECONFIG}" get nodes \
+      -o jsonpath='{.items[0].metadata.labels.nvidia\.com/gpu\.product}' 2>/dev/null \
+      | tr '-' ' ' | xargs)
+  fi
+
+  if [[ -z "$gpu_name" ]]; then
+    log "WARNING: Cannot detect GPU name — skipping SkyPilot node labels"
+    log "  Run manually: kubectl label node <node> skypilot.co/accelerator=<name> skypilot.co/accelerator-count=<n>"
+    return 0
+  fi
+
+  local skypilot_name
+  skypilot_name=$(map_nvidia_name_to_skypilot "$gpu_name")
+
+  local gpu_count=1
+  if command -v nvidia-smi >/dev/null 2>&1; then
+    gpu_count=$(nvidia-smi -L 2>/dev/null | wc -l | tr -d ' ')
+    [[ "${gpu_count}" -ge 1 ]] 2>/dev/null || gpu_count=1
+  fi
+
+  log "GPU: '${gpu_name}' → skypilot.co/accelerator=${skypilot_name} (count=${gpu_count})"
+
+  local node
+  for node in $(kubectl --kubeconfig "${K3S_KUBECONFIG}" get nodes \
+      -o jsonpath='{.items[*].metadata.name}' 2>/dev/null); do
+    kubectl --kubeconfig "${K3S_KUBECONFIG}" label node "${node}" \
+      "skypilot.co/accelerator=${skypilot_name}" \
+      "skypilot.co/accelerator-count=${gpu_count}" \
+      --overwrite
+    log "Labeled node ${node}: accelerator=${skypilot_name} count=${gpu_count}"
+  done
+}
+
 deploy_gpu_stack() {
   log "Applying RuntimeClass nvidia"
   if [[ -f "${RUNTIME_CLASS_FILE}" ]]; then
@@ -377,6 +469,7 @@ run "kubectl --kubeconfig '${K3S_KUBECONFIG}' get nodes -o wide"
 
 ensure_nvidia_runtime_for_k3s
 deploy_gpu_stack
+label_gpu_nodes_for_skypilot
 verify_local_image_in_k3s_containerd
 setup_kubectl_and_kubeconfig
 

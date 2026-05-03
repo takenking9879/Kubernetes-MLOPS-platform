@@ -66,6 +66,67 @@ _SKY_AWS_KNOWN: frozenset[str] = frozenset({
     "L4", "L40S", "RTXPRO6000", "T4", "V100", "V100-32GB",
 })
 
+# ── nvidia-smi name → SkyPilot accelerator label (lowercase, for K8s) ────────
+# Output must be lowercase — skypilot.co/accelerator label requires lowercase.
+_NVIDIA_SMI_TO_SKYPILOT: dict[str, str] = {
+    "rtx 5090": "rtx5090",
+    "rtx 4090": "rtx4090",
+    "rtx 4080": "rtx4080",
+    "rtx 4070 ti super": "rtx4070ti",
+    "rtx 4070 ti": "rtx4070ti",
+    "rtx 4070 super": "rtx4070",
+    "rtx 4070": "rtx4070",
+    "rtx 4060": "rtx4060",
+    "rtx 3090 ti": "rtx3090",
+    "rtx 3090": "rtx3090",
+    "rtx 3080 ti": "rtx3080",
+    "rtx 3080": "rtx3080",
+    "a100-80gb-pcie": "a100-80gb",
+    "a100-sxm4-80gb": "a100-80gb-sxm",
+    "a100 80gb pcie": "a100-80gb",
+    "a100": "a100",
+    "a40": "a40",
+    "h100-80gb-hbm3": "h100-sxm",
+    "h100 80gb hbm3": "h100-sxm",
+    "h100-nvl": "h100-nvl",
+    "h100 nvl": "h100-nvl",
+    "h100": "h100",
+    "h200": "h200-sxm",
+    "l40s": "l40s",
+    "l40": "l40",
+    "l4": "l4",
+    "v100-32gb": "v100-32gb",
+    "v100 32gb": "v100-32gb",
+    "v100": "v100",
+    "rtx a4000": "rtxa4000",
+    "rtx a5000": "rtxa5000",
+    "rtx a6000": "rtxa6000",
+    "rtx 2000 ada generation": "rtx2000-ada",
+    "rtx 4000 ada generation": "rtx4000-ada",
+    "rtx 6000 ada generation": "rtx6000-ada",
+}
+
+
+def _nvidia_name_to_skypilot(raw_name: str) -> str:
+    """Map nvidia-smi GPU name to lowercase SkyPilot K8s accelerator label."""
+    normalized = (
+        raw_name.lower()
+        .replace("nvidia ", "")
+        .replace("geforce ", "")
+        .replace(" laptop gpu", "")
+        .replace("-laptop-gpu", "")
+        .strip()
+    )
+    result = _NVIDIA_SMI_TO_SKYPILOT.get(normalized)
+    if result:
+        return result
+    for key, val in _NVIDIA_SMI_TO_SKYPILOT.items():
+        if key in normalized:
+            return val
+    # Fallback: strip spaces and hyphens, lowercase
+    return normalized.replace(" ", "").replace("-", "")
+
+
 # ── RunPod GPU displayName/id → SkyPilot accelerator ID ──────────────────────
 # Keys are the `id` field returned by RunPod's GraphQL API (often = displayName).
 _RUNPOD_TO_SKYPILOT: dict[str, str] = {
@@ -182,6 +243,8 @@ class GPUCatalogService:
             all_offers.extend(self._query_vast(sky_catalog))
         if "aws" in active:
             all_offers.extend(self._query_aws(sky_catalog))
+        if "local" in active or "k3s" in active:
+            all_offers.extend(self._query_k3s())
 
         if min_vram_gb > 0:
             all_offers = [o for o in all_offers if o.vram_gb >= min_vram_gb]
@@ -190,6 +253,81 @@ class GPUCatalogService:
             all_offers = [o for o in all_offers if o.gpu_type.lower() in lower]
 
         return all_offers
+
+    # ── Local K3S cluster ─────────────────────────────────────────────────────
+
+    def _query_k3s(self) -> list[GPUOffer]:
+        """Query local K3S cluster for GPU offers via nvidia-smi + kubectl."""
+        cache_key = "_k3s"
+        now = time.time()
+        if cache_key in self._cache and now - self._cache_ts.get(cache_key, 0) < self.TTL_SECONDS:
+            return self._cache[cache_key]
+        try:
+            smi = subprocess.run(
+                ["nvidia-smi", "--query-gpu=name,memory.total", "--format=csv,noheader"],
+                capture_output=True, text=True, timeout=10,
+            )
+            if smi.returncode != 0 or not smi.stdout.strip():
+                return []
+
+            gpu_lines = [ln.strip() for ln in smi.stdout.strip().splitlines() if ln.strip()]
+            if not gpu_lines:
+                return []
+
+            parts = gpu_lines[0].split(",")
+            gpu_name_raw = parts[0].strip()
+            vram_mib = 0
+            if len(parts) > 1:
+                try:
+                    vram_mib = int(parts[1].strip().split()[0])
+                except (ValueError, IndexError):
+                    pass
+            gpu_count = len(gpu_lines)
+            skypilot_acc = _nvidia_name_to_skypilot(gpu_name_raw)
+
+            # Prefer the node label if it's already been set (authoritative)
+            nodes_r = subprocess.run(
+                ["kubectl", "get", "nodes", "-o", "json"],
+                capture_output=True, text=True, timeout=10,
+            )
+            if nodes_r.returncode == 0:
+                import json as _json
+                for node in _json.loads(nodes_r.stdout).get("items", []):
+                    label_acc = node.get("metadata", {}).get("labels", {}).get("skypilot.co/accelerator", "")
+                    if label_acc:
+                        skypilot_acc = label_acc
+                        break
+
+            if not skypilot_acc:
+                return []
+
+            offers = [GPUOffer(
+                provider="local",
+                gpu_type=skypilot_acc,
+                gpu_count=gpu_count,
+                vram_gb=round(vram_mib / 1024, 1),
+                vcpus=0,
+                ram_gb=0.0,
+                price_on_demand=0.0,
+                price_spot=None,
+                spot_available=False,
+                available_count=gpu_count,
+                region="local",
+                infiniband=False,
+                skypilot_supported=True,
+                skypilot_accelerator=f"{skypilot_acc}:{gpu_count}",
+                skypilot_cloud="k8s",
+                provider_region_id="",
+                skypilot_region="",
+                skypilot_zone="",
+                skypilot_infra="k8s/in-cluster",
+            )]
+            self._cache[cache_key] = offers
+            self._cache_ts[cache_key] = now
+            return offers
+        except Exception as exc:
+            logger.warning("K3S GPU catalog query failed: %s", exc)
+            return []
 
     # ── SkyPilot catalog (unified, all three providers) ───────────────────────
 

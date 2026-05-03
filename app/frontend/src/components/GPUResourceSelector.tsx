@@ -35,21 +35,21 @@ import { useGpuCatalogStore } from '../store/gpuCatalogStore';
 // ── Constants ─────────────────────────────────────────────────────────────────
 
 const PROVIDERS = [
-  { id: 'runpod', label: 'RunPod' },
-  { id: 'vast', label: 'Vast.ai' },
-  { id: 'aws', label: 'AWS' },
-  { id: 'gcp', label: 'GCP' },
-  { id: 'azure', label: 'Azure' },
-  { id: 'local', label: 'Local GPU' },
+  { id: 'runpod',    label: 'RunPod' },
+  { id: 'vast',      label: 'Vast.ai' },
+  { id: 'aws',       label: 'AWS' },
+  { id: 'gcp',       label: 'GCP' },
+  { id: 'azure',     label: 'Azure' },
+  { id: 'localGPU',  label: 'Local K3S', exclusive: true },
 ];
 
 const INFRA_OPTIONS = [
-  { id: 'runpod',        label: 'RunPod' },
-  { id: 'vast',          label: 'Vast.ai' },
-  { id: 'aws',           label: 'AWS' },
-  { id: 'gcp',           label: 'GCP' },
-  { id: 'azure',         label: 'Azure' },
-  { id: 'ssh/local-gpu', label: 'Local GPU' },
+  { id: 'runpod',          label: 'RunPod' },
+  { id: 'vast',            label: 'Vast.ai' },
+  { id: 'aws',             label: 'AWS' },
+  { id: 'gcp',             label: 'GCP' },
+  { id: 'azure',           label: 'Azure' },
+  { id: 'k8s/in-cluster',  label: 'Local K3S' },
 ];
 
 const VRAM_OPTIONS = [0, 8, 16, 24, 40, 80];
@@ -132,9 +132,9 @@ export function GPUResourceSelector({ value, onChange, disabled }: Props) {
   // Debounced select call whenever constraints change (auto mode only)
   useEffect(() => {
     if (!open || mode !== 'auto') return;
-    // Local SSH node pool: no catalog needed; backend derives infra from YAML.
+    // localGPU: K3S in-cluster — no catalog cost estimate, backend detects GPU from node labels
     const _providers = value.providers ?? ['runpod'];
-    if (_providers.length === 1 && _providers[0] === 'local') {
+    if (_providers.length === 1 && _providers[0] === 'localGPU') {
       setSelectResult(null);
       return;
     }
@@ -185,7 +185,17 @@ export function GPUResourceSelector({ value, onChange, disabled }: Props) {
   const toggleProvider = useCallback(
     (id: string) => {
       const cur = value.providers ?? ['runpod'];
-      const next = cur.includes(id) ? cur.filter((p) => p !== id) : [...cur, id];
+      let next: string[];
+      if (id === 'localGPU') {
+        // localGPU is exclusive — selecting it deselects all cloud providers
+        next = cur.includes('localGPU') ? cur.filter((p) => p !== 'localGPU') : ['localGPU'];
+      } else {
+        // Selecting a cloud provider deselects localGPU
+        const withoutLocal = cur.filter((p) => p !== 'localGPU');
+        next = withoutLocal.includes(id)
+          ? withoutLocal.filter((p) => p !== id)
+          : [...withoutLocal, id];
+      }
       if (next.length === 0) return;
       set({ providers: next });
     },
@@ -389,7 +399,7 @@ export function GPUResourceSelector({ value, onChange, disabled }: Props) {
 
   const isLocalOnly =
     (value.providers ?? ['runpod']).length === 1 &&
-    (value.providers ?? ['runpod'])[0] === 'local';
+    (value.providers ?? ['runpod'])[0] === 'localGPU';
 
   const savings =
     selectResult?.estimated_cost_spot != null &&
@@ -497,13 +507,13 @@ export function GPUResourceSelector({ value, onChange, disabled }: Props) {
                 </div>
               </div>
 
-              {/* Local GPU note (no catalog needed) */}
+              {/* Local K3S note */}
               {isLocalOnly && (
-                <p className="rounded border border-blue-700/40 bg-blue-950/30 px-3 py-2 text-[11px] text-blue-300">
-                  Routes to local Docker container via SSH Node Pool
-                  (<span className="font-mono">host.docker.internal:2222</span>).
-                  No GPU catalog or cost estimate — uses the pre-running container with{' '}
-                  <span className="font-mono">--gpus all</span>.
+                <p className="rounded border border-green-700/40 bg-green-950/30 px-3 py-2 text-[11px] text-green-300">
+                  Local K3S cluster — no pricing, no autoscaling, no region selection.
+                  GPU type detected automatically from node labels{' '}
+                  (<span className="font-mono">skypilot.co/accelerator</span>).
+                  For local debugging and validation only.
                 </p>
               )}
 

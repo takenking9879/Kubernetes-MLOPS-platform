@@ -105,7 +105,43 @@ def _norm_key(value: str) -> str:
 
 
 def _normalize_provider(provider: str) -> str:
-    return str(provider or "").strip().lower()
+    raw = str(provider or "").strip().lower()
+    if raw in ("localgpu", "local_gpu"):
+        return "localgpu"
+    return raw
+
+
+def _detect_k3s_gpu_accelerator(num_gpus: int = 1) -> str:
+    """Return 'rtx4070:1' style string from K3S node labels, or '' on failure."""
+    import json as _json
+    import subprocess as _sp
+    try:
+        # Prefer the node label (set by up-k3s-gpu.sh / deploy.sh) — most accurate
+        r = _sp.run(
+            ["kubectl", "get", "nodes", "-o", "json"],
+            capture_output=True, text=True, timeout=10,
+        )
+        if r.returncode == 0:
+            for node in _json.loads(r.stdout).get("items", []):
+                labels = node.get("metadata", {}).get("labels", {})
+                cap = node.get("status", {}).get("capacity", {})
+                if int(cap.get("nvidia.com/gpu", 0) or 0) == 0:
+                    continue
+                acc = labels.get("skypilot.co/accelerator", "")
+                if acc:
+                    return f"{acc}:{num_gpus}"
+        # Fallback: nvidia-smi on host
+        smi = _sp.run(
+            ["nvidia-smi", "--query-gpu=name", "--format=csv,noheader"],
+            capture_output=True, text=True, timeout=10,
+        )
+        if smi.returncode == 0 and smi.stdout.strip():
+            from src.services.gpu_catalog import _nvidia_name_to_skypilot
+            name = _nvidia_name_to_skypilot(smi.stdout.strip().splitlines()[0])
+            return f"{name}:{num_gpus}" if name else ""
+        return ""
+    except Exception:
+        return ""
 
 
 def _normalize_region(provider: str, region: str) -> str:
@@ -360,11 +396,20 @@ def build_any_of_from_constraints(constraints: dict[str, Any] | None) -> list[di
     if not constraints:
         return []
 
-    # Local SSH node pool: infra is preserved from the YAML template.
-    # any_of must be empty so job_builder.py does not overwrite infra: ssh/local-gpu.
     _providers = [_normalize_provider(p) for p in (constraints.get("providers") or []) if str(p).strip()]
-    if _providers == ["local"]:
-        return []
+
+    # localGPU → K3S in-cluster path: detect GPU from node labels and generate any_of
+    if "localgpu" in _providers or "k8s" in _providers:
+        n_gpus = max(1, int(constraints.get("num_gpus_per_node") or 1))
+        gpu_acc = _detect_k3s_gpu_accelerator(n_gpus)
+        if not gpu_acc:
+            return []  # cluster unreachable or no labeled GPU node — fail fast
+        return [{"infra": "k8s/in-cluster", "accelerators": gpu_acc, "use_spot": False}]
+
+    # Exclusivity guard: localGPU cannot mix with cloud providers
+    _local_ids = {"localgpu", "k8s"}
+    if any(p in _local_ids for p in _providers) and any(p not in _local_ids for p in _providers):
+        raise ValueError("localGPU provider cannot be combined with cloud providers")
 
     n_gpus = max(1, int(constraints.get("num_gpus_per_node") or 1))
     manual = sanitize_gpu_fallbacks(constraints.get("gpu_fallbacks"), default_num_gpus=n_gpus)

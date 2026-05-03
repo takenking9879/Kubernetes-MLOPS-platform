@@ -31,7 +31,10 @@ if [[ ! -f "${WIN_HOSTS}" ]]; then
   exit 0
 fi
 
-if ! command -v powershell.exe >/dev/null 2>&1; then
+# Resolve powershell.exe — not always in PATH when called from deploy.sh / sudo.
+POWERSHELL="$(command -v powershell.exe 2>/dev/null \
+  || echo /mnt/c/Windows/System32/WindowsPowerShell/v1.0/powershell.exe)"
+if [[ ! -x "${POWERSHELL}" ]]; then
   warn "powershell.exe not found. Skipping."
   exit 0
 fi
@@ -51,7 +54,7 @@ build_new_hosts() {
 }
 
 # ── Build PS1 that runs elevated (hosts + portproxy) ──────────────────────────
-WIN_TEMP="$(powershell.exe -NoProfile -NonInteractive -Command \
+WIN_TEMP="$("${POWERSHELL}" -NoProfile -NonInteractive -Command \
   '[System.IO.Path]::GetTempPath()' 2>/dev/null | tr -d '\r\n')"
 WSL_TEMP="$(wslpath "${WIN_TEMP}")"
 
@@ -75,7 +78,7 @@ PSEOF
 
 log "Launching elevated PowerShell for hosts + portproxy (UAC prompt will appear)..."
 
-powershell.exe -NoProfile -NonInteractive -Command \
+"${POWERSHELL}" -NoProfile -NonInteractive -Command \
   "Start-Process powershell -Verb RunAs -Wait \
    -ArgumentList '-NoProfile -ExecutionPolicy Bypass -File \"${WIN_PS1}\" \"${WIN_CONTENT}\" \"C:\Windows\System32\drivers\etc\hosts\" \"${WSL_IP}\"'"
 
@@ -88,7 +91,7 @@ else
   warn "Hosts verify failed — UAC may have been denied."
 fi
 
-PROXY_CHECK="$(powershell.exe -NoProfile -Command \
+PROXY_CHECK="$("${POWERSHELL}" -NoProfile -Command \
   "netsh interface portproxy show v4tov4" 2>/dev/null | grep -c "127.0.0.1" || true)"
 if [[ "${PROXY_CHECK}" -ge 2 ]]; then
   log "Portproxy active: 127.0.0.1:80/443 → ${WSL_IP}:80/443"

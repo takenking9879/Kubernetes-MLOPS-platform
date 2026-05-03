@@ -61,6 +61,89 @@ if [ "${ENABLE_REPO_DOWNLOAD}" = true ]; then
 fi
 
 # ============================================================
+# GPU NODE LABELING (SkyPilot)
+# ============================================================
+_map_nvidia_name_to_skypilot() {
+  local raw
+  raw=$(echo "$1" | tr '[:upper:]' '[:lower:]' \
+    | sed 's/nvidia //g; s/geforce //g; s/ laptop gpu//g; s/laptop gpu//g; s/-laptop-gpu//g' \
+    | sed 's/nvidia-//g; s/geforce-//g' \
+    | xargs)
+  case "$raw" in
+    "rtx 5090"|"rtx5090"|"rtx-5090")           echo "rtx5090" ;;
+    "rtx 4090"|"rtx4090"|"rtx-4090")           echo "rtx4090" ;;
+    "rtx 4080"|"rtx4080"|"rtx-4080")           echo "rtx4080" ;;
+    "rtx 4070 ti super"|"rtx4070tisuper")       echo "rtx4070ti" ;;
+    "rtx 4070 ti"|"rtx4070ti"|"rtx-4070-ti")   echo "rtx4070ti" ;;
+    "rtx 4070 super"|"rtx4070super")            echo "rtx4070" ;;
+    "rtx 4070"|"rtx4070"|"rtx-4070")           echo "rtx4070" ;;
+    "rtx 4060"|"rtx4060"|"rtx-4060")           echo "rtx4060" ;;
+    "rtx 3090 ti"|"rtx3090ti"|"rtx-3090-ti")   echo "rtx3090" ;;
+    "rtx 3090"|"rtx3090"|"rtx-3090")           echo "rtx3090" ;;
+    "rtx 3080 ti"|"rtx3080ti"|"rtx-3080-ti")   echo "rtx3080" ;;
+    "rtx 3080"|"rtx3080"|"rtx-3080")           echo "rtx3080" ;;
+    *"a100"*"80gb"*"sxm"*)  echo "a100-80gb-sxm" ;;
+    *"a100"*"80gb"*)         echo "a100-80gb" ;;
+    *"a100"*)                echo "a100" ;;
+    *"a40"*)                 echo "a40" ;;
+    *"h100"*"nvl"*)          echo "h100-nvl" ;;
+    *"h100"*"sxm"*)          echo "h100-sxm" ;;
+    *"h100"*)                echo "h100" ;;
+    *"h200"*)                echo "h200-sxm" ;;
+    *"l40s"*)                echo "l40s" ;;
+    *"l40"*)                 echo "l40" ;;
+    *"l4"*)                  echo "l4" ;;
+    *"v100"*"32gb"*)         echo "v100-32gb" ;;
+    *"v100"*)                echo "v100" ;;
+    *"a4000"*)               echo "rtxa4000" ;;
+    *"a5000"*)               echo "rtxa5000" ;;
+    *"a6000"*)               echo "rtxa6000" ;;
+    *"rtx 2000 ada"*|*"rtx2000ada"*)  echo "rtx2000-ada" ;;
+    *"rtx 4000 ada"*|*"rtx4000ada"*)  echo "rtx4000-ada" ;;
+    *"rtx 6000 ada"*|*"rtx6000ada"*)  echo "rtx6000-ada" ;;
+    *) echo "$raw" | tr -d ' -' | tr '[:upper:]' '[:lower:]' ;;
+  esac
+}
+
+_label_gpu_nodes_for_skypilot() {
+  local gpu_name=""
+  if command -v nvidia-smi >/dev/null 2>&1; then
+    gpu_name=$(nvidia-smi --query-gpu=name --format=csv,noheader 2>/dev/null | head -1 | xargs)
+  fi
+  if [[ -z "$gpu_name" ]]; then
+    gpu_name=$(kubectl get nodes \
+      -o jsonpath='{.items[0].metadata.labels.nvidia\.com/gpu\.product}' 2>/dev/null \
+      | tr '-' ' ' | xargs)
+  fi
+  if [[ -z "$gpu_name" ]]; then
+    warn "Cannot detect GPU name — skipping SkyPilot node labels"
+    return 0
+  fi
+  local skypilot_name
+  skypilot_name=$(_map_nvidia_name_to_skypilot "$gpu_name")
+  local gpu_count=1
+  if command -v nvidia-smi >/dev/null 2>&1; then
+    gpu_count=$(nvidia-smi -L 2>/dev/null | wc -l | tr -d ' ')
+    [[ "${gpu_count}" -ge 1 ]] 2>/dev/null || gpu_count=1
+  fi
+  info "GPU node labeling: '${gpu_name}' → skypilot.co/accelerator=${skypilot_name} (count=${gpu_count})"
+  local node
+  for node in $(kubectl get nodes -o jsonpath='{.items[*].metadata.name}' 2>/dev/null); do
+    kubectl label node "${node}" \
+      "skypilot.co/accelerator=${skypilot_name}" \
+      "skypilot.co/accelerator-count=${gpu_count}" \
+      --overwrite
+  done
+  ok "GPU nodes labeled for SkyPilot"
+}
+
+if kubectl get nodes >/dev/null 2>&1; then
+  _label_gpu_nodes_for_skypilot
+else
+  warn "K3S API unreachable — skipping GPU node labeling"
+fi
+
+# ============================================================
 # NAMESPACES + SECRETS
 # ============================================================
 sep
@@ -424,12 +507,6 @@ deploy_ingress() {
 
   ok "Platform ingress deployed 🚀"
 
-  # k3s on WSL2 only: sync Windows hosts file so *.localhost resolves to the current
-  # WSL2 IP. Not needed with Docker Desktop / kubeadm (those map ports to 127.0.0.1
-  # automatically). Triggers a one-time UAC prompt on Windows.
-  INGRESS_IP="$(kubectl get svc ingress-nginx-controller -n ingress-nginx \
-    -o jsonpath='{.status.loadBalancer.ingress[0].ip}' 2>/dev/null || true)"
-  bash "$(dirname "$0")/update-win-hosts.sh" "${INGRESS_IP:-}" || true
 }
 
 # ============================================================

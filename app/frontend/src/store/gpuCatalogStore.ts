@@ -28,7 +28,7 @@ export const useGpuCatalogStore = create<GPUCatalogStore>((set, get) => ({
     if (get().loading) return;
     set({ loading: true });
     try {
-      const data = await queryGPUCatalog({ providers: 'runpod,vast,aws,gcp,azure' });
+      const data = await queryGPUCatalog({ providers: 'runpod,vast,aws,gcp,azure,local' });
       set({ catalog: data, lastFetched: Date.now() });
     } catch {
       // Keep existing catalog — stale data > empty panel

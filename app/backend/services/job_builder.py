@@ -101,7 +101,7 @@ _SKY_DIR = _REPO_ROOT / "k3s/sky"
 # Tabular training — provider-specific (RunPod/Vast templates, AWS custom image)
 _SKY_GPU_RUNPOD_YAML = _SKY_DIR / "ray-gpu-training-runpod.yaml"
 _SKY_GPU_VAST_YAML   = _SKY_DIR / "ray-gpu-training-vast.yaml"
-_SKY_GPU_LOCAL_YAML  = _SKY_DIR / "ray-gpu-training-local.yaml"
+_SKY_GPU_K8S_YAML    = _SKY_DIR / "ray-gpu-training-k8s.yaml"
 _SKY_MULTINODE_YAML  = _SKY_DIR / "ray-gpu-multinode-aws.yaml"
 
 # LLM training — provider-specific
@@ -131,8 +131,9 @@ def _provider_from_any_of(any_of: list[dict]) -> str:
     infra = str(first.get("infra", "")).strip().lower()
     if infra:
         prefix = infra.split("/", 1)[0]
-        # ssh/ prefix = SkyPilot SSH Node Pool → local Docker GPU execution
-        return "local" if prefix == "ssh" else prefix
+        if prefix == "k8s":
+            return "k8s"
+        return prefix
 
     return "runpod"
 
@@ -168,19 +169,27 @@ class JobBuilder:
         else:
             if provider == "vast":
                 base_yaml_path = _SKY_GPU_VAST_YAML
-            elif provider == "local":
-                base_yaml_path = _SKY_GPU_LOCAL_YAML
+            elif provider == "k8s":
+                base_yaml_path = _SKY_GPU_K8S_YAML
             else:
                 base_yaml_path = _SKY_GPU_RUNPOD_YAML
 
         sky_conf = self._load_base_yaml(base_yaml_path)
 
-        # Inject dynamic ordered list if provided
+        # Inject dynamic resource constraints
         if config.any_of:
             resources_cfg = sky_conf.setdefault("resources", {})
-            resources_cfg["ordered"] = config.any_of
-            resources_cfg.pop("any_of", None)
-            resources_cfg.pop("infra", None)
+            # K8s single-entry: set infra + accelerators directly (no ordered list)
+            if len(config.any_of) == 1 and config.any_of[0].get("infra", "").startswith("k8s/"):
+                entry = config.any_of[0]
+                resources_cfg["infra"] = entry["infra"]
+                resources_cfg["accelerators"] = entry["accelerators"]
+                resources_cfg.pop("ordered", None)
+                resources_cfg.pop("any_of", None)
+            else:
+                resources_cfg["ordered"] = config.any_of
+                resources_cfg.pop("any_of", None)
+                resources_cfg.pop("infra", None)
 
         # Inject num_nodes for multi-node
         if is_multinode:
@@ -370,11 +379,23 @@ class JobBuilder:
             else:
                 base = _SKY_LLM_RUNPOD_YAML
         else:
-            base = _SKY_GPU_VAST_YAML if provider == "vast" else _SKY_GPU_RUNPOD_YAML
+            if provider == "vast":
+                base = _SKY_GPU_VAST_YAML
+            elif provider == "k8s":
+                base = _SKY_GPU_K8S_YAML
+            else:
+                base = _SKY_GPU_RUNPOD_YAML
 
         sky_conf = self._load_base_yaml(base)
         if any_of:
             resources_cfg = sky_conf.setdefault("resources", {})
-            resources_cfg["ordered"] = any_of
-            resources_cfg.pop("any_of", None)
+            if len(any_of) == 1 and any_of[0].get("infra", "").startswith("k8s/"):
+                entry = any_of[0]
+                resources_cfg["infra"] = entry["infra"]
+                resources_cfg["accelerators"] = entry["accelerators"]
+                resources_cfg.pop("ordered", None)
+                resources_cfg.pop("any_of", None)
+            else:
+                resources_cfg["ordered"] = any_of
+                resources_cfg.pop("any_of", None)
         return _yaml.dump(sky_conf, default_flow_style=False, allow_unicode=True)
