@@ -21,6 +21,9 @@ name: ray-gpu-training-k8s
 num_nodes: 1
 
 resources:
+  # SkyPilot Kubernetes custom images require the docker: prefix.
+  # Keep this pinned so local K3S runs do not fall back to SkyPilot's default GPU image.
+  image_id: docker:takenking9879/ray-train:2.53.0
   # infra and accelerators are injected by job_builder.py at build time.
   # These placeholders are never used at runtime — they exist so the YAML
   # is valid for manual sky launch testing.

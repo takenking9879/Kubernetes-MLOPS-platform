@@ -214,6 +214,7 @@ def _run_sky_training(
         from kubernetes import client as _k8s_client, config as _k8s_config
 
         n_gpus_k8s = int(num_gpus_per_node) if str(num_gpus_per_node).strip().isdigit() else 1
+        k8s_train_image = "docker:takenking9879/ray-train:2.53.0"
         k8s_acc = ""
         try:
             try:
@@ -240,9 +241,13 @@ def _run_sky_training(
         resources_cfg = sky_conf.setdefault("resources", {})
         resources_cfg["infra"] = "k8s/in-cluster"
         resources_cfg["accelerators"] = k8s_acc
+        resources_cfg["image_id"] = k8s_train_image
         resources_cfg.pop("ordered", None)
         resources_cfg.pop("any_of", None)
-        print(f"[sky-training] K3S GPU: {k8s_acc} — infra: k8s/in-cluster")
+        print(
+            f"[sky-training] K3S GPU: {k8s_acc} — infra: k8s/in-cluster "
+            f"(image={k8s_train_image})"
+        )
     elif rc:
         gpu_fallbacks = rc.get("gpu_fallbacks")
         explicit_gpu_selection = bool(
