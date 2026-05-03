@@ -1,6 +1,0 @@
-local-gpu:
-  user: root
-  identity_file: ~/.sky/ssh_keys/local-gpu
-  port: 2222
-  hosts:
-    - host.docker.internal

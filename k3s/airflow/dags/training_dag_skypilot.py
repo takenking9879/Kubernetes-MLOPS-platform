@@ -123,7 +123,7 @@ def _run_sky_training(
         or ""
     ).strip()
 
-    # Derive provider early (needed to skip AWS credential check for local provider).
+    # Derive provider early (needed to skip AWS credential check for K3S local provider).
     _rc_early: dict | None = None
     if resource_constraints_json and resource_constraints_json not in ("null", "{}"):
         try:
@@ -133,7 +133,8 @@ def _run_sky_training(
     _early_providers = (_rc_early or {}).get("providers") or []
     _early_provider = str(_early_providers[0]).lower() if _early_providers else "runpod"
 
-    if _early_provider != "local" and (not aws_access_key_id or not aws_secret_access_key):
+    _local_providers = {"localgpu", "k8s"}
+    if _early_provider not in _local_providers and (not aws_access_key_id or not aws_secret_access_key):
         raise RuntimeError(
             "Missing AWS credentials in Airflow scheduler environment. "
             "Expected AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY from env-secret."
@@ -191,7 +192,6 @@ def _run_sky_training(
     _yaml_map = {
         ("train",       "runpod"):   "ray-gpu-training-runpod.yaml",
         ("train",       "vast"):     "ray-gpu-training-vast.yaml",
-        ("train",       "local"):    "ray-gpu-training-local.yaml",
         ("train",       "localgpu"): "ray-gpu-training-k8s.yaml",
         ("train",       "k8s"):      "ray-gpu-training-k8s.yaml",
         ("train_multi", "aws"):      "ray-gpu-multinode-aws.yaml",
@@ -284,7 +284,7 @@ def _run_sky_training(
         "DEEPSPEED_STAGE":     deepspeed_stage,
     })
 
-    if provider in ("local", "localgpu", "k8s"):
+    if provider in _local_providers:
         sky_envs["METRICS_SOURCE"] = "local_k3s"
         sky_envs["GPU_PRICE_PER_HOUR"] = "0"
         sky_envs["USE_SPOT"] = "false"
