@@ -211,27 +211,27 @@ def _run_sky_training(
 
     if provider in ("localgpu", "k8s"):
         # Detect GPU accelerator from K8s node labels set by up-k3s-gpu.sh
-        import json as _json
-        import subprocess as _sp
+        from kubernetes import client as _k8s_client, config as _k8s_config
+
         n_gpus_k8s = int(num_gpus_per_node) if str(num_gpus_per_node).strip().isdigit() else 1
         k8s_acc = ""
         try:
-            r = _sp.run(
-                ["kubectl", "get", "nodes", "-o", "json"],
-                capture_output=True, text=True, timeout=10,
-            )
-            if r.returncode == 0:
-                for node in _json.loads(r.stdout).get("items", []):
-                    labels = node.get("metadata", {}).get("labels", {})
-                    cap = node.get("status", {}).get("capacity", {})
-                    if int(cap.get("nvidia.com/gpu", 0) or 0) == 0:
-                        continue
-                    acc = labels.get("skypilot.co/accelerator", "")
-                    if acc:
-                        k8s_acc = f"{acc}:{n_gpus_k8s}"
-                        break
+            try:
+                _k8s_config.load_incluster_config()
+            except Exception:
+                _k8s_config.load_kube_config()
+            v1 = _k8s_client.CoreV1Api()
+            for node in v1.list_node().items:
+                labels = node.metadata.labels or {}
+                capacity = node.status.capacity or {}
+                if int(capacity.get("nvidia.com/gpu", 0) or 0) == 0:
+                    continue
+                acc = labels.get("skypilot.co/accelerator", "")
+                if acc:
+                    k8s_acc = f"{acc}:{n_gpus_k8s}"
+                    break
         except Exception as exc:
-            print(f"[sky-training] kubectl node query failed: {exc}")
+            print(f"[sky-training] K8s node query failed: {exc}")
         if not k8s_acc:
             raise RuntimeError(
                 "localGPU provider selected but no K8s node with nvidia.com/gpu capacity "

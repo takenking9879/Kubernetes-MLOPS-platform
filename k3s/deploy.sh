@@ -422,7 +422,10 @@ deploy_airflow() {
   sep
   info "Deploying Airflow"
   helm upgrade --install my-airflow apache-airflow/airflow -n airflow -f k3s/airflow/airflow_values.yaml
+
+  info "Applying Airflow RBAC manifests"
   kubectl apply -f k3s/airflow/airflow-rbac.yaml
+  kubectl apply -f k3s/airflow/rbac-node-reader.yaml
 
   # ── SkyPilot runner pod prerequisites ─────────────────────────────────────
   # sky-runner pods (KubernetesPodOperator) read ALL cloud credentials from
