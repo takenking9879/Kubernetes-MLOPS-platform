@@ -189,10 +189,12 @@ def _run_sky_training(
         print("[sky-training] Outbound metrics shipping disabled (missing remote_write URL).")
 
     _yaml_map = {
-        ("train",       "runpod"): "ray-gpu-training-runpod.yaml",
-        ("train",       "vast"):   "ray-gpu-training-vast.yaml",
-        ("train",       "local"):  "ray-gpu-training-local.yaml",
-        ("train_multi", "aws"):    "ray-gpu-multinode-aws.yaml",
+        ("train",       "runpod"):   "ray-gpu-training-runpod.yaml",
+        ("train",       "vast"):     "ray-gpu-training-vast.yaml",
+        ("train",       "local"):    "ray-gpu-training-local.yaml",
+        ("train",       "localgpu"): "ray-gpu-training-k8s.yaml",
+        ("train",       "k8s"):      "ray-gpu-training-k8s.yaml",
+        ("train_multi", "aws"):      "ray-gpu-multinode-aws.yaml",
     }
     kind = "train_multi" if (use_gpu and n_nodes > 1) else "train"
     yaml_name = (
@@ -207,7 +209,41 @@ def _run_sky_training(
     with open(yaml_path) as fh:
         sky_conf = yaml.safe_load(fh)
 
-    if rc:
+    if provider in ("localgpu", "k8s"):
+        # Detect GPU accelerator from K8s node labels set by up-k3s-gpu.sh
+        import json as _json
+        import subprocess as _sp
+        n_gpus_k8s = int(num_gpus_per_node) if str(num_gpus_per_node).strip().isdigit() else 1
+        k8s_acc = ""
+        try:
+            r = _sp.run(
+                ["kubectl", "get", "nodes", "-o", "json"],
+                capture_output=True, text=True, timeout=10,
+            )
+            if r.returncode == 0:
+                for node in _json.loads(r.stdout).get("items", []):
+                    labels = node.get("metadata", {}).get("labels", {})
+                    cap = node.get("status", {}).get("capacity", {})
+                    if int(cap.get("nvidia.com/gpu", 0) or 0) == 0:
+                        continue
+                    acc = labels.get("skypilot.co/accelerator", "")
+                    if acc:
+                        k8s_acc = f"{acc}:{n_gpus_k8s}"
+                        break
+        except Exception as exc:
+            print(f"[sky-training] kubectl node query failed: {exc}")
+        if not k8s_acc:
+            raise RuntimeError(
+                "localGPU provider selected but no K8s node with nvidia.com/gpu capacity "
+                "and skypilot.co/accelerator label found. Run label_gpu_nodes_for_skypilot."
+            )
+        resources_cfg = sky_conf.setdefault("resources", {})
+        resources_cfg["infra"] = "k8s/in-cluster"
+        resources_cfg["accelerators"] = k8s_acc
+        resources_cfg.pop("ordered", None)
+        resources_cfg.pop("any_of", None)
+        print(f"[sky-training] K3S GPU: {k8s_acc} — infra: k8s/in-cluster")
+    elif rc:
         gpu_fallbacks = rc.get("gpu_fallbacks")
         explicit_gpu_selection = bool(
             (rc.get("gpu_types") or [])
@@ -248,8 +284,8 @@ def _run_sky_training(
         "DEEPSPEED_STAGE":     deepspeed_stage,
     })
 
-    if provider == "local":
-        sky_envs["METRICS_SOURCE"] = "local_docker"
+    if provider in ("local", "localgpu", "k8s"):
+        sky_envs["METRICS_SOURCE"] = "local_k3s"
         sky_envs["GPU_PRICE_PER_HOUR"] = "0"
         sky_envs["USE_SPOT"] = "false"
 
