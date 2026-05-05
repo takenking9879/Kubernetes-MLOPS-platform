@@ -91,12 +91,53 @@ def _run_sky_runner(
         return json.load(fh)
 
 
+def _detect_k3s_gpu_for_serve(rc: dict, n_gpus: int = 1) -> str:
+    """Detect K8s GPU accelerator label. Runs in Airflow Python env (has kubernetes pkg)."""
+    from kubernetes import client as _k8s_client, config as _k8s_config
+    k8s_acc = ""
+    try:
+        try:
+            _k8s_config.load_incluster_config()
+        except Exception:
+            _k8s_config.load_kube_config()
+        v1 = _k8s_client.CoreV1Api()
+        for node in v1.list_node().items:
+            labels = node.metadata.labels or {}
+            capacity = node.status.capacity or {}
+            if int(capacity.get("nvidia.com/gpu", 0) or 0) == 0:
+                continue
+            acc = labels.get("skypilot.co/accelerator", "")
+            if acc:
+                k8s_acc = f"{acc}:{n_gpus}"
+                break
+    except Exception as exc:
+        raise RuntimeError(f"[tabular-serve] K8s node query failed: {exc}") from exc
+    if not k8s_acc:
+        raise RuntimeError(
+            "[tabular-serve] localGPU selected but no K8s node with nvidia.com/gpu "
+            "and skypilot.co/accelerator label found."
+        )
+    return k8s_acc
+
+
 def _launch_tabular_serve(**context) -> dict:
     conf = context["dag_run"].conf or {}
     mlflow_tracking_uri = (
         (conf.get("mlflow_tracking_uri") or "").strip()
         or (os.getenv("MLFLOW_TRACKING_URI") or "").strip()
     )
+
+    rc = conf.get("resource_constraints") or {}
+    providers = rc.get("providers") or []
+    provider = str(providers[0]).lower() if providers else "runpod"
+
+    extra: dict = {}
+    if provider in ("localgpu", "k8s"):
+        n_gpus = max(1, int(rc.get("num_gpus_per_node") or 1))
+        k8s_acc = _detect_k3s_gpu_for_serve(rc, n_gpus)
+        extra["K8S_GPU_ACCELERATOR"] = k8s_acc
+        print(f"[tabular-serve] K3S GPU detected: {k8s_acc}")
+
     result = _run_sky_runner(
         "launch-tabular-serve",
         {
@@ -111,6 +152,7 @@ def _launch_tabular_serve(**context) -> dict:
             "TARGET_QPS_PER_REPLICA": conf.get("target_qps_per_replica", 10),
             "RESOURCE_CONSTRAINTS_JSON": json.dumps(conf.get("resource_constraints") or {}),
             "SKYSERVE_CONTROLLER_CONFIG_JSON": json.dumps(conf.get("serve_controller") or {}),
+            **extra,
         },
     )
     if not isinstance(result, dict):

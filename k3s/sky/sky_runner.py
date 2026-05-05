@@ -409,28 +409,12 @@ def _provider(rc: dict | None) -> str:
 
 
 def _detect_k3s_gpu_accelerator_kubectl(n_gpus: int = 1, label: str = "") -> str:
-    """Return 'accelerator:n_gpus' by querying kubectl — no kubernetes package needed."""
-    import subprocess, json as _json
+    """Return 'accelerator:n_gpus'. Reads K8S_GPU_ACCELERATOR env var set by Airflow DAG."""
     prefix = f"[{label}] " if label else ""
-    try:
-        result = subprocess.run(
-            ["kubectl", "get", "nodes", "-o", "json"],
-            capture_output=True, text=True, timeout=15,
-        )
-        if result.returncode != 0:
-            raise RuntimeError(f"kubectl get nodes failed: {result.stderr.strip()}")
-        nodes = _json.loads(result.stdout).get("items", [])
-        for node in nodes:
-            labels = node.get("metadata", {}).get("labels", {})
-            capacity = node.get("status", {}).get("capacity", {})
-            if int(capacity.get("nvidia.com/gpu", 0) or 0) == 0:
-                continue
-            acc = labels.get("skypilot.co/accelerator", "")
-            if acc:
-                print(f"{prefix}K3S GPU detected via kubectl: {acc} (n_gpus={n_gpus})")
-                return f"{acc}:{n_gpus}"
-    except FileNotFoundError:
-        raise RuntimeError(f"{prefix}kubectl not found in PATH — cannot detect K3S GPU")
+    acc = os.environ.get("K8S_GPU_ACCELERATOR", "").strip()
+    if acc:
+        print(f"{prefix}K3S GPU from env K8S_GPU_ACCELERATOR: {acc}")
+        return acc
     return ""
 
 
