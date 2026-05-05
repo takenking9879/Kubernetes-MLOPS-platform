@@ -408,6 +408,32 @@ def _provider(rc: dict | None) -> str:
     return str(providers[0]).lower() if providers else "runpod"
 
 
+def _detect_k3s_gpu_accelerator_kubectl(n_gpus: int = 1, label: str = "") -> str:
+    """Return 'accelerator:n_gpus' by querying kubectl — no kubernetes package needed."""
+    import subprocess, json as _json
+    prefix = f"[{label}] " if label else ""
+    try:
+        result = subprocess.run(
+            ["kubectl", "get", "nodes", "-o", "json"],
+            capture_output=True, text=True, timeout=15,
+        )
+        if result.returncode != 0:
+            raise RuntimeError(f"kubectl get nodes failed: {result.stderr.strip()}")
+        nodes = _json.loads(result.stdout).get("items", [])
+        for node in nodes:
+            labels = node.get("metadata", {}).get("labels", {})
+            capacity = node.get("status", {}).get("capacity", {})
+            if int(capacity.get("nvidia.com/gpu", 0) or 0) == 0:
+                continue
+            acc = labels.get("skypilot.co/accelerator", "")
+            if acc:
+                print(f"{prefix}K3S GPU detected via kubectl: {acc} (n_gpus={n_gpus})")
+                return f"{acc}:{n_gpus}"
+    except FileNotFoundError:
+        raise RuntimeError(f"{prefix}kubectl not found in PATH — cannot detect K3S GPU")
+    return ""
+
+
 def _deep_merge(dst: dict, src: dict) -> dict:
     """Recursively merge src into dst and return dst."""
     for key, value in src.items():
@@ -1490,26 +1516,8 @@ def launch_tabular_serve():
     # Inject resource constraints
     provider = _provider(rc)
     if provider in ("localgpu", "k8s"):
-        from kubernetes import client as _k8s_client, config as _k8s_config
         n_gpus = max(1, int((rc or {}).get("num_gpus_per_node") or 1))
-        k8s_acc = ""
-        try:
-            try:
-                _k8s_config.load_incluster_config()
-            except Exception:
-                _k8s_config.load_kube_config()
-            v1 = _k8s_client.CoreV1Api()
-            for node in v1.list_node().items:
-                labels = node.metadata.labels or {}
-                capacity = node.status.capacity or {}
-                if int(capacity.get("nvidia.com/gpu", 0) or 0) == 0:
-                    continue
-                acc = labels.get("skypilot.co/accelerator", "")
-                if acc:
-                    k8s_acc = f"{acc}:{n_gpus}"
-                    break
-        except Exception as exc:
-            raise RuntimeError(f"[tabular-serve] K3S GPU detection failed: {exc}") from exc
+        k8s_acc = _detect_k3s_gpu_accelerator_kubectl(n_gpus, label="tabular-serve")
         if not k8s_acc:
             raise RuntimeError(
                 "[tabular-serve] localGPU selected but no K8s node with "
