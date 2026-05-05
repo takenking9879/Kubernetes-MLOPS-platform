@@ -73,7 +73,7 @@ setup: |
     ${SUDO} useradd -m -s /bin/bash -d /home/ray ray
   fi
   ${SUDO} mkdir -p /home/ray/app /home/ray/.cache/ray /tmp/ray
-  ${SUDO} chown -R ray:ray /home/ray /tmp/ray
+  ${SUDO} chown -R "$(id -u ray):$(id -g ray)" /home/ray /tmp/ray
 
   if ! command -v git >/dev/null 2>&1; then
     ${SUDO} apt-get update -qq
