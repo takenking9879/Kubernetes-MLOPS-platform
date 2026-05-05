@@ -31,14 +31,6 @@ spec:
       TUNE_MAX_TRAIN_ROWS: "250000"
       TUNE_MAX_VAL_ROWS: "150000"
 
-      # Performance knobs (small datasets):
-      # When enabled, datasets are pinned in Ray object store before training.
-      # This accelerates repeated epoch access for small datasets (<500K rows).
-      # For larger datasets, disable to avoid object store pressure and potential
-      # spilling to disk. Monitor ray_object_store_memory when scaling up.
-      RAY_MATERIALIZE_DATASETS: "1"
-      RAY_MATERIALIZE_DATASETS_TUNE: "1"
-
       # Keep the job alive briefly after finishing so Prometheus can scrape final metrics.
       PROMETHEUS_GRACE_SECONDS: "10"
       REPORT_FREQUENCY: "1" # Report every epoch to keep Epoch Duration continuity in Grafana

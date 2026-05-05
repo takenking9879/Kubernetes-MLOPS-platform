@@ -198,6 +198,8 @@ export interface RunRequest {
   /** Per-run search space overrides sent when Override mode is active in the UI.
    *  Shape matches the SearchSpaceEntry union in hyperparams.ts serialised to JSON. */
   search_space?: Record<string, { type: string; options?: number[]; min?: number; max?: number; value?: unknown }>;
+  /** Materialize datasets in Ray object store for faster training (0=lazy streaming, 1=materialized). */
+  materialize_datasets?: boolean;
 }
 
 
@@ -464,6 +466,18 @@ export async function submitRun(request: RunRequest): Promise<TrainingRunResult>
     method: 'POST',
     body: JSON.stringify(request),
   });
+}
+
+export interface DatasetSize {
+  row_count: number | null;
+  file_size_mb: number | null;
+  file_count: number | null;
+}
+
+/** Fetch approximate dataset size from Iceberg snapshot metadata (no scan). */
+export async function fetchDatasetSize(preprocessRunId: string): Promise<DatasetSize> {
+  const qs = `preprocess_run_id=${encodeURIComponent(preprocessRunId)}`;
+  return _fetch<DatasetSize>(`/api/v2/runs/dataset-size?${qs}`);
 }
 
 export async function listTrainingRunIds(): Promise<{ runs: TrainingRunId[] }> {

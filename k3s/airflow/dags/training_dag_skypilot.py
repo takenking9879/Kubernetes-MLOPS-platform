@@ -72,6 +72,7 @@ def _run_sky_training(
     use_deepspeed: str,
     deepspeed_stage: str,
     resource_constraints_json: str,
+    materialize_datasets: str,
     sky_timeout_seconds: int,
     sky_yaml_dir: str,
     sky_bin: str,
@@ -287,6 +288,7 @@ def _run_sky_training(
         "AWS_S3_ENDPOINT_URL": aws_s3_endpoint_url,
         "USE_DEEPSPEED":       use_deepspeed,
         "DEEPSPEED_STAGE":     deepspeed_stage,
+        "RAY_MATERIALIZE_DATASETS": "1" if materialize_datasets.lower() in ("true", "1", "yes") else "0",
     })
 
     if provider in _local_providers:
@@ -527,6 +529,7 @@ with DAG(
             "sky_timeout_seconds":       SKY_TIMEOUT_SECONDS,
             "sky_yaml_dir":              _SKY_YAML_DIR,
             "sky_bin":                   _SKY_BIN,
+            "materialize_datasets":      "{{ 'true' if dag_run.conf.get('materialize_datasets', False) else 'false' }}",
             "use_managed_jobs":          "{{ dag_run.conf.get('use_managed_jobs', params.sky_use_managed_jobs) }}",
         },
         do_xcom_push=True,

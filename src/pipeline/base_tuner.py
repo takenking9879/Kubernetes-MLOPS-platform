@@ -14,7 +14,7 @@ Dataset Loading Strategy:
     Datasets are loaded ONCE before the Tuner starts and shared across all trials via
     tune.with_parameters().  tune.with_parameters stores objects via ray.put(), so
     each trial receives ObjectRefs pointing to the same blocks — no data duplication.
-    Optional materialization is controlled by RAY_MATERIALIZE_DATASETS_TUNE.
+    Materialization is obligatory — datasets are pinned in object store before trials.
     Lazy datasets remain lazy (plan is serialised as a few KB) enabling Parquet column
     pushdown and scalability to datasets larger than object store memory.
     train_loop_config propagation is preserved.
@@ -296,9 +296,10 @@ class BaseTuner(ABC):
         if _max_val_rows > 0:
             shared_val_ds = shared_val_ds.limit(_max_val_rows)
 
-        # Optional materialization — only if explicitly requested, not forced by default.
-        # When enabled, blocks are pinned in the object store for the full tuning run.
-        if os.getenv("RAY_MATERIALIZE_DATASETS_TUNE", "0").lower() in ("1", "true", "yes"):
+        # Materialize datasets — blocks are pinned in the object store for the full tuning run.
+        # Tuning data is small (sample_fraction + row limits), so materialization is safe
+        # and recommended.  Controlled by the same RAY_MATERIALIZE_DATASETS flag as training.
+        if os.getenv("RAY_MATERIALIZE_DATASETS", "0").lower() in ("1", "true", "yes"):
             shared_train_ds = shared_train_ds.materialize()
             shared_val_ds = shared_val_ds.materialize()
 

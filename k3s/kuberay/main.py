@@ -31,6 +31,10 @@ from src.schemas.spark.schema_registry import SchemaRegistry
 from src.pipeline.train import get_trainer
 from src.pipeline.tuning import get_tuner
 
+# ===== ICEBERG PICKLE FIX (Ray 2.55) =====
+from src.pipeline.utils.iceberg_pickle_fix import apply_iceberg_pickle_fix
+apply_iceberg_pickle_fix()
+
 # ===== PROMETHEUS METRICS =====
 from prometheus_client import start_http_server
 from src.prometheus import (
@@ -209,10 +213,12 @@ class KubeRayTraining(BaseUtils):
 
             self._validate_schema(ds)
 
-            if os.getenv("RAY_MATERIALIZE_DATASETS", "0") in ("1", "true", "True"):
-                self.logger.info(f"Materializing {split} dataset in Ray Object Store for performance.")
-                ds = ds.materialize()
             self.logger.info(f"Data for split '{split}' loaded.")
+
+            if os.getenv("RAY_MATERIALIZE_DATASETS", "0") in ("1", "true", "True"):
+                self.logger.info(f"Materializing {split} dataset (RAY_MATERIALIZE_DATASETS=1).")
+                ds = ds.materialize()
+
             return ds
         except Exception as e:
             self.logger.error(f"Failed to load {split} data from {table_name}: {str(e)}", exc_info=True)
@@ -848,6 +854,7 @@ def main():
         ctx = ray.data.DataContext.get_current()
         ctx.enable_rich_progress_bars = True
         ctx.use_ray_tqdm = False
+        ctx.execution_options.preserve_order = True
 
         output_dir = os.getenv("OUTPUT_DIR", "s3://k8s-mlops-platform-bucket/v1/models")
 

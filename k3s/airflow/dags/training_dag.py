@@ -82,6 +82,7 @@ def _submit_ray_job(**context):
     ray_job_name = k8s_name(train_run_id, "ray", max_len=47)
     manifest["metadata"]["name"] = ray_job_name
 
+    materialize = conf.get("materialize_datasets", False)
     extra_env = {
         "TRAIN_RUN_ID":        train_run_id,
         "PREPROCESS_RUN_ID":   preprocess_run_id,
@@ -89,6 +90,7 @@ def _submit_ray_job(**context):
         "PARAMS_S3_PATH":      train_params_s3_path,
         "PROCESSED_TABLE":     processed_table,
         "MLFLOW_TRACKING_URI": MLFLOW_TRACKING_URI,
+        "RAY_MATERIALIZE_DATASETS": "1" if materialize else "0",
     }
 
     existing_runtime_env = _yaml.safe_load(

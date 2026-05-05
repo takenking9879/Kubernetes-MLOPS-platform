@@ -36,6 +36,7 @@ import {
 import {
   launchJob,
   submitRun,
+  fetchDatasetSize,
   listDatasets,
   getLLMCatalog,
   listArchitectures,
@@ -58,6 +59,7 @@ import {
   type PreprocessRunId,
   type TrainingRunResult,
   type TrainingRunId,
+  type DatasetSize,
   type SchemaUploadSingleResult,
   type ServingConfigResult,
   type ServingDeployResult,
@@ -164,6 +166,8 @@ export function LaunchWizardPage() {
   const [mlflowArtifactLocation, setMlflowArtifactLocation] = useState(
     's3://k8s-mlops-platform-bucket/mlflow-artifacts/',
   );
+  const [materializeDatasets, setMaterializeDatasets] = useState(false);
+  const [datasetSize, setDatasetSize] = useState<DatasetSize | null>(null);
 
   const [hyperparams, setHyperparams] = useState<Record<string, number | string | string[]>>(
     () => getDefaultsForTask('xgboost', 'classification'),
@@ -232,6 +236,14 @@ export function LaunchWizardPage() {
         });
       })
       .catch(() => setPreprocessInfo(null));
+  }, [preprocessRunId]);
+
+  // Fetch dataset size from Iceberg snapshot metadata (no scan)
+  useEffect(() => {
+    if (!preprocessRunId) { setDatasetSize(null); return; }
+    fetchDatasetSize(preprocessRunId)
+      .then(setDatasetSize)
+      .catch(() => setDatasetSize(null));
   }, [preprocessRunId]);
 
   // Unique datasets from loaded preprocess runs
@@ -646,6 +658,7 @@ export function LaunchWizardPage() {
           }
           return resolved;
         })() : undefined,
+        materialize_datasets: materializeDatasets,
       });
       setTabularResult(result);
     } catch (err) {
@@ -1068,6 +1081,40 @@ export function LaunchWizardPage() {
                             Disabled
                           </button>
                         </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Dataset materialization toggle */}
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="flex flex-col gap-0.5">
+                        <span className="text-[10px] text-slate-500">
+                          Materialize datasets in Ray object store
+                        </span>
+                        {datasetSize && datasetSize.row_count != null && (
+                          <span className="text-[9px] text-slate-600">
+                            ~{datasetSize.row_count.toLocaleString()} rows&ensp;·&ensp;
+                            {datasetSize.file_size_mb != null
+                              ? `${datasetSize.file_size_mb} MB`
+                              : 'unknown size'}&ensp;·&ensp;
+                            {datasetSize.file_count} file{datasetSize.file_count !== 1 ? 's' : ''}
+                          </span>
+                        )}
+                        {!datasetSize && preprocessRunId && (
+                          <span className="text-[9px] text-slate-600">Fetching dataset size...</span>
+                        )}
+                      </div>
+                      <div className="flex gap-1.5">
+                        <button type="button"
+                          onClick={() => setMaterializeDatasets(true)}
+                          className={materializeDatasets ? BTN_TOGGLE_ON : BTN_TOGGLE_OFF}>
+                          Materialize
+                        </button>
+                        <button type="button"
+                          onClick={() => setMaterializeDatasets(false)}
+                          className={!materializeDatasets ? BTN_TOGGLE_ON : BTN_TOGGLE_OFF}>
+                          Lazy stream
+                        </button>
                       </div>
                     </div>
                   </div>

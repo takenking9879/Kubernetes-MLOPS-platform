@@ -122,6 +122,7 @@ class TrainingConfigIn(BaseModel):
     hyperparams: dict[str, Any] = Field(default_factory=dict)
     model_cfg: dict[str, Any] = Field(default_factory=dict)
     num_nodes: int = 1
+    materialize_datasets: bool = False
 
 
 class ServingConfigIn(BaseModel):
@@ -258,6 +259,7 @@ def _upload_training_params(
         "execution": {
             "train_run_id": train_run_id,
             "processed_table": processed_table,
+            "materialize_datasets": body.training.materialize_datasets,
         },
         "kuberay": {
             "model": {
@@ -542,6 +544,7 @@ async def launch_job(body: LaunchRequest) -> LaunchResponse:
             )
             dag_conf["train_params_s3_path"] = train_params_s3_path
             dag_conf["use_managed_jobs"] = bool(body.training.use_managed_jobs)
+            dag_conf["materialize_datasets"] = body.training.materialize_datasets
             if body.resource_constraints:
                 rc_dict = constraints_dict or body.resource_constraints.model_dump()
                 if any_of:

@@ -27,6 +27,21 @@ from services.resource_constraints import (
     has_explicit_resource_selection,
 )
 
+
+def _get_iceberg_catalog():
+    """Return an Iceberg Glue catalog for metadata operations (no scan)."""
+    from pyiceberg.catalog import load_catalog
+    return load_catalog(
+        "iceberg",
+        type="glue",
+        warehouse=f"s3://{S3_BUCKET}/warehouse",
+        **{
+            "client.access-key-id": os.getenv("AWS_ACCESS_KEY_ID", ""),
+            "client.secret-access-key": os.getenv("AWS_SECRET_ACCESS_KEY", ""),
+            "client.region": AWS_REGION,
+        },
+    )
+
 router = APIRouter(prefix="/api/v2/runs", tags=["runs"])
 
 # ─── Config ──────────────────────────────────────────────────────────────────
@@ -167,6 +182,7 @@ class RunRequest(BaseModel):
     hyperparams: dict[str, Any] = {}
     tune_settings: dict[str, Any] = {}
     search_space: dict[str, Any] = {}  # per-run Ray Tune search space overrides (UI Override mode)
+    materialize_datasets: bool = False  # 0=lazy streaming (scalable), 1=materialize in object store (fast for small data)
 
     @model_validator(mode="after")
     def validate_hyperparams(self) -> "RunRequest":
@@ -358,6 +374,7 @@ def _generate_training_params_yaml(
                 "enabled": req.tuning.enabled,
                 "number_of_trials": req.tuning.number_of_trials,
             },
+            "materialize_datasets": req.materialize_datasets,
         },
         "splits": lineage.get("splits", {}),
         "model": {
@@ -453,6 +470,45 @@ async def list_training_run_ids():
     return {"runs": runs}
 
 
+@router.get("/dataset-size")
+async def dataset_size(preprocess_run_id: str):
+    """Return approximate row count and file size for the processed table.
+
+    Reads Iceberg snapshot metadata only — no data scan.
+    Returns {row_count, file_size_mb, file_count} or nulls if unavailable.
+    """
+    try:
+        s3 = _s3_client()
+        preprocess_params = _fetch_preprocess_params(preprocess_run_id, s3, S3_BUCKET)
+        lineage = _build_lineage(preprocess_run_id, preprocess_params, S3_BUCKET)
+        table_name = lineage.get("processed_table", "")
+
+        if not table_name:
+            return {"row_count": None, "file_size_mb": None, "file_count": None}
+
+        catalog = _get_iceberg_catalog()
+        table = catalog.load_table(table_name)
+        snapshot = table.current_snapshot()
+        if snapshot is None:
+            return {"row_count": 0, "file_size_mb": 0, "file_count": 0}
+
+        summary: dict = getattr(snapshot, "summary", {}) or {}
+        total_records = summary.get("total-records")
+        total_file_size = summary.get("total-files-size")
+        total_data_files = summary.get("total-data-files")
+
+        return {
+            "row_count": int(total_records) if total_records is not None else None,
+            "file_size_mb": round(int(total_file_size) / (1024 * 1024), 2) if total_file_size is not None else None,
+            "file_count": int(total_data_files) if total_data_files is not None else None,
+        }
+    except Exception as exc:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to fetch dataset size: {exc}",
+        ) from exc
+
+
 @router.get("/check")
 async def check_artifact(execution_id: str, dataset: str):
     """Check if an artifact_set_id already exists in the Iceberg metadata table."""
@@ -526,6 +582,7 @@ async def submit_run(request: RunRequest):
         "train_params_s3_path": train_params_s3_path,
         "model_type": request.framework,
         "num_nodes": request.num_nodes,
+        "materialize_datasets": request.materialize_datasets,
     }
     if use_skypilot:
         dag_conf["use_managed_jobs"] = bool(request.use_managed_jobs)

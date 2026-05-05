@@ -255,6 +255,22 @@ export function TrainingInspector({ nodeId, data }: Props) {
                       onChange={(e) => set({ seed: parseInt(e.target.value) || 42 })} />
                   </div>
                 </div>
+
+                <div className="flex items-center justify-between gap-2 pt-1 border-t border-slate-700/40">
+                  <div className="space-y-0.5">
+                    <p className={LBL}>Materialize Datasets</p>
+                    <p className={META}>Lazy stream = scalable, Materialize = fast for small data</p>
+                  </div>
+                  <div className="flex gap-1">
+                    {[true, false].map((v) => (
+                      <button key={String(v)} type="button"
+                        className={data.materializeDatasets === v ? BTN_ON : BTN_OFF}
+                        onClick={() => set({ materializeDatasets: v })}>
+                        {v ? 'Materialize' : 'Lazy stream'}
+                      </button>
+                    ))}
+                  </div>
+                </div>
               </div>
             )}
           </div>

@@ -436,6 +436,7 @@ export const useDagStore = create<DagState>()(
                     : baseHyperparams,
                   tune_settings: d.tuneEnabled ? baseTuneSettings : {},
                   search_space: resolvedSearchSpace,
+                  materialize_datasets: d.materializeDatasets,
                 });
 
                 setStatus('running', { dagRunId: resp.dag_run_id } as Partial<TrainingOrchNodeData>);

@@ -173,11 +173,17 @@ class BaseTrainer(ABC):
         cpus_per_worker = int(os.getenv("CPUS_PER_WORKER", 2))
 
         # 1 — Preprocess datasets (framework-specific)
-        # Record materialization state BEFORE preprocessing: _preprocess_datasets() adds a
-        # lazy select_columns() (Project) operator which turns a MaterializedDataset into a
-        # plain lazy Dataset. Without re-materializing after, the Project operator runs as
-        # CPU-bound Ray tasks every epoch. With all CPUs reserved by the training worker,
-        # it stalls ~4s per dataset per epoch (7.76s/epoch × 50 epochs = 388s overhead).
+        # _preprocess_datasets() adds a lazy select_columns() (Project) operator.
+        #
+        # Two paths supported:
+        #   Lazy (scalable):          caller passes lazy datasets → skip materialize.
+        #                             Ray Data streams data per-epoch.  No memory pressure.
+        #   Materialized (optimized): caller materialized datasets → re-materialize
+        #                             after the projection to bake it into object store.
+        #                             Avoids re-executing Project every epoch at the cost
+        #                             of object-store memory (only projected columns stored).
+        #
+        # Lazy datasets are pickle-safe thanks to iceberg_pickle_fix.py (Ray 2.55 bug).
         def _is_materialized(ds) -> bool:
             try:
                 from ray.data import MaterializedDataset
@@ -195,8 +201,6 @@ class BaseTrainer(ABC):
             feature_columns=feature_columns,
         )
 
-        # Re-materialize to bake preprocessing result into the object store.
-        # Only fires when the caller already materialized the datasets (RAY_MATERIALIZE_DATASETS=1).
         if _train_was_mat:
             train_dataset = train_dataset.materialize()
         if _val_was_mat:

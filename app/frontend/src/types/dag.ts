@@ -103,6 +103,7 @@ export interface TrainingOrchNodeData {
   uploadedArchId: string;
   // resources
   resourceConstraints: ResourceConstraints;
+  materializeDatasets: boolean;
   trainRunId: string | null;
   dagRunId: string | null;
 }
@@ -261,6 +262,7 @@ export function makeTrainingNodeData(overrides?: Partial<TrainingOrchNodeData>):
       prefer_spot: true,
       job_type: 'tabular',
     },
+    materializeDatasets: false,
     trainRunId: null,
     dagRunId: null,
     ...overrides,

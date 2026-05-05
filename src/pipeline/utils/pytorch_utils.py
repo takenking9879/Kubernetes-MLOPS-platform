@@ -114,6 +114,7 @@ def train_func(config: Dict):
     lr = params.get("lr", 1e-3)
     weight_decay = params.get("weight_decay", 0)
     max_epochs = params.get("max_epochs", 10)
+    seed = params.get("seed", 42)
     target = config.get("target", "attack")
 
     train_shard = ray.train.get_dataset_shard("train")
@@ -249,16 +250,25 @@ def train_func(config: Dict):
     feature_cols = config.get("feature_columns")
     logged_first_train_batch = False
     logged_first_val_batch = False
+
+    train_loader = train_shard.iter_torch_batches(
+        batch_size=batch_size,
+        dtypes=torch.float32,
+        prefetch_batches=prefetch,
+        local_shuffle_buffer_size=batch_size * 8,
+        local_shuffle_seed=seed,
+        pin_memory=use_gpu,
+    )
+    val_loader = val_shard.iter_torch_batches(
+        batch_size=batch_size,
+        dtypes=torch.float32,
+        prefetch_batches=prefetch,
+        pin_memory=use_gpu,
+    )
+
     for epoch in range(max_epochs):
         epoch_start = time.perf_counter()
         model.train()
-        train_loader = train_shard.iter_torch_batches(
-            batch_size=batch_size,
-            dtypes=torch.float32,
-            prefetch_batches=prefetch,               # GPU: max(4, cpus) / CPU: max(2, cpus//2)
-            local_shuffle_buffer_size=batch_size * 8,
-            pin_memory=use_gpu,                      # async DMA when non_blocking=True below
-        )
         train_loss, train_batches = 0.0, 0
         for batch in train_loader:
             # Separate target from features dynamically
@@ -311,12 +321,6 @@ def train_func(config: Dict):
         avg_train_loss = train_loss / max(train_batches, 1)
 
         model.eval()
-        val_loader = val_shard.iter_torch_batches(
-            batch_size=batch_size,
-            dtypes=torch.float32,
-            prefetch_batches=prefetch,
-            pin_memory=use_gpu,
-        )
         val_loss, val_batches = 0.0, 0
 
         # Classification: accumulate confusion matrix.  Regression: accumulate preds/targets.

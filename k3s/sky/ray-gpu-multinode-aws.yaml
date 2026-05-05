@@ -95,7 +95,6 @@ envs:
   MAX_CONCURRENT_TRIALS: "2" # DAG injects: same as workers
   TUNE_MAX_TRAIN_ROWS: "500000"
   TUNE_MAX_VAL_ROWS: "200000"
-  RAY_MATERIALIZE_DATASETS: "1"
   REPORT_FREQUENCY: "4"
   RAY_enable_infeasible_task_early_exit: "true"
   RAY_DEFAULT_OBJECT_STORE_MEMORY_PROPORTION: "0.6"
