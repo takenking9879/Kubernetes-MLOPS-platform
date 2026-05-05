@@ -520,9 +520,11 @@ _YAML_MAP: dict[tuple[str, str], str] = {
     ("vllm",             "runpod"): "vllm-serving-runpod.yaml",
     ("vllm",             "vast"):   "vllm-serving-vast.yaml",
     ("vllm_multi",       "aws"):    "ray-vllm-multinode-serving.yaml",
-    ("tabular_serve",    "runpod"): "tabular-serving-single.yaml",
-    ("tabular_serve",    "vast"):   "tabular-serving-single.yaml",
-    ("tabular_serve",    "aws"):    "tabular-serving-single.yaml",
+    ("tabular_serve",    "runpod"):   "tabular-serving-single.yaml",
+    ("tabular_serve",    "vast"):     "tabular-serving-single.yaml",
+    ("tabular_serve",    "aws"):      "tabular-serving-single.yaml",
+    ("tabular_serve",    "localgpu"): "tabular-serving-k8s.yaml",
+    ("tabular_serve",    "k8s"):      "tabular-serving-k8s.yaml",
     ("tabular_serve_multi", "runpod"): "tabular-serving-multinode.yaml",
     ("tabular_serve_multi", "vast"):   "tabular-serving-multinode.yaml",
     ("tabular_serve_multi", "aws"):    "tabular-serving-multinode.yaml",
@@ -1485,8 +1487,42 @@ def launch_tabular_serve():
     if num_nodes > 1:
         sky_conf["num_nodes"] = num_nodes
 
-    # Inject explicit resource constraints when provided
-    if rc:
+    # Inject resource constraints
+    provider = _provider(rc)
+    if provider in ("localgpu", "k8s"):
+        from kubernetes import client as _k8s_client, config as _k8s_config
+        n_gpus = max(1, int((rc or {}).get("num_gpus_per_node") or 1))
+        k8s_acc = ""
+        try:
+            try:
+                _k8s_config.load_incluster_config()
+            except Exception:
+                _k8s_config.load_kube_config()
+            v1 = _k8s_client.CoreV1Api()
+            for node in v1.list_node().items:
+                labels = node.metadata.labels or {}
+                capacity = node.status.capacity or {}
+                if int(capacity.get("nvidia.com/gpu", 0) or 0) == 0:
+                    continue
+                acc = labels.get("skypilot.co/accelerator", "")
+                if acc:
+                    k8s_acc = f"{acc}:{n_gpus}"
+                    break
+        except Exception as exc:
+            raise RuntimeError(f"[tabular-serve] K3S GPU detection failed: {exc}") from exc
+        if not k8s_acc:
+            raise RuntimeError(
+                "[tabular-serve] localGPU selected but no K8s node with "
+                "nvidia.com/gpu and skypilot.co/accelerator label found."
+            )
+        resources_cfg = sky_conf.setdefault("resources", {})
+        resources_cfg["infra"] = "k8s/in-cluster"
+        resources_cfg["accelerators"] = k8s_acc
+        resources_cfg["image_id"] = "docker:takenking9879/ray-train:2.53.0"
+        resources_cfg.pop("ordered", None)
+        resources_cfg.pop("any_of", None)
+        print(f"[tabular-serve] K3S GPU: {k8s_acc} — infra: k8s/in-cluster")
+    elif rc:
         gpu_fallbacks = rc.get("gpu_fallbacks") or rc.get("ordered")
         if gpu_fallbacks and isinstance(gpu_fallbacks, list):
             sky_conf.setdefault("resources", {})["ordered"] = gpu_fallbacks
