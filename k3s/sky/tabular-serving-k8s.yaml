@@ -25,10 +25,10 @@ resources:
   # SkyPilot Kubernetes custom images require the docker: prefix.
   image_id: docker:takenking9879/ray-train:2.53.0
   ports: 8000
-  # infra and accelerators are injected by job_builder.py at build time.
+  # infra, accelerators, and memory are injected by sky_runner.py at launch time.
   infra: k8s/in-cluster
   accelerators: rtx4070:1
-  disk_size: 30
+  memory: "8+"
 
 envs:
   # ── Per-run parameters (overridden at launch time by tabular_serving_skypilot_dag) ──

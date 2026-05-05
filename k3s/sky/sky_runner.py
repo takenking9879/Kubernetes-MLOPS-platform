@@ -1511,9 +1511,14 @@ def launch_tabular_serve():
         resources_cfg["infra"] = "k8s/in-cluster"
         resources_cfg["accelerators"] = k8s_acc
         resources_cfg["image_id"] = "docker:takenking9879/ray-train:2.53.0"
+        resources_cfg.pop("disk_size", None)  # not supported by K8s
         resources_cfg.pop("ordered", None)
         resources_cfg.pop("any_of", None)
-        print(f"[tabular-serve] K3S GPU: {k8s_acc} — infra: k8s/in-cluster")
+        # Allow memory override via resource_constraints; default in YAML is "8+"
+        mem_gb = (rc or {}).get("memory_gb_per_node")
+        if mem_gb:
+            resources_cfg["memory"] = f"{mem_gb}+"
+        print(f"[tabular-serve] K3S GPU: {k8s_acc} — infra: k8s/in-cluster, memory={resources_cfg.get('memory', 'yaml-default')}")
     elif rc:
         gpu_fallbacks = rc.get("gpu_fallbacks") or rc.get("ordered")
         if gpu_fallbacks and isinstance(gpu_fallbacks, list):
