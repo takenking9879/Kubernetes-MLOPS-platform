@@ -117,6 +117,7 @@ _SKY_VLLM_MULTI_YAML  = _SKY_DIR / "ray-vllm-multinode-serving.yaml"
 # Tabular serving — SkyPilot sky serve (single-node and multi-node Ray)
 _SKY_TABULAR_SERVE_SINGLE_YAML = _SKY_DIR / "tabular-serving-single.yaml"
 _SKY_TABULAR_SERVE_MULTI_YAML  = _SKY_DIR / "tabular-serving-multinode.yaml"
+_SKY_TABULAR_SERVE_K8S_YAML    = _SKY_DIR / "tabular-serving-k8s.yaml"
 
 
 def _provider_from_any_of(any_of: list[dict]) -> str:
@@ -254,10 +255,13 @@ class JobBuilder:
         if not config.serve_run_id:
             config.serve_run_id = f"serve-tabular-{uuid.uuid4().hex[:8]}"
 
-        base_yaml_path = (
-            _SKY_TABULAR_SERVE_MULTI_YAML if config.num_nodes > 1
-            else _SKY_TABULAR_SERVE_SINGLE_YAML
-        )
+        provider = _provider_from_any_of(config.any_of)
+        if config.num_nodes > 1:
+            base_yaml_path = _SKY_TABULAR_SERVE_MULTI_YAML
+        elif provider == "k8s":
+            base_yaml_path = _SKY_TABULAR_SERVE_K8S_YAML
+        else:
+            base_yaml_path = _SKY_TABULAR_SERVE_SINGLE_YAML
         sky_conf = self._load_base_yaml(base_yaml_path)
 
         # Inject replica policy
@@ -270,8 +274,17 @@ class JobBuilder:
             sky_conf["num_nodes"] = config.num_nodes
         if config.any_of:
             resources_cfg = sky_conf.setdefault("resources", {})
-            resources_cfg["ordered"] = config.any_of
-            resources_cfg.pop("any_of", None)
+            # K8s single-entry: set infra + accelerators directly (no ordered list)
+            if len(config.any_of) == 1 and config.any_of[0].get("infra", "").startswith("k8s/"):
+                entry = config.any_of[0]
+                resources_cfg["infra"] = entry["infra"]
+                resources_cfg["accelerators"] = entry["accelerators"]
+                resources_cfg.pop("ordered", None)
+                resources_cfg.pop("any_of", None)
+            else:
+                resources_cfg["ordered"] = config.any_of
+                resources_cfg.pop("any_of", None)
+                resources_cfg.pop("infra", None)
 
         sky_conf.setdefault("envs", {}).update({
             "SERVE_RUN_ID":         config.serve_run_id,

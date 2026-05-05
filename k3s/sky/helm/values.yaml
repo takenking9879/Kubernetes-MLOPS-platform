@@ -189,6 +189,35 @@ apiService:
       'common_utils.cluster_name_on_cloud_avoid_double_user_hash',
     )
 
+    # Fix Ray 2.9.3 copy.deepcopy Sentinel bug in serve controller runtime setup.
+    # constants.py holds the RAY_SKYPILOT_INSTALLATION_COMMANDS template that
+    # becomes the controller's setup script.  The sed fix runs right after
+    # ray_patches.patch() during every controller deployment.
+    patch(
+      '/usr/local/lib/python3.10/site-packages/sky/skylet/constants.py',
+      "    '\"from sky.skylet.ray_patches import patch; patch()\" || exit 1; }; ')\n",
+      "    '\"from sky.skylet.ray_patches import patch; patch()\" || exit 1; }; '  # RTK: fix copy.deepcopy Sentinel crash in Ray 2.9.3 scripts.py\n"
+      "    'sed -i \"s/new_command = copy.deepcopy(command)/new_command = copy.copy(command)/\" '  # RTK_deepcopy_fix\n"
+      "    '~/skypilot-runtime/lib/python3.10/site-packages/ray/scripts/scripts.py 2>/dev/null || true; '  # RTK_deepcopy_fix\n"
+      "    )  # RTK_deepcopy_fix\n",
+      'constants_ray_deepcopy_fix',
+    )
+
+    # Fix the same Sentinel crash in kubernetes-ray.yml.j2 Jinja2 template.
+    # This template generates K8s serve controller pod specs.  The sed runs
+    # right after ray_patches.patch() during the Ray installation block.
+    patch(
+      '/usr/local/lib/python3.10/site-packages/sky/templates/kubernetes-ray.yml.j2',
+      '              {{sky_unset_pythonpath_and_set_cwd}} $(cat ~/.sky/python_path) -c "from sky.skylet.ray_patches import patch; patch()" || exit 1;\n'
+      '                }\n'
+      '                touch /tmp/ray_skypilot_installation_complete\n',
+      '              {{sky_unset_pythonpath_and_set_cwd}} $(cat ~/.sky/python_path) -c "from sky.skylet.ray_patches import patch; patch()" || exit 1;\n'
+      '                  sed -i "s/new_command = copy.deepcopy(command)/new_command = copy.copy(command)/" ~/skypilot-runtime/lib/python3.10/site-packages/ray/scripts/scripts.py 2>/dev/null || true;  # RTK_deepcopy_fix\n'
+      '                }\n'
+      '                touch /tmp/ray_skypilot_installation_complete\n',
+      'kubernetes_ray_template_deepcopy_fix',
+    )
+
     PY
 
   # ── SkyPilot config ─────────────────────────────────────────────────────────

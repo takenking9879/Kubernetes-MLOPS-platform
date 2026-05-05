@@ -1,0 +1,294 @@
+# k3s/sky/tabular-serving-k8s.yaml
+#
+# SkyPilot sky serve for tabular model — single node per replica on LOCAL K3S cluster.
+# Mirror of tabular-serving-single.yaml adapted for SkyPilot Kubernetes provider.
+#
+# Prerequisites:
+#   - Node must have skypilot.co/accelerator label (set by up-k3s-gpu.sh / deploy.sh)
+#   - Node must expose nvidia.com/gpu in allocatable capacity
+#   - sky check (inside API server pod) must show k8s/in-cluster as enabled
+#   - Image takenking9879/ray-train:2.53.0 must be imported into k3s containerd
+#
+# infra and accelerators are injected by job_builder.py at build time.
+
+name: tabular-serving-k8s
+
+service:
+  ports: 8000
+  readiness_probe: /infer
+  replica_policy:
+    min_replicas: 1
+    max_replicas: 3
+    target_qps_per_replica: 10
+
+resources:
+  # SkyPilot Kubernetes custom images require the docker: prefix.
+  image_id: docker:takenking9879/ray-train:2.53.0
+  ports: 8000
+  # infra and accelerators are injected by job_builder.py at build time.
+  infra: k8s/in-cluster
+  accelerators: rtx4070:1
+  disk_size: 30
+
+envs:
+  # ── Per-run parameters (overridden at launch time by tabular_serving_skypilot_dag) ──
+  SERVE_RUN_ID: ""
+  REGISTRY_MODEL_NAME: ""
+  MODEL_ALIAS: "champion"
+  SERVE_PORT: "8000"
+
+  # ── Infrastructure ──
+  S3_BUCKET: "k8s-mlops-platform-bucket"
+  MLFLOW_TRACKING_URI: ""
+  AWS_ACCESS_KEY_ID: ""
+  AWS_SECRET_ACCESS_KEY: ""
+  AWS_DEFAULT_REGION: "us-east-1"
+  AWS_S3_ENDPOINT_URL: ""
+
+  # ── Outbound metrics shipping ──
+  METRICS_REMOTE_WRITE_URL: ""
+  METRICS_REMOTE_WRITE_USERNAME: ""
+  METRICS_REMOTE_WRITE_PASSWORD: ""
+  SKY_CLUSTER_NAME: ""
+  SKY_PROVIDER: "local_k3s"
+  METRICS_SOURCE: "local_k3s"
+
+  # Legacy Grafana aliases (still supported by write_grafana_config.py)
+  GRAFANA_REMOTE_WRITE_URL: ""
+  GRAFANA_INSTANCE_ID: ""
+  GRAFANA_API_KEY: ""
+
+setup: |
+  set -euo pipefail
+
+  nvidia-smi || { echo "ERROR: nvidia-smi failed - GPU not attached"; exit 1; }
+
+  if [ "$(id -u)" -eq 0 ]; then
+    SUDO=""
+  else
+    SUDO="sudo"
+  fi
+
+  if ! id -u ray >/dev/null 2>&1; then
+    ${SUDO} useradd -m -s /bin/bash -d /home/ray ray
+  fi
+  ${SUDO} mkdir -p /home/ray/app /home/ray/.cache/ray /tmp/ray
+  ${SUDO} chown -R ray:ray /home/ray /tmp/ray
+
+  if ! command -v git >/dev/null 2>&1; then
+    ${SUDO} apt-get update -qq
+    ${SUDO} apt-get install -y --no-install-recommends git
+    ${SUDO} rm -rf /var/lib/apt/lists/*
+  fi
+
+  if [ ! -d /home/ray/app/repo/.git ]; then
+    git clone --depth=1 --branch main \
+      https://github.com/takenking9879/Kubernetes-MLOPS-platform.git \
+      /home/ray/app/repo
+  else
+    git -C /home/ray/app/repo pull --ff-only origin main
+  fi
+
+  REQ_FILE="/home/ray/app/repo/k3s/kuberay/gpu/requirements_serving.txt"
+  [ -f "${REQ_FILE}" ] || { echo "ERROR: requirements file not found: ${REQ_FILE}"; exit 1; }
+
+  echo "[setup] Probing Python candidates (path + version):"
+  for probe in python3.12 /usr/bin/python3.12 /usr/local/bin/python3.12 /root/miniconda3/bin/python python3 python; do
+    if [ -x "${probe}" ]; then
+      PROBE_PATH="${probe}"
+    elif command -v "${probe}" >/dev/null 2>&1; then
+      PROBE_PATH="$(command -v "${probe}")"
+    else
+      echo "[setup] - ${probe}: not found"
+      continue
+    fi
+
+    PROBE_VER="$("${PROBE_PATH}" -c "import sys; print(sys.version.split()[0])" 2>/dev/null || echo unknown)"
+    echo "[setup] - ${probe} -> ${PROBE_PATH} (python=${PROBE_VER})"
+  done
+
+  PYTHON_BIN=""
+  PYTHON_VERSION=""
+  for candidate in python3.12 /usr/bin/python3.12 /usr/local/bin/python3.12 /root/miniconda3/bin/python python3 python; do
+    if [ -x "${candidate}" ]; then
+      CAND_PATH="${candidate}"
+    elif command -v "${candidate}" >/dev/null 2>&1; then
+      CAND_PATH="$(command -v "${candidate}")"
+    else
+      continue
+    fi
+
+    echo "[setup] Evaluating candidate: ${CAND_PATH}"
+    if CAND_VER="$("${CAND_PATH}" -c "import sys, torch; assert torch.cuda.is_available(); print('.'.join(map(str, sys.version_info[:3])))" 2>/dev/null)"; then
+      echo "[setup] Candidate accepted: ${CAND_PATH} (python=${CAND_VER}, torch+cuda OK)"
+      PYTHON_BIN="${CAND_PATH}"
+      PYTHON_VERSION="${CAND_VER}"
+      break
+    else
+      echo "[setup] Candidate rejected: ${CAND_PATH} (missing torch+cuda check)"
+    fi
+  done
+
+  [ -n "${PYTHON_BIN}" ] || {
+    echo "ERROR: No base-image Python with torch+CUDA found."
+    exit 1
+  }
+
+  echo "[setup] Selected runtime base Python: ${PYTHON_BIN} (version=${PYTHON_VERSION})"
+
+  # Apply Python-conditional pins (same as training)
+  "${PYTHON_BIN}" - <<'PY'
+  from pathlib import Path
+
+  req = Path('/home/ray/app/repo/k3s/kuberay/gpu/requirements_serving.txt')
+  txt = req.read_text()
+  changed = False
+
+  old_numpy = 'numpy==2.3.3\n'
+  new_numpy = 'numpy==2.2.6; python_version < "3.11"\n' \
+              'numpy==2.3.3; python_version >= "3.11"\n'
+  if old_numpy in txt and 'numpy==2.2.6; python_version < "3.11"' not in txt:
+      txt = txt.replace(old_numpy, new_numpy, 1)
+      changed = True
+
+  if changed:
+      req.write_text(txt)
+      print(f'[setup] Patched Python-conditional pins in requirements_serving.txt')
+  else:
+      print(f'[setup] requirements_serving.txt already has Python-conditional pins')
+  PY
+
+  RUNTIME_VENV="/opt/ml-platform-serving"
+  ${SUDO} rm -rf "${RUNTIME_VENV}"
+  ${SUDO} "${PYTHON_BIN}" -m venv --system-site-packages "${RUNTIME_VENV}"
+
+  RUNTIME_PYTHON="${RUNTIME_VENV}/bin/python"
+  [ -x "${RUNTIME_PYTHON}" ] || { echo "ERROR: venv python not found: ${RUNTIME_PYTHON}"; exit 1; }
+
+  echo "${RUNTIME_PYTHON}" | ${SUDO} tee /home/ray/app/runtime_python.txt >/dev/null
+  echo "[setup] Runtime venv Python: ${RUNTIME_PYTHON}"
+
+  ${SUDO} "${RUNTIME_PYTHON}" -m pip install --no-cache-dir -r "${REQ_FILE}"
+
+  "${RUNTIME_PYTHON}" - <<'PY'
+  import boto3, mlflow, numpy, pandas, pyiceberg, ray, sklearn, xgboost, yaml
+  print('Setup import smoke test passed.')
+  PY
+
+  echo "Setup complete."
+
+  METRICS_RW_URL="${METRICS_REMOTE_WRITE_URL:-${GRAFANA_REMOTE_WRITE_URL:-}}"
+  if [ -n "${METRICS_RW_URL}" ]; then
+    AGENT_BIN=/usr/local/bin/grafana-agent
+    if [ ! -f "${AGENT_BIN}" ]; then
+      AGENT_VER=v0.43.3 ARCH=amd64
+      curl -sL "https://github.com/grafana/agent/releases/download/${AGENT_VER}/grafana-agent-linux-${ARCH}.zip" \
+        -o /tmp/grafana-agent.zip
+      unzip -q /tmp/grafana-agent.zip -d /tmp/
+      mv /tmp/grafana-agent-linux-${ARCH} "${AGENT_BIN}"
+      chmod +x "${AGENT_BIN}"
+    fi
+  fi
+
+run: |
+  set -euo pipefail
+
+  PYTHON_BIN="$(cat /home/ray/app/runtime_python.txt)"
+  [ -x "${PYTHON_BIN}" ] || { echo "ERROR: runtime python not executable: ${PYTHON_BIN}"; exit 1; }
+
+  RAY_BIN="$(dirname "${PYTHON_BIN}")/ray"
+  if [ ! -x "${RAY_BIN}" ]; then
+    command -v ray >/dev/null 2>&1 && RAY_BIN="$(command -v ray)" || {
+      echo "ERROR: Ray CLI not found for runtime python (${PYTHON_BIN})"
+      exit 1
+    }
+  fi
+
+  SERVE_BIN="$(dirname "${PYTHON_BIN}")/serve"
+  if [ ! -x "${SERVE_BIN}" ]; then
+    command -v serve >/dev/null 2>&1 && SERVE_BIN="$(command -v serve)" || {
+      echo "ERROR: serve CLI not found for runtime python (${PYTHON_BIN})"
+      exit 1
+    }
+  fi
+
+  export PYTHONPATH=/home/ray/app/repo:/home/ray/app/repo/src
+  export RAY_ADDRESS="127.0.0.1:6379"
+  export RAY_SERVE_ADMIN_URL="http://127.0.0.1:8265"
+  export PARAMS_SERVING_S3_PATH="s3://${S3_BUCKET}/runs/serving/${SERVE_RUN_ID}/params_serving.yaml"
+
+  LOG_DIR="/tmp/skypilot-logs"
+  mkdir -p "${LOG_DIR}"
+  GRAFANA_AGENT_LOG="${LOG_DIR}/grafana-agent.log"
+  GRAFANA_AGENT_PID=""
+
+  _terminate_pid() {
+    local pid="${1:-}"
+    local label="${2:-process}"
+    if [ -z "${pid}" ] || ! kill -0 "${pid}" 2>/dev/null; then
+      return 0
+    fi
+    kill "${pid}" 2>/dev/null || true
+    for _ in $(seq 1 10); do
+      if ! kill -0 "${pid}" 2>/dev/null; then
+        break
+      fi
+      sleep 1
+    done
+    if kill -0 "${pid}" 2>/dev/null; then
+      echo "[run] ${label} still alive after SIGTERM; sending SIGKILL (PID=${pid})"
+      kill -9 "${pid}" 2>/dev/null || true
+    fi
+    wait "${pid}" 2>/dev/null || true
+  }
+
+  cleanup_background() {
+    set +e
+    _terminate_pid "${GRAFANA_AGENT_PID}" "grafana-agent"
+
+    echo "[run] Stopping serving Ray cluster (port 6379)..."
+    pkill -SIGTERM -f "ray.*[=:]6379" 2>/dev/null || true
+    sleep 5
+    pkill -SIGKILL -f "ray.*[=:]6379" 2>/dev/null || true
+    echo "[run] Serving Ray cluster stopped."
+  }
+  trap cleanup_background EXIT INT TERM
+
+  METRICS_RW_URL="${METRICS_REMOTE_WRITE_URL:-${GRAFANA_REMOTE_WRITE_URL:-}}"
+  if [ -n "${METRICS_RW_URL}" ] && command -v grafana-agent >/dev/null 2>&1; then
+    "${PYTHON_BIN}" /home/ray/app/repo/k3s/sky/write_grafana_config.py
+    grafana-agent --config.file=/tmp/grafana-agent-config.yaml \
+      >"${GRAFANA_AGENT_LOG}" 2>&1 &
+    GRAFANA_AGENT_PID=$!
+    echo "[run] Grafana Agent started → ${METRICS_RW_URL} (PID=${GRAFANA_AGENT_PID}, log=${GRAFANA_AGENT_LOG})"
+  fi
+
+  export RAY_ADDRESS="127.0.0.1:6379"
+
+  "${RAY_BIN}" start --head \
+    --port=6379 \
+    --dashboard-port=8265 \
+    --dashboard-host=0.0.0.0 \
+    --disable-usage-stats \
+    --include-dashboard=True
+
+  for i in $(seq 1 60); do
+    "${RAY_BIN}" health-check --address=127.0.0.1:6379 &>/dev/null && break
+    echo "Waiting for Ray head ($i/60)"
+    sleep 1
+  done
+  "${RAY_BIN}" health-check --address=127.0.0.1:6379 \
+    || { echo "ERROR: Ray head did not become healthy"; exit 1; }
+
+  echo "[run] Starting Ray Serve app — models:/${REGISTRY_MODEL_NAME}@${MODEL_ALIAS}"
+  echo "[run] PARAMS_SERVING_S3_PATH=${PARAMS_SERVING_S3_PATH}"
+
+  "${SERVE_BIN}" start \
+    --address="127.0.0.1:6379" \
+    --http-host="0.0.0.0" \
+    --http-port="${SERVE_PORT}"
+
+  "${SERVE_BIN}" run \
+    k3s.kuberay.serving.app:deployment_graph \
+    --address="127.0.0.1:6379" \
+    --route-prefix="/infer"
