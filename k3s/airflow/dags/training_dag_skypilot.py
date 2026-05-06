@@ -46,6 +46,9 @@ _SKY_BIN = os.getenv("SKYPILOT_VENV_BIN", "/opt/skypilot-venv/bin/sky")
 _SKY_YAML_DIR = os.getenv("SKY_YAML_DIR", "/opt/airflow/dags/repo/k3s/sky")
 
 SKY_TIMEOUT_SECONDS = int(os.getenv("SKY_TIMEOUT_SECONDS", "7200"))
+K3S_RAY_TRAIN_IMAGE = os.getenv(
+    "K3S_RAY_TRAIN_IMAGE", "docker:takenking9879/ray-train:2.53.0"
+)
 
 # Managed jobs are prone to controller-state races in some SkyPilot versions
 # under heavy recovery. Default to direct `sky launch` to avoid that path.
@@ -55,6 +58,21 @@ SKY_USE_MANAGED_JOBS = os.getenv("SKY_USE_MANAGED_JOBS", "false").strip().lower(
     "yes",
     "on",
 )
+
+
+def _parse_k8s_cpu_count(raw_cpu: str | int | float | None) -> int:
+    """Normalize Kubernetes CPU quantity strings to whole CPU cores."""
+    if raw_cpu is None:
+        return 0
+    raw = str(raw_cpu).strip()
+    if not raw:
+        return 0
+    if raw.endswith("m"):
+        milli = raw[:-1].strip()
+        if not milli:
+            return 0
+        return max(1, int(float(milli) / 1000.0))
+    return max(1, int(float(raw)))
 
 
 # ─── Callables ────────────────────────────────────────────────────────────────
@@ -215,8 +233,9 @@ def _run_sky_training(
         from kubernetes import client as _k8s_client, config as _k8s_config
 
         n_gpus_k8s = int(num_gpus_per_node) if str(num_gpus_per_node).strip().isdigit() else 1
-        k8s_train_image = "docker:takenking9879/ray-train:2.53.0"
+        k8s_train_image = K3S_RAY_TRAIN_IMAGE
         k8s_acc = ""
+        k8s_cpu_budget = 0
         try:
             try:
                 _k8s_config.load_incluster_config()
@@ -226,11 +245,16 @@ def _run_sky_training(
             for node in v1.list_node().items:
                 labels = node.metadata.labels or {}
                 capacity = node.status.capacity or {}
+                allocatable = node.status.allocatable or {}
                 if int(capacity.get("nvidia.com/gpu", 0) or 0) == 0:
                     continue
                 acc = labels.get("skypilot.co/accelerator", "")
                 if acc:
                     k8s_acc = f"{acc}:{n_gpus_k8s}"
+                    node_cpus = _parse_k8s_cpu_count(
+                        allocatable.get("cpu") or capacity.get("cpu")
+                    )
+                    k8s_cpu_budget = max(1, node_cpus // 2) if node_cpus > 0 else 1
                     break
         except Exception as exc:
             print(f"[sky-training] K8s node query failed: {exc}")
@@ -243,11 +267,13 @@ def _run_sky_training(
         resources_cfg["infra"] = "k8s/in-cluster"
         resources_cfg["accelerators"] = k8s_acc
         resources_cfg["image_id"] = k8s_train_image
+        resources_cfg["cpus"] = str(k8s_cpu_budget)
+        resources_cfg["memory"] = "12+"
         resources_cfg.pop("ordered", None)
         resources_cfg.pop("any_of", None)
         print(
             f"[sky-training] K3S GPU: {k8s_acc} — infra: k8s/in-cluster "
-            f"(image={k8s_train_image})"
+            f"(image={k8s_train_image}, cpus={k8s_cpu_budget}, memory=12+)"
         )
     elif rc:
         gpu_fallbacks = rc.get("gpu_fallbacks")
@@ -295,6 +321,8 @@ def _run_sky_training(
         sky_envs["METRICS_SOURCE"] = "local_k3s"
         sky_envs["GPU_PRICE_PER_HOUR"] = "0"
         sky_envs["USE_SPOT"] = "false"
+        if provider in ("localgpu", "k8s"):
+            sky_envs["K8S_CPU_LIMIT"] = str(resources_cfg.get("cpus", "1"))
 
     # Remove secret placeholders from template envs to avoid persisting secret keys
     # with empty/default values in the generated YAML.

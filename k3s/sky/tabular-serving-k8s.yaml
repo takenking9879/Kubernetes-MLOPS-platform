@@ -264,13 +264,24 @@ run: |
   fi
 
   export RAY_ADDRESS="127.0.0.1:6379"
+  _detect_pod_cpus() {
+    local pod_cpus="${SKYPILOT_POD_CPU_CORE_LIMIT:-${K8S_CPU_LIMIT:-}}"
+    if [ -n "${pod_cpus}" ] && [ "${pod_cpus}" -gt 0 ] 2>/dev/null; then
+      echo "${pod_cpus}"
+      return
+    fi
+    nproc 2>/dev/null || echo 1
+  }
+  TOTAL_CPUS_NODE=$(_detect_pod_cpus)
+  echo "[run] Using CPU budget=${TOTAL_CPUS_NODE} (SKYPILOT_POD_CPU_CORE_LIMIT=${SKYPILOT_POD_CPU_CORE_LIMIT:-unset})"
 
   "${RAY_BIN}" start --head \
     --port=6379 \
     --dashboard-port=8265 \
     --dashboard-host=0.0.0.0 \
     --disable-usage-stats \
-    --include-dashboard=True
+    --include-dashboard=True \
+    --num-cpus="${TOTAL_CPUS_NODE}"
 
   for i in $(seq 1 60); do
     "${RAY_BIN}" health-check --address=127.0.0.1:6379 &>/dev/null && break

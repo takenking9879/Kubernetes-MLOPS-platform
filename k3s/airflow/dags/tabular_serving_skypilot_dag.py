@@ -91,10 +91,26 @@ def _run_sky_runner(
         return json.load(fh)
 
 
-def _detect_k3s_gpu_for_serve(rc: dict, n_gpus: int = 1) -> str:
-    """Detect K8s GPU accelerator label. Runs in Airflow Python env (has kubernetes pkg)."""
+def _parse_k8s_cpu_count(raw_cpu: str | int | float | None) -> int:
+    """Normalize Kubernetes CPU quantity strings to whole CPU cores."""
+    if raw_cpu is None:
+        return 0
+    raw = str(raw_cpu).strip()
+    if not raw:
+        return 0
+    if raw.endswith("m"):
+        milli = raw[:-1].strip()
+        if not milli:
+            return 0
+        return max(1, int(float(milli) / 1000.0))
+    return max(1, int(float(raw)))
+
+
+def _detect_k3s_gpu_for_serve(rc: dict, n_gpus: int = 1) -> tuple[str, int]:
+    """Detect K8s GPU accelerator label and local CPU budget."""
     from kubernetes import client as _k8s_client, config as _k8s_config
     k8s_acc = ""
+    k8s_cpu_budget = 0
     try:
         try:
             _k8s_config.load_incluster_config()
@@ -104,11 +120,16 @@ def _detect_k3s_gpu_for_serve(rc: dict, n_gpus: int = 1) -> str:
         for node in v1.list_node().items:
             labels = node.metadata.labels or {}
             capacity = node.status.capacity or {}
+            allocatable = node.status.allocatable or {}
             if int(capacity.get("nvidia.com/gpu", 0) or 0) == 0:
                 continue
             acc = labels.get("skypilot.co/accelerator", "")
             if acc:
                 k8s_acc = f"{acc}:{n_gpus}"
+                node_cpus = _parse_k8s_cpu_count(
+                    allocatable.get("cpu") or capacity.get("cpu")
+                )
+                k8s_cpu_budget = max(1, node_cpus // 2) if node_cpus > 0 else 1
                 break
     except Exception as exc:
         raise RuntimeError(f"[tabular-serve] K8s node query failed: {exc}") from exc
@@ -117,7 +138,7 @@ def _detect_k3s_gpu_for_serve(rc: dict, n_gpus: int = 1) -> str:
             "[tabular-serve] localGPU selected but no K8s node with nvidia.com/gpu "
             "and skypilot.co/accelerator label found."
         )
-    return k8s_acc
+    return k8s_acc, k8s_cpu_budget
 
 
 def _launch_tabular_serve(**context) -> dict:
@@ -134,9 +155,10 @@ def _launch_tabular_serve(**context) -> dict:
     extra: dict = {}
     if provider in ("localgpu", "k8s"):
         n_gpus = max(1, int(rc.get("num_gpus_per_node") or 1))
-        k8s_acc = _detect_k3s_gpu_for_serve(rc, n_gpus)
+        k8s_acc, k8s_cpu_budget = _detect_k3s_gpu_for_serve(rc, n_gpus)
         extra["K8S_GPU_ACCELERATOR"] = k8s_acc
-        print(f"[tabular-serve] K3S GPU detected: {k8s_acc}")
+        extra["K8S_CPU_LIMIT"] = str(k8s_cpu_budget)
+        print(f"[tabular-serve] K3S GPU detected: {k8s_acc} (cpus={k8s_cpu_budget})")
 
     result = _run_sky_runner(
         "launch-tabular-serve",

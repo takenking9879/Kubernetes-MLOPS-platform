@@ -71,6 +71,9 @@ _SERVE_STREAM_LOAD_BALANCER = False
 _SERVE_FALLBACK_REPLICA_IDS = ("1",)
 _ANSI_ESCAPE_RE = re.compile(r"\x1b\[[0-9;]*[A-Za-z]")
 _SKY_CLI_PREFIX: list[str] | None = None
+_K3S_RAY_TRAIN_IMAGE = os.getenv(
+    "K3S_RAY_TRAIN_IMAGE", "docker:takenking9879/ray-train:2.53.0"
+)
 
 
 def _sky_cli_cmd(*args: str) -> list[str]:
@@ -1510,7 +1513,10 @@ def launch_tabular_serve():
         resources_cfg = sky_conf.setdefault("resources", {})
         resources_cfg["infra"] = "k8s/in-cluster"
         resources_cfg["accelerators"] = k8s_acc
-        resources_cfg["image_id"] = "docker:takenking9879/ray-train:2.53.0"
+        resources_cfg["image_id"] = _K3S_RAY_TRAIN_IMAGE
+        k8s_cpu_limit = _env("K8S_CPU_LIMIT").strip()
+        if k8s_cpu_limit:
+            resources_cfg["cpus"] = k8s_cpu_limit
         resources_cfg.pop("disk_size", None)  # not supported by K8s
         resources_cfg.pop("ordered", None)
         resources_cfg.pop("any_of", None)
@@ -1518,7 +1524,11 @@ def launch_tabular_serve():
         mem_gb = (rc or {}).get("memory_gb_per_node")
         if mem_gb:
             resources_cfg["memory"] = f"{mem_gb}+"
-        print(f"[tabular-serve] K3S GPU: {k8s_acc} — infra: k8s/in-cluster, memory={resources_cfg.get('memory', 'yaml-default')}")
+        print(
+            f"[tabular-serve] K3S GPU: {k8s_acc} — infra: k8s/in-cluster, "
+            f"cpus={resources_cfg.get('cpus', 'yaml-default')}, "
+            f"memory={resources_cfg.get('memory', 'yaml-default')}"
+        )
     elif rc:
         gpu_fallbacks = rc.get("gpu_fallbacks") or rc.get("ordered")
         if gpu_fallbacks and isinstance(gpu_fallbacks, list):

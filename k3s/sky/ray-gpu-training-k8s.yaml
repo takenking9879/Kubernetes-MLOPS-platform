@@ -24,6 +24,7 @@ resources:
   # SkyPilot Kubernetes custom images require the docker: prefix.
   # Keep this pinned so local K3S runs do not fall back to SkyPilot's default GPU image.
   image_id: docker:takenking9879/ray-train:2.53.0
+  memory: "12+"
   # infra and accelerators are injected by job_builder.py at build time.
   # These placeholders are never used at runtime — they exist so the YAML
   # is valid for manual sky launch testing.
@@ -255,6 +256,16 @@ run: |
   echo "[run] GPU exporter started (PID=${GPU_EXPORTER_PID})"
 
   export RAY_ADDRESS="127.0.0.1:6379"
+  _detect_pod_cpus() {
+    local pod_cpus="${SKYPILOT_POD_CPU_CORE_LIMIT:-${K8S_CPU_LIMIT:-}}"
+    if [ -n "${pod_cpus}" ] && [ "${pod_cpus}" -gt 0 ] 2>/dev/null; then
+      echo "${pod_cpus}"
+      return
+    fi
+    nproc 2>/dev/null || echo 1
+  }
+  TOTAL_CPUS_NODE=$(_detect_pod_cpus)
+  echo "[run] Using CPU budget=${TOTAL_CPUS_NODE} (SKYPILOT_POD_CPU_CORE_LIMIT=${SKYPILOT_POD_CPU_CORE_LIMIT:-unset})"
 
   if [ "${SKYPILOT_NUM_GPUS_PER_NODE:-0}" -gt 0 ]; then
     "${RAY_BIN}" start --head \
@@ -263,6 +274,7 @@ run: |
       --dashboard-host=0.0.0.0 \
       --disable-usage-stats \
       --include-dashboard=True \
+      --num-cpus="${TOTAL_CPUS_NODE}" \
       --num-gpus="${SKYPILOT_NUM_GPUS_PER_NODE}"
   else
     "${RAY_BIN}" start --head \
@@ -270,7 +282,8 @@ run: |
       --dashboard-port=8265 \
       --dashboard-host=0.0.0.0 \
       --disable-usage-stats \
-      --include-dashboard=True
+      --include-dashboard=True \
+      --num-cpus="${TOTAL_CPUS_NODE}"
   fi
 
   for i in $(seq 1 60); do
@@ -289,32 +302,6 @@ run: |
   export MAX_CONCURRENT_TRIALS=${MAX_CONCURRENT_TRIALS:-${NUM_WORKERS}}
   export GPUS_PER_WORKER=${GPUS_PER_WORKER:-1}
   export GPUS_PER_WORKER_TUNE=${GPUS_PER_WORKER_TUNE:-${GPUS_PER_WORKER}}
-
-  _detect_node_cpus() {
-    local ray_cpus
-    ray_cpus="$("${PYTHON_BIN}" -c '
-  import os
-  try:
-    import ray
-    ray.init(address=os.getenv("RAY_ADDRESS", "127.0.0.1:6379"), ignore_reinit_error=True, log_to_driver=False)
-    cpu = int(ray.cluster_resources().get("CPU", 0))
-    print(cpu if cpu > 0 else "")
-  except Exception:
-    print("")
-  finally:
-    try:
-      import ray
-      if ray.is_initialized():
-        ray.shutdown()
-    except Exception:
-      pass
-  ' 2>/dev/null || true)"
-    if [ -n "${ray_cpus}" ] && [ "${ray_cpus}" -gt 0 ] 2>/dev/null; then
-      echo "${ray_cpus}"; return
-    fi
-    nproc 2>/dev/null || echo 1
-  }
-  TOTAL_CPUS_NODE=$(_detect_node_cpus)
   _cpus_per_worker_uniform_with_leftover() {
     local total_cpus="${1:-1}" workers="${2:-1}"
     if [ "${workers}" -le 0 ]; then workers=1; fi
