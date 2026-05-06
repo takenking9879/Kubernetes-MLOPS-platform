@@ -228,6 +228,16 @@ apiService:
   # jobs.bucket → needed for workdir persistence across rolling updates.
   # Replace s3://sky-workdir with an actual S3 bucket before deploying.
   config: |
+    kubernetes:
+      # SkyPilot's Kubernetes template defaults the Ray workload container
+      # (`ray-node`) to imagePullPolicy: Always. Override it globally so local
+      # K3s/containerd images are reused for both direct `sky launch` and
+      # managed `sky jobs launch` workloads.
+      pod_config:
+        spec:
+          containers:
+            - name: ray-node
+              imagePullPolicy: IfNotPresent
     jobs:
       controller:
         consolidation_mode: true

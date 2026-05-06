@@ -47,6 +47,23 @@ controller = jobs.setdefault('controller', {})
 resources = controller.setdefault('resources', {})
 resources['disk_size'] = disk_size
 
+kubernetes = config.setdefault('kubernetes', {})
+pod_config = kubernetes.setdefault('pod_config', {})
+spec = pod_config.setdefault('spec', {})
+containers = spec.setdefault('containers', [])
+
+ray_container = next(
+    (container for container in containers if container.get('name') == 'ray-node'),
+    None,
+)
+if ray_container is None:
+    containers.append({
+        'name': 'ray-node',
+        'imagePullPolicy': 'IfNotPresent',
+    })
+else:
+    ray_container['imagePullPolicy'] = 'IfNotPresent'
+
 config_path.write_text(yaml.safe_dump(config, sort_keys=False), encoding='utf-8')
 print(f"[entrypoint] SkyPilot jobs controller disk_size set to {disk_size} GB")
 PY
