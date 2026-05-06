@@ -129,7 +129,7 @@ def _detect_k3s_gpu_for_serve(rc: dict, n_gpus: int = 1) -> tuple[str, int]:
                 node_cpus = _parse_k8s_cpu_count(
                     allocatable.get("cpu") or capacity.get("cpu")
                 )
-                k8s_cpu_budget = max(1, node_cpus // 2) if node_cpus > 0 else 1
+                k8s_cpu_budget = max(1, node_cpus // 3) if node_cpus > 0 else 1
                 break
     except Exception as exc:
         raise RuntimeError(f"[tabular-serve] K8s node query failed: {exc}") from exc

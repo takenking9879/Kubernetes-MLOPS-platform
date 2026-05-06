@@ -254,7 +254,7 @@ def _run_sky_training(
                     node_cpus = _parse_k8s_cpu_count(
                         allocatable.get("cpu") or capacity.get("cpu")
                     )
-                    k8s_cpu_budget = max(1, node_cpus // 2) if node_cpus > 0 else 1
+                    k8s_cpu_budget = max(1, node_cpus // 3) if node_cpus > 0 else 1
                     break
         except Exception as exc:
             print(f"[sky-training] K8s node query failed: {exc}")
