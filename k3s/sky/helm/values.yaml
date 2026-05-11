@@ -33,6 +33,11 @@ apiService:
 
   useDeployMode: false
 
+  # Cap Kubernetes orchestration thread pool (default 92 on 24-core host → 8).
+  extraEnvs:
+    - name: SKYPILOT_MAX_PARALLEL_THREADS
+      value: "8"
+
   # Hotfix for SkyPilot managed-jobs race in consolidation mode.
   # Applies an in-container patch at API-server startup so it persists across
   # pod restarts without manual kubectl exec edits.
@@ -142,9 +147,12 @@ apiService:
       "                return False\n",
       "        if record.started_at is not None:\n"
       "            create_time_drift = abs(process.create_time() - record.started_at)\n"
-      "            # Controller launch may go through a short-lived shell wrapper.\n"
-      "            # A small drift should not mark a live controller as dead.\n"
-      "            if create_time_drift > 15:\n"
+      "            # The controller shell wrapper runs ACTIVATE_SKY_REMOTE_PYTHON_ENV\n"
+      "            # before exec-ing into python3.  exec() resets the Linux process\n"
+      "            # create_time to the exec timestamp, so the drift equals the\n"
+      "            # activation duration (~60-70s in the API-server container).\n"
+      "            # 300s gives 4x headroom over the measured activation time.\n"
+      "            if create_time_drift > 300:\n"
       "                if not quiet:\n"
       "                    logger.debug(\n"
       "                        f'Controller process {record.pid} started at '\n"
@@ -218,6 +226,19 @@ apiService:
       'kubernetes_ray_template_deepcopy_fix',
     )
 
+    # Cap Kubernetes orchestration thread count.
+    # Default formula: max(4, cpu_count-1) * 4 = 92 on a 24-core host.
+    # On single-node local k3s only 1-2 pods are ever provisioned at once;
+    # 92 threads is pure overhead competing with the workload on the same machine.
+    # Cap via SKYPILOT_MAX_PARALLEL_THREADS env var (set below via extraEnvs).
+    patch(
+      '/usr/local/lib/python3.10/site-packages/sky/utils/subprocess_utils.py',
+      "    return max(4, cpu_count - 1) * _get_thread_multiplier(cloud_str)\n",
+      "    _raw = max(4, cpu_count - 1) * _get_thread_multiplier(cloud_str)\n"
+      "    return min(_raw, int(__import__('os').environ.get('SKYPILOT_MAX_PARALLEL_THREADS', str(_raw))))\n",
+      'subprocess_utils.cap_parallel_threads_for_local_k8s',
+    )
+
     PY
 
   # ── SkyPilot config ─────────────────────────────────────────────────────────
@@ -229,6 +250,10 @@ apiService:
   # Replace s3://sky-workdir with an actual S3 bucket before deploying.
   config: |
     kubernetes:
+      # Enforce limits.cpu = requests.cpu on every worker pod so the kernel
+      # applies a real cgroup CPU cap. Without this, pods run with cpu.max=max
+      # and can spike to all 24 host CPUs despite an 8-CPU request.
+      set_pod_resource_limits: true
       # SkyPilot's Kubernetes template defaults the Ray workload container
       # (`ray-node`) to imagePullPolicy: Always. Override it globally so local
       # K3s/containerd images are reused for both direct `sky launch` and
@@ -280,6 +305,7 @@ apiService:
   #     -f k3s/sky/helm/values.yaml
   # Verify: kubectl exec -n skypilot deployment/skypilot-api-server -- cat /root/.sky/ssh_node_pools.yaml
   sshNodePools:
+
 
 # ── Cloud credentials ─────────────────────────────────────────────────────────
 # Chart-native credential injection (correct approach).

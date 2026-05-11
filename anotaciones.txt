@@ -101,3 +101,6 @@ y tengo que interrumpirlo manualmente para evitar quedarnos trabados
 aunque sky check ssh lo ve que esta up...
 
 https://github.com/tirth8205/code-review-graph/tree/main
+
+Liberar RAM en WSL:
+sudo tee /proc/sys/vm/drop_caches

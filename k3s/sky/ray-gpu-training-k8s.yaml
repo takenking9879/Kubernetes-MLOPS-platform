@@ -273,7 +273,7 @@ run: |
       --dashboard-port=8265 \
       --dashboard-host=0.0.0.0 \
       --disable-usage-stats \
-      --include-dashboard=True \
+      --include-dashboard=False \
       --num-cpus="${TOTAL_CPUS_NODE}" \
       --num-gpus="${SKYPILOT_NUM_GPUS_PER_NODE}"
   else
@@ -282,7 +282,7 @@ run: |
       --dashboard-port=8265 \
       --dashboard-host=0.0.0.0 \
       --disable-usage-stats \
-      --include-dashboard=True \
+      --include-dashboard=False \
       --num-cpus="${TOTAL_CPUS_NODE}"
   fi
 
