@@ -97,11 +97,6 @@ Status definitions:
 
 </details>
 
-## End-To-End ML Pipeline
-<p align="center">
-  <img src="./project-docs/images/end-to-end-pipeline.png" alt="End-to-End ML Pipeline Diagram" width="560" />
-</p>
-
 ## Training Orchestration Path
 <p align="center">
   <img src="./project-docs/images/training-orchestration-path.png" alt="Training Orchestration Path Diagram" width="1400" />
@@ -141,18 +136,24 @@ The Docker Desktop GPU issue was eventually worked around, but a deeper problem 
 
 Downside: the serving architecture was tightly coupled to Ray Operator’s native RayService workflow. Migrating to SkyPilot introduced major architectural changes that left the serving stack only partially functional. Although the pipeline worked before the migration, recovery was never fully completed afterward. The transition also introduced dependency on SkyServe, which is still relatively immature according to its current official documentation.
 
-### 3) Running SkyPilot Jobs Locally on Kubernetes
+### 3) SkyPilot controller/API server duplication issue
+
+During failures such as unavailable GPU instances or temporary API server disconnections, SkyPilot could incorrectly spawn additional controllers/API server processes instead of reconnecting to the existing control plane. This created multiple controllers competing for the same jobs, causing unstable orchestration behavior, duplicated scheduling loops, unnecessary resource consumption, and randomly cancelled jobs.
+
+The issue was mitigated by stabilizing controller reuse and preventing duplicated control-plane processes during recovery and reconnect scenarios. SkyPilot’s Helm chart `preDeployHook` mechanism was used to deploy and patch these control-plane changes directly into the cluster lifecycle.
+
+### 4) Running SkyPilot Jobs Locally on Kubernetes
 
 - Local GPU debugging and remote provider execution share the same orchestration flow, ensuring local runs behave as close as possible to remote execution and reducing expensive cloud debugging cycles.
 - One of the hardest parts of the infrastructure was making SkyPilot run reliably on a local Kubernetes environment. During development, a SkyPilot Kubernetes bug caused Ray/SkyPilot workloads to ignore proper CPU and RAM limits, which saturated the host node and significantly slowed down the entire machine during local execution.
 - Multiple approaches were tested to support local GPU execution, including SSH Node Pools with Docker Desktop containers acting as VM-like workers. However, WSL2 networking, GPU passthrough, and orchestration complexity became difficult to maintain, which ultimately motivated the migration toward a k3s-based local Kubernetes setup.
 
-### 4) Faster setup and iteration with `uv` and prebuilt images
+### 5) Faster setup and iteration with `uv` and prebuilt images
 
 - Reduced environment startup time from roughly 7–8 minutes to around 2–3 minutes by using prebuilt CUDA/PyTorch images from the GPU provider and only installing the remaining project dependencies at runtime.
 - Additional setup-time improvements for local Kubernetes jobs were achieved by storing Docker images directly inside the local k3s/containerd registry, allowing workloads to pull images from the local cluster registry instead of repeatedly downloading them from remote registries during development and testing iterations.
 
-### 5) Idle-light architecture
+### 6) Idle-light architecture
 
 - Spark and Ray workloads are launched as ephemeral Kubernetes resources (`SparkApplication`, `RayJob`) instead of maintaining permanently running training clusters.
 - This reduces idle CPU, memory, and GPU consumption on the cluster by only allocating distributed resources during active execution.
@@ -160,7 +161,21 @@ Downside: the serving architecture was tightly coupled to Ray Operator’s nativ
 Trade-off:
 - Lower idle resource footprint at the cost of additional orchestration and startup latency during workload initialization and teardown.
 
-### 6) Scripts-first operations (for now)
+### 7) GPU availability-aware scheduling for SkyPilot
+
+SkyPilot abstracts GPU providers through a normalized resource catalog, but instance availability is not real-time. As a result, SkyPilot could spend significant time searching across regions and instance types only to discover that certain GPUs were temporarily unavailable in specific regions despite existing elsewhere.
+
+To reduce provisioning latency and failed scheduling attempts, the backend was extended to query provider-side GPU availability before launching jobs, effectively giving SkyPilot a pre-filtered set of viable resources instead of relying entirely on exhaustive provider scans.
+
+This optimization reduced GPU selection/setup latency from roughly 1–2 minutes of provider-side searching to near-instant scheduling decisions in most tested scenarios. The optimization was primarily tested with RunPod, where GPU availability fluctuates frequently across regions and instance types. Support for AWS and Vast.ai was not validated.
+
+### 8) Helm chart customization and secret management challenges
+
+Deploying and customizing the Helm charts for Airflow and MLflow introduced significant integration complexity due to inconsistent documentation and chart-specific configuration behavior. Several configuration fields accepted only specific formats or nested structures that were not fully documented, making deployment customization highly iterative.
+
+Secret injection and secure environment propagation into pods was also non-trivial. Some expected Kubernetes patterns were disabled, renamed, or abstracted differently by the Airflow chart maintainers.
+
+### 9) Scripts-first operations (for now)
 
 - `k3s/*.sh` scripts are the primary bootstrap/deploy workflow for rapid local iteration.
 
