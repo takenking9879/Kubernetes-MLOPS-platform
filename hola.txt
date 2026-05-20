@@ -1,1 +1,0 @@
-kubectl exec -n skypilot deploy/my-skypilot-api-server -- bash -lc 'ps -eo pid,ppid,pcpu,pmem,comm,args --sort=-pcpu | grep "jobs.controller" | grep -v grep | wc -l'
