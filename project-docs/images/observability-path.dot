@@ -1,0 +1,15 @@
+digraph G {
+  rankdir=LR;
+  graph [pad="0.25", nodesep="0.45", ranksep="0.6", splines=ortho, bgcolor="#050B16", fontname="Helvetica"];
+  node [shape=box, style="rounded,filled", fillcolor="#0F172A:#08111F", gradientangle=90, color="#22D3EE", fontcolor="#E2E8F0", penwidth=1.7, fontname="Helvetica", fontsize=12];
+  edge [color="#22D3EE", arrowsize=0.75, penwidth=1.2, fontcolor="#93C5FD", fontsize=11];
+
+  SUB1 [label="☸ K8S Workloads\nSpark / Ray / Kafka / SkyPilot API", fillcolor="#18345D:#10233C", color="#60A5FA"];
+  SUB2 [label="☁ CLOUD External SkyPilot Workers\nremote_write path", fillcolor="#3A2758:#241839", color="#C084FC"];
+  PROM [label="[PROM] Prometheus", fillcolor="#1F3550:#142235", color="#06B6D4"];
+  GRAF [label="[GRAFANA] Dashboards", fillcolor="#1F3550:#142235", color="#06B6D4"];
+
+  SUB1 -> PROM;
+  SUB2 -> PROM;
+  PROM -> GRAF;
+}

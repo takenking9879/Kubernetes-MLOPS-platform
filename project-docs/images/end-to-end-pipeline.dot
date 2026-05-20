@@ -1,0 +1,53 @@
+digraph G {
+  rankdir=TB;
+  graph [pad="0.35", nodesep="0.55", ranksep="0.95", splines=ortho, overlap=false, bgcolor="#050B16", fontname="Helvetica"];
+  node [shape=box, style="rounded,filled", fillcolor="#0F172A:#08111F", gradientangle=90, color="#22D3EE", fontcolor="#E2E8F0", penwidth=1.7, fontname="Helvetica", fontsize=15];
+  edge [color="#22D3EE", arrowsize=0.85, penwidth=1.35, fontcolor="#93C5FD", fontsize=11];
+
+  A [label="[DATA] Upload Dataset", fillcolor="#0E4A4A:#0A3131", color="#14B8A6"];
+  B [label="[DAG] Build + Validate Feature Graph", fillcolor="#0D3E63:#07263E", color="#38BDF8"];
+  C [label="[SPARK] Preprocess Features", fillcolor="#4A260F:#2E170A", color="#F97316"];
+  D [label="↻ AIRFLOW Launch Pipeline DAG", fillcolor="#103A5D:#0A2A43", color="#60A5FA"];
+  E [label="☁ SKYPILOT Resolve Local/Cloud Route", fillcolor="#124234:#0A2F24", color="#10B981"];
+  F [label="⚡ RAY Hyperparameter Tuning", fillcolor="#3A2357:#231538", color="#A78BFA"];
+  G [label="⚡ RAY Final Train", fillcolor="#3A2357:#231538", color="#A78BFA"];
+  H [label="[MLFLOW] Log + Register Model", fillcolor="#184033:#102A22", color="#34D399"];
+  I [label="[SERVING] Deploy (Partial)", fillcolor="#4A2C10:#2F1A08", color="#F59E0B"];
+  J [label="[MONITOR] Drift + Retrain (Partial)", fillcolor="#4A2C10:#2F1A08", color="#F59E0B"];
+
+  subgraph cluster_prep {
+    label="DATA PREP";
+    color="#14B8A6";
+    fontcolor="#67E8F9";
+    style="rounded,dashed";
+    A -> B -> C;
+  }
+
+  subgraph cluster_orchestrate {
+    label="ORCHESTRATION";
+    color="#60A5FA";
+    fontcolor="#BFDBFE";
+    style="rounded,dashed";
+    D -> E;
+  }
+
+  subgraph cluster_train {
+    label="TRAINING";
+    color="#A78BFA";
+    fontcolor="#DDD6FE";
+    style="rounded,dashed";
+    F -> G -> H;
+  }
+
+  subgraph cluster_runtime {
+    label="RUNTIME FEEDBACK LOOP";
+    color="#F59E0B";
+    fontcolor="#FDE68A";
+    style="rounded,dashed";
+    I -> J;
+  }
+
+  C -> D;
+  E -> F;
+  H -> I;
+}

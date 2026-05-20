@@ -1,0 +1,24 @@
+digraph G {
+  rankdir=LR;
+  graph [pad="0.35", nodesep="0.55", ranksep="0.85", splines=spline, overlap=false, bgcolor="#050B16", fontname="Helvetica"];
+  node [shape=box, style="rounded,filled", fillcolor="#0F172A:#08111F", gradientangle=90, color="#22D3EE", fontcolor="#E2E8F0", penwidth=1.8, fontname="Helvetica", fontsize=12];
+  edge [color="#22D3EE", arrowsize=0.75, penwidth=1.2, fontcolor="#93C5FD", fontsize=11];
+
+  UI   [label="[UI] Frontend", fillcolor="#0D3E63:#07263E", color="#38BDF8"];
+  API  [label="[API] Backend", fillcolor="#103A5D:#0A2A43", color="#60A5FA"];
+  AF   [label="↻ AIRFLOW Training DAG", fillcolor="#103A5D:#0A2A43", color="#60A5FA"];
+  SKY  [label="☁ SKYPILOT Runner", fillcolor="#124234:#0A2F24", color="#10B981"];
+  K3S  [label="☸ K8S Local GPU Target", fillcolor="#18345D:#10233C", color="#60A5FA"];
+  EXT  [label="[CLOUD] RunPod / Vast / AWS", fillcolor="#3A2758:#241839", color="#C084FC"];
+  RAY  [label="⚡ RAY Tune + Final Train", fillcolor="#3A2357:#231538", color="#A78BFA"];
+  MLF  [label="[MLFLOW] Tracking + Registry", fillcolor="#184033:#102A22", color="#34D399"];
+
+  { rank=same; K3S; EXT; }
+
+  UI -> API -> AF -> SKY;
+  SKY -> K3S;
+  SKY -> EXT;
+  K3S -> RAY [label="local"];
+  EXT -> RAY [label="remote"];
+  RAY -> MLF;
+}

@@ -252,7 +252,6 @@ k3s/sky/helm/skypilot/
 UI_code.txt
 UI_prompt.txt
 skytest.yaml
-images/
 # Added by code-review-graph
 .code-review-graph/
 

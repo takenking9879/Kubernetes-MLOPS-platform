@@ -1,0 +1,50 @@
+digraph G {
+  // Render with:
+  // dot -Tpng project-docs/images/high-level-architecture.dot -o project-docs/images/high-level-architecture.png
+  rankdir=LR;
+  graph [pad="0.35", nodesep="0.55", ranksep="1.05", splines=ortho, overlap=false, bgcolor="#050B16", fontname="Helvetica"];
+  node [shape=box, style="rounded,filled", fillcolor="#0F172A:#08111F", gradientangle=90, color="#22D3EE", fontcolor="#E2E8F0", penwidth=1.7, fontname="Helvetica", fontsize=13, margin="0.18,0.10"];
+  edge [color="#22D3EE", arrowsize=0.8, penwidth=1.3, fontname="Helvetica", fontsize=11, fontcolor="#93C5FD"];
+
+  UI    [label="[UI] React Canvas", fillcolor="#0D3E63:#07263E", color="#38BDF8"];
+  DAG   [label="[DAG] Feature Graph", fillcolor="#0D3E63:#07263E", color="#38BDF8"];
+  API   [label="[API] FastAPI\n(validate + dry-run)", fillcolor="#103A5D:#0A2A43", color="#60A5FA"];
+  AF    [label="↻ AIRFLOW Orchestration", fillcolor="#103A5D:#0A2A43", color="#60A5FA"];
+  SKY   [label="☁ SKYPILOT Orchestrator", fillcolor="#124234:#0A2F24", color="#10B981"];
+  RAY   [label="⚡ RAY Tune + Train", fillcolor="#3A2357:#231538", color="#A78BFA"];
+  MLF   [label="[MLFLOW] Tracking + Registry", fillcolor="#184033:#102A22", color="#34D399"];
+
+  K3S   [label="☸ K8S Local GPU Target", fillcolor="#18345D:#10233C", color="#60A5FA"];
+  EXT   [label="[CLOUD] RunPod / Vast / AWS", fillcolor="#3A2758:#241839", color="#C084FC"];
+  PG    [label="[POSTGRES] Metadata DB", shape=cylinder, fillcolor="#184033:#102A22", color="#34D399"];
+
+  KAF   [label="[KAFKA] Streaming Ingest", fillcolor="#3C2341:#25162A", color="#F472B6"];
+  S3    [label="[S3] Object Storage", shape=cylinder, fillcolor="#0E4A4A:#0A3131", color="#14B8A6"];
+  SPARK [label="[SPARK] Preprocessing", fillcolor="#4A260F:#2E170A", color="#F97316"];
+  ICE   [label="[ICEBERG] Feature Tables", shape=cylinder, fillcolor="#0E4A4A:#0A3131", color="#14B8A6"];
+
+  PROM  [label="[PROM] Prometheus", fillcolor="#1F3550:#142235", color="#06B6D4"];
+  GRAF  [label="[GRAFANA] Dashboards", fillcolor="#1F3550:#142235", color="#06B6D4"];
+
+  { rank=same; UI; DAG; API; AF; SKY; RAY; MLF; }
+  { rank=same; K3S; EXT; PG; }
+  { rank=same; KAF; S3; SPARK; ICE; }
+  { rank=same; PROM; GRAF; }
+
+  UI -> DAG -> API -> AF -> SKY -> RAY -> MLF;
+  SKY -> K3S;
+  SKY -> EXT;
+  K3S -> RAY [label="local"];
+  EXT -> RAY [label="remote"];
+  MLF -> PG;
+
+  API -> S3;
+  AF -> SPARK;
+  KAF -> SPARK;
+  SPARK -> ICE;
+  S3 -> ICE;
+
+  RAY -> PROM;
+  SPARK -> PROM [constraint=false];
+  PROM -> GRAF;
+}
